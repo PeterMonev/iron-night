@@ -50,22 +50,21 @@ lateral = np.abs(cent[:, lat] - ring_center[lat])
 along = cent[:, axis] - ring_center[axis]
 above = cent[:, 1] > ring_y + 0.005
 narrow = (lat_v.max(axis=1) - lat_v.min(axis=1)) < 0.05          # faces of something thin, like a barrel
-# forward: the glacis - a large plate sloping up toward the turret - is at the front of every tank; the rear is vertical
-# doors and a flat engine deck. Compare the sloped area at the two ends.
-sloped = (fn[:, 1] > 0.35) & (fn[:, 1] < 0.9) & (np.abs(fn[:, axis]) > 0.4)
-mid = (lo[axis] + hi[axis]) / 2
-area_plus = fa[sloped & (cent[:, axis] > mid + 0.25 * size[axis])].sum(); area_minus = fa[sloped & (cent[:, axis] < mid - 0.25 * size[axis])].sum()
-forward = 1.0 if area_plus >= area_minus else -1.0
-print(f"glacis area +{area_plus:.3f} / -{area_minus:.3f}")
-# the barrel: narrow faces near the centre line ahead of the turret
-thin_ahead = above & narrow & (along * forward > 0.2 * size[axis]) & (np.abs(cent[:, lat] - xc) < 0.08 * size[lat])
-n_thin = int(thin_ahead.sum()); print(f"barrel candidates ahead: {n_thin} faces")
+# forward is where the generated gun points: a tight cluster of narrow faces on the centre line above the ring; the
+# engine deck's stowage at the other end is spread out laterally
+cands = []
+for fwd in (1.0, -1.0):
+    sel = above & narrow & (along * fwd > 0.2 * size[axis]) & (np.abs(cent[:, lat] - xc) < 0.08 * size[lat])
+    spread = float(np.std(cent[sel, lat])) if sel.sum() > 15 else 9.0
+    cands.append((spread, -int(sel.sum()), fwd, sel))
+cands.sort(key=lambda c: (c[0], c[1])); spread, n_neg, forward, thin_ahead = cands[0]; n_thin = -n_neg
+print(f"gun side: {'+' if forward > 0 else '-'}{'x' if axis == 0 else 'z'}, {n_thin} narrow faces, spread {spread:.3f}")
 if n_thin > 15:
     bx = np.median(cent[thin_ahead, lat]); by = np.median(cent[thin_ahead, 1])
     rb = float(np.clip(1.7 * np.percentile(np.abs(cent[thin_ahead, lat] - bx), 80), 0.02, 0.036))
     body = above & (np.abs(cent[:, lat] - bx) > rb * 1.3) & (np.abs(along) < 0.3 * size[axis])
     tfront = np.percentile(along[body] * forward, 97) if body.sum() > 50 else 0.2 * size[axis]
-    barrel = (np.abs(cent[:, lat] - bx) < rb) & (np.abs(cent[:, 1] - by) < rb * 1.2) & (along * forward > tfront + 0.005)
+    barrel = (np.abs(cent[:, lat] - bx) < rb) & (np.abs(cent[:, 1] - by) < rb * 1.2) & (along * forward > tfront - 0.03 * size[axis])
     print(f"barrel axis lateral {bx - xc:+.3f}, radius {rb:.3f}, turret front at {tfront / size[axis]:.2f} of the hull length")
 else:
     barrel = np.zeros(len(f), dtype=bool); print("no barrel found")

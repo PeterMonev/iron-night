@@ -60,6 +60,13 @@ namespace IronNight
                 barrel.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
                 barrel.transform.localPosition = new Vector3(0f, spec.gunHeight, spec.mantlet + spec.gunLength * 0.5f);
                 barrel.GetComponent<Renderer>().sharedMaterial = barrelMaterial;
+                // a short wide collar at the base hides where the generated gun was cut out of the mantlet
+                var collar = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(collar.GetComponent<Collider>());
+                collar.name = "Mantlet"; collar.transform.SetParent(pivot, false);
+                collar.transform.localScale = new Vector3(spec.gunRadius * 5f, 0.22f, spec.gunRadius * 5f);
+                collar.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                collar.transform.localPosition = new Vector3(0f, spec.gunHeight, spec.mantlet + 0.1f);
+                collar.GetComponent<Renderer>().sharedMaterial = mat;
                 if (spec.muzzleBrake)
                 {
                     var brake = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(brake.GetComponent<Collider>());
