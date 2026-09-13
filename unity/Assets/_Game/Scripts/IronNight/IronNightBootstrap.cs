@@ -19,7 +19,7 @@ namespace IronNight
 
             var cam = Camera.main;
             if (cam == null) cam = new GameObject("Main Camera", typeof(Camera)) { tag = "MainCamera" }.GetComponent<Camera>();
-            cam.orthographic = false; cam.fieldOfView = 46f; cam.nearClipPlane = 0.5f; cam.farClipPlane = 260f;
+            cam.orthographic = false; cam.fieldOfView = 50f; cam.nearClipPlane = 0.5f; cam.farClipPlane = 320f;
             cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.02f, 0.03f, 0.05f);
             var camData = cam.GetUniversalAdditionalCameraData();
             camData.renderPostProcessing = true; camData.renderShadows = true;

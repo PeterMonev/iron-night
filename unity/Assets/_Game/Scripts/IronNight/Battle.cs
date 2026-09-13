@@ -56,7 +56,7 @@ namespace IronNight
 
             // night: moonlight with soft shadows, a cold ambient, fog swallowing the distance
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat; RenderSettings.ambientLight = new Color(0.17f, 0.2f, 0.3f);
-            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = 0.011f; RenderSettings.fogColor = new Color(0.02f, 0.03f, 0.05f);
+            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = 0.0065f; RenderSettings.fogColor = new Color(0.02f, 0.03f, 0.05f);
             var moonGo = new GameObject("Moon"); var moon = moonGo.AddComponent<Light>();
             moon.type = LightType.Directional; moon.color = new Color(0.72f, 0.78f, 1f); moon.intensity = 2.2f; moon.shadows = LightShadows.Soft; moon.shadowStrength = 0.8f;
             moonGo.transform.rotation = Quaternion.Euler(52f, -35f, 0f);
@@ -77,9 +77,9 @@ namespace IronNight
         void PlaceCamera(bool snap)
         {
             var L = Leader; if (L == null) return;
-            var want = L.transform.position + new Vector3(0f, 30f, -27f);
+            var want = L.transform.position + new Vector3(0f, 44f, -36f);
             cam.transform.position = snap ? want : Vector3.Lerp(cam.transform.position, want, 1f - Mathf.Exp(-Time.deltaTime * 4f));
-            cam.transform.LookAt(cam.transform.position + new Vector3(0f, -30f, 30f));
+            cam.transform.LookAt(cam.transform.position + new Vector3(0f, -44f, 40f));
             ground.position = new Vector3(Mathf.Round(cam.transform.position.x / GroundTile) * GroundTile, 0f, Mathf.Round(cam.transform.position.z / GroundTile) * GroundTile);
             flareLight.transform.position = L.transform.position + Vector3.up * 11f;
         }
@@ -129,6 +129,7 @@ namespace IronNight
             flareLight.range = 34f + platoon.Count * 3f;
             PlaceCamera(false);
             hud.Set(t, platoon.Count); hud.SetLeader(Mathf.CeilToInt(L.hp), 8);
+            hud.Indicators(foes, cam);
             if (t >= NightLength) End(true);
         }
 

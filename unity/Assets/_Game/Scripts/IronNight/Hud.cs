@@ -18,6 +18,7 @@ namespace IronNight
         Text clock, count, fps, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp;
         Image levelFill; GameObject sheet, endSheet, adBtn; Transform cardRoot; Canvas canvas;
         readonly Button[] formButtons = new Button[4];
+        readonly List<Image> arrows = new List<Image>(); Sprite arrowSprite;
         float fpsAccum, fpsTimer, toastLeft; int fpsFrames;
 
         public Canvas Canvas => canvas;
@@ -76,6 +77,32 @@ namespace IronNight
             adNote = MakeText(endSheet.transform, "AdNote", new Vector2(0.5f, 0.5f), new Vector2(0, -130), TextAnchor.MiddleCenter, 28, dim); adNote.rectTransform.sizeDelta = new Vector2(900, 100);
             MakeButton(endSheet.transform, "New assault", new Vector2(0.5f, 0.5f), new Vector2(0, -260), new Vector2(880, 130), 40, () => OnAgain?.Invoke());
             endSheet.SetActive(false);
+            arrowSprite = ArrowSprite();
+        }
+
+        /// <summary>Red chevrons on the screen edge pointing at enemies that are outside the view.</summary>
+        public void Indicators(List<Vehicle> foes, Camera cam)
+        {
+            int used = 0; var rect = canvas.GetComponent<RectTransform>().rect; float hw = rect.width * 0.5f - 40f, hh = rect.height * 0.5f - 150f;
+            foreach (var e in foes)
+            {
+                if (e.dead) continue; var vp = cam.WorldToViewportPoint(e.transform.position);
+                if (vp.z > 0f && vp.x > 0.02f && vp.x < 0.98f && vp.y > 0.06f && vp.y < 0.9f) continue;
+                var d = new Vector2(vp.x - 0.5f, vp.y - 0.5f); if (vp.z < 0f) d = -d; if (d.sqrMagnitude < 1e-6f) continue;
+                d.Normalize(); float k = Mathf.Min(hw / Mathf.Max(0.001f, Mathf.Abs(d.x)), hh / Mathf.Max(0.001f, Mathf.Abs(d.y)));
+                Image a;
+                if (used < arrows.Count) a = arrows[used];
+                else { a = MakeImage(canvas.transform, "Arrow", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(54, 54), new Color(0.95f, 0.3f, 0.25f, 0.9f)); a.sprite = arrowSprite; a.rectTransform.pivot = new Vector2(0.5f, 0.5f); arrows.Add(a); }
+                a.enabled = true; a.rectTransform.anchoredPosition = d * k; a.rectTransform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg - 90f); used++;
+            }
+            for (int i = used; i < arrows.Count; i++) arrows[i].enabled = false;
+        }
+
+        static Sprite ArrowSprite()
+        {
+            const int S = 64; var tex = new Texture2D(S, S, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear };
+            for (int y = 0; y < S; y++) for (int x = 0; x < S; x++) { float u = (x + 0.5f) / S - 0.5f, v = (y + 0.5f) / S; bool inside = v > 0.15f && Mathf.Abs(u) < (v - 0.15f) * 0.55f && v < 0.95f; tex.SetPixel(x, y, new Color(1f, 1f, 1f, inside ? 1f : 0f)); }
+            tex.Apply(); return Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), S);
         }
 
         void Highlight(int idx) { for (int i = 0; i < 4; i++) formButtons[i].GetComponent<Image>().color = i == idx ? new Color(0.95f, 0.66f, 0.23f, 0.9f) : new Color(0.03f, 0.04f, 0.06f, 0.6f); for (int i = 0; i < 4; i++) formButtons[i].transform.Find("Label").GetComponent<Text>().color = i == idx ? new Color(0.1f, 0.08f, 0.05f) : new Color(0.93f, 0.91f, 0.86f); }
