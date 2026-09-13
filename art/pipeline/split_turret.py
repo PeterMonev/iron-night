@@ -71,9 +71,33 @@ else:
 lateral = np.abs(cent[:, lat] - ring_center[lat])
 # turret: above the ring and not far along the hull (stowage on the deck corners stays with the hull); the mantlet stub near the centre stays
 far = np.abs(along) > 0.3 * size[axis]
-turret = (above & ~far) | (above & (lateral < 0.08) & (along * forward > 0) & (along * forward < 0.3 * size[axis]))
+turret = ((above & ~far) | (above & (lateral < 0.08) & (along * forward > 0) & (along * forward < 0.3 * size[axis]))) & (lateral < 0.24 * size[axis])  # deck pieces beside the turret stay with the hull
 turret = turret & ~barrel
-hull = ~turret & ~barrel
+# the generator blows up the roof machine gun and antennas into cannon-sized tubes. Roof = median height of the
+# turret's big upward-facing faces; everything above it is split into connected pieces, and the narrow pieces go
+# (the cupola is wide and stays).
+import scipy.sparse as sp
+from scipy.sparse.csgraph import connected_components
+roof_faces = turret & (fn[:, 1] > 0.8) & (fa > np.percentile(fa[turret], 60))
+roof = np.median(cent[roof_faces, 1]) if roof_faces.sum() > 20 else ring_y + 0.1
+cand = turret & (cent[:, 1] > roof + 0.02 * height)
+idx = np.where(cand)[0]; pos = {f_: i for i, f_ in enumerate(idx)}
+adj = mesh.face_adjacency; keep = cand[adj[:, 0]] & cand[adj[:, 1]]
+rows = [pos[x] for x in adj[keep, 0]]; cols = [pos[x] for x in adj[keep, 1]]
+graph = sp.coo_matrix((np.ones(len(rows)), (rows, cols)), shape=(len(idx), len(idx)))
+ncomp, labels = connected_components(graph, directed=False)
+clutter = np.zeros(len(f), dtype=bool)
+for c_ in range(ncomp):
+    members = idx[labels == c_]; pts = v[f[members]].reshape(-1, 3)
+    width = max(pts[:, 0].max() - pts[:, 0].min(), pts[:, 2].max() - pts[:, 2].min())
+    tall = pts[:, 1].max() - roof
+    area = fa[members].sum(); big = area > 0.004 * fa[turret].sum()
+    # keep only substantial, wide, low pieces (the cupola); shards, tubes and tall narrow things go
+    if not big or width < 0.09 * size[axis] or (tall > 0.12 * height and width < 0.14 * size[axis]): clutter[members] = True
+    elif name == 'sherman': print(f"  kept piece: width {width / size[axis]:.2f} L, tall {tall / height:.2f} h, area {area / fa[turret].sum():.3f}")
+turret = turret & ~clutter
+print(f"roof at {(roof - lo[1]) / height:.2f} of height, {ncomp} pieces above it, clutter faces removed: {int(clutter.sum())}")
+hull = ~turret & ~barrel & ~clutter
 print(f"forward is {'+' if forward > 0 else '-'}{'x' if axis == 0 else 'z'}, barrel faces removed: {int(barrel.sum())}")
 
 os.makedirs(out_dir, exist_ok=True)
