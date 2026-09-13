@@ -19,13 +19,13 @@ namespace IronNight
 
         public static readonly VehicleSpec Sherman = new VehicleSpec
         {
-            id = "sherman", name = "M4 Sherman", hullMesh = "sherman_hull", turretMesh = "sherman_turret", texture = "sherman", forward = -1f, ringHeight = 2.178f,
+            id = "sherman", name = "M4 Sherman", hullMesh = "sherman_hull", turretMesh = "sherman_turret", texture = "sherman", forward = 1f, ringHeight = 2.178f,
             gunLength = 1.9f, gunRadius = 0.08f, gunHeight = 0.42f, mantlet = 1.15f, tint = new Color(0.86f, 0.9f, 0.68f),
             speed = 9f, turnRate = 2.2f, turretRate = 3.2f, reload = 1.3f, damage = 1f, range = 26f, hp = 3f, radius = 2.4f
         };
         public static readonly VehicleSpec Firefly = new VehicleSpec
         {
-            id = "firefly", name = "Sherman Firefly", hullMesh = "sherman_hull", turretMesh = "sherman_turret", texture = "sherman", forward = -1f, ringHeight = 2.178f,
+            id = "firefly", name = "Sherman Firefly", hullMesh = "sherman_hull", turretMesh = "sherman_turret", texture = "sherman", forward = 1f, ringHeight = 2.178f,
             gunLength = 3.6f, gunRadius = 0.075f, gunHeight = 0.42f, mantlet = 1.15f, muzzleBrake = true, tint = new Color(0.8f, 0.85f, 0.64f),
             speed = 8.5f, turnRate = 2f, turretRate = 2.8f, reload = 1.6f, damage = 2f, range = 30f, hp = 3f, radius = 2.4f
         };

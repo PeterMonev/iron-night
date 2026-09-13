@@ -1,10 +1,10 @@
 {
  "sherman": {
-  "hullFaces": 18358,
-  "turretFaces": 1021,
+  "hullFaces": 21405,
+  "turretFaces": 1320,
   "ringHeight": 2.1779506965408943,
   "longAxis": "z",
-  "forward": -1.0,
+  "forward": 1.0,
   "hullLength": 5.9,
   "ringCenter": [
    -0.03746749833226204,
@@ -13,8 +13,8 @@
   ]
  },
  "pz4": {
-  "hullFaces": 18253,
-  "turretFaces": 1561,
+  "hullFaces": 21286,
+  "turretFaces": 1808,
   "ringHeight": 2.022124417895211,
   "longAxis": "z",
   "forward": 1.0,
@@ -26,8 +26,8 @@
   ]
  },
  "tiger": {
-  "hullFaces": 17527,
-  "turretFaces": 2288,
+  "hullFaces": 20409,
+  "turretFaces": 2751,
   "ringHeight": 2.248770306701156,
   "longAxis": "z",
   "forward": 1.0,

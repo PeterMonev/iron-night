@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8"><title>assembly check</title>
+<style>body{margin:0;background:#2b3a2a}canvas{display:block}</style></head><body>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+// exactly what the game builds: hull + turret rotated by the forward sign, straight barrel on the pivot's +Z; red arrow = +Z = direction of travel and fire
+const GUN = { sherman: {len: 1.9, r: 0.08, mantlet: 1.15, h: 0.42}, pz4: {len: 3.2, r: 0.07, mantlet: 1.15, h: 0.4}, tiger: {len: 3.9, r: 0.085, mantlet: 1.5, h: 0.45} };
+const tanks = ['sherman', 'pz4', 'tiger'];
+const W = 1500, H = 1500; const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true}); renderer.setSize(W, H); renderer.setScissorTest(true); document.body.appendChild(renderer.domElement);
+const load = f => new Promise(res => new GLTFLoader().load(f + '?ts=' + Date.now(), g => res(g.scene)));
+const meta = await (await fetch('glb/parts/meta.json?ts=' + Date.now())).json();
+for (let i = 0; i < 3; i++){
+  const t = tanks[i]; const hull = await load(`glb/parts/${t}_hull.glb`), tur = await load(`glb/parts/${t}_turret.glb`); const rot = meta[t].forward > 0 ? 0 : Math.PI;
+  const views = [[-1.3, 0.8, 1.5], [1.9, 0.35, 0.01], [0.01, 2.6, 0.01]];
+  for (let j = 0; j < 3; j++){
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x2b3a2a);
+    scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x3a3020, 1.2)); const sun = new THREE.DirectionalLight(0xfff1d0, 2.2); sun.position.set(3, 6, 2); scene.add(sun);
+    const g = new THREE.Group(); const h = hull.clone(); h.rotation.y = rot; g.add(h); const tu = tur.clone(); tu.rotation.y = rot; g.add(tu);
+    const G = GUN[t]; const barrel = new THREE.Mesh(new THREE.CylinderGeometry(G.r * 0.85, G.r, G.len, 14), new THREE.MeshStandardMaterial({color: 0x3e4630, roughness: 0.7})); barrel.rotation.x = Math.PI / 2; barrel.position.set(0, G.h, G.mantlet + G.len / 2); g.add(barrel);
+    scene.add(g); scene.add(new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 3.6, 0), 5, 0xff2020, 1.2, 0.8));
+    const r = 8; const cam = new THREE.PerspectiveCamera(35, 1, 0.1, 100); cam.position.set(views[j][0] * r, views[j][1] * r, views[j][2] * r); cam.lookAt(0, 0.5, 0);
+    renderer.setViewport(j * 500, H - (i + 1) * 500, 500, 500); renderer.setScissor(j * 500, H - (i + 1) * 500, 500, 500); renderer.render(scene, cam);
+  }
+}
+window.__done = true;
+</script></body></html>

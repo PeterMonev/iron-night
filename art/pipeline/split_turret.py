@@ -50,15 +50,15 @@ lateral = np.abs(cent[:, lat] - ring_center[lat])
 along = cent[:, axis] - ring_center[axis]
 above = cent[:, 1] > ring_y + 0.005
 narrow = (lat_v.max(axis=1) - lat_v.min(axis=1)) < 0.05          # faces of something thin, like a barrel
-# forward is where the generated gun points: a tight cluster of narrow faces on the centre line above the ring; the
-# engine deck's stowage at the other end is spread out laterally
-cands = []
-for fwd in (1.0, -1.0):
-    sel = above & narrow & (along * fwd > 0.2 * size[axis]) & (np.abs(cent[:, lat] - xc) < 0.08 * size[lat])
-    spread = float(np.std(cent[sel, lat])) if sel.sum() > 15 else 9.0
-    cands.append((spread, -int(sel.sum()), fwd, sel))
-cands.sort(key=lambda c: (c[0], c[1])); spread, n_neg, forward, thin_ahead = cands[0]; n_thin = -n_neg
-print(f"gun side: {'+' if forward > 0 else '-'}{'x' if axis == 0 else 'z'}, {n_thin} narrow faces, spread {spread:.3f}")
+# forward: the glacis - the big plate sloping up toward the turret - is at the front of every tank; the rear is vertical
+# doors and a flat engine deck. (A roof machine gun pointing backwards fooled the "where is the thin tube" rule.)
+sloped = (fn[:, 1] > 0.35) & (fn[:, 1] < 0.9) & (np.abs(fn[:, axis]) > 0.4)
+mid = (lo[axis] + hi[axis]) / 2
+area_plus = fa[sloped & (cent[:, axis] > mid + 0.25 * size[axis])].sum(); area_minus = fa[sloped & (cent[:, axis] < mid - 0.25 * size[axis])].sum()
+forward = 1.0 if area_plus >= area_minus else -1.0
+thin_ahead = above & narrow & (along * forward > 0.2 * size[axis]) & (np.abs(cent[:, lat] - xc) < 0.08 * size[lat])
+n_thin = int(thin_ahead.sum())
+print(f"glacis area +{area_plus:.3f} / -{area_minus:.3f} -> front is {'+' if forward > 0 else '-'}{'x' if axis == 0 else 'z'}; {n_thin} narrow faces ahead")
 if n_thin > 15:
     bx = np.median(cent[thin_ahead, lat]); by = np.median(cent[thin_ahead, 1])
     rb = float(np.clip(1.7 * np.percentile(np.abs(cent[thin_ahead, lat] - bx), 80), 0.02, 0.036))
@@ -97,13 +97,23 @@ for c_ in range(ncomp):
     elif name == 'sherman': print(f"  kept piece: width {width / size[axis]:.2f} L, tall {tall / height:.2f} h, area {area / fa[turret].sum():.3f}")
 turret = turret & ~clutter
 print(f"roof at {(roof - lo[1]) / height:.2f} of height, {ncomp} pieces above it, clutter faces removed: {int(clutter.sum())}")
-hull = ~turret & ~barrel & ~clutter
+# slivers: antennas, aerials and gun-cleaning rods come out as long thin triangles above the deck; remove them everywhere
+e = v[f]; el = np.stack([np.linalg.norm(e[:, 0] - e[:, 1], axis=1), np.linalg.norm(e[:, 1] - e[:, 2], axis=1), np.linalg.norm(e[:, 2] - e[:, 0], axis=1)], axis=1)
+sliver = (el.max(axis=1) > 0.035) & (el.min(axis=1) < 0.008) & (cent[:, 1] > ring_y - 0.02)
+# and anything narrow that reaches high above the deck (the whole aerial, not just its long faces)
+tall_thin = narrow & (cent[:, 1] > roof + 0.05 * height) & ~clutter
+print(f"slivers removed: {int(sliver.sum())}, tall thin faces removed: {int(tall_thin.sum())}")
+turret = turret & ~sliver & ~tall_thin
+hull = ~turret & ~barrel & ~clutter & ~sliver & ~tall_thin
 print(f"forward is {'+' if forward > 0 else '-'}{'x' if axis == 0 else 'z'}, barrel faces removed: {int(barrel.sum())}")
 
 os.makedirs(out_dir, exist_ok=True)
 scale = hull_len / size[axis]
 def export(mask, fname):
     part = mesh.submesh([np.where(mask)[0]], append=True)
+    try:
+        n0 = len(part.faces); part.fill_holes(); print(f"  {fname}: holes capped, {len(part.faces) - n0} faces added")
+    except Exception as ex: print('  fill_holes failed', ex)
     part.apply_translation(-ring_center)  # pivot = turret ring centre for both parts
     part.apply_scale(scale)
     part.export(os.path.join(out_dir, fname))
