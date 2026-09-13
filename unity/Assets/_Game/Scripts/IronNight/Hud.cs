@@ -1,0 +1,160 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace IronNight
+{
+    /// <summary>
+    /// The overlay: night clock, platoon count, level bar, formation buttons, toast line, the three-card level-up sheet
+    /// and the end-of-assault sheet with the (mock) rewarded-ad button. Built in code with the legacy UI, English only.
+    /// </summary>
+    public class Hud : MonoBehaviour
+    {
+        public class Card { public string id, title, desc; }
+
+        public System.Action<Formation> OnFormation;
+        public System.Action OnAd, OnAgain;
+
+        Text clock, count, fps, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp;
+        Image levelFill; GameObject sheet, endSheet, adBtn; Transform cardRoot; Canvas canvas;
+        readonly Button[] formButtons = new Button[4];
+        float fpsAccum, fpsTimer, toastLeft; int fpsFrames;
+
+        public Canvas Canvas => canvas;
+
+        public void Build()
+        {
+            var canvasGo = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            canvasGo.transform.SetParent(transform, false);
+            canvas = canvasGo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.sortingOrder = 10;
+            var scaler = canvasGo.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize; scaler.referenceResolution = new Vector2(1080, 2340); scaler.matchWidthOrHeight = 0.5f;
+            if (!FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>())
+                new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(UnityEngine.InputSystem.UI.InputSystemUIInputModule));
+
+            var t = canvasGo.transform;
+            var ink = new Color(0.93f, 0.91f, 0.86f); var amber = new Color(0.95f, 0.66f, 0.23f); var dim = new Color(0.66f, 0.64f, 0.59f);
+            MakeText(t, "ClockLabel", new Vector2(0, 1), new Vector2(60, -70), TextAnchor.UpperLeft, 30, dim).text = "NIGHT ASSAULT";
+            clock = MakeText(t, "Clock", new Vector2(0, 1), new Vector2(60, -108), TextAnchor.UpperLeft, 82, ink);
+            MakeText(t, "CountLabel", new Vector2(1, 1), new Vector2(-60, -70), TextAnchor.UpperRight, 30, dim).text = "PLATOON";
+            count = MakeText(t, "Count", new Vector2(1, 1), new Vector2(-60, -108), TextAnchor.UpperRight, 82, amber);
+            fps = MakeText(t, "Fps", new Vector2(0.5f, 1), new Vector2(0, -70), TextAnchor.UpperCenter, 28, dim);
+            leaderHp = MakeText(t, "LeaderHp", new Vector2(0, 1), new Vector2(60, -186), TextAnchor.UpperLeft, 30, amber);
+            levelText = MakeText(t, "Level", new Vector2(0.5f, 1), new Vector2(0, -262), TextAnchor.UpperCenter, 30, dim);
+            var barBg = MakeImage(t, "LevelBar", new Vector2(0.5f, 1), new Vector2(0, -240), new Vector2(960, 8), new Color(1f, 1f, 1f, 0.12f));
+            levelFill = MakeImage(barBg.transform, "Fill", new Vector2(0, 0.5f), Vector2.zero, new Vector2(0, 8), amber);
+            toast = MakeText(t, "Toast", new Vector2(0.5f, 0.5f), new Vector2(0, 420), TextAnchor.MiddleCenter, 60, ink); toast.text = "";
+
+            var names = new[] { "WEDGE", "COLUMN", "LINE", "ECHELON" };
+            var forms = new[] { Formation.Wedge, Formation.Column, Formation.Line, Formation.Echelon };
+            for (int i = 0; i < 4; i++)
+            {
+                var f = forms[i]; int idx = i;
+                var b = MakeButton(t, names[i], new Vector2(0.5f, 0f), new Vector2(-390 + i * 260, 120), new Vector2(244, 92), 34, () => { OnFormation?.Invoke(f); Highlight(idx); });
+                formButtons[i] = b.GetComponent<Button>();
+            }
+            Highlight(0);
+
+            // level-up sheet
+            sheet = new GameObject("LevelUp", typeof(RectTransform), typeof(Image)); sheet.transform.SetParent(t, false);
+            Stretch(sheet); sheet.GetComponent<Image>().color = new Color(0.02f, 0.03f, 0.04f, 0.8f);
+            MakeText(sheet.transform, "Eyebrow", new Vector2(0.5f, 0.5f), new Vector2(0, 600), TextAnchor.MiddleCenter, 30, dim).text = "LEVEL UP";
+            MakeText(sheet.transform, "Title", new Vector2(0.5f, 0.5f), new Vector2(0, 530), TextAnchor.MiddleCenter, 96, ink).text = "Choose";
+            var cards = new GameObject("Cards", typeof(RectTransform)); cards.transform.SetParent(sheet.transform, false);
+            var crt = cards.GetComponent<RectTransform>(); crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 0.5f); crt.sizeDelta = Vector2.zero;
+            cardRoot = cards.transform; sheet.SetActive(false);
+
+            // end sheet
+            endSheet = new GameObject("End", typeof(RectTransform), typeof(Image)); endSheet.transform.SetParent(t, false);
+            Stretch(endSheet); endSheet.GetComponent<Image>().color = new Color(0.02f, 0.03f, 0.04f, 0.84f);
+            endEyebrow = MakeText(endSheet.transform, "Eyebrow", new Vector2(0.5f, 0.5f), new Vector2(0, 520), TextAnchor.MiddleCenter, 30, dim);
+            endTitle = MakeText(endSheet.transform, "Title", new Vector2(0.5f, 0.5f), new Vector2(0, 430), TextAnchor.MiddleCenter, 110, ink);
+            stats = MakeText(endSheet.transform, "Stats", new Vector2(0.5f, 0.5f), new Vector2(0, 250), TextAnchor.MiddleCenter, 40, dim); stats.rectTransform.sizeDelta = new Vector2(900, 300);
+            adBtn = MakeButton(endSheet.transform, "Field repair · watch an ad", new Vector2(0.5f, 0.5f), new Vector2(0, -20), new Vector2(880, 130), 40, () => OnAd?.Invoke());
+            adBtn.GetComponent<Image>().color = amber; adLabel = adBtn.transform.Find("Label").GetComponent<Text>(); adLabel.color = new Color(0.1f, 0.08f, 0.05f);
+            adNote = MakeText(endSheet.transform, "AdNote", new Vector2(0.5f, 0.5f), new Vector2(0, -130), TextAnchor.MiddleCenter, 28, dim); adNote.rectTransform.sizeDelta = new Vector2(900, 100);
+            MakeButton(endSheet.transform, "New assault", new Vector2(0.5f, 0.5f), new Vector2(0, -260), new Vector2(880, 130), 40, () => OnAgain?.Invoke());
+            endSheet.SetActive(false);
+        }
+
+        void Highlight(int idx) { for (int i = 0; i < 4; i++) formButtons[i].GetComponent<Image>().color = i == idx ? new Color(0.95f, 0.66f, 0.23f, 0.9f) : new Color(0.03f, 0.04f, 0.06f, 0.6f); for (int i = 0; i < 4; i++) formButtons[i].transform.Find("Label").GetComponent<Text>().color = i == idx ? new Color(0.1f, 0.08f, 0.05f) : new Color(0.93f, 0.91f, 0.86f); }
+        static void Stretch(GameObject go) { var rt = go.GetComponent<RectTransform>(); rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; rt.offsetMin = rt.offsetMax = Vector2.zero; }
+
+        public void Set(float seconds, int platoon)
+        {
+            int m = Mathf.FloorToInt(seconds / 60f), s = Mathf.FloorToInt(seconds % 60f);
+            clock.text = $"{m}:{s:00}"; count.text = platoon.ToString();
+        }
+
+        public void SetLeader(int hp, int max) { var s = new System.Text.StringBuilder("LEADER "); for (int i = 0; i < max; i++) s.Append(i < hp ? "■" : "□"); leaderHp.text = s.ToString(); }
+        public void SetLevel(int level, float progress) { levelText.text = $"Level {level}"; levelFill.rectTransform.sizeDelta = new Vector2(960f * Mathf.Clamp01(progress), 8f); }
+        public void Toast(string text) { toast.text = text; toastLeft = 2.2f; }
+
+        public void ShowCards(List<Card> cards, System.Action<string> onPick)
+        {
+            foreach (Transform c in cardRoot) Destroy(c.gameObject);
+            for (int i = 0; i < cards.Count; i++)
+            {
+                var card = cards[i];
+                var b = MakeButton(cardRoot, card.title, new Vector2(0.5f, 0.5f), new Vector2(0, 300 - i * 290), new Vector2(900, 250), 56, () => { sheet.SetActive(false); onPick(card.id); });
+                b.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.1f, 0.96f);
+                var title = b.transform.Find("Label").GetComponent<Text>();
+                title.alignment = TextAnchor.UpperLeft; title.rectTransform.anchorMin = title.rectTransform.anchorMax = title.rectTransform.pivot = new Vector2(0f, 1f);
+                title.rectTransform.anchoredPosition = new Vector2(30f, -22f); title.rectTransform.sizeDelta = new Vector2(840f, 70f);
+                var desc = MakeText(b.transform, "Desc", new Vector2(0f, 1f), new Vector2(30f, -100f), TextAnchor.UpperLeft, 34, new Color(0.66f, 0.64f, 0.59f));
+                desc.rectTransform.sizeDelta = new Vector2(840f, 130f); desc.text = card.desc;
+            }
+            sheet.SetActive(true);
+        }
+
+        public void ShowEnd(bool dawn, string statLine, bool adAvailable)
+        {
+            endEyebrow.text = dawn ? "05:00 · DAWN" : "PLATOON LEADER KNOCKED OUT";
+            endTitle.text = dawn ? "You held the line" : "Assault over";
+            stats.text = statLine;
+            adBtn.SetActive(adAvailable);
+            adLabel.text = dawn ? "Double score · watch an ad" : "Field repair · watch an ad";
+            adNote.text = dawn ? "Rewarded video (mock): ×2 score for the depot." : "Rewarded video (mock): the leader is repaired once and the assault goes on.";
+            endSheet.SetActive(true);
+        }
+        public void HideEnd() { endSheet.SetActive(false); }
+        public void SetAdNote(string s) { adNote.text = s; }
+
+        void Update()
+        {
+            fpsAccum += Time.unscaledDeltaTime; fpsFrames++; fpsTimer += Time.unscaledDeltaTime;
+            if (fpsTimer >= 0.5f) { fps.text = $"{fpsFrames / fpsAccum:0} fps"; fpsAccum = 0; fpsFrames = 0; fpsTimer = 0; }
+            if (toastLeft > 0f) { toastLeft -= Time.unscaledDeltaTime; if (toastLeft <= 0f) toast.text = ""; }
+        }
+
+        static Font DefaultFont() => Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        public static Text MakeText(Transform parent, string name, Vector2 anchor, Vector2 offset, TextAnchor align, int size, Color color)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Text)); go.transform.SetParent(parent, false);
+            var rt = go.GetComponent<RectTransform>(); rt.anchorMin = rt.anchorMax = anchor; rt.pivot = anchor; rt.anchoredPosition = offset; rt.sizeDelta = new Vector2(900, 140);
+            var t = go.GetComponent<Text>(); t.font = DefaultFont(); t.fontSize = size; t.alignment = align; t.color = color; t.raycastTarget = false;
+            return t;
+        }
+
+        public static Image MakeImage(Transform parent, string name, Vector2 anchor, Vector2 offset, Vector2 size, Color color)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image)); go.transform.SetParent(parent, false);
+            var rt = go.GetComponent<RectTransform>(); rt.anchorMin = rt.anchorMax = anchor; rt.pivot = anchor; rt.anchoredPosition = offset; rt.sizeDelta = size;
+            var img = go.GetComponent<Image>(); img.color = color; img.raycastTarget = false;
+            return img;
+        }
+
+        static GameObject MakeButton(Transform parent, string label, Vector2 anchor, Vector2 pos, Vector2 size, int fontSize, System.Action onClick)
+        {
+            var go = new GameObject("Btn " + label, typeof(RectTransform), typeof(Image), typeof(Button)); go.transform.SetParent(parent, false);
+            var rt = go.GetComponent<RectTransform>(); rt.anchorMin = rt.anchorMax = anchor; rt.pivot = new Vector2(0.5f, 0.5f); rt.anchoredPosition = pos; rt.sizeDelta = size;
+            go.GetComponent<Image>().color = new Color(0.03f, 0.04f, 0.06f, 0.6f);
+            go.GetComponent<Button>().onClick.AddListener(() => onClick());
+            var t = MakeText(go.transform, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, TextAnchor.MiddleCenter, fontSize, new Color(0.93f, 0.91f, 0.86f));
+            t.GetComponent<RectTransform>().sizeDelta = size; t.text = label;
+            return go;
+        }
+    }
+}

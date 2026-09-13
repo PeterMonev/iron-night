@@ -1,0 +1,7 @@
+Sprites in this folder were generated locally for this project (Stable Diffusion XL base 1.0 under the CreativeML
+OpenRAIL++-M license, ControlNet Union SDXL by xinsir under Apache-2.0) from schematics drawn by us. Commercial use in
+the game is permitted by both licenses; the guides and the resulting images are the project's own work.
+
+3D models in ../models were generated locally with Microsoft TRELLIS 2 (MIT) from reference images made in ChatGPT
+(outputs owned by the user under OpenAI's terms). The image encoder DINOv3 (Meta, DINOv3 License) permits commercial use;
+the game credits must show "Built with DINOv3".

@@ -1,0 +1,81 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Iron Night 3D scene</title>
+<style>body{margin:0;background:#06080c}canvas{display:block;max-height:100vh;width:auto}#info{position:fixed;left:8px;top:8px;color:#eee;font:13px sans-serif}</style></head>
+<body><div id="info">loading…</div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+// A still of the game view: a Sherman platoon in a wedge at night, two Panzer IVs coming over the field, a searchlight,
+// a burning wreck. Portrait phone framing, camera tilted so hull sides and turrets read.
+const W = 1080, H = 1920;
+const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true}); renderer.setSize(W, H); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.25; document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x06080c); scene.fog = new THREE.FogExp2(0x06080c, 0.012);
+// moonlight: cool, low, soft shadows; a faint warm bounce from the flares around the platoon
+const moon = new THREE.DirectionalLight(0x8fa8ff, 2.2); moon.position.set(-18, 30, 12); moon.castShadow = true; moon.shadow.mapSize.set(2048, 2048);
+const sc = moon.shadow.camera; sc.left = sc.bottom = -45; sc.right = sc.top = 45; sc.near = 1; sc.far = 90; scene.add(moon);
+scene.add(new THREE.HemisphereLight(0x2c3a5c, 0x0c0a06, 0.5));
+const META = await (await fetch('glb/parts/meta.json')).json();
+const loader = new GLTFLoader(); const load = f => new Promise(res => loader.load(f, g => res(g.scene)));
+const tex = new THREE.TextureLoader();
+// ground: the AI mud tile, with grass patches as a second tiled plane cut by a soft alpha map
+const mud = await tex.loadAsync('ground/mud2.png'); mud.wrapS = mud.wrapT = THREE.RepeatWrapping; mud.repeat.set(9, 9); mud.anisotropy = 8; mud.colorSpace = THREE.SRGBColorSpace;
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), new THREE.MeshStandardMaterial({map: mud, roughness: 0.95})); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+const grass = await tex.loadAsync('ground/grass2.png'); grass.wrapS = grass.wrapT = THREE.RepeatWrapping; grass.repeat.set(9, 9); grass.anisotropy = 8; grass.colorSpace = THREE.SRGBColorSpace;
+const ac = document.createElement('canvas'); ac.width = ac.height = 1024; const ag = ac.getContext('2d'); ag.fillStyle = '#000'; ag.fillRect(0, 0, 1024, 1024);
+let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+for (let i = 0; i < 70; i++){ const x = rnd() * 1024, y = rnd() * 1024, r = 70 + rnd() * 150; const gr = ag.createRadialGradient(x, y, r * 0.2, x, y, r); gr.addColorStop(0, '#fff'); gr.addColorStop(1, 'rgba(255,255,255,0)'); ag.fillStyle = gr; ag.fillRect(x - r, y - r, 2 * r, 2 * r); }
+const alpha = new THREE.CanvasTexture(ac);
+const grassMesh = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), new THREE.MeshStandardMaterial({map: grass, alphaMap: alpha, transparent: true, roughness: 1, depthWrite: false})); grassMesh.rotation.x = -Math.PI / 2; grassMesh.position.y = 0.02; grassMesh.receiveShadow = true; scene.add(grassMesh);
+// tanks: hull + turret from the split GLBs, pivot at the turret ring, a straight barrel of the real length added
+const parts = {}; for (const n of ['sherman', 'pz4', 'tiger']) parts[n] = { hull: await load(`glb/parts/${n}_hull.glb`), turret: await load(`glb/parts/${n}_turret.glb`) };
+parts.pak40 = { hull: await load('glb/parts/pak40_hull.glb'), turret: null };
+const GUN = { sherman: {len: 2.6, r: 0.075, brake: false, mantlet: 1.1, h: 0.42}, pz4: {len: 3.2, r: 0.07, brake: true, mantlet: 1.15, h: 0.4}, tiger: {len: 3.9, r: 0.085, brake: true, mantlet: 1.5, h: 0.45}, pak40: null };
+const TINT = { sherman: 0x8f9c6e, pz4: 0xb8a97a, tiger: 0xc2b07c, pak40: 0xc2b07c }; // pull the washed-out generated textures back toward olive drab / dunkelgelb
+function prep(o, kind){ o.traverse(m => { if (m.isMesh){ m.castShadow = m.receiveShadow = true; m.material = m.material.clone(); m.material.roughness = 0.85; m.material.metalness = 0.05; if (TINT[kind]) m.material.color.setHex(TINT[kind]);
+  // smooth shading: merge vertices then recompute normals (the generated mesh is flat-shaded)
+  let g = m.geometry; g = BufferGeometryUtils.mergeVertices(g, 1e-4); g.computeVertexNormals(); m.geometry = g; } }); return o; }
+function tank(kind, x, z, heading, turretAngle, burning){
+  const M = META[kind], G = GUN[kind]; const root = new THREE.Group(); root.position.set(x, 0, z); root.rotation.y = heading;
+  const fwd = M.forward; const hull = prep(parts[kind].hull.clone(), kind); hull.rotation.y = fwd > 0 ? 0 : Math.PI; hull.position.y = M.ringHeight; root.add(hull);
+  if (!parts[kind].turret){ hull.position.y = 0; scene.add(root); return root; } // the PaK is one piece that aims with its whole body
+  const tur = new THREE.Group(); tur.position.y = M.ringHeight; tur.rotation.y = turretAngle; root.add(tur);
+  const tm = prep(parts[kind].turret.clone(), kind); tm.rotation.y = fwd > 0 ? 0 : Math.PI; tur.add(tm);
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(G.r * 0.85, G.r, G.len, 14), new THREE.MeshStandardMaterial({color: kind === 'sherman' ? 0x3e4630 : 0x6b6248, roughness: 0.7, metalness: 0.2}));
+  barrel.rotation.x = Math.PI / 2; barrel.position.set(0, G.h, G.mantlet + G.len / 2); barrel.castShadow = true; tur.add(barrel);
+  if (G.brake){ const b = new THREE.Mesh(new THREE.CylinderGeometry(G.r * 1.7, G.r * 1.7, 0.32, 14), barrel.material); b.rotation.x = Math.PI / 2; b.position.set(0, G.h, G.mantlet + G.len - 0.16); tur.add(b); }
+  // the ground shadow contact: a soft dark disc under the tracks
+  if (burning){ root.traverse(m => { if (m.isMesh && m.material.map) { m.material = m.material.clone(); m.material.color.setScalar(0.35); } });
+    const fire = new THREE.PointLight(0xff7a2a, 40, 14, 1.6); fire.position.set(0, 2.2, 0); root.add(fire); root.userData.fire = fire; }
+  scene.add(root); return root;
+}
+// the platoon (heading roughly north / up the screen), enemies coming from the top right
+const T = [tank('sherman', 0, 0, 0.15, 0.6), tank('sherman', -6.5, 6, 0.1, 0.9), tank('sherman', 6.5, 6.5, 0.2, 0.4)];
+const E = [tank('pz4', 9, -22, Math.PI + 0.5, Math.PI + 0.3), tank('pz4', -12, -17, Math.PI - 0.6, Math.PI - 0.4, true), tank('tiger', -3, -33, Math.PI + 0.15, Math.PI + 0.1), tank('pak40', 7.5, -11, Math.PI + 0.9, 0)];
+// flare light over the platoon (warm), a searchlight from the enemy side
+const flare = new THREE.PointLight(0xffb060, 150, 34, 1.5); flare.position.set(1, 11, 3); flare.castShadow = false; scene.add(flare);
+const spot = new THREE.SpotLight(0xd8e6ff, 900, 140, 0.16, 0.6, 1.2); spot.position.set(-40, 24, -60); spot.target.position.set(4, 0, 4); spot.castShadow = true; spot.shadow.mapSize.set(1024, 1024); scene.add(spot, spot.target);
+// the beam itself: a faint additive cone
+const beamLen = 110; const beam = new THREE.Mesh(new THREE.ConeGeometry(beamLen * Math.tan(0.16), beamLen, 24, 1, true), new THREE.MeshBasicMaterial({color: 0xbfd0ff, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide}));
+{ const dir = spot.target.position.clone().sub(spot.position).normalize(); beam.geometry.translate(0, -beamLen / 2, 0); beam.geometry.rotateX(Math.PI); // apex at the origin, opening along -y -> flip so it opens along +y
+  beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir); beam.position.copy(spot.position); beam.frustumCulled = false; scene.add(beam); }
+// tracer shells and muzzle flash sprites
+const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,220,150,0.8)'); gr.addColorStop(1, 'rgba(255,160,60,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c); })();
+function sprite(x, y, z, s, color){ const sp = new THREE.Sprite(new THREE.SpriteMaterial({map: glowTex, color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false})); sp.position.set(x, y, z); sp.scale.set(s, s, 1); scene.add(sp); return sp; }
+sprite(0.7, 2.7, 4.4, 5, 0xffe2a0);   // leader firing
+{ const ml = new THREE.PointLight(0xffd090, 60, 12, 1.5); ml.position.set(0.7, 2.7, 4.4); scene.add(ml); }
+for (let i = 0; i < 4; i++) sprite(1.5 + i * 2.6, 2.6, -3 - i * 6.2, 1.1 + i * 0.1, 0xfff0c0); // shell in flight
+sprite(-12, 3.6, -17, 9, 0xff9a40); sprite(-11.4, 5.2, -16.6, 6, 0xff6a20); // the wreck's fire
+// smoke over the wreck
+const smokeTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(90,90,95,0.9)'); gr.addColorStop(1, 'rgba(60,60,65,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c); })();
+for (let i = 0; i < 6; i++){ const sp = new THREE.Sprite(new THREE.SpriteMaterial({map: smokeTex, transparent: true, opacity: 0.55 - i * 0.07, depthWrite: false})); sp.position.set(-12 + i * 1.1, 5 + i * 2.4, -17 - i * 0.6); sp.scale.setScalar(7 + i * 2.5); scene.add(sp); }
+// craters and track ruts: dark decals on the ground
+const decal = (x, z, r, a) => { const m = new THREE.Mesh(new THREE.CircleGeometry(r, 24), new THREE.MeshBasicMaterial({color: 0x000000, transparent: true, opacity: a, depthWrite: false})); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.03, z); scene.add(m); };
+[[ -14, -8, 2.6], [18, 6, 2.2], [-6, -30, 3.2], [30, -34, 2.8], [-26, 14, 2.4]].forEach(([x, z, r]) => decal(x, z, r, 0.55));
+// camera: portrait, tilted 55 degrees, the platoon in the lower half, the enemy in the upper half
+const cam = new THREE.PerspectiveCamera(46, W / H, 0.5, 300); cam.position.set(0, 30, 27); cam.lookAt(0, 0, -3);
+renderer.render(scene, cam);
+document.getElementById('info').textContent = 'rendered';
+window.__done = true;
+</script></body></html>

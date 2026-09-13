@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="utf-8"><title>GLB quad check</title>
+<style>body{margin:0;background:#2b3a2a}canvas{display:block}</style></head><body>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+// two models, each from a 3/4 angle and from above, in one 1200x900 canvas
+const files = (new URLSearchParams(location.search).get('f') || '').split(',');
+const W = 1200, H = 900; const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true}); renderer.setSize(W, H); renderer.setScissorTest(true); document.body.appendChild(renderer.domElement);
+const load = f => new Promise(res => new GLTFLoader().load(f, g => res(g.scene)));
+for (let i = 0; i < files.length; i++){
+  const scene = new THREE.Scene(); scene.background = new THREE.Color(0x2b3a2a);
+  scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x3a3020, 1.2)); const sun = new THREE.DirectionalLight(0xfff1d0, 2.2); sun.position.set(3, 6, 2); scene.add(sun);
+  const m = await load(files[i]); const box = new THREE.Box3().setFromObject(m); const size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3()); m.position.sub(c); scene.add(m); const r = size.length() * 0.62;
+  [[-1.2, 0.9, 1.4], [0.01, 2.2, 0.01]].forEach((v, j) => { const cam = new THREE.PerspectiveCamera(35, (W / 2) / (H / 2), 0.01, 100); cam.position.set(v[0] * r, v[1] * r, v[2] * r); cam.lookAt(0, 0, 0);
+    const x = j * W / 2, y = (1 - i) * H / 2; renderer.setViewport(x, y, W / 2, H / 2); renderer.setScissor(x, y, W / 2, H / 2); renderer.render(scene, cam); });
+}
+window.__done = true;
+</script></body></html>

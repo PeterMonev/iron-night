@@ -1,0 +1,23 @@
+# Unity
+unity/[Ll]ibrary/
+unity/[Tt]emp/
+unity/[Oo]bj/
+unity/[Bb]uild/
+unity/[Bb]uilds/
+unity/[Ll]ogs/
+unity/[Uu]serSettings/
+unity/.vs/
+unity/*.csproj
+unity/*.sln
+unity/*.slnx
+unity/.vsconfig
+unity/Assets/StreamingAssets/aa/
+# builds and logs
+builds/
+*.log
+# tooling
+node_modules/
+.DS_Store
+Thumbs.db
+unity/.utmp/
+unity/.gradle/

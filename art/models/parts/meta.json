@@ -1,0 +1,49 @@
+{
+ "sherman": {
+  "hullFaces": 18095,
+  "turretFaces": 1429,
+  "ringHeight": 2.2115452626707635,
+  "longAxis": "z",
+  "forward": -1.0,
+  "hullLength": 5.9,
+  "ringCenter": [
+   -0.050604406744241714,
+   0.0646323347091675,
+   0.00839072015757362
+  ]
+ },
+ "pz4": {
+  "hullFaces": 18152,
+  "turretFaces": 1676,
+  "ringHeight": 2.033444982812233,
+  "longAxis": "z",
+  "forward": 1.0,
+  "hullLength": 5.9,
+  "ringCenter": [
+   -0.026643714557091396,
+   0.08302265286445625,
+   -0.12306531021992366
+  ]
+ },
+ "tiger": {
+  "hullFaces": 17817,
+  "turretFaces": 1819,
+  "ringHeight": 2.4318055170373247,
+  "longAxis": "z",
+  "forward": -1.0,
+  "hullLength": 6.3,
+  "ringCenter": [
+   -0.015521177013094226,
+   0.104938669204712,
+   -0.06430041231215
+  ]
+ },
+ "pak40": {
+  "hullFaces": 12000,
+  "turretFaces": 0,
+  "ringHeight": 0.0,
+  "longAxis": "z",
+  "forward": -1.0,
+  "hullLength": 5.7
+ }
+}
