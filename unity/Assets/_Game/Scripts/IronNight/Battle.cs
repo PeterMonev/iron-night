@@ -67,8 +67,8 @@ namespace IronNight
             for (int i = 0; i < 2; i++)
             {
                 var sl = new GameObject("Searchlight " + i); var l = sl.AddComponent<Light>();
-                l.type = LightType.Spot; l.color = new Color(0.82f, 0.88f, 1f); l.intensity = 60f; l.range = 220f; l.spotAngle = 11f; l.innerSpotAngle = 6f; l.shadows = LightShadows.None;
-                var beam = fx.Beam(200f, 0.085f, new Color(0.7f, 0.78f, 1f, 0.035f)); beam.transform.SetParent(sl.transform, false);
+                l.type = LightType.Spot; l.color = new Color(0.82f, 0.88f, 1f); l.intensity = 60f; l.range = 220f; l.spotAngle = 5f; l.innerSpotAngle = 3f; l.shadows = LightShadows.None;
+                var beam = fx.Beam(220f, 0.03f, new Color(0.75f, 0.82f, 1f, 0.16f)); beam.transform.SetParent(sl.transform, false);
                 sl.transform.position = new Vector3(i == 0 ? -70f : 75f, 3f, 90f + i * 30f);
                 searchlights.Add(sl.transform);
             }

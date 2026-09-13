@@ -22,23 +22,20 @@ size = hi - lo
 axis = int(np.argmax([size[0], size[2]])) * 2  # 0 = X, 2 = Z
 height = size[1]
 
-# footprint length along the long axis at increasing heights, ignoring the thin gun barrel near the centre line:
-# the hull is long, the turret is short, so the ring is where the length collapses
+# the turret ring sits on the hull deck: the deck is the height band with the most upward-facing area between 40% and 80%
+# of the model height (roof of the hull, sponsons); the turret walls rise from there
 lat = 2 if axis == 0 else 0
 xc = (lo[lat] + hi[lat]) / 2
-def length_at(y):
-    sel = v[(v[:, 1] > y - 0.008) & (v[:, 1] < y + 0.008) & (np.abs(v[:, lat] - xc) > 0.04)]
-    if len(sel) < 20: return 0.0
-    return np.percentile(sel[:, axis], 97) - np.percentile(sel[:, axis], 3)
-hull_length = max(length_at(lo[1] + height * fr) for fr in (0.35, 0.4, 0.45))
-ring_y = None
-for fr in np.arange(0.45, 0.95, 0.01):
-    y = lo[1] + height * fr; L = length_at(y)
-    if 0 < L < 0.75 * hull_length: ring_y = y; break
+fn = mesh.face_normals; fc = v[f].mean(axis=1); fa = mesh.area_faces
+up = (fn[:, 1] > 0.85) & (np.abs(fc[:, lat] - xc) > 0.12 * size[lat])   # flat faces away from the centre line (the turret roof is central)
+bands = np.arange(0.40, 0.80, 0.02); best, best_area = None, 0.0
+for fr in bands:
+    y0 = lo[1] + height * fr; sel = up & (fc[:, 1] >= y0) & (fc[:, 1] < y0 + height * 0.02)
+    area = fa[sel].sum()
+    if area > best_area: best_area, best = area, fr
+ring_y = lo[1] + height * (best + 0.015) if best is not None else lo[1] + height * 0.6
 if ring_frac is not None: ring_y = lo[1] + height * ring_frac
-if ring_y is None: ring_y = lo[1] + height * 0.62
-ring_y += 0.015  # a hair above the deck so the deck slab stays with the hull
-print(f"{name}: height {height:.3f}, ring height {ring_y:.3f} ({(ring_y - lo[1]) / height:.2f} of height)")
+print(f"{name}: height {height:.3f}, deck band {best}, ring height {ring_y:.3f} ({(ring_y - lo[1]) / height:.2f} of height)")
 
 cent = v[f].mean(axis=1)
 lat_v = np.abs(v[f][:, :, lat] - xc)            # lateral offset of each face's three vertices
@@ -47,11 +44,32 @@ tur_c = cent[above]
 ring_center = np.array([np.median(tur_c[:, 0]), ring_y, np.median(tur_c[:, 2])]) if above.any() else (lo + hi) / 2
 along = cent[:, axis] - ring_center[axis]
 lateral = np.abs(cent[:, lat] - ring_center[lat])
-# the generated barrel is thin, bent and too short; it is removed here and the game adds a straight one of the real length.
-# barrel faces: all three vertices close to the centre line, around ring height, well away from the ring along the long axis
-thin = (lat_v.max(axis=1) < 0.06) & (cent[:, 1] > ring_y - 0.08) & (cent[:, 1] < ring_y + 0.14) & (np.abs(along) > 0.22 * size[axis])
-forward = 1.0 if (thin & (along > 0)).sum() >= (thin & (along < 0)).sum() else -1.0
-barrel = thin & (along * forward > 0)
+# the generated barrel is bent and too short; it is removed and the game adds a straight one of the real length.
+# its axis is measured from the part that sticks out beyond the hull's nose, then everything inside a cylinder around
+# that axis, from the turret face forward, goes - whichever part it would have landed in
+along = cent[:, axis] - ring_center[axis]
+above = cent[:, 1] > ring_y + 0.005
+narrow = (lat_v.max(axis=1) - lat_v.min(axis=1)) < 0.05          # faces of something thin, like a barrel
+# forward: the glacis - a large plate sloping up toward the turret - is at the front of every tank; the rear is vertical
+# doors and a flat engine deck. Compare the sloped area at the two ends.
+sloped = (fn[:, 1] > 0.35) & (fn[:, 1] < 0.9) & (np.abs(fn[:, axis]) > 0.4)
+mid = (lo[axis] + hi[axis]) / 2
+area_plus = fa[sloped & (cent[:, axis] > mid + 0.25 * size[axis])].sum(); area_minus = fa[sloped & (cent[:, axis] < mid - 0.25 * size[axis])].sum()
+forward = 1.0 if area_plus >= area_minus else -1.0
+print(f"glacis area +{area_plus:.3f} / -{area_minus:.3f}")
+# the barrel: narrow faces near the centre line ahead of the turret
+thin_ahead = above & narrow & (along * forward > 0.2 * size[axis]) & (np.abs(cent[:, lat] - xc) < 0.08 * size[lat])
+n_thin = int(thin_ahead.sum()); print(f"barrel candidates ahead: {n_thin} faces")
+if n_thin > 15:
+    bx = np.median(cent[thin_ahead, lat]); by = np.median(cent[thin_ahead, 1])
+    rb = float(np.clip(1.7 * np.percentile(np.abs(cent[thin_ahead, lat] - bx), 80), 0.02, 0.036))
+    body = above & (np.abs(cent[:, lat] - bx) > rb * 1.3) & (np.abs(along) < 0.3 * size[axis])
+    tfront = np.percentile(along[body] * forward, 97) if body.sum() > 50 else 0.2 * size[axis]
+    barrel = (np.abs(cent[:, lat] - bx) < rb) & (np.abs(cent[:, 1] - by) < rb * 1.2) & (along * forward > tfront + 0.005)
+    print(f"barrel axis lateral {bx - xc:+.3f}, radius {rb:.3f}, turret front at {tfront / size[axis]:.2f} of the hull length")
+else:
+    barrel = np.zeros(len(f), dtype=bool); print("no barrel found")
+lateral = np.abs(cent[:, lat] - ring_center[lat])
 # turret: above the ring and not far along the hull (stowage on the deck corners stays with the hull); the mantlet stub near the centre stays
 far = np.abs(along) > 0.3 * size[axis]
 turret = (above & ~far) | (above & (lateral < 0.08) & (along * forward > 0) & (along * forward < 0.3 * size[axis]))

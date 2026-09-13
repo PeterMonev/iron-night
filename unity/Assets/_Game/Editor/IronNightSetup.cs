@@ -82,7 +82,7 @@ namespace IronNight.EditorTools
         static void CreateMaterials()
         {
             var vehicle = MakeMaterial("VehicleLit", "Universal Render Pipeline/Lit");
-            vehicle.SetFloat("_Smoothness", 0.28f); vehicle.SetFloat("_Metallic", 0.05f);
+            vehicle.SetFloat("_Smoothness", 0.28f); vehicle.SetFloat("_Metallic", 0.05f); vehicle.SetFloat("_Cull", (float)CullMode.Off); // generated meshes have holes: render the inside walls too
             var barrel = MakeMaterial("BarrelLit", "Universal Render Pipeline/Lit");
             barrel.SetColor("_BaseColor", new Color(0.3f, 0.31f, 0.26f)); barrel.SetFloat("_Smoothness", 0.45f); barrel.SetFloat("_Metallic", 0.4f);
             var ground = MakeMaterial("GroundLit", "Universal Render Pipeline/Lit");

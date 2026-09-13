@@ -19,25 +19,25 @@ namespace IronNight
 
         public static readonly VehicleSpec Sherman = new VehicleSpec
         {
-            id = "sherman", name = "M4 Sherman", hullMesh = "sherman_hull", turretMesh = "sherman_turret", texture = "sherman", forward = -1f, ringHeight = 2.212f,
+            id = "sherman", name = "M4 Sherman", hullMesh = "sherman_hull", turretMesh = "sherman_turret", texture = "sherman", forward = 1f, ringHeight = 2.178f,
             gunLength = 2.6f, gunRadius = 0.075f, gunHeight = 0.42f, mantlet = 1.1f, tint = new Color(0.86f, 0.9f, 0.68f),
             speed = 9f, turnRate = 2.2f, turretRate = 3.2f, reload = 1.3f, damage = 1f, range = 26f, hp = 3f, radius = 2.4f
         };
         public static readonly VehicleSpec Firefly = new VehicleSpec
         {
-            id = "firefly", name = "Sherman Firefly", hullMesh = "sherman_hull", turretMesh = "sherman_turret", texture = "sherman", forward = -1f, ringHeight = 2.212f,
+            id = "firefly", name = "Sherman Firefly", hullMesh = "sherman_hull", turretMesh = "sherman_turret", texture = "sherman", forward = 1f, ringHeight = 2.178f,
             gunLength = 3.6f, gunRadius = 0.075f, gunHeight = 0.42f, mantlet = 1.1f, muzzleBrake = true, tint = new Color(0.8f, 0.85f, 0.64f),
             speed = 8.5f, turnRate = 2f, turretRate = 2.8f, reload = 1.6f, damage = 2f, range = 30f, hp = 3f, radius = 2.4f
         };
         public static readonly VehicleSpec PanzerIV = new VehicleSpec
         {
-            id = "pz4", name = "Panzer IV", hullMesh = "pz4_hull", turretMesh = "pz4_turret", texture = "pz4", forward = 1f, ringHeight = 2.033f,
+            id = "pz4", name = "Panzer IV", hullMesh = "pz4_hull", turretMesh = "pz4_turret", texture = "pz4", forward = 1f, ringHeight = 2.022f,
             gunLength = 3.2f, gunRadius = 0.07f, gunHeight = 0.4f, mantlet = 1.15f, muzzleBrake = true, tint = new Color(1f, 0.95f, 0.74f),
             speed = 8f, turnRate = 1.9f, turretRate = 2.6f, reload = 1.7f, damage = 1f, range = 24f, hp = 3f, radius = 2.4f
         };
         public static readonly VehicleSpec Tiger = new VehicleSpec
         {
-            id = "tiger", name = "Tiger I", hullMesh = "tiger_hull", turretMesh = "tiger_turret", texture = "tiger", forward = -1f, ringHeight = 2.432f,
+            id = "tiger", name = "Tiger I", hullMesh = "tiger_hull", turretMesh = "tiger_turret", texture = "tiger", forward = 1f, ringHeight = 2.249f,
             gunLength = 3.9f, gunRadius = 0.085f, gunHeight = 0.45f, mantlet = 1.5f, muzzleBrake = true, tint = new Color(1f, 0.95f, 0.74f),
             speed = 6f, turnRate = 1.4f, turretRate = 2f, reload = 2.6f, damage = 2f, range = 30f, hp = 8f, radius = 2.8f
         };
