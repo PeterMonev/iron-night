@@ -5,18 +5,18 @@ using UnityEngine.UI;
 namespace IronNight
 {
     /// <summary>
-    /// The overlay: night clock, platoon count, level bar, formation buttons, toast line, the three-card level-up sheet
-    /// and the end-of-assault sheet with the (mock) rewarded-ad button. Built in code with the legacy UI, English only.
+    /// The overlay: night clock, platoon count, level bar, formation buttons, pause button, toast line, the three-card
+    /// level-up sheet, the pause sheet and the end-of-assault sheet with the (mock) rewarded-ad button. Built in code with the legacy UI, English only.
     /// </summary>
     public class Hud : MonoBehaviour
     {
         public class Card { public string id, title, desc; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain, OnStart, OnDepot, OnBack, OnReserveAd;
+        public System.Action OnAd, OnAgain, OnStart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit;
 
         Text clock, count, fps, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp;
-        Image levelFill; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn; Transform cardRoot, depotRows; Canvas canvas; Text depotPoints, titleStats, endPoints, reserveNote, bossName; Image bossFill; GameObject bossBar;
+        Image levelFill; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform cardRoot, depotRows; Canvas canvas; Text depotPoints, titleStats, endPoints, reserveNote, bossName; Image bossFill; GameObject bossBar;
         readonly Button[] formButtons = new Button[4];
         readonly List<Image> arrows = new List<Image>(); Sprite arrowSprite;
         float fpsAccum, fpsTimer, toastLeft; int fpsFrames;
@@ -53,6 +53,7 @@ namespace IronNight
             bossFill = MakeImage(bbg.transform, "Fill", new Vector2(0, 0.5f), Vector2.zero, new Vector2(960, 10), new Color(0.95f, 0.35f, 0.3f));
             bossBar.SetActive(false);
             toast = MakeText(t, "Toast", new Vector2(0.5f, 0.5f), new Vector2(0, 420), TextAnchor.MiddleCenter, 60, ink); toast.text = "";
+            var pauseBtn = MakeButton(t, "II", new Vector2(0.5f, 1f), new Vector2(0, -150), new Vector2(120, 76), 40, () => OnPause?.Invoke()); pauseBtn.name = "Pause";
 
             var names = new[] { "WEDGE", "COLUMN", "LINE", "ECHELON" };
             var forms = new[] { Formation.Wedge, Formation.Column, Formation.Line, Formation.Echelon };
@@ -88,6 +89,16 @@ namespace IronNight
             var root = canvasGo.transform;
             endPoints = MakeText(endSheet.transform, "Points", new Vector2(0.5f, 0.5f), new Vector2(0, 120), TextAnchor.MiddleCenter, 44, amber);
             MakeButton(endSheet.transform, "Depot", new Vector2(0.5f, 0.5f), new Vector2(0, -400), new Vector2(880, 130), 40, () => OnDepot?.Invoke());
+
+            // pause sheet
+            pauseSheet = new GameObject("Pause", typeof(RectTransform), typeof(Image)); pauseSheet.transform.SetParent(root, false);
+            Stretch(pauseSheet); pauseSheet.GetComponent<Image>().color = new Color(0.02f, 0.03f, 0.04f, 0.8f);
+            MakeText(pauseSheet.transform, "Title", new Vector2(0.5f, 0.5f), new Vector2(0, 430), TextAnchor.MiddleCenter, 96, ink).text = "Paused";
+            var resume = MakeButton(pauseSheet.transform, "Resume", new Vector2(0.5f, 0.5f), new Vector2(0, 160), new Vector2(880, 150), 52, () => OnResume?.Invoke());
+            resume.GetComponent<Image>().color = amber; resume.transform.Find("Label").GetComponent<Text>().color = new Color(0.1f, 0.08f, 0.05f);
+            var snd = MakeButton(pauseSheet.transform, "Sound: on", new Vector2(0.5f, 0.5f), new Vector2(0, -20), new Vector2(880, 130), 40, () => OnSound?.Invoke()); soundLabel = snd.transform.Find("Label").GetComponent<Text>();
+            MakeButton(pauseSheet.transform, "Abandon the assault", new Vector2(0.5f, 0.5f), new Vector2(0, -200), new Vector2(880, 130), 40, () => OnQuit?.Invoke());
+            pauseSheet.SetActive(false);
 
             // title sheet
             titleSheet = new GameObject("Title", typeof(RectTransform), typeof(Image)); titleSheet.transform.SetParent(root, false);
@@ -190,7 +201,7 @@ namespace IronNight
 
         public void SetLeader(int hp, int max) { var s = new System.Text.StringBuilder("LEADER "); for (int i = 0; i < max; i++) s.Append(i < hp ? "■" : "□"); leaderHp.text = s.ToString(); }
         public void SetLevel(int level, float progress) { levelText.text = $"Level {level}"; levelFill.rectTransform.sizeDelta = new Vector2(960f * Mathf.Clamp01(progress), 8f); }
-        public void Toast(string text) { toast.text = text; toastLeft = 2.2f; }
+        public void Toast(string text, float seconds = 2.2f) { toast.text = text; toastLeft = seconds; }
         public void ShowBoss(string name) { bossName.text = name.ToUpperInvariant(); bossBar.SetActive(true); }
         public void SetBoss(float frac) { bossFill.rectTransform.sizeDelta = new Vector2(960f * Mathf.Clamp01(frac), 10f); }
         public void HideBoss() { bossBar.SetActive(false); }
@@ -223,6 +234,8 @@ namespace IronNight
             endSheet.SetActive(true);
         }
         public void HideEnd() { endSheet.SetActive(false); }
+        public void ShowPause(bool soundOn) { soundLabel.text = soundOn ? "Sound: on" : "Sound: off"; pauseSheet.SetActive(true); }
+        public void HidePause() { pauseSheet.SetActive(false); }
         public void SetAdNote(string s) { adNote.text = s; }
 
         void Update()

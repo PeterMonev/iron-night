@@ -17,7 +17,7 @@ namespace IronNight
             new Upgrade { id = "loaders", title = "Veteran loaders", desc = "The platoon reloads 6% faster per level." },
             new Upgrade { id = "optics", title = "Night optics", desc = "Gunners engage 5% farther per level." },
             new Upgrade { id = "engines", title = "Tuned engines", desc = "The platoon drives 5% faster per level." },
-            new Upgrade { id = "reserve", title = "Reserve crews", desc = "Level 1: start the night with two wingmen. Level 2: wingmen take one more hit.", MaxLevel = 2 },
+            new Upgrade { id = "reserve", title = "Reserve crews", desc = "Every reinforcement arrives with one more hit it can take, per level.", MaxLevel = 2 },
         };
 
         public static int Points { get; private set; }
@@ -68,7 +68,6 @@ namespace IronNight
         public static float ReloadMul => 1f - 0.06f * Level("loaders");
         public static float RangeMul => 1f + 0.05f * Level("optics");
         public static float SpeedMul => 1f + 0.05f * Level("engines");
-        public static int StartWingmen => Level("reserve") >= 1 ? 2 : 1;
-        public static float WingmanHpBonus => Level("reserve") >= 2 ? 1f : 0f;
+        public static float WingmanHpBonus => Level("reserve");
     }
 }

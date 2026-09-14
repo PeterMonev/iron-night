@@ -40,6 +40,7 @@ namespace IronNight
         readonly List<Prop> active = new List<Prop>();
         Transform cam; Material patchMaterial, laneMaterial, yardMaterial, craterMaterial, hedgeMaterial, canopyMaterial, trunkMaterial;
         Material[] fieldMaterials; Mesh[] blobs; GameObject lampTemplate;
+        readonly List<GameObject> craters = new List<GameObject>(); int nextCrater;   // shell craters of the night, oldest reused
 
         public void Build(Camera camera)
         {
@@ -370,6 +371,25 @@ namespace IronNight
                 }
             }
             return pos;
+        }
+
+        /// <summary>True when a vehicle of this radius could stand at the point without overlapping anything solid.</summary>
+        public bool Free(Vector3 pos, float radius)
+        {
+            foreach (var p in active)
+            {
+                if (p.radii.Length == 0) continue; float reach = p.bound + 6f; if ((p.pos - pos).sqrMagnitude > reach * reach) continue;
+                for (int c = 0; c < p.radii.Length; c++) { float min = p.radii[c] + radius; if ((new Vector2(pos.x, pos.z) - p.circleCenters[c]).sqrMagnitude < min * min) return false; }
+            }
+            return true;
+        }
+
+        /// <summary>A fresh shell crater on the ground; the field keeps the last forty.</summary>
+        public void Crater(Vector3 pos, float size)
+        {
+            GameObject q;
+            if (craters.Count < 40) { q = Quad(transform, pos, Random.value * 360f, size, size, craterMaterial, 0.07f); q.name = "ShellCrater"; craters.Add(q); }
+            else { q = craters[nextCrater]; nextCrater = (nextCrater + 1) % craters.Count; q.transform.position = new Vector3(pos.x, 0.07f, pos.z); q.transform.rotation = Quaternion.Euler(90f, Random.value * 360f, 0f); q.transform.localScale = new Vector3(size, size, 1f); }
         }
 
         /// <summary>True when a shell at this point is inside something solid that is taller than the shell's flight.</summary>

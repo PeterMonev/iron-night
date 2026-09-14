@@ -12,7 +12,7 @@ namespace IronNight
         public VehicleSpec spec;
         public bool friendly;
         public float hp, yaw, turretYaw, reloadLeft, hitFlash;
-        public float speedMul = 1f, damageMul = 1f, rangeMul = 1f, reloadMul = 1f;
+        public float speedMul = 1f, damageMul = 1f, rangeMul = 1f, reloadMul = 1f, turretMul = 1f;
         public bool dead;
         public Vehicle target;
 
@@ -109,7 +109,7 @@ namespace IronNight
             var d = targetPos - transform.position; if (d.sqrMagnitude < 0.01f) return false;
             float want = Mathf.Atan2(d.x, d.z);
             float diff = Mathf.DeltaAngle(turretYaw * Mathf.Rad2Deg, want * Mathf.Rad2Deg) * Mathf.Deg2Rad;
-            float rate = spec.turretRate * dt;
+            float rate = spec.turretRate * turretMul * dt;
             turretYaw += Mathf.Clamp(diff, -rate, rate);
             return Mathf.Abs(diff) < 0.06f;
         }
