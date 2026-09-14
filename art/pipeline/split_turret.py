@@ -59,28 +59,23 @@ forward = 1.0 if area_plus >= area_minus else -1.0
 thin_ahead = above & narrow & (along * forward > 0.2 * size[axis]) & (np.abs(cent[:, lat] - xc) < 0.08 * size[lat])
 n_thin = int(thin_ahead.sum())
 print(f"glacis area +{area_plus:.3f} / -{area_minus:.3f} -> front is {'+' if forward > 0 else '-'}{'x' if axis == 0 else 'z'}; {n_thin} narrow faces ahead")
-if n_thin > 15:
-    bx = np.median(cent[thin_ahead, lat]); by = np.median(cent[thin_ahead, 1])
-    rb = float(np.clip(1.7 * np.percentile(np.abs(cent[thin_ahead, lat] - bx), 80), 0.02, 0.036))
-    body = above & (np.abs(cent[:, lat] - bx) > rb * 1.3) & (np.abs(along) < 0.3 * size[axis])
-    tfront = np.percentile(along[body] * forward, 97) if body.sum() > 50 else 0.2 * size[axis]
-    barrel = (np.abs(cent[:, lat] - bx) < rb) & (np.abs(cent[:, 1] - by) < rb * 1.2) & (along * forward > tfront - 0.03 * size[axis])
-    print(f"barrel axis lateral {bx - xc:+.3f}, radius {rb:.3f}, turret front at {tfront / size[axis]:.2f} of the hull length")
-else:
-    barrel = np.zeros(len(f), dtype=bool); print("no barrel found")
+# the turret's front face: the widest part of the turret body ahead of the ring (mantlet included); everything in front
+# of it at turret height is gun, coaxial gun and sight tubes - the game adds a straight gun of the real length there
+body = above & ~narrow & (np.abs(along) < 0.3 * size[axis])
+tfront = np.percentile(along[body] * forward, 96) if body.sum() > 50 else 0.2 * size[axis]
+gunzone = above & (along * forward > tfront + 0.005)
+barrel = gunzone
+print(f"turret front at {tfront / size[axis]:.2f} of the hull length, faces ahead of it removed: {int(gunzone.sum())}")
 lateral = np.abs(cent[:, lat] - ring_center[lat])
-# turret: above the ring and not far along the hull (stowage on the deck corners stays with the hull); the mantlet stub near the centre stays
 far = np.abs(along) > 0.3 * size[axis]
-turret = ((above & ~far) | (above & (lateral < 0.08) & (along * forward > 0) & (along * forward < 0.3 * size[axis]))) & (lateral < 0.24 * size[axis])  # deck pieces beside the turret stay with the hull
-turret = turret & ~barrel
-# the generator blows up the roof machine gun and antennas into cannon-sized tubes. Roof = median height of the
-# turret's big upward-facing faces; everything above it is split into connected pieces, and the narrow pieces go
-# (the cupola is wide and stays).
+turret = (above & ~far) & (lateral < 0.24 * size[axis]) & ~barrel
+
+# above the roof: keep the cupola and hatch lids (compact, flat), drop tubes and aerials (elongated, thin)
 import scipy.sparse as sp
 from scipy.sparse.csgraph import connected_components
 roof_faces = turret & (fn[:, 1] > 0.8) & (fa > np.percentile(fa[turret], 60))
 roof = np.median(cent[roof_faces, 1]) if roof_faces.sum() > 20 else ring_y + 0.1
-cand = turret & (cent[:, 1] > roof + 0.02 * height)
+cand = turret & (cent[:, 1] > roof + 0.015 * height)
 idx = np.where(cand)[0]; pos = {f_: i for i, f_ in enumerate(idx)}
 adj = mesh.face_adjacency; keep = cand[adj[:, 0]] & cand[adj[:, 1]]
 rows = [pos[x] for x in adj[keep, 0]]; cols = [pos[x] for x in adj[keep, 1]]
@@ -89,23 +84,15 @@ ncomp, labels = connected_components(graph, directed=False)
 clutter = np.zeros(len(f), dtype=bool)
 for c_ in range(ncomp):
     members = idx[labels == c_]; pts = v[f[members]].reshape(-1, 3)
-    width = max(pts[:, 0].max() - pts[:, 0].min(), pts[:, 2].max() - pts[:, 2].min())
-    tall = pts[:, 1].max() - roof
-    area = fa[members].sum(); big = area > 0.004 * fa[turret].sum()
-    # keep only substantial, wide, low pieces (the cupola); shards, tubes and tall narrow things go
-    if not big or width < 0.09 * size[axis] or (tall > 0.12 * height and width < 0.14 * size[axis]): clutter[members] = True
-    elif name == 'sherman': print(f"  kept piece: width {width / size[axis]:.2f} L, tall {tall / height:.2f} h, area {area / fa[turret].sum():.3f}")
+    ext = np.sort([pts[:, 0].max() - pts[:, 0].min(), pts[:, 2].max() - pts[:, 2].min()])  # horizontal extents, small to large
+    tall = pts[:, 1].max() - roof; area = fa[members].sum()
+    elongated = ext[1] > 2.2 * max(ext[0], 0.01) and ext[0] < 0.07 * size[axis]     # a tube lying on the roof
+    spike = tall > 0.1 * height and ext[1] < 0.08 * size[axis]                     # an aerial standing on it
+    tiny = area < 0.002 * fa[turret].sum()                                          # loose shards
+    if elongated or spike or tiny: clutter[members] = True
 turret = turret & ~clutter
-print(f"roof at {(roof - lo[1]) / height:.2f} of height, {ncomp} pieces above it, clutter faces removed: {int(clutter.sum())}")
-# slivers: antennas, aerials and gun-cleaning rods come out as long thin triangles above the deck; remove them everywhere
-e = v[f]; el = np.stack([np.linalg.norm(e[:, 0] - e[:, 1], axis=1), np.linalg.norm(e[:, 1] - e[:, 2], axis=1), np.linalg.norm(e[:, 2] - e[:, 0], axis=1)], axis=1)
-sliver = (el.max(axis=1) > 0.035) & (el.min(axis=1) < 0.008) & (cent[:, 1] > ring_y - 0.02)
-# and anything narrow that reaches high above the deck (the whole aerial, not just its long faces)
-tall_thin = narrow & (cent[:, 1] > roof + 0.05 * height) & ~clutter
-print(f"slivers removed: {int(sliver.sum())}, tall thin faces removed: {int(tall_thin.sum())}")
-turret = turret & ~sliver & ~tall_thin
-hull = ~turret & ~barrel & ~clutter & ~sliver & ~tall_thin
-print(f"forward is {'+' if forward > 0 else '-'}{'x' if axis == 0 else 'z'}, barrel faces removed: {int(barrel.sum())}")
+print(f"roof at {(roof - lo[1]) / height:.2f} of height, {ncomp} pieces above it, tubes/aerials/shards removed: {int(clutter.sum())}")
+hull = ~turret & ~barrel & ~clutter
 
 os.makedirs(out_dir, exist_ok=True)
 scale = hull_len / size[axis]
