@@ -12,7 +12,7 @@ namespace IronNight
     /// </summary>
     public class Battle : MonoBehaviour
     {
-        class Shell { public Vector3 pos, vel; public bool friendly, he, bounced; public float dmg, life; public Transform vis; public Material mat; }
+        class Shell { public Vector3 pos, vel; public bool friendly, he, bounced; public float dmg, life, trail; public Transform vis; }
         enum Weather { Clear, Overcast, Fog, Rain }
         class Sky { public Color ambient, fog, moonColor; public float fogDensity, moonIntensity, shadow; }
         class Flare { public Vector3 pos; public float age; public Transform vis; public Light light; public Material mat; }
@@ -196,11 +196,9 @@ namespace IronNight
             var scatter = (v.friendly ? 1.5f * scatterMul : 4f * (smokeLeft > 0f ? 3f : 1f)) * Mathf.Deg2Rad * Random.Range(-1f, 1f);
             var dir = Quaternion.Euler(0f, scatter * Mathf.Rad2Deg, 0f) * v.GunDirection; var pos = v.MuzzlePosition;
             float speed = v.friendly ? ShellSpeed : EnemyShellSpeed;
-            var go = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(go.GetComponent<Collider>()); go.name = "Shell";
-            var m = new Material(shellTemplate); m.SetTexture("_BaseMap", glowTex); m.SetColor("_BaseColor", v.friendly ? new Color(1f, 0.95f, 0.7f, 1f) : new Color(1f, 0.55f, 0.35f, 1f));
-            var r = go.GetComponent<Renderer>(); r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            go.transform.localScale = new Vector3(0.7f, 2.6f, 1f);
-            shells.Add(new Shell { pos = pos, vel = dir * speed, friendly = v.friendly, he = v.friendly && he, dmg = v.spec.damage * v.damageMul, life = v.Range / speed + 0.25f, vis = go.transform, mat = m });
+            var vis = fx.Tracer(v.friendly ? new Color(1f, 1f, 0.9f, 1f) : new Color(1f, 0.75f, 0.55f, 1f), v.friendly ? new Color(1f, 0.85f, 0.45f, 0.6f) : new Color(1f, 0.45f, 0.25f, 0.6f));
+            vis.position = pos; vis.rotation = Quaternion.LookRotation(cam.transform.forward, dir);
+            shells.Add(new Shell { pos = pos, vel = dir * speed, friendly = v.friendly, he = v.friendly && he, dmg = v.spec.damage * v.damageMul, life = v.Range / speed + 0.25f, vis = vis });
             fx.MuzzleFlash(pos, dir); Sfx.Shot(pos, v.friendly, v.spec.gunLength > 3f || v.spec.isGun);
         }
 
@@ -208,7 +206,8 @@ namespace IronNight
         {
             for (int i = shells.Count - 1; i >= 0; i--)
             {
-                var s = shells[i]; s.pos += s.vel * dt; s.life -= dt;
+                var s = shells[i]; s.pos += s.vel * dt; s.life -= dt; s.trail += s.vel.magnitude * dt;
+                if (s.trail > 4f && !s.bounced) { s.trail = 0f; fx.Trail(s.pos); }
                 // the tracer: a stretched glow along the flight, facing the camera
                 s.vis.position = s.pos; s.vis.rotation = Quaternion.LookRotation(cam.transform.forward, s.vel);
                 var hitList = s.friendly ? foes : platoon; Vehicle hit = null;
@@ -230,7 +229,7 @@ namespace IronNight
                 if (s.bounced) s.vel += Vector3.down * (30f * dt);
                 if (hit == null && !s.bounced && props.Blocks(s.pos)) { fx.Hit(s.pos, 0.6f); Sfx.Hit(s.pos); s.life = 0f; }
                 else if (hit == null && s.life <= 0f) { var g = new Vector3(s.pos.x, 0f, s.pos.z); fx.Dust(g); props.Crater(g, 2.2f); }   // spent: into the dirt
-                if (hit != null || s.life <= 0f) { Destroy(s.mat); Destroy(s.vis.gameObject); shells.RemoveAt(i); }
+                if (hit != null || s.life <= 0f) { fx.Release(s.vis); shells.RemoveAt(i); }
             }
         }
 
