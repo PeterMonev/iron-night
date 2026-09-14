@@ -401,6 +401,19 @@ namespace IronNight
             return list;
         }
 
+        /// <summary>Searchlight posts ahead of a point: where a flak gun would stand.</summary>
+        public List<Vector3> Posts(Vector3 from, Vector3 dir, float min, float max)
+        {
+            var list = new List<Vector3>();
+            foreach (var p in active)
+            {
+                if (p.what != What.Searchlight) continue;
+                var d = p.pos - from; d.y = 0f; float len = d.magnitude; if (len < min || len > max) continue;
+                if (Vector3.Dot(d / len, dir) > 0.35f) list.Add(p.pos);
+            }
+            return list;
+        }
+
         /// <summary>A fresh shell crater on the ground; the field keeps the last forty.</summary>
         public void Crater(Vector3 pos, float size)
         {

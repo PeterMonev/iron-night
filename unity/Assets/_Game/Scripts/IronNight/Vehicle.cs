@@ -81,8 +81,8 @@ namespace IronNight
             else
             {
                 // the anti-tank gun is one mesh at ground level that turns as a whole; its muzzle is ahead of the shield
-                hull.transform.SetParent(pivot, false); hull.transform.localPosition = Vector3.zero;
-                muzzle = new GameObject("Muzzle").transform; muzzle.SetParent(pivot, false); muzzle.localPosition = new Vector3(0f, 1.1f, 3.4f);
+                hull.transform.SetParent(pivot, false); hull.transform.localPosition = Vector3.zero; hull.transform.localScale = Vector3.one * spec.scale;
+                muzzle = new GameObject("Muzzle").transform; muzzle.SetParent(pivot, false); muzzle.localPosition = new Vector3(0f, 1.1f, 3.4f) * spec.scale;
             }
             renderers = GetComponentsInChildren<Renderer>();
             baseColors = new Color[renderers.Length];

@@ -56,6 +56,11 @@ namespace IronNight
 
         public static void AddPoints(int points) { Load(); Points += points; Save(); }
 
+        // the daily supply drop: 300 points once a day, claimed on the title screen
+        public const int DailyPoints = 300;
+        public static bool DailyReady => PlayerPrefs.GetString("depot.daily", "") != System.DateTime.Now.ToString("yyyyMMdd");
+        public static void ClaimDaily() { if (!DailyReady) return; PlayerPrefs.SetString("depot.daily", System.DateTime.Now.ToString("yyyyMMdd")); AddPoints(DailyPoints); }
+
         /// <summary>Called once per night, at its end, with what the player did; the points go in through AddPoints.</summary>
         public static void RecordNight(int kills, float seconds)
         {

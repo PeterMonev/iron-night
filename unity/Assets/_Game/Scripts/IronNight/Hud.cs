@@ -13,9 +13,9 @@ namespace IronNight
         public class Card { public string id, title, desc; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain, OnStart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit;
+        public System.Action OnAd, OnAgain, OnStart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily;
 
-        Text clock, count, fps, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp;
+        Text clock, count, fps, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions; GameObject dailyBtn;
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
         class Rising { public Text t; public float life; public Vector3 world; }
         readonly List<Rising> popups = new List<Rising>(); readonly Stack<Text> popupPool = new Stack<Text>(); RectTransform canvasRect; Transform cardRoot, depotRows; Canvas canvas; Text depotPoints, titleStats, endPoints, reserveNote, bossName; Image bossFill; GameObject bossBar;
@@ -40,7 +40,7 @@ namespace IronNight
             var t = hg.transform; canvasRect = canvasGo.GetComponent<RectTransform>();
             var fl = new GameObject("HitFlash", typeof(RectTransform), typeof(Image)); fl.transform.SetParent(t, false); Stretch(fl); flash = fl.GetComponent<Image>(); flash.color = new Color(0.8f, 0.1f, 0.05f, 0f); flash.raycastTarget = false;
             var ink = new Color(0.93f, 0.91f, 0.86f); var amber = new Color(0.95f, 0.66f, 0.23f); var dim = new Color(0.66f, 0.64f, 0.59f);
-            MakeText(t, "ClockLabel", new Vector2(0, 1), new Vector2(60, -70), TextAnchor.UpperLeft, 30, dim).text = "NIGHT ASSAULT";
+            assaultLabel = MakeText(t, "ClockLabel", new Vector2(0, 1), new Vector2(60, -70), TextAnchor.UpperLeft, 30, dim); assaultLabel.text = "NIGHT ASSAULT";
             clock = MakeText(t, "Clock", new Vector2(0, 1), new Vector2(60, -108), TextAnchor.UpperLeft, 82, ink);
             MakeText(t, "CountLabel", new Vector2(1, 1), new Vector2(-60, -70), TextAnchor.UpperRight, 30, dim).text = "PLATOON";
             count = MakeText(t, "Count", new Vector2(1, 1), new Vector2(-60, -108), TextAnchor.UpperRight, 82, amber);
@@ -108,7 +108,10 @@ namespace IronNight
             Stretch(titleSheet); titleSheet.GetComponent<Image>().color = new Color(0.02f, 0.03f, 0.04f, 0.72f);
             MakeText(titleSheet.transform, "Eyebrow", new Vector2(0.5f, 0.5f), new Vector2(0, 660), TextAnchor.MiddleCenter, 34, dim).text = "WWII · NIGHT ASSAULT";
             var big = MakeText(titleSheet.transform, "Name", new Vector2(0.5f, 0.5f), new Vector2(0, 540), TextAnchor.MiddleCenter, 150, ink); big.text = "IRON NIGHT"; big.fontStyle = FontStyle.Bold; big.rectTransform.sizeDelta = new Vector2(1000, 200);
-            MakeText(titleSheet.transform, "Tag", new Vector2(0.5f, 0.5f), new Vector2(0, 420), TextAnchor.MiddleCenter, 36, dim).text = "Lead a Sherman platoon through five minutes of darkness.";
+            MakeText(titleSheet.transform, "Tag", new Vector2(0.5f, 0.5f), new Vector2(0, 430), TextAnchor.MiddleCenter, 36, dim).text = "Lead a Sherman platoon through five minutes of darkness.";
+            conditions = MakeText(titleSheet.transform, "Conditions", new Vector2(0.5f, 0.5f), new Vector2(0, 360), TextAnchor.MiddleCenter, 30, amber);
+            dailyBtn = MakeButton(titleSheet.transform, "Daily supply drop · +" + Depot.DailyPoints + " points", new Vector2(0.5f, 0.5f), new Vector2(0, 275), new Vector2(880, 80), 30, () => OnDaily?.Invoke());
+            dailyBtn.GetComponent<Image>().color = new Color(0.2f, 0.32f, 0.2f, 0.95f);
             var start = MakeButton(titleSheet.transform, "Night assault", new Vector2(0.5f, 0.5f), new Vector2(0, 150), new Vector2(880, 150), 52, () => OnStart?.Invoke());
             start.GetComponent<Image>().color = amber; start.transform.Find("Label").GetComponent<Text>().color = new Color(0.1f, 0.08f, 0.05f);
             MakeButton(titleSheet.transform, "Depot", new Vector2(0.5f, 0.5f), new Vector2(0, -10), new Vector2(880, 130), 40, () => OnDepot?.Invoke());
@@ -136,7 +139,7 @@ namespace IronNight
 
         public void ShowTitle(bool reserveGranted)
         {
-            Depot.Load(); hudGroup.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(false);
+            Depot.Load(); hudGroup.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(false); dailyBtn.SetActive(Depot.DailyReady);
             int m = Mathf.FloorToInt(Depot.BestTime / 60f), s = Mathf.FloorToInt(Depot.BestTime % 60f);
             titleStats.text = Depot.NightsFought == 0 ? "First night. Drag anywhere to drive; the turrets fire on their own." : $"{Depot.NightsFought} nights fought · best {Depot.BestKills} kills · longest {m}:{s:00}\n{Depot.Points} depot points";
             reserveBtn.SetActive(!reserveGranted); reserveNote.text = reserveGranted ? "Reserve tank granted: the platoon can grow to 4 tonight." : "The platoon holds 3 tanks. A rewarded video opens a 4th slot for this night (mock).";
@@ -274,6 +277,8 @@ namespace IronNight
             endSheet.SetActive(true);
         }
         public void HideEnd() { endSheet.SetActive(false); }
+        /// <summary>Tonight's weather on the title and in the corner of the HUD.</summary>
+        public void SetConditions(string name, string note) { conditions.text = name == "Clear" ? "Tonight: clear skies · full moon" : "Tonight: " + name.ToLowerInvariant() + " · " + note; assaultLabel.text = "NIGHT ASSAULT · " + name.ToUpperInvariant(); }
         public void ShowPause(bool soundOn) { soundLabel.text = soundOn ? "Sound: on" : "Sound: off"; pauseSheet.SetActive(true); }
         public void HidePause() { pauseSheet.SetActive(false); }
         public void SetAdNote(string s) { adNote.text = s; }

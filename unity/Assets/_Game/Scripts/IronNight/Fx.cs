@@ -80,6 +80,14 @@ namespace IronNight
             if (Random.value < 0.5f) Spawn(pos + Vector3.up * 2.5f, 3f + Random.value * 2f, new Color(0.25f, 0.24f, 0.22f, 0.6f), 4f, true, new Vector3(Random.Range(-0.4f, 0.4f), 1.6f, Random.Range(-0.4f, 0.4f)));
         }
 
+        /// <summary>A shell glancing off: a white flash and a handful of sparks thrown off the armour.</summary>
+        public void Spark(Vector3 pos, Vector3 away)
+        {
+            Spawn(pos, 2.4f, new Color(1f, 0.97f, 0.85f, 1f), 0.08f, false, Vector3.zero);
+            for (int i = 0; i < 5; i++) Spawn(pos, 0.5f + Random.value * 0.4f, new Color(1f, 0.85f, 0.5f, 1f), 0.25f + Random.value * 0.2f, false, (away + Random.insideUnitSphere * 0.8f + Vector3.up * 0.6f).normalized * (14f + Random.value * 10f));
+            Flash(pos, new Color(1f, 0.9f, 0.7f), 30f, 10f, 0.08f);
+        }
+
         /// <summary>A shell that missed everything and hit the dirt: a small brown puff.</summary>
         public void Dust(Vector3 pos)
         {

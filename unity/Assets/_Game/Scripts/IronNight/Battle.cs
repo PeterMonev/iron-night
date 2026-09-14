@@ -12,7 +12,9 @@ namespace IronNight
     /// </summary>
     public class Battle : MonoBehaviour
     {
-        class Shell { public Vector3 pos, vel; public bool friendly, he; public float dmg, life; public Transform vis; public Material mat; }
+        class Shell { public Vector3 pos, vel; public bool friendly, he, bounced; public float dmg, life; public Transform vis; public Material mat; }
+        enum Weather { Clear, Overcast, Fog, Rain }
+        class Sky { public Color ambient, fog, moonColor; public float fogDensity, moonIntensity, shadow; }
         class Flare { public Vector3 pos; public float age; public Transform vis; public Light light; public Material mat; }
         class Wreck { public Vehicle v; public float age, burnTimer; public Light fire; }
         class ArtyShell { public Vector3 at; public float timer; }
@@ -22,6 +24,7 @@ namespace IronNight
         const float ShellSpeed = 62f, EnemyShellSpeed = 55f, GroundTile = 40f;
 
         Camera cam; Hud hud; TouchStick stick; Fx fx; Props props; Tracks tracks;
+        Weather weather; Sky sky; float rumbleTimer = 12f, flicker, enemyRangeMul = 1f; ParticleSystem rain; Material groundMaterial;
         Transform ground; Light flareLight, moon; float shake; int banked, nightTigers, nightPaks, nightFlares; bool nightRecorded, bossKilled;
         readonly List<Vehicle> platoon = new List<Vehicle>(); readonly List<Vehicle> foes = new List<Vehicle>();
         readonly List<Shell> shells = new List<Shell>(); readonly List<Flare> flares = new List<Flare>(); readonly List<Wreck> wrecks = new List<Wreck>();
@@ -43,11 +46,15 @@ namespace IronNight
         {
             cam = camera; hud = h; stick = s; fx = effects;
             shellTemplate = Resources.Load<Material>("Additive"); glowTex = Lightswarm.ProceduralSprites.Glow(64, 0.3f).texture;
+            PickWeather();
             BuildWorld();
             // the night always starts with the leader alone; the platoon grows from flares to 3, a rewarded ad opens a 4th slot.
             // The depot's permanent upgrades set the starting numbers
             Depot.Load(); firstNight = Depot.NightsFought == 0;
             reloadMul = Depot.ReloadMul; rangeMul = Depot.RangeMul; speedMul = Depot.SpeedMul; maxPlatoon = 3;
+            if (weather == Weather.Fog) { rangeMul *= 0.8f; enemyRangeMul = 0.8f; } else if (weather == Weather.Overcast) enemyRangeMul = 0.9f; else if (weather == Weather.Rain) { speedMul *= 0.92f; enemyRangeMul = 0.95f; }
+            hud.SetConditions(weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Overcast ? "a dark night, the enemy sees 10% less" : weather == Weather.Rain ? "mud slows the platoon, the enemy sees 5% less" : "");
+            hud.OnDaily = () => { Depot.ClaimDaily(); hud.ShowTitle(reserveGranted); };
             platoon.Add(Vehicle.Create(VehicleSpec.Sherman, true, Vector3.zero, 0f)); Leader.hp = Depot.LeaderHp;
             hud.OnFormation = f => formation = f;
             hud.OnAd = OnAd; hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
@@ -77,10 +84,11 @@ namespace IronNight
             tracks = new GameObject("Tracks").AddComponent<Tracks>(); tracks.Build();
 
             // night: moonlight with soft shadows, a cold ambient, fog swallowing the distance
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat; RenderSettings.ambientLight = new Color(0.24f, 0.27f, 0.36f);
-            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = 0.0065f; RenderSettings.fogColor = new Color(0.03f, 0.045f, 0.07f);
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat; RenderSettings.ambientLight = sky.ambient;
+            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = sky.fogDensity; RenderSettings.fogColor = sky.fog;
             var moonGo = new GameObject("Moon"); moon = moonGo.AddComponent<Light>();
-            moon.type = LightType.Directional; moon.color = new Color(0.82f, 0.86f, 1f); moon.intensity = 2.6f; moon.shadows = LightShadows.Soft; moon.shadowStrength = 0.8f;
+            moon.type = LightType.Directional; moon.color = sky.moonColor; moon.intensity = sky.moonIntensity; moon.shadows = LightShadows.Soft; moon.shadowStrength = sky.shadow;
+            if (weather == Weather.Rain) { BuildRain(); gm.SetFloat("_Smoothness", 0.55f); } groundMaterial = gm; Sfx.Ambient(weather == Weather.Rain);
             moonGo.transform.rotation = Quaternion.Euler(52f, -35f, 0f);
             // the flare light over the platoon: warm, follows the leader, grows with the platoon
             var fl = new GameObject("FlareLight"); flareLight = fl.AddComponent<Light>();
@@ -106,11 +114,12 @@ namespace IronNight
             if (phase != Phase.Play) { PlaceCamera(false); TickWrecks(dt); Sfx.Engine(0f); props.Tick(); return; }
             t += dt;
             if (firstNight && hintIndex < hints.Length && t >= hintTimes[hintIndex]) { hud.Toast(hints[hintIndex], 3.5f); hintIndex++; }
-            Dawn(Mathf.Clamp01((t - 255f) / 45f));
+            Lighting(Mathf.Clamp01((t - 255f) / 45f), dt);
             if (smokeLeft > 0f) smokeLeft -= dt; if (smokeCooldown > 0f) smokeCooldown -= dt;
             TickArtillery(dt);
             var L = Leader;
             if (leaderShield > 0f) leaderShield -= dt;
+            if (rain != null) rain.transform.position = L.transform.position + Vector3.up * 30f;
 
             // the leader drives where the thumb points; the wingmen hold their slots
             if (stick.Active) L.Drive(stick.Direction, dt);
@@ -135,7 +144,7 @@ namespace IronNight
             for (int i = 0; i < foes.Count; i++)
             {
                 var e = foes[i]; e.reloadLeft -= dt;
-                var target = Nearest(platoon, e.transform.position, 1000f); if (target == null) continue;
+                var target = Nearest(platoon, e.transform.position, 1000f); if (target == null) continue; e.rangeMul = enemyRangeMul;
                 float dist = Dist(e, target);
                 if (!e.spec.isGun && dist > e.Range * 0.8f) { var d = target.transform.position - e.transform.position; e.Drive(Steer(e, new Vector2(d.x, d.z)), dt); }
                 bool on = e.Aim(target.transform.position, dt);
@@ -203,14 +212,23 @@ namespace IronNight
                 // the tracer: a stretched glow along the flight, facing the camera
                 s.vis.position = s.pos; s.vis.rotation = Quaternion.LookRotation(cam.transform.forward, s.vel);
                 var hitList = s.friendly ? foes : platoon; Vehicle hit = null;
-                foreach (var v in hitList) { if (v.dead) continue; var d = v.transform.position - s.pos; d.y = 0f; if (d.sqrMagnitude < v.spec.radius * v.spec.radius) { hit = v; break; } }
+                if (!s.bounced) foreach (var v in hitList) { if (v.dead) continue; var d = v.transform.position - s.pos; d.y = 0f; if (d.sqrMagnitude < v.spec.radius * v.spec.radius) { hit = v; break; } }
+                if (hit != null && Ricochets(s, hit))
+                {
+                    // glances off: sparks, a whine, and the shell tumbles away over the hull
+                    var away = s.pos - hit.transform.position; away.y = 0f; away.Normalize();
+                    s.vel = Vector3.Reflect(s.vel, away) * 0.45f + away * 10f + Vector3.up * 16f; s.life = 0.8f; s.bounced = true;
+                    fx.Spark(new Vector3(s.pos.x, 1.8f, s.pos.z), away); Sfx.Ricochet(s.pos); hud.Popup(hit.transform.position, "Ricochet", new Color(0.8f, 0.82f, 0.86f));
+                    hit = null;
+                }
                 if (hit != null)
                 {
                     Damage(hit, s.dmg, s.pos);
                     if (s.he) foreach (var v in hitList) if (v != hit && !v.dead && Dist(v, hit) < 5f) Damage(v, s.dmg * 0.5f, v.transform.position);
                     fx.Hit(new Vector3(s.pos.x, 1.6f, s.pos.z), s.he ? 1.5f : 1f);
                 }
-                if (hit == null && props.Blocks(s.pos)) { fx.Hit(s.pos, 0.6f); Sfx.Hit(s.pos); s.life = 0f; }
+                if (s.bounced) s.vel += Vector3.down * (30f * dt);
+                if (hit == null && !s.bounced && props.Blocks(s.pos)) { fx.Hit(s.pos, 0.6f); Sfx.Hit(s.pos); s.life = 0f; }
                 else if (hit == null && s.life <= 0f) { var g = new Vector3(s.pos.x, 0f, s.pos.z); fx.Dust(g); props.Crater(g, 2.2f); }   // spent: into the dirt
                 if (hit != null || s.life <= 0f) { Destroy(s.mat); Destroy(s.vis.gameObject); shells.RemoveAt(i); }
             }
@@ -236,8 +254,8 @@ namespace IronNight
             else
             {
                 foes.Remove(v); kills++;
-                if (v.spec == VehicleSpec.Tiger || v.spec == VehicleSpec.TigerAce) nightTigers++; if (v.spec == VehicleSpec.Pak40) nightPaks++;
-                int worth = v.spec == VehicleSpec.Tiger ? 5 : v.spec == VehicleSpec.TigerAce ? 12 : 2; score += worth * 50; xp += worth;
+                if (v.spec == VehicleSpec.Tiger || v.spec == VehicleSpec.TigerAce) nightTigers++; if (v.spec.isGun) nightPaks++;
+                int worth = v.spec == VehicleSpec.Tiger ? 5 : v.spec == VehicleSpec.TigerAce ? 12 : v.spec == VehicleSpec.Flak88 ? 4 : 2; score += worth * 50; xp += worth;
                 hud.Popup(v.transform.position, "+" + worth * 50, new Color(0.95f, 0.66f, 0.23f)); shake = Mathf.Max(shake, Dist(v, Leader) < 25f ? 0.5f : 0.2f);
                 if (v == boss) { score += 1500; bossKilled = true; shake = 2f; hud.HideBoss(); hud.Toast("Tiger Ace destroyed · +1500"); }
                 SpawnFlare(v.transform.position);
@@ -309,13 +327,22 @@ namespace IronNight
                     var pos = props.PushOut(L.transform.position + L.Forward * 38f + new Vector3(Random.Range(-14f, 14f), 0f, 0f), 3f); float gyaw = L.yaw + Mathf.PI;
                     var nests = props.Nests(L.transform.position, L.Forward, 26f, 60f);
                     if (nests.Count > 0) { var nest = nests[Random.Range(0, nests.Count)]; var toL = L.transform.position - nest; toL.y = 0f; toL.Normalize(); pos = nest - toL * 3.2f; gyaw = Mathf.Atan2(toL.x, toL.z); }   // behind the sandbags, facing us
-                    var gun = Vehicle.Create(VehicleSpec.Pak40, false, pos, gyaw); gun.turretYaw = gun.yaw; foes.Add(gun);
+                    var gspec = VehicleSpec.Pak40;
+                    if (t > 100f && Random.value < 0.35f)
+                    {
+                        // the searchlight posts have an 88 with them: long reach, hard hit, slow to turn
+                        var posts = props.Posts(L.transform.position, L.Forward, 34f, 66f);
+                        if (posts.Count > 0) { var post = posts[Random.Range(0, posts.Count)]; var toL = L.transform.position - post; toL.y = 0f; toL.Normalize(); pos = props.PushOut(post + toL * 8f, 3f); gyaw = Mathf.Atan2(toL.x, toL.z); gspec = VehicleSpec.Flak88; }
+                    }
+                    var gun = Vehicle.Create(gspec, false, pos, gyaw); gun.turretYaw = gun.yaw; foes.Add(gun);
+                    hud.Toast((gspec == VehicleSpec.Flak88 ? "88! Flak gun, " : "Anti-tank gun dug in, ") + Clock(pos), 2.8f);
                 }
                 else
                 {
                     var spec = (t > 90f && Random.value < Mathf.Lerp(0.1f, 0.35f, (t - 90f) / 180f)) ? VehicleSpec.Tiger : VehicleSpec.PanzerIV;
                     var pos = L.transform.position + dir * Random.Range(44f, 52f);
                     var e = Vehicle.Create(spec, false, pos, Mathf.Atan2(-dir.x, -dir.z)); e.turretYaw = e.yaw; foes.Add(e);
+                    if (spec == VehicleSpec.Tiger) hud.Toast("Tiger! " + Clock(pos), 2.8f);
                 }
             }
             if (t >= 120f && !wave2) { wave2 = true; Column(); }
@@ -343,7 +370,7 @@ namespace IronNight
                 var pos = L.transform.position + f * (34f + i * 3f) - r * side * (46f + i * 9f);
                 var e = Vehicle.Create(spec, false, pos, Mathf.Atan2(r.x * side, r.z * side)); e.turretYaw = e.yaw; foes.Add(e);
             }
-            hud.Toast("Armoured column");
+            hud.Toast("Armoured column, " + Clock(L.transform.position - r * side * 50f), 2.8f);
         }
 
         /// <summary>Vehicles push each other apart so the platoon never stacks and enemies keep a spacing.</summary>
@@ -410,14 +437,70 @@ namespace IronNight
             });
         }
 
-        /// <summary>The last 45 seconds: the sky greys, the moon warms, the fog lifts a little. k runs 0..1.</summary>
-        void Dawn(float k)
+        /// <summary>Tonight's weather: most nights are clear; overcast, fog and rain each change the light and the fight.</summary>
+        void PickWeather()
         {
-            if (k <= 0f) return; float e = k * k;
-            RenderSettings.ambientLight = Color.Lerp(new Color(0.24f, 0.27f, 0.36f), new Color(0.42f, 0.4f, 0.44f), e);
-            RenderSettings.fogColor = Color.Lerp(new Color(0.03f, 0.045f, 0.07f), new Color(0.3f, 0.26f, 0.28f), e); RenderSettings.fogDensity = Mathf.Lerp(0.0065f, 0.004f, e);
-            moon.color = Color.Lerp(new Color(0.82f, 0.86f, 1f), new Color(1f, 0.82f, 0.62f), e); moon.intensity = Mathf.Lerp(2.6f, 3.6f, e);
+            float r = Random.value; weather = r < 0.45f ? Weather.Clear : r < 0.7f ? Weather.Overcast : r < 0.85f ? Weather.Fog : Weather.Rain;
+            var args = System.Environment.GetCommandLineArgs();   // test switches: --fog, --rain, --overcast, --clear
+            foreach (Weather w in System.Enum.GetValues(typeof(Weather))) if (System.Array.IndexOf(args, "--" + w.ToString().ToLowerInvariant()) >= 0) weather = w;
+            switch (weather)
+            {
+                case Weather.Overcast: sky = new Sky { ambient = new Color(0.17f, 0.19f, 0.27f), fog = new Color(0.025f, 0.03f, 0.045f), fogDensity = 0.008f, moonColor = new Color(0.7f, 0.74f, 0.9f), moonIntensity = 1.7f, shadow = 0.5f }; break;
+                case Weather.Fog: sky = new Sky { ambient = new Color(0.24f, 0.26f, 0.32f), fog = new Color(0.09f, 0.1f, 0.12f), fogDensity = 0.016f, moonColor = new Color(0.8f, 0.82f, 0.9f), moonIntensity = 1.9f, shadow = 0.45f }; break;
+                case Weather.Rain: sky = new Sky { ambient = new Color(0.15f, 0.17f, 0.24f), fog = new Color(0.03f, 0.035f, 0.05f), fogDensity = 0.009f, moonColor = new Color(0.66f, 0.7f, 0.86f), moonIntensity = 1.5f, shadow = 0.4f }; break;
+                default: sky = new Sky { ambient = new Color(0.24f, 0.27f, 0.36f), fog = new Color(0.03f, 0.045f, 0.07f), fogDensity = 0.0065f, moonColor = new Color(0.82f, 0.86f, 1f), moonIntensity = 2.6f, shadow = 0.8f }; break;
+            }
+            LightShaft.boost = weather == Weather.Fog ? 1.8f : weather == Weather.Rain ? 1.3f : 1f;
+        }
+
+        /// <summary>The night's light every frame: the sky of the weather, then the last 45 seconds turning to dawn
+        /// (k runs 0..1), then the flicker of a barrage somewhere over the horizon.</summary>
+        void Lighting(float k, float dt)
+        {
+            rumbleTimer -= dt;
+            if (rumbleTimer <= 0f) { rumbleTimer = 9f + Random.value * 18f; flicker = 0.35f; Sfx.Rumble(); }
+            if (flicker > 0f) flicker = Mathf.Max(0f, flicker - dt * 1.4f);
+            if (k <= 0f && flicker <= 0f) return;
+            float e = k * k; var fl = new Color(0.2f, 0.17f, 0.14f) * (flicker * flicker * 4f);
+            RenderSettings.ambientLight = Color.Lerp(sky.ambient, new Color(0.42f, 0.4f, 0.44f), e) + fl;
+            RenderSettings.fogColor = Color.Lerp(sky.fog, new Color(0.3f, 0.26f, 0.28f), e); RenderSettings.fogDensity = Mathf.Lerp(sky.fogDensity, Mathf.Min(sky.fogDensity, 0.004f), e);
+            moon.color = Color.Lerp(sky.moonColor, new Color(1f, 0.82f, 0.62f), e); moon.intensity = Mathf.Lerp(sky.moonIntensity, 3.6f, e);
             moon.transform.rotation = Quaternion.Euler(Mathf.Lerp(52f, 22f, e), Mathf.Lerp(-35f, -80f, e), 0f);
+        }
+
+        /// <summary>Rain: thin pale streaks falling through a 70 m box over the platoon, stretched by their speed.</summary>
+        void BuildRain()
+        {
+            var go = new GameObject("Rain"); rain = go.AddComponent<ParticleSystem>(); rain.Stop();
+            var main = rain.main; main.startSpeed = 40f; main.startLifetime = 1.1f; main.startSize = 0.07f; main.maxParticles = 2000; main.simulationSpace = ParticleSystemSimulationSpace.World; main.gravityModifier = 1.5f;
+            main.startColor = new Color(0.7f, 0.75f, 0.85f, 0.45f);
+            var em = rain.emission; em.rateOverTime = 1300f;
+            var sh = rain.shape; sh.shapeType = ParticleSystemShapeType.Box; sh.scale = new Vector3(70f, 1f, 90f); sh.rotation = new Vector3(90f, 0f, 0f);
+            var r = go.GetComponent<ParticleSystemRenderer>(); r.renderMode = ParticleSystemRenderMode.Stretch; r.lengthScale = 22f; r.velocityScale = 0f;
+            var m = new Material(Resources.Load<Material>("Additive")); m.SetTexture("_BaseMap", glowTex); m.SetColor("_BaseColor", new Color(0.5f, 0.55f, 0.65f, 0.35f)); r.sharedMaterial = m;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false;
+            go.transform.position = Vector3.up * 30f; rain.Play();
+        }
+
+        /// <summary>Armour is sloped and shells glance: most likely off a front plate, rarely off a side, never from
+        /// HE. The Tiger's slab front bounces a little more; the 17-pounder and APCR bite through.</summary>
+        bool Ricochets(Shell s, Vehicle target)
+        {
+            if (target.spec.isGun || s.he) return false;
+            float facing = Vector3.Dot(s.vel.normalized, target.Forward);          // -1: straight into its front, +1: into its rear
+            float chance = facing < -0.5f ? 0.1f : facing > 0.5f ? 0.02f : 0.05f;    // rare: a surprise, not a rule
+            if (target.spec == VehicleSpec.Tiger || target.spec == VehicleSpec.TigerAce) chance *= 1.5f;
+            if (s.friendly && s.dmg >= 2f) chance *= 0.5f;
+            return Random.value < chance;
+        }
+
+        /// <summary>Where something is, the way a commander calls it: "2 o'clock", from the leader's heading.</summary>
+        string Clock(Vector3 at)
+        {
+            var L = Leader; if (L == null) return ""; var d = at - L.transform.position; d.y = 0f;
+            float rel = Mathf.DeltaAngle(L.yaw * Mathf.Rad2Deg, Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg);
+            int hour = Mathf.RoundToInt(rel / 30f); if (hour <= 0) hour += 12;
+            return hour + " o'clock";
         }
 
         static void Buzz()

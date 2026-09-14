@@ -9,7 +9,7 @@ namespace IronNight
     /// </summary>
     public class LightShaft : MonoBehaviour
     {
-        public static Camera cam;
+        public static Camera cam; public static float boost = 1f;   // fog nights make the beams stand out
         static Texture2D tex;
         const int N = 14;
         public float length = 380f, width0 = 2.2f, width1 = 16f;
@@ -36,7 +36,7 @@ namespace IronNight
                 }
                 tex.Apply();
             }
-            mat = new Material(Resources.Load<Material>("Additive")); mat.SetTexture("_BaseMap", tex); mat.SetColor("_BaseColor", new Color(0.9f, 1f, 1.3f, 0.3f));
+            mat = new Material(Resources.Load<Material>("Additive")); mat.SetTexture("_BaseMap", tex); mat.SetColor("_BaseColor", new Color(0.9f, 1f, 1.3f, 0.3f * boost));
             var mr = gameObject.AddComponent<MeshRenderer>(); mr.sharedMaterial = mat;
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; mr.receiveShadows = false;
         }

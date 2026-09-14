@@ -16,6 +16,7 @@ namespace IronNight
         public Color tint = Color.white;
         public float speed, turnRate, turretRate, reload, damage, range, hp, radius;
         public bool isGun;              // PaK: no turret, aims with its body, never moves
+        public float scale = 1f;        // the mesh scaled up: the 88 is the PaK mesh at 1.45
 
         public static readonly VehicleSpec Sherman = new VehicleSpec
         {
@@ -54,9 +55,16 @@ namespace IronNight
             speed = 0f, turnRate = 1.4f, turretRate = 1.4f, reload = 2.2f, damage = 1f, range = 32f, hp = 2f, radius = 1.8f, isGun = true
         };
 
+        public static readonly VehicleSpec Flak88 = new VehicleSpec
+        {
+            id = "flak88", name = "8.8 cm Flak", hullMesh = "pak40_hull", turretMesh = null, texture = "pak40", forward = -1f, ringHeight = 0f, scale = 1.45f,
+            gunLength = 0f, tint = new Color(0.78f, 0.78f, 0.76f),
+            speed = 0f, turnRate = 0.9f, turretRate = 0.9f, reload = 3.2f, damage = 2f, range = 40f, hp = 4f, radius = 2.6f, isGun = true
+        };
+
         public static VehicleSpec ById(string id)
         {
-            switch (id) { case "firefly": return Firefly; case "pz4": return PanzerIV; case "tiger": return Tiger; case "pak40": return Pak40; default: return Sherman; }
+            switch (id) { case "firefly": return Firefly; case "pz4": return PanzerIV; case "tiger": return Tiger; case "pak40": return Pak40; case "flak88": return Flak88; default: return Sherman; }
         }
     }
 

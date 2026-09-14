@@ -11,7 +11,7 @@ namespace IronNight
     {
         const int Rate = 44100;
         static Sfx instance;
-        AudioClip shot, shotFar, hit, explosion, pickup, click, levelUp, engineLoop, wind, whistle;
+        AudioClip shot, shotFar, hit, explosion, pickup, click, levelUp, engineLoop, wind, whistle, rain, rumble, ricochet;
         readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, ambient, ui;
         System.Random rng = new System.Random(3);
 
@@ -59,6 +59,12 @@ namespace IronNight
             engineLoop = Clip("engine", 1.0f, i => { float t = i / (float)Rate; float pulse = Mathf.Sin(2f * Mathf.PI * 36f * t); pulse = Mathf.Sign(pulse) * Mathf.Pow(Mathf.Abs(pulse), 0.3f); float grit = Noise() * 0.25f; return (pulse * 0.5f + grit) * 0.35f; });
             // an artillery shell coming down: a falling whistle, louder as it nears
             whistle = Clip("whistle", 1.1f, i => { float t = i / (float)Rate; float f = 2400f * Mathf.Pow(0.22f, t / 1.1f); float env = Mathf.Min(1f, t * 3f) * (t < 0.95f ? 1f : (1.1f - t) / 0.15f); return (Mathf.Sin(2f * Mathf.PI * f * t) * 0.3f + Noise() * 0.05f) * env; });
+            // a shell glancing off armour: a high metallic whine dropping in pitch
+            ricochet = Clip("ricochet", 0.45f, i => { float t = i / (float)Rate; float f = 3200f * Mathf.Pow(0.45f, t / 0.45f); return (Mathf.Sin(2f * Mathf.PI * f * t) * 0.5f + Noise() * Mathf.Exp(-t * 60f) * 0.6f) * Mathf.Exp(-t * 7f); });
+            // rain on the hull: dense noise with a soft flutter; distant guns: a slow low thud rolling away
+            lp = 0f; float lpr = 0f;
+            rain = Clip("rain", 3.0f, i => { lpr = lpr * 0.6f + Noise() * 0.4f; float t = i / (float)Rate; return lpr * 0.5f * (0.85f + 0.15f * Mathf.Sin(2f * Mathf.PI * t * 1.3f)); });
+            rumble = Clip("rumble", 2.2f, i => { float t = i / (float)Rate; lp = lp * 0.992f + Noise() * 0.008f; float env = Mathf.Min(1f, t * 6f) * Mathf.Exp(-t * 1.6f); return (lp * 9f + Mathf.Sin(2f * Mathf.PI * 32f * t) * 0.5f * Mathf.Exp(-t * 2.5f)) * env; });
             lp = 0f;
             wind = Clip("wind", 3.0f, i => { lp = lp * 0.985f + Noise() * 0.015f; float t = i / (float)Rate; float env = 0.7f + 0.3f * Mathf.Sin(2f * Mathf.PI * t / 3f); return lp * 4f * env; });
 
@@ -78,8 +84,13 @@ namespace IronNight
         }
 
         public static void Shot(Vector3 pos, bool friendly, bool heavy) { if (instance) instance.PlayAt(heavy ? instance.shot : instance.shotFar, pos, heavy ? 0.9f : 0.7f, (friendly ? 1f : 0.85f) * Random.Range(0.94f, 1.06f)); }
+        /// <summary>Distant barrage somewhere over the horizon.</summary>
+        public static void Rumble() { if (instance) instance.ui.PlayOneShot(instance.rumble, 0.55f); }
+        /// <summary>The night's ambient bed: wind, or rain on the hull.</summary>
+        public static void Ambient(bool raining) { if (!instance) return; var a = instance.ambient; a.clip = raining ? instance.rain : instance.wind; a.volume = raining ? 0.32f : 0.18f; a.Play(); }
         public static void Flak(Vector3 pos) { if (instance) instance.PlayAt(instance.shotFar, pos, 0.35f, 1.6f); }
         public static void Whistle(Vector3 pos) { if (instance) instance.PlayAt(instance.whistle, pos, 0.7f, Random.Range(0.95f, 1.05f)); }
+        public static void Ricochet(Vector3 pos) { if (instance) instance.PlayAt(instance.ricochet, pos, 0.8f, Random.Range(0.9f, 1.15f)); }
         public static void Hit(Vector3 pos) { if (instance) instance.PlayAt(instance.hit, pos, 0.8f, Random.Range(0.9f, 1.1f)); }
         public static void Explosion(Vector3 pos) { if (instance) instance.PlayAt(instance.explosion, pos, 1f, Random.Range(0.9f, 1.05f)); }
         public static void Pickup() { if (instance) instance.ui.PlayOneShot(instance.pickup, 0.6f); }
