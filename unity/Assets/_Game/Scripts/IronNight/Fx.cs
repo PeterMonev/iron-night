@@ -174,8 +174,21 @@ namespace IronNight
         /// <summary>Gives a tracer's quads back to the pool.</summary>
         public void Release(Transform tracer)
         {
-            for (int i = tracer.childCount - 1; i >= 0; i--) { var q = tracer.GetChild(i).gameObject; q.transform.SetParent(transform, false); q.transform.localScale = Vector3.one; q.SetActive(false); quadPool.Push(q); }
+            for (int i = tracer.childCount - 1; i >= 0; i--) { var q = tracer.GetChild(i).gameObject; if (q.GetComponent<MeshRenderer>() == null) continue; q.transform.SetParent(transform, false); q.transform.localScale = Vector3.one; q.transform.localRotation = Quaternion.identity; q.SetActive(false); quadPool.Push(q); }
             Destroy(tracer.gameObject);
+        }
+
+        /// <summary>Signal smoke: a coloured puff rising slowly from a marker.</summary>
+        public void Signal(Vector3 pos, Color color) { Spawn(smokeRagged, pos, 2.2f + Random.value, color, 2.6f, new Vector3(Random.Range(-0.3f, 0.3f), 1.6f, Random.Range(-0.3f, 0.3f)), 1.8f, true); }
+
+        /// <summary>A ring on the ground with a light over it: the objective marker, the landed supply crate.</summary>
+        public Transform Marker(Vector3 pos, Color color, float size)
+        {
+            var root = new GameObject("Marker").transform; root.SetParent(transform, false); root.position = pos;
+            var q = Quad(); q.transform.SetParent(root, false); q.transform.localPosition = new Vector3(0f, 0.08f, 0f); q.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); q.transform.localScale = new Vector3(size, size, 1f);
+            var r = q.GetComponent<Renderer>(); r.sharedMaterial = addRing; mpb.SetColor(BaseColor, color); r.SetPropertyBlock(mpb);
+            var l = new GameObject("Light").AddComponent<Light>(); l.transform.SetParent(root, false); l.transform.localPosition = Vector3.up * 2f; l.type = LightType.Point; l.color = color; l.intensity = 8f; l.range = 14f; l.shadows = LightShadows.None;
+            return root;
         }
 
         /// <summary>A thin puff left behind a shell in flight.</summary>

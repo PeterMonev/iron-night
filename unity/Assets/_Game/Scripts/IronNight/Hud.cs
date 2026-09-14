@@ -18,7 +18,8 @@ namespace IronNight
         Text clock, count, fps, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions; GameObject dailyBtn;
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
         class Rising { public Text t; public float life; public Vector3 world; }
-        readonly List<Rising> popups = new List<Rising>(); readonly Stack<Text> popupPool = new Stack<Text>(); RectTransform canvasRect; Transform cardRoot, depotRows; Canvas canvas; Text depotPoints, titleStats, endPoints, reserveNote, bossName; Image bossFill; GameObject bossBar;
+        readonly List<Rising> popups = new List<Rising>(); readonly Stack<Text> popupPool = new Stack<Text>(); RectTransform canvasRect;
+        Image radar, objectiveArrow; Text objectiveLabel; readonly List<Image> radarDots = new List<Image>(); readonly List<Image> hpBars = new List<Image>(); readonly List<Image> hpFills = new List<Image>(); Transform cardRoot, depotRows; Canvas canvas; Text depotPoints, titleStats, endPoints, reserveNote, bossName; Image bossFill; GameObject bossBar;
         readonly Button[] formButtons = new Button[4];
         readonly List<Image> arrows = new List<Image>(); Sprite arrowSprite;
         float fpsAccum, fpsTimer, toastLeft; int fpsFrames;
@@ -57,6 +58,11 @@ namespace IronNight
             bossBar.SetActive(false);
             toast = MakeText(t, "Toast", new Vector2(0.5f, 0.5f), new Vector2(0, 420), TextAnchor.MiddleCenter, 60, ink); toast.text = "";
             var pauseBtn = MakeButton(t, "II", new Vector2(0.5f, 1f), new Vector2(0, -150), new Vector2(120, 76), 40, () => OnPause?.Invoke()); pauseBtn.name = "Pause";
+            radar = MakeImage(t, "Radar", new Vector2(1f, 0f), new Vector2(-150, 330), new Vector2(240, 240), new Color(0.02f, 0.03f, 0.04f, 0.55f)); radar.sprite = Lightswarm.ProceduralSprites.Glow(64, 0.98f); radar.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            var ring = MakeImage(radar.transform, "Ring", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(240, 240), new Color(0.93f, 0.91f, 0.86f, 0.35f)); ring.sprite = Lightswarm.ProceduralSprites.Ring(128, 0.03f); ring.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            var me = MakeImage(radar.transform, "Me", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(14, 14), new Color(0.95f, 0.66f, 0.23f, 1f)); me.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            objectiveArrow = MakeImage(t, "ObjectiveArrow", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(64, 64), new Color(0.35f, 0.95f, 0.45f, 0.95f)); objectiveArrow.rectTransform.pivot = new Vector2(0.5f, 0.5f); objectiveArrow.enabled = false;
+            objectiveLabel = MakeText(t, "ObjectiveLabel", new Vector2(0.5f, 0.5f), Vector2.zero, TextAnchor.MiddleCenter, 30, new Color(0.35f, 0.95f, 0.45f)); objectiveLabel.rectTransform.sizeDelta = new Vector2(240, 50); objectiveLabel.text = "";
 
             var names = new[] { "WEDGE", "COLUMN", "LINE", "ECHELON" };
             var forms = new[] { Formation.Wedge, Formation.Column, Formation.Line, Formation.Echelon };
@@ -88,7 +94,7 @@ namespace IronNight
             adNote = MakeText(endSheet.transform, "AdNote", new Vector2(0.5f, 0.5f), new Vector2(0, -130), TextAnchor.MiddleCenter, 28, dim); adNote.rectTransform.sizeDelta = new Vector2(900, 100);
             MakeButton(endSheet.transform, "New assault", new Vector2(0.5f, 0.5f), new Vector2(0, -260), new Vector2(880, 130), 40, () => OnAgain?.Invoke());
             endSheet.SetActive(false);
-            arrowSprite = ArrowSprite();
+            arrowSprite = ArrowSprite(); objectiveArrow.sprite = arrowSprite;
             var root = canvasGo.transform;
             endPoints = MakeText(endSheet.transform, "Points", new Vector2(0.5f, 0.5f), new Vector2(0, 120), TextAnchor.MiddleCenter, 44, amber);
             MakeButton(endSheet.transform, "Depot", new Vector2(0.5f, 0.5f), new Vector2(0, -400), new Vector2(880, 130), 40, () => OnDepot?.Invoke());
@@ -141,7 +147,7 @@ namespace IronNight
         {
             Depot.Load(); hudGroup.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(false); dailyBtn.SetActive(Depot.DailyReady);
             int m = Mathf.FloorToInt(Depot.BestTime / 60f), s = Mathf.FloorToInt(Depot.BestTime % 60f);
-            titleStats.text = Depot.NightsFought == 0 ? "First night. Drag anywhere to drive; the turrets fire on their own." : $"{Depot.NightsFought} nights fought · best {Depot.BestKills} kills · longest {m}:{s:00}\n{Depot.Points} depot points";
+            titleStats.text = Depot.NightsFought == 0 ? "First night. Drag anywhere to drive; the turrets fire on their own." : $"{Depot.Rank} · {Depot.NightsFought} nights fought · best {Depot.BestKills} kills · longest {m}:{s:00}\n{Depot.Points} depot points";
             reserveBtn.SetActive(!reserveGranted); reserveNote.text = reserveGranted ? "Reserve tank granted: the platoon can grow to 4 tonight." : "The platoon holds 3 tanks. A rewarded video opens a 4th slot for this night (mock).";
             Missions.Load(); foreach (Transform c in missionRoot) Destroy(c.gameObject);
             for (int i = 0; i < Missions.Active.Count; i++)
@@ -194,6 +200,21 @@ namespace IronNight
                     b.GetComponent<Button>().interactable = can && !chosen;
                 }
             }
+            // the leader's tank
+            {
+                float y = -(Depot.Upgrades.Count + 1) * 250f;
+                var row = MakeImage(depotRows, "Row leader", new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 230), new Color(0.08f, 0.09f, 0.1f, 0.96f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);
+                var title = MakeText(row.transform, "Title", new Vector2(0f, 1f), new Vector2(30, -20), TextAnchor.UpperLeft, 44, new Color(0.93f, 0.91f, 0.86f)); title.text = "Leader's tank"; title.rectTransform.sizeDelta = new Vector2(600, 60);
+                var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(30, -80), TextAnchor.UpperLeft, 28, new Color(0.66f, 0.64f, 0.59f)); desc.text = "The Firefly's 17-pounder hits twice as hard and reaches farther; the turret is slower."; desc.rectTransform.sizeDelta = new Vector2(880, 80);
+                for (int k = 0; k < Depot.Leaders.Length; k++)
+                {
+                    var c = Depot.Leaders[k]; bool owned = Depot.OwnsLeader(c), chosen = Depot.LeaderId == c.id, can = owned || Depot.Points >= c.cost;
+                    var b = MakeButton(row.transform, owned ? c.name : $"{c.name} · {c.cost}", new Vector2(0f, 0f), new Vector2(240 + k * 440, 50), new Vector2(420, 80), 28, () => { if (Depot.PickLeader(c)) RefreshDepot(); });
+                    b.GetComponent<Image>().color = chosen ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : can ? new Color(0.2f, 0.22f, 0.24f, 0.95f) : new Color(0.12f, 0.12f, 0.13f, 0.9f);
+                    b.transform.Find("Label").GetComponent<Text>().color = chosen ? new Color(0.1f, 0.08f, 0.05f) : can ? new Color(0.93f, 0.91f, 0.86f) : new Color(0.5f, 0.48f, 0.45f);
+                    b.GetComponent<Button>().interactable = can && !chosen;
+                }
+            }
         }
 
         public void SetEndPoints(int points) { endPoints.text = points > 0 ? $"+{points} depot points" : ""; }
@@ -214,6 +235,52 @@ namespace IronNight
                 a.enabled = true; a.rectTransform.anchoredPosition = d * k; a.rectTransform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg - 90f); used++;
             }
             for (int i = used; i < arrows.Count; i++) arrows[i].enabled = false;
+        }
+
+        /// <summary>The radar in the corner: enemies red, wingmen green, the objective amber, ninety metres to the rim, north up.</summary>
+        public void Radar(List<Vehicle> foes, List<Vehicle> platoon, Vector3 leader, Vector3 objective, bool hasObjective)
+        {
+            int used = 0; const float range = 90f, rim = 110f;
+            Image Dot(Vector3 world, Color c, float size)
+            {
+                Image d; if (used < radarDots.Count) d = radarDots[used]; else { d = MakeImage(radar.transform, "Dot", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(10, 10), Color.white); d.sprite = Lightswarm.ProceduralSprites.Glow(16, 0.9f); d.rectTransform.pivot = new Vector2(0.5f, 0.5f); radarDots.Add(d); }
+                used++; var o = new Vector2(world.x - leader.x, world.z - leader.z) * (rim / range); if (o.magnitude > rim) o = o.normalized * rim;
+                d.enabled = true; d.color = c; d.rectTransform.sizeDelta = new Vector2(size, size); d.rectTransform.anchoredPosition = o; return d;
+            }
+            foreach (var e in foes) if (!e.dead) Dot(e.transform.position, e.spec.isGun ? new Color(1f, 0.55f, 0.3f) : new Color(0.95f, 0.3f, 0.25f), e.spec == VehicleSpec.TigerAce ? 16f : 11f);
+            for (int i = 1; i < platoon.Count; i++) if (!platoon[i].dead) Dot(platoon[i].transform.position, new Color(0.45f, 0.9f, 0.5f), 10f);
+            if (hasObjective) Dot(objective, new Color(0.35f, 0.95f, 0.45f), 14f);
+            for (int i = used; i < radarDots.Count; i++) radarDots[i].enabled = false;
+        }
+
+        /// <summary>Small bars over enemies that were hit in the last three seconds.</summary>
+        public void HpBars(List<Vehicle> foes, Camera cam, Vehicle boss)
+        {
+            int used = 0;
+            foreach (var e in foes)
+            {
+                if (e.dead || e == boss || e.hp >= e.spec.hp || Time.time - e.lastHit > 3f) continue;
+                var sp = cam.WorldToScreenPoint(e.transform.position + Vector3.up * 3.2f); if (sp.z < 0f) continue;
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, sp, null, out var local);
+                Image bg, fill;
+                if (used < hpBars.Count) { bg = hpBars[used]; fill = hpFills[used]; }
+                else { bg = MakeImage(hudGroup.transform, "HpBar", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(90, 10), new Color(0f, 0f, 0f, 0.6f)); bg.rectTransform.pivot = new Vector2(0.5f, 0.5f); fill = MakeImage(bg.transform, "Fill", new Vector2(0f, 0.5f), new Vector2(2, 0), new Vector2(86, 6), new Color(0.95f, 0.3f, 0.25f)); fill.rectTransform.pivot = new Vector2(0f, 0.5f); hpBars.Add(bg); hpFills.Add(fill); }
+                bg.enabled = fill.enabled = true; bg.rectTransform.anchoredPosition = local; fill.rectTransform.sizeDelta = new Vector2(86f * Mathf.Clamp01(e.hp / e.spec.hp), 6f); used++;
+            }
+            for (int i = used; i < hpBars.Count; i++) { hpBars[i].enabled = false; hpFills[i].enabled = false; }
+        }
+
+        /// <summary>A green chevron on the screen edge toward the objective, with the distance; hidden while it is in view.</summary>
+        public void Objective(Vector3 pos, float dist, Camera cam, bool show)
+        {
+            if (!show) { objectiveArrow.enabled = false; objectiveLabel.text = ""; return; }
+            var rect = canvas.GetComponent<RectTransform>().rect; float hw = rect.width * 0.5f - 60f, hh = rect.height * 0.5f - 200f;
+            var vp = cam.WorldToViewportPoint(pos);
+            if (vp.z > 0f && vp.x > 0.05f && vp.x < 0.95f && vp.y > 0.1f && vp.y < 0.85f) { objectiveArrow.enabled = false; objectiveLabel.text = ""; return; }
+            var d = new Vector2(vp.x - 0.5f, vp.y - 0.5f); if (vp.z < 0f) d = -d; if (d.sqrMagnitude < 1e-6f) d = Vector2.up; d.Normalize();
+            float k = Mathf.Min(hw / Mathf.Max(0.001f, Mathf.Abs(d.x)), hh / Mathf.Max(0.001f, Mathf.Abs(d.y)));
+            objectiveArrow.enabled = true; objectiveArrow.rectTransform.anchoredPosition = d * k; objectiveArrow.rectTransform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg - 90f);
+            objectiveLabel.rectTransform.anchoredPosition = d * k - d * 70f; objectiveLabel.text = Mathf.RoundToInt(dist) + " m";
         }
 
         static Sprite ArrowSprite()

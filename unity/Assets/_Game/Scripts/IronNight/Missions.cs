@@ -10,8 +10,8 @@ namespace IronNight
     /// </summary>
     public static class Missions
     {
-        public class Mission { public int index; public string stat, text; public int goal, reward, progress, start; public bool perNight; public string Title => string.Format(text, goal); }
-        public class Night { public int kills, tigers, paks, flares, level; public float time; public bool boss; }
+        public class Mission { public int index; public string stat, text; public int goal, reward, progress, start; public bool perNight; public string Title => string.Format(text, goal); public string Key => stat + goal; }
+        public class Night { public int kills, tigers, paks, flares, level, objectives; public float time; public bool boss; }
 
         static readonly Mission[] Pool =
         {
@@ -19,6 +19,7 @@ namespace IronNight
             new Mission { stat = "time", goal = 120, reward = 300, text = "Hold until 2:00 in one night", perNight = true },
             new Mission { stat = "flares", goal = 6, reward = 200, text = "Pick up {0} flares" },
             new Mission { stat = "tigers", goal = 1, reward = 250, text = "Destroy a Tiger" },
+            new Mission { stat = "objectives", goal = 3, reward = 300, text = "Reach {0} objectives" },
             new Mission { stat = "kills", goal = 30, reward = 500, text = "Destroy {0} enemy vehicles" },
             new Mission { stat = "paks", goal = 3, reward = 250, text = "Knock out {0} anti-tank guns" },
             new Mission { stat = "level", goal = 5, reward = 300, text = "Reach level {0} in one night", perNight = true },
@@ -28,6 +29,7 @@ namespace IronNight
             new Mission { stat = "flares", goal = 20, reward = 600, text = "Pick up {0} flares" },
             new Mission { stat = "kills", goal = 80, reward = 1200, text = "Destroy {0} enemy vehicles" },
             new Mission { stat = "boss", goal = 1, reward = 1500, text = "Destroy the Tiger Ace", perNight = true },
+            new Mission { stat = "objectives", goal = 12, reward = 900, text = "Reach {0} objectives" },
             new Mission { stat = "paks", goal = 10, reward = 700, text = "Knock out {0} anti-tank guns" },
             new Mission { stat = "level", goal = 8, reward = 700, text = "Reach level {0} in one night", perNight = true },
             new Mission { stat = "nightkills", goal = 35, reward = 800, text = "Destroy {0} enemies in one night", perNight = true },
@@ -41,12 +43,12 @@ namespace IronNight
         {
             if (loaded) return; loaded = true;
             for (int i = 0; i < Pool.Length; i++) Pool[i].index = i;
-            var ids = PlayerPrefs.GetString("missions.active", "");
-            foreach (var s in ids.Split(',')) if (int.TryParse(s, out int k) && k >= 0 && k < Pool.Length) { var m = Pool[k]; m.progress = m.start = PlayerPrefs.GetInt("missions.p." + k, 0); Active.Add(m); }
+            var keys = PlayerPrefs.GetString("missions.active", "");
+            foreach (var key in keys.Split(',')) foreach (var m in Pool) if (m.Key == key && !Active.Contains(m)) { m.progress = m.start = PlayerPrefs.GetInt("missions.p." + key, 0); Active.Add(m); }
             Fill(); Save();
         }
 
-        static bool Done(int index) => PlayerPrefs.GetInt("missions.done." + index, 0) == 1;
+        static bool Done(Mission m) => PlayerPrefs.GetInt("missions.done." + m.Key, 0) == 1;
 
         /// <summary>Keeps three missions open: the first unfinished ones from the list, one per kind of stat.</summary>
         static void Fill()
@@ -54,15 +56,15 @@ namespace IronNight
             foreach (var m in Pool)
             {
                 if (Active.Count >= 3) break;
-                if (Done(m.index) || Active.Contains(m) || Active.Exists(a => a.stat == m.stat)) continue;
+                if (Done(m) || Active.Contains(m) || Active.Exists(a => a.stat == m.stat)) continue;
                 m.progress = m.start = 0; Active.Add(m);
             }
         }
 
         static void Save()
         {
-            var ids = new List<string>(); foreach (var m in Active) { ids.Add(m.index.ToString()); PlayerPrefs.SetInt("missions.p." + m.index, m.progress); }
-            PlayerPrefs.SetString("missions.active", string.Join(",", ids)); PlayerPrefs.Save();
+            var keys = new List<string>(); foreach (var m in Active) { keys.Add(m.Key); PlayerPrefs.SetInt("missions.p." + m.Key, m.progress); }
+            PlayerPrefs.SetString("missions.active", string.Join(",", keys)); PlayerPrefs.Save();
         }
 
         static int Stat(Night n, string stat)
@@ -70,7 +72,7 @@ namespace IronNight
             switch (stat)
             {
                 case "kills": case "nightkills": return n.kills; case "tigers": return n.tigers; case "paks": return n.paks; case "flares": return n.flares;
-                case "level": return n.level; case "time": return Mathf.FloorToInt(n.time); case "boss": return n.boss ? 1 : 0; default: return 0;
+                case "level": return n.level; case "time": return Mathf.FloorToInt(n.time); case "boss": return n.boss ? 1 : 0; case "objectives": return n.objectives; default: return 0;
             }
         }
 
@@ -85,7 +87,7 @@ namespace IronNight
                 m.progress = m.perNight ? Mathf.Max(m.progress, s) : m.start + s;
                 if (m.progress >= m.goal)
                 {
-                    PlayerPrefs.SetInt("missions.done." + m.index, 1); Depot.AddPoints(m.reward); done.Add(m); Active.RemoveAt(i);
+                    PlayerPrefs.SetInt("missions.done." + m.Key, 1); Depot.AddPoints(m.reward); done.Add(m); Active.RemoveAt(i);
                 }
             }
             Fill(); Save(); return done;

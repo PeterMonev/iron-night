@@ -11,7 +11,7 @@ namespace IronNight
     {
         public VehicleSpec spec;
         public bool friendly;
-        public float hp, yaw, turretYaw, reloadLeft, hitFlash;
+        public float hp, yaw, turretYaw, reloadLeft, hitFlash, lastHit = -100f;
         public float speedMul = 1f, damageMul = 1f, rangeMul = 1f, reloadMul = 1f, turretMul = 1f;
         public bool dead;
         public Vehicle target;
@@ -136,7 +136,7 @@ namespace IronNight
         public void Hit(float damage)
         {
             if (dead) return;
-            hp -= damage; hitFlash = 1f;
+            hp -= damage; hitFlash = 1f; lastHit = Time.time;
         }
 
         /// <summary>Turns the vehicle into a wreck: dark, scorched, the turret left where it was.</summary>

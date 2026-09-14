@@ -18,13 +18,16 @@ namespace IronNight
         class Flare { public Vector3 pos; public float age; public Transform vis; public Light light; public Material mat; }
         class Wreck { public Vehicle v; public float age, burnTimer; public Light fire; }
         class ArtyShell { public Vector3 at; public float timer; }
+        class Objective { public Vector3 pos; public Transform marker; public float smokeTimer; public int n; }
+        class Drop { public Vector3 pos; public float height, age; public int kind; public Transform crate, chute, marker; public LineRenderer lines; }
         enum Phase { Title, Play, LevelUp, Pause, End }
 
         const float NightLength = 300f;         // five minutes of darkness, dawn at 5:00
         const float ShellSpeed = 62f, EnemyShellSpeed = 55f, GroundTile = 40f;
 
         Camera cam; Hud hud; TouchStick stick; Fx fx; Props props; Tracks tracks;
-        Weather weather; Sky sky; float rumbleTimer = 12f, flicker, enemyRangeMul = 1f; ParticleSystem rain; Material groundMaterial;
+        Weather weather; Sky sky; float rumbleTimer = 12f, flicker, enemyRangeMul = 1f, ammoMul = 1f, ammoLeft, dropTimer = 35f; ParticleSystem rain; Material groundMaterial;
+        Objective objective; int objectivesReached; readonly List<Drop> drops = new List<Drop>(); Material crateMaterial, chuteMaterial;
         Transform ground; Light flareLight, moon; float shake; int banked, nightTigers, nightPaks, nightFlares; bool nightRecorded, bossKilled;
         readonly List<Vehicle> platoon = new List<Vehicle>(); readonly List<Vehicle> foes = new List<Vehicle>();
         readonly List<Shell> shells = new List<Shell>(); readonly List<Flare> flares = new List<Flare>(); readonly List<Wreck> wrecks = new List<Wreck>();
@@ -55,7 +58,8 @@ namespace IronNight
             if (weather == Weather.Fog) { rangeMul *= 0.8f; enemyRangeMul = 0.8f; } else if (weather == Weather.Overcast) enemyRangeMul = 0.9f; else if (weather == Weather.Rain) { speedMul *= 0.92f; enemyRangeMul = 0.95f; }
             hud.SetConditions(weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Overcast ? "a dark night, the enemy sees 10% less" : weather == Weather.Rain ? "mud slows the platoon, the enemy sees 5% less" : "");
             hud.OnDaily = () => { Depot.ClaimDaily(); hud.ShowTitle(reserveGranted); };
-            platoon.Add(Vehicle.Create(VehicleSpec.Sherman, true, Vector3.zero, 0f)); Leader.hp = Depot.LeaderHp;
+            platoon.Add(Vehicle.Create(VehicleSpec.ById(Depot.LeaderId), true, Vector3.zero, 0f)); Leader.hp = Depot.LeaderHp;
+            NextObjective();
             hud.OnFormation = f => formation = f;
             hud.OnAd = OnAd; hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             hud.OnStart = () => { hud.HideTitle(); phase = Phase.Play; stick.Blocked = false; };
@@ -168,6 +172,11 @@ namespace IronNight
             PlaceCamera(false);
             hud.Set(t, platoon.Count); hud.SetLeader(Mathf.CeilToInt(L.hp), Mathf.CeilToInt(Depot.LeaderHp));
             hud.Indicators(foes, cam);
+            TickObjective(dt); TickDrops(dt);
+            if (ammoLeft > 0f) { ammoLeft -= dt; if (ammoLeft <= 0f) { ammoMul = 1f; hud.Toast("APCR spent"); } }
+            hud.Radar(foes, platoon, L.transform.position, objective != null ? objective.pos : Vector3.zero, objective != null);
+            hud.HpBars(foes, cam, boss);
+            if (objective != null) { var od = objective.pos - L.transform.position; od.y = 0f; hud.Objective(objective.pos, od.magnitude, cam, true); }
             if (t >= NightLength) End(true);
         }
 
@@ -201,7 +210,7 @@ namespace IronNight
             float speed = v.friendly ? ShellSpeed : EnemyShellSpeed;
             var vis = fx.Tracer(v.friendly ? new Color(1f, 1f, 0.9f, 1f) : new Color(1f, 0.75f, 0.55f, 1f), v.friendly ? new Color(1f, 0.85f, 0.45f, 0.6f) : new Color(1f, 0.45f, 0.25f, 0.6f));
             vis.position = pos; vis.rotation = Quaternion.LookRotation(cam.transform.forward, dir);
-            shells.Add(new Shell { pos = pos, vel = dir * speed, friendly = v.friendly, he = v.friendly && he, dmg = v.spec.damage * v.damageMul, life = v.Range / speed + 0.25f, vis = vis });
+            shells.Add(new Shell { pos = pos, vel = dir * speed, friendly = v.friendly, he = v.friendly && he, dmg = v.spec.damage * v.damageMul * (v.friendly ? ammoMul : 1f), life = v.Range / speed + 0.25f, vis = vis });
             fx.MuzzleFlash(pos, dir); Sfx.Shot(pos, v.friendly, v.spec.gunLength > 3f || v.spec.isGun); if (v.friendly) Sfx.Reload(v.transform.position);
         }
 
@@ -512,6 +521,82 @@ namespace IronNight
 #endif
         }
 
+        /// <summary>The next objective: a point 110 to 170 m ahead, within forty degrees of north, marked with green
+        /// smoke and a light. Reaching it is worth 300 and the next one is set.</summary>
+        void NextObjective()
+        {
+            var L = Leader; float ang = (Random.value - 0.5f) * 80f * Mathf.Deg2Rad, dist = 110f + Random.value * 60f;
+            var pos = L.transform.position + new Vector3(Mathf.Sin(ang), 0f, Mathf.Cos(ang)) * dist;
+            objective = new Objective { pos = pos, n = objectivesReached + 1, marker = fx.Marker(pos, new Color(0.35f, 0.95f, 0.45f), 9f) };
+            if (phase == Phase.Play) hud.Toast("Objective " + objective.n + " · " + Mathf.RoundToInt(dist) + " m ahead", 3f);
+        }
+
+        void TickObjective(float dt)
+        {
+            if (objective == null) return; var L = Leader;
+            objective.smokeTimer -= dt; if (objective.smokeTimer <= 0f) { objective.smokeTimer = 0.45f; fx.Signal(objective.pos + Vector3.up * 0.6f, new Color(0.3f, 0.8f, 0.4f, 0.75f)); }
+            objective.pos = props.PushOut(objective.pos, 5f);   // once its cell is loaded, it steps out of hedges and walls
+            objective.marker.position = objective.pos;
+            var d = objective.pos - L.transform.position; d.y = 0f;
+            if (d.magnitude < 12f)
+            {
+                score += 300; objectivesReached++; shake = Mathf.Max(shake, 0.3f); Sfx.Pickup();
+                hud.Popup(objective.pos, "+300", new Color(0.35f, 0.95f, 0.45f)); hud.Toast("Objective " + objective.n + " reached · +300", 2.6f);
+                Destroy(objective.marker.gameObject); objective = null; NextObjective();
+            }
+        }
+
+        /// <summary>Supply drops: a crate under a parachute comes down near the platoon every minute or so. The leader
+        /// drives over it: repair, APCR ammunition for a while, a smoke screen, or a radio that calls the guns.</summary>
+        void TickDrops(float dt)
+        {
+            dropTimer -= dt; var L = Leader;
+            if (dropTimer <= 0f)
+            {
+                dropTimer = 50f + Random.value * 25f;
+                float a = Random.value * Mathf.PI * 2f; var pos = props.PushOut(L.transform.position + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * (16f + Random.value * 14f), 3f);
+                var d = new Drop { pos = pos, height = 55f, kind = Random.Range(0, 4) };
+                if (crateMaterial == null) { crateMaterial = new Material(Resources.Load<Material>("BarrelLit")); crateMaterial.SetColor("_BaseColor", new Color(0.45f, 0.36f, 0.22f)); crateMaterial.SetFloat("_Metallic", 0f); crateMaterial.SetFloat("_Smoothness", 0.2f); chuteMaterial = new Material(Resources.Load<Material>("VehicleLit")); chuteMaterial.SetColor("_BaseColor", new Color(0.85f, 0.82f, 0.72f)); chuteMaterial.SetFloat("_Cull", 0f); }
+                d.crate = GameObject.CreatePrimitive(PrimitiveType.Cube).transform; Destroy(d.crate.GetComponent<Collider>()); d.crate.localScale = new Vector3(1.3f, 1f, 1.3f); d.crate.GetComponent<Renderer>().sharedMaterial = crateMaterial;
+                d.chute = GameObject.CreatePrimitive(PrimitiveType.Sphere).transform; Destroy(d.chute.GetComponent<Collider>()); d.chute.localScale = new Vector3(6f, 3.2f, 6f); d.chute.GetComponent<Renderer>().sharedMaterial = chuteMaterial;
+                d.lines = new GameObject("Shrouds").AddComponent<LineRenderer>(); d.lines.positionCount = 8; d.lines.startWidth = d.lines.endWidth = 0.05f; d.lines.material = chuteMaterial; d.lines.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                drops.Add(d); hud.Toast("Supply drop coming down, " + Clock(pos), 2.8f);
+            }
+            for (int i = drops.Count - 1; i >= 0; i--)
+            {
+                var d = drops[i]; d.age += dt;
+                if (d.height > 0f)
+                {
+                    d.height = Mathf.Max(0f, d.height - 6f * dt); var sway = new Vector3(Mathf.Sin(d.age * 1.3f), 0f, Mathf.Cos(d.age * 0.9f)) * 0.6f;
+                    d.crate.position = d.pos + Vector3.up * (d.height + 0.5f) + sway; d.chute.position = d.crate.position + Vector3.up * 4.5f;
+                    for (int k = 0; k < 4; k++) { float ang = k * Mathf.PI / 2f; d.lines.SetPosition(k * 2, d.crate.position + Vector3.up * 0.5f); d.lines.SetPosition(k * 2 + 1, d.chute.position + new Vector3(Mathf.Cos(ang), -1.2f, Mathf.Sin(ang)) * 2.6f); }
+                    if (d.height <= 0f)
+                    {
+                        // landed: the canopy collapses beside the crate, a light marks it
+                        d.chute.position = d.pos + new Vector3(2.5f, 0.15f, 1f); d.chute.localScale = new Vector3(5f, 0.3f, 5f); d.lines.enabled = false;
+                        d.marker = fx.Marker(d.pos, new Color(1f, 0.75f, 0.35f), 5f); d.age = 0f;
+                    }
+                    continue;
+                }
+                var toL = L.transform.position - d.pos; toL.y = 0f;
+                if (toL.magnitude < 4.5f)
+                {
+                    Sfx.Pickup();
+                    switch (d.kind)
+                    {
+                        case 0: L.hp = Mathf.Min(Depot.LeaderHp + 2f, L.hp + 2f); hud.Toast("Repair kit · leader +2", 2.6f); break;
+                        case 1: ammoMul = 1.5f; ammoLeft = 25f; hud.Toast("APCR ammunition · +50% damage for 25 s", 2.8f); break;
+                        case 2: if (smokeCooldown <= 0f) PopSmoke(); else { L.hp = Mathf.Min(Depot.LeaderHp + 2f, L.hp + 1f); hud.Toast("Spare parts · leader +1", 2.6f); } break;
+                        default: if (!FireMission()) { score += 150; hud.Toast("Radio set · +150", 2.6f); } break;
+                    }
+                    hud.Popup(d.pos, "Supplies", new Color(1f, 0.85f, 0.5f)); RemoveDrop(d); drops.RemoveAt(i);
+                }
+                else if (d.age > 70f) { RemoveDrop(d); drops.RemoveAt(i); }
+            }
+        }
+
+        void RemoveDrop(Drop d) { Destroy(d.crate.gameObject); Destroy(d.chute.gameObject); Destroy(d.lines.gameObject); if (d.marker != null) Destroy(d.marker.gameObject); }
+
         void Pause() { if (phase != Phase.Play) return; phase = Phase.Pause; stick.Blocked = true; Sfx.Quiet(true); hud.ShowPause(!Sfx.Muted); }
         void Resume() { if (phase != Phase.Pause) return; hud.HidePause(); Sfx.Quiet(false); phase = Phase.Play; stick.Blocked = false; }
         void OnApplicationPause(bool paused) { if (paused) Pause(); }   // the phone: a call, the home button
@@ -538,28 +623,26 @@ namespace IronNight
 
         /// <summary>The artillery card: every so often a salvo of four falls on the thickest group of enemies near the
         /// platoon, never within 12 m of one of ours.</summary>
+        /// <summary>A salvo of four on the thickest group of enemies near the platoon, never within 12 m of one of ours.
+        /// Returns false when there is nothing worth the shells.</summary>
+        bool FireMission()
+        {
+            Vehicle best = null; int bestN = 0;
+            foreach (var e in foes)
+            {
+                if (e.dead || Dist(e, Leader) > 70f) continue; bool nearOurs = false; foreach (var p in platoon) if (Dist(e, p) < 12f) nearOurs = true; if (nearOurs) continue;
+                int k = 0; foreach (var o in foes) if (!o.dead && Dist(e, o) < 10f) k++;
+                if (k > bestN) { bestN = k; best = e; }
+            }
+            if (best == null) return false;
+            hud.Toast("Artillery · fire mission"); Sfx.Whistle(best.transform.position);
+            for (int i = 0; i < 4; i++) { var at = best.transform.position + new Vector3(Random.Range(-6f, 6f), 0f, Random.Range(-6f, 6f)); float when = 1.1f + i * 0.35f; arty.Add(new ArtyShell { at = at, timer = when }); fx.Incoming(at, when); }
+            return true;
+        }
+
         void TickArtillery(float dt)
         {
-            if (artyInterval > 0f)
-            {
-                artyTimer -= dt;
-                if (artyTimer <= 0f)
-                {
-                    Vehicle best = null; int bestN = 0;
-                    foreach (var e in foes)
-                    {
-                        if (e.dead || Dist(e, Leader) > 70f) continue; bool nearOurs = false; foreach (var p in platoon) if (Dist(e, p) < 12f) nearOurs = true; if (nearOurs) continue;
-                        int k = 0; foreach (var o in foes) if (!o.dead && Dist(e, o) < 10f) k++;
-                        if (k > bestN) { bestN = k; best = e; }
-                    }
-                    if (best != null)
-                    {
-                        artyTimer = artyInterval; hud.Toast("Artillery · fire mission"); Sfx.Whistle(best.transform.position);
-                        for (int i = 0; i < 4; i++) { var at = best.transform.position + new Vector3(Random.Range(-6f, 6f), 0f, Random.Range(-6f, 6f)); float when = 1.1f + i * 0.35f; arty.Add(new ArtyShell { at = at, timer = when }); fx.Incoming(at, when); }
-                    }
-                    else artyTimer = 3f;
-                }
-            }
+            if (artyInterval > 0f) { artyTimer -= dt; if (artyTimer <= 0f) artyTimer = FireMission() ? artyInterval : 3f; }
             for (int i = arty.Count - 1; i >= 0; i--)
             {
                 var a = arty[i]; a.timer -= dt; if (a.timer > 0f) continue;
@@ -575,7 +658,7 @@ namespace IronNight
             int earned = score * (doubled ? 2 : 1) + (dawn ? 500 : 0);
             Depot.AddPoints(earned - banked); banked = earned;                       // a revived night banks only what is new
             if (!nightRecorded) { Depot.RecordNight(kills, t); nightRecorded = true; }
-            var done = Missions.Report(new Missions.Night { kills = kills, tigers = nightTigers, paks = nightPaks, flares = nightFlares, level = level, time = t, boss = bossKilled });
+            var done = Missions.Report(new Missions.Night { kills = kills, tigers = nightTigers, paks = nightPaks, flares = nightFlares, level = level, time = t, boss = bossKilled, objectives = objectivesReached });
             int bonus = 0; var lines = new System.Text.StringBuilder(); foreach (var o in done) { bonus += o.reward; lines.Append("\nOrder carried out · " + o.Title + " · +" + o.reward); }
             hud.SetEndPoints(earned + bonus);
             int m = Mathf.FloorToInt(t / 60f), s = Mathf.FloorToInt(t % 60f);

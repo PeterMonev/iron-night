@@ -79,6 +79,21 @@ namespace IronNight
             new Camo { id = "night", name = "Night", tint = new Color(0.62f, 0.68f, 0.85f), cost = 1500 },
         };
         public static string CamoId { get { Load(); return PlayerPrefs.GetString("depot.camo", "olive"); } }
+
+        // the leader's tank: the Sherman, or the Firefly with the 17-pounder once it is bought
+        public class LeaderChoice { public string id, name; public int cost; }
+        public static readonly LeaderChoice[] Leaders = { new LeaderChoice { id = "sherman", name = "M4 Sherman", cost = 0 }, new LeaderChoice { id = "firefly", name = "Sherman Firefly", cost = 2000 } };
+        public static string LeaderId { get { Load(); return PlayerPrefs.GetString("depot.leader", "sherman"); } }
+        public static bool OwnsLeader(LeaderChoice c) => c.cost == 0 || PlayerPrefs.GetInt("depot.leader." + c.id, 0) == 1;
+        public static bool PickLeader(LeaderChoice c)
+        {
+            Load();
+            if (!OwnsLeader(c)) { if (Points < c.cost) return false; Points -= c.cost; PlayerPrefs.SetInt("depot.leader." + c.id, 1); }
+            PlayerPrefs.SetString("depot.leader", c.id); Save(); return true;
+        }
+
+        /// <summary>A rank for the title screen, by nights fought.</summary>
+        public static string Rank { get { Load(); int n = NightsFought; return n < 1 ? "Recruit" : n < 5 ? "Trooper" : n < 10 ? "Corporal" : n < 20 ? "Sergeant" : n < 40 ? "Lieutenant" : n < 80 ? "Captain" : "Major"; } }
         public static Color CamoTint { get { foreach (var c in Camos) if (c.id == CamoId) return c.tint; return Color.white; } }
         public static bool OwnsCamo(Camo c) => c.cost == 0 || PlayerPrefs.GetInt("depot.camo." + c.id, 0) == 1;
         public static bool PickCamo(Camo c)
