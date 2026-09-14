@@ -77,7 +77,7 @@
 
 ## Store
 
-- Икона: SDXL (), избрана  →  + адаптивна икона ( в 66% safe zone,  нощно синьо);  я слага във всички Android слотове (Adaptive/Round/Legacy).
+- Икона: SDXL (`art/pipeline/gen-icon.js`), избрана `art/icon/icon2_00002_.png` → `unity/Assets/_Game/Icon/icon.png` + адаптивна икона (`icon_fg.png` в 66% safe zone, `icon_bg.png` нощно синьо); `IronNightSetup` я слага във всички Android слотове (Adaptive/Round/Legacy).
 
 ## Технически
 
