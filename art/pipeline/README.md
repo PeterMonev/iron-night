@@ -29,3 +29,11 @@ Second ComfyUI instance with its own Python (torch 2.10.0+cu130 to match the pre
    pivot at the turret ring, real metres, the generated barrel removed (the game adds a straight one). `meta.json` records ring height and forward axis.
 4. `serve.js` + `viewer.html` / `viewer3.html` / `scene.html` show the result in a browser (node serve.js, port 8787).
 Licenses: TRELLIS 2 and ComfyUI-Trellis2 MIT; DINOv3 (Meta) commercial OK, "Built with DINOv3" in the credits; MoGe MIT.
+
+## Props and the field
+
+- Props (farmhouse, barn, truck, haystack, dead tree, sandbags): same TRELLIS run, then `python_trellis/python.exe prop_export.py <glb> <name> <length_m>`
+  -> `Assets/_Game/Resources/Props/<name>.obj` + texture, long axis on Z, base on the ground.
+- Ground: `node bake-fields.js` bakes the four seamless 40 m field tiles (plough, pasture, mown, stubble), the lane strip, the yard and crater
+  decals and the hedge foliage from the SDXL tiles in `art/ai-ground` into `Assets/_Game/Resources/Textures`. Hedges, trees and the searchlight
+  are built in code (`Props.cs`), the layout is a hash of the 40 m cell coordinates.

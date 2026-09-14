@@ -90,7 +90,9 @@ namespace IronNight.EditorTools
             // additive and alpha-blended unlit quads for flashes, tracers, flares, beams and smoke
             var additive = MakeMaterial("Additive", "Universal Render Pipeline/Unlit"); Transparent(additive, true);
             var smoke = MakeMaterial("Smoke", "Universal Render Pipeline/Unlit"); Transparent(smoke, false);
-            foreach (var m in new[] { vehicle, barrel, ground, additive, smoke }) EditorUtility.SetDirty(m);
+            // lit, alpha-blended ground decals: lanes, yards, craters
+            var decal = MakeMaterial("GroundDecal", "Universal Render Pipeline/Lit"); Transparent(decal, false); decal.SetFloat("_Smoothness", 0.05f); decal.SetFloat("_Metallic", 0f);
+            foreach (var m in new[] { vehicle, barrel, ground, additive, smoke, decal }) EditorUtility.SetDirty(m);
 
             const string profilePath = Res + "BattleProfile.asset";
             var old = AssetDatabase.LoadAssetAtPath<VolumeProfile>(profilePath); if (old != null) AssetDatabase.DeleteAsset(profilePath);

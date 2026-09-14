@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-5797998505371710095
+--- !u!114 &-8673277850902203366
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}
@@ -40,7 +40,7 @@ MonoBehaviour:
   maxNits:
     m_OverrideState: 1
     m_Value: 1000
---- !u!114 &-1298615334365537738
+--- !u!114 &-1005232922172735527
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}
@@ -81,10 +81,10 @@ MonoBehaviour:
   m_Name: BattleProfile
   m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.VolumeProfile
   components:
-  - {fileID: 8308833273679633105}
-  - {fileID: -1298615334365537738}
-  - {fileID: -5797998505371710095}
---- !u!114 &8308833273679633105
+  - {fileID: 5871662650613136781}
+  - {fileID: -1005232922172735527}
+  - {fileID: -8673277850902203366}
+--- !u!114 &5871662650613136781
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}

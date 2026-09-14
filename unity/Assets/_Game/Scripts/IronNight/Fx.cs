@@ -5,14 +5,14 @@ namespace IronNight
 {
     /// <summary>
     /// Every light effect of the fight as camera-facing additive quads plus a few point lights: muzzle flashes, tracer
-    /// shells, hits, burning wrecks with smoke, signal flares, and the searchlight beams. Quads are pooled; nothing is
+    /// shells, hits, burning wrecks with smoke and signal flares. Quads are pooled; nothing is
     /// allocated during a wave.
     /// </summary>
     public class Fx : MonoBehaviour
     {
         class Puff { public Transform t; public Renderer r; public Material m; public float life, age, size, rise; public Color color; public Vector3 vel; public bool smoke; }
 
-        Material additiveTemplate, smokeTemplate; Texture2D glowTex, softTex, beamTex;
+        Material additiveTemplate, smokeTemplate; Texture2D glowTex, softTex;
         readonly List<Puff> puffs = new List<Puff>(); readonly Stack<GameObject> quadPool = new Stack<GameObject>();
         readonly List<Light> lights = new List<Light>(); readonly List<float> lightLife = new List<float>(); readonly List<float> lightMax = new List<float>();
         Camera cam;
@@ -99,23 +99,6 @@ namespace IronNight
                 if (lightLife[i] <= 0f) { Destroy(lights[i].gameObject); lights.RemoveAt(i); lightLife.RemoveAt(i); lightMax.RemoveAt(i); continue; }
                 lights[i].intensity *= Mathf.Clamp01(lightLife[i] / lightMax[i]) > 0.5f ? 1f : 0.85f;
             }
-        }
-
-        /// <summary>A long faint additive cone: the searchlight beam. Apex at the origin, opening along +Z.</summary>
-        public GameObject Beam(float length, float halfAngle, Color color)
-        {
-            var go = new GameObject("Beam"); go.transform.SetParent(transform, false);
-            var mf = go.AddComponent<MeshFilter>(); var mr = go.AddComponent<MeshRenderer>();
-            int n = 24; float r = Mathf.Tan(halfAngle) * length;
-            var verts = new Vector3[n * 2 + 2]; var tris = new int[n * 6];
-            var uvs = new Vector2[n * 2 + 2];
-            for (int i = 0; i <= n; i++) { float a = i * Mathf.PI * 2f / n; verts[i * 2] = Vector3.zero; verts[i * 2 + 1] = new Vector3(Mathf.Cos(a) * r, Mathf.Sin(a) * r, length); uvs[i * 2] = new Vector2(0.5f, 0f); uvs[i * 2 + 1] = new Vector2(0.5f, 1f); }
-            for (int i = 0; i < n; i++) { int b = i * 2; tris[i * 6] = b; tris[i * 6 + 1] = b + 1; tris[i * 6 + 2] = b + 3; tris[i * 6 + 3] = b; tris[i * 6 + 4] = b + 3; tris[i * 6 + 5] = b + 2; }
-            var mesh = new Mesh { vertices = verts, uv = uvs, triangles = tris }; mesh.RecalculateBounds(); mf.sharedMesh = mesh;
-            if (beamTex == null) { beamTex = new Texture2D(4, 64, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp }; for (int y = 0; y < 64; y++) { float q = y / 63f; float a = (1f - q) * (1f - q) * (0.25f + 0.75f * Mathf.Clamp01(q * 8f)); for (int x = 0; x < 4; x++) beamTex.SetPixel(x, y, new Color(1f, 1f, 1f, a)); } beamTex.Apply(); }
-            var m = new Material(additiveTemplate); m.SetTexture("_BaseMap", beamTex); m.SetColor("_BaseColor", color); m.SetInt("_Cull", 0); mr.sharedMaterial = m;
-            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; mr.receiveShadows = false;
-            return go;
         }
     }
 }

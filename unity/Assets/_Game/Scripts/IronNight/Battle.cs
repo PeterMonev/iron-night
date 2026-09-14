@@ -20,7 +20,7 @@ namespace IronNight
         const float ShellSpeed = 62f, EnemyShellSpeed = 55f, GroundTile = 40f;
 
         Camera cam; Hud hud; TouchStick stick; Fx fx; Props props;
-        Transform ground; Light flareLight; readonly List<Transform> searchlights = new List<Transform>();
+        Transform ground; Light flareLight;
         readonly List<Vehicle> platoon = new List<Vehicle>(); readonly List<Vehicle> foes = new List<Vehicle>();
         readonly List<Shell> shells = new List<Shell>(); readonly List<Flare> flares = new List<Flare>(); readonly List<Wreck> wrecks = new List<Wreck>();
         Material shellTemplate; Texture2D glowTex;
@@ -55,33 +55,25 @@ namespace IronNight
 
         void BuildWorld()
         {
-            // the field: one 400 m plane with the baked seamless tile, kept under the camera on a 40 m grid
+            // a 400 m plain pasture plane under everything, kept under the camera on a 40 m grid; the fields, lanes,
+            // hedges, farms and searchlight posts on top of it are Props, built cell by cell around the camera
             var g = GameObject.CreatePrimitive(PrimitiveType.Plane); g.name = "Ground"; Destroy(g.GetComponent<Collider>());
             g.transform.localScale = new Vector3(GroundTile, 1f, GroundTile);
             var gm = new Material(Resources.Load<Material>("GroundLit"));
-            gm.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/ground")); gm.SetTextureScale("_BaseMap", new Vector2(10f, 10f)); gm.SetColor("_BaseColor", new Color(0.58f, 0.6f, 0.55f));
+            gm.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/field_pasture")); gm.SetTextureScale("_BaseMap", new Vector2(10f, 10f)); gm.SetColor("_BaseColor", new Color(0.9f, 0.9f, 0.88f));
             g.GetComponent<Renderer>().sharedMaterial = gm; g.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             ground = g.transform;
             props = new GameObject("Props").AddComponent<Props>(); props.Build(cam);
 
             // night: moonlight with soft shadows, a cold ambient, fog swallowing the distance
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat; RenderSettings.ambientLight = new Color(0.17f, 0.2f, 0.3f);
-            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = 0.0065f; RenderSettings.fogColor = new Color(0.02f, 0.03f, 0.05f);
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat; RenderSettings.ambientLight = new Color(0.24f, 0.27f, 0.36f);
+            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = 0.0065f; RenderSettings.fogColor = new Color(0.03f, 0.045f, 0.07f);
             var moonGo = new GameObject("Moon"); var moon = moonGo.AddComponent<Light>();
-            moon.type = LightType.Directional; moon.color = new Color(0.72f, 0.78f, 1f); moon.intensity = 2.2f; moon.shadows = LightShadows.Soft; moon.shadowStrength = 0.8f;
+            moon.type = LightType.Directional; moon.color = new Color(0.82f, 0.86f, 1f); moon.intensity = 2.6f; moon.shadows = LightShadows.Soft; moon.shadowStrength = 0.8f;
             moonGo.transform.rotation = Quaternion.Euler(52f, -35f, 0f);
             // the flare light over the platoon: warm, follows the leader, grows with the platoon
             var fl = new GameObject("FlareLight"); flareLight = fl.AddComponent<Light>();
             flareLight.type = LightType.Point; flareLight.color = new Color(1f, 0.72f, 0.4f); flareLight.intensity = 18f; flareLight.range = 40f; flareLight.shadows = LightShadows.None;
-            // searchlights on the enemy side, sweeping
-            for (int i = 0; i < 2; i++)
-            {
-                var sl = new GameObject("Searchlight " + i); var l = sl.AddComponent<Light>();
-                l.type = LightType.Spot; l.color = new Color(0.82f, 0.88f, 1f); l.intensity = 60f; l.range = 220f; l.spotAngle = 5f; l.innerSpotAngle = 3f; l.shadows = LightShadows.None;
-                var beam = fx.Beam(220f, 0.03f, new Color(0.75f, 0.82f, 1f, 0.16f)); beam.transform.SetParent(sl.transform, false);
-                sl.transform.position = new Vector3(i == 0 ? -70f : 75f, 3f, 90f + i * 30f);
-                searchlights.Add(sl.transform);
-            }
         }
 
         void PlaceCamera(bool snap)
@@ -90,7 +82,7 @@ namespace IronNight
             var want = L.transform.position + new Vector3(0f, 44f, -36f);
             cam.transform.position = snap ? want : Vector3.Lerp(cam.transform.position, want, 1f - Mathf.Exp(-Time.deltaTime * 4f));
             cam.transform.LookAt(cam.transform.position + new Vector3(0f, -44f, 40f));
-            ground.position = new Vector3(Mathf.Round(cam.transform.position.x / GroundTile) * GroundTile, 0f, Mathf.Round(cam.transform.position.z / GroundTile) * GroundTile);
+            ground.position = new Vector3(Mathf.Round(cam.transform.position.x / GroundTile) * GroundTile, -0.08f, Mathf.Round(cam.transform.position.z / GroundTile) * GroundTile);
             flareLight.transform.position = L.transform.position + Vector3.up * 11f;
         }
 
@@ -134,7 +126,7 @@ namespace IronNight
                 e.Apply();
             }
 
-            TickShells(dt); TickFlares(dt); TickWrecks(dt); TickSpawns(dt); TickSearchlights(dt);
+            TickShells(dt); TickFlares(dt); TickWrecks(dt); TickSpawns(dt);
             KeepApart();
             foreach (var v in platoon) v.transform.position = props.PushOut(v.transform.position, v.spec.radius * 0.7f);
             foreach (var e in foes) if (!e.spec.isGun) e.transform.position = props.PushOut(e.transform.position, e.spec.radius * 0.7f);
@@ -288,7 +280,7 @@ namespace IronNight
                 if (roll < 0.22f && t > 20f)
                 {
                     // an anti-tank gun dug in on the platoon's way, waiting
-                    var pos = L.transform.position + L.Forward * 38f + new Vector3(Random.Range(-14f, 14f), 0f, 0f);
+                    var pos = props.PushOut(L.transform.position + L.Forward * 38f + new Vector3(Random.Range(-14f, 14f), 0f, 0f), 3f);
                     var gun = Vehicle.Create(VehicleSpec.Pak40, false, pos, L.yaw + Mathf.PI); gun.turretYaw = gun.yaw; foes.Add(gun);
                 }
                 else
@@ -324,18 +316,6 @@ namespace IronNight
                 var e = Vehicle.Create(spec, false, pos, Mathf.Atan2(r.x * side, r.z * side)); e.turretYaw = e.yaw; foes.Add(e);
             }
             hud.Toast("Armoured column");
-        }
-
-        void TickSearchlights(float dt)
-        {
-            var L = Leader;
-            for (int i = 0; i < searchlights.Count; i++)
-            {
-                var s = searchlights[i]; float a = Mathf.Sin(t * 0.23f + i * 2.1f) * 0.9f;
-                var toPlatoon = L.transform.position - s.position; float baseYaw = Mathf.Atan2(toPlatoon.x, toPlatoon.z);
-                s.rotation = Quaternion.Euler(4f, (baseYaw + a) * Mathf.Rad2Deg, 0f);
-                if (toPlatoon.magnitude > 150f) s.position = L.transform.position + L.Forward * 100f + new Vector3((i == 0 ? -1f : 1f) * 70f, 3f, 0f);
-            }
         }
 
         /// <summary>Vehicles push each other apart so the platoon never stacks and enemies keep a spacing.</summary>
