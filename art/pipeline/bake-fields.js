@@ -22,10 +22,10 @@ function blobs(g, img, S, count, rmin, rmax, alpha, n = 4) {
   pg.globalCompositeOperation = 'destination-in'; pg.drawImage(mc, 0, 0); g.drawImage(pc, 0, 0);
 }
 // large slow tone variation so the repeat is less obvious: a few huge soft dark or light blobs
-function tone(g, S, count, dark) {
+function tone(g, S, count, dark, strength = 1) {
   for (let i = 0; i < count; i++) {
     const x = rnd() * S, y = rnd() * S, r = 300 + rnd() * 500;
-    for (const [wx, wy] of WRAP) { const dx = wx * S, dy = wy * S; const gr = g.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, r); gr.addColorStop(0, dark ? 'rgba(10,8,4,0.22)' : 'rgba(190,175,140,0.14)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x + dx - r, y + dy - r, 2 * r, 2 * r); }
+    for (const [wx, wy] of WRAP) { const dx = wx * S, dy = wy * S; const gr = g.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, r); gr.addColorStop(0, dark ? 'rgba(10,8,4,' + 0.22 * strength + ')' : 'rgba(190,175,140,' + 0.14 * strength + ')'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x + dx - r, y + dy - r, 2 * r, 2 * r); }
   }
 }
 
@@ -84,6 +84,36 @@ function tone(g, S, count, dark) {
       const i = (y * S2 + x) * 4; d[i] = 72 * leaf * shade + 18; d[i + 1] = 118 * leaf * shade + 26; d[i + 2] = 48 * leaf * shade + 12; d[i + 3] = 255;
     }
     g.putImageData(img, 0, 0); night(c, 0.6, 0.55); save(c, 'hedge');
+  }
+  // the Ardennes: the same four fields under snow. The ground shows through where a noise mask says so (ragged
+  // patches, not circles), a snow lane with dark ruts, a snow yard.
+  const noiseMask = (S, cells, threshold, soft) => {
+    const mc = createCanvas(S, S), mg = mc.getContext('2d'); const img = mg.createImageData(S, S), d = img.data;
+    const lat = n => { const a = []; for (let i = 0; i < n * n; i++) a.push(rnd()); return (x, y) => a[((y % n + n) % n) * n + ((x % n + n) % n)]; };
+    const octs = [[cells, 1], [cells * 2, 0.5], [cells * 4, 0.25]].map(([n, w]) => [n, w, lat(n)]); const sm = t => t * t * (3 - 2 * t); const step = 4;
+    for (let y = 0; y < S; y += step) for (let x = 0; x < S; x += step) {
+      let v = 0, ws = 0; for (const [n, w, L] of octs) { const fx = x / S * n, fy = y / S * n, ix = Math.floor(fx), iy = Math.floor(fy), tx = sm(fx - ix), ty = sm(fy - iy); v += w * ((L(ix, iy) * (1 - tx) + L(ix + 1, iy) * tx) * (1 - ty) + (L(ix, iy + 1) * (1 - tx) + L(ix + 1, iy + 1) * tx) * ty); ws += w; }
+      v /= ws; const a = Math.max(0, Math.min(1, (v - threshold) / soft)) * 255;
+      for (let yy = 0; yy < step; yy++) for (let xx = 0; xx < step; xx++) { const i = ((y + yy) * S + x + xx) * 4; d[i + 3] = a; }
+    }
+    mg.putImageData(img, 0, 0); return mc;
+  };
+  const snowBase = (g, S) => { g.fillStyle = 'rgb(214,218,226)'; g.fillRect(0, 0, S, S); const img = g.getImageData(0, 0, S, S), d = img.data; let sd = 5; const r2 = () => (sd = (sd * 16807) % 2147483647) / 2147483647; for (let i = 0; i < d.length; i += 4) { const v = (r2() - 0.5) * 14; d[i] += v; d[i + 1] += v; d[i + 2] += v; } g.putImageData(img, 0, 0); };
+  const through = (g, img, S, cells, threshold, soft, alpha) => { const pc = createCanvas(S, S), pg = pc.getContext('2d'); tile(pg, img, S, 4); pg.globalCompositeOperation = 'destination-in'; pg.drawImage(noiseMask(S, cells, threshold, soft), 0, 0); g.globalAlpha = alpha; g.drawImage(pc, 0, 0); g.globalAlpha = 1; };
+  { const c = createCanvas(S, S), g = c.getContext('2d'); snowBase(g, S); g.globalAlpha = 0.3; tile(g, mud2, S, 4); g.globalAlpha = 1; through(g, field, S, 6, 0.56, 0.12, 0.8); tone(g, S, 5, true, 0.3); night(c, 0.5, 0.62); save(c, 'field_snow_plough'); }
+  { const c = createCanvas(S, S), g = c.getContext('2d'); snowBase(g, S); through(g, grass, S, 8, 0.55, 0.1, 0.85); through(g, mud, S, 5, 0.62, 0.1, 0.6); tone(g, S, 5, true, 0.3); night(c, 0.45, 0.62); save(c, 'field_snow_pasture'); }
+  { const c = createCanvas(S, S), g = c.getContext('2d'); snowBase(g, S); g.globalAlpha = 0.2; tile(g, grass2, S, 4); g.globalAlpha = 1; through(g, grass2, S, 7, 0.6, 0.1, 0.7); tone(g, S, 5, true, 0.3); night(c, 0.45, 0.62); save(c, 'field_snow_mown'); }
+  { const c = createCanvas(S, S), g = c.getContext('2d'); snowBase(g, S); through(g, mud, S, 7, 0.5, 0.12, 0.85); through(g, grass, S, 9, 0.62, 0.08, 0.6); tone(g, S, 5, true, 0.3); night(c, 0.5, 0.62); save(c, 'field_snow_stubble'); }
+  {
+    const W = 512, H = 2048, c = createCanvas(W, H), g = c.getContext('2d'); g.fillStyle = 'rgb(190,192,198)'; g.fillRect(0, 0, W, H); g.globalAlpha = 0.5; for (let y = 0; y < H; y += 512) g.drawImage(mud, 0, y, 512, 512); g.globalAlpha = 1;
+    for (const cx of [150, 362]) { g.strokeStyle = 'rgba(50,42,34,0.75)'; g.lineWidth = 30; g.beginPath(); for (let y = -64; y <= H + 64; y += 32) { const x = cx + Math.sin(y / H * Math.PI * 4) * 9 + Math.sin(y / H * Math.PI * 10) * 4; if (y === -64) g.moveTo(x, y); else g.lineTo(x, y); } g.stroke(); }
+    g.globalCompositeOperation = 'destination-in'; const eg = g.createLinearGradient(0, 0, W, 0); eg.addColorStop(0, 'rgba(0,0,0,0)'); eg.addColorStop(0.16, 'rgba(0,0,0,1)'); eg.addColorStop(0.84, 'rgba(0,0,0,1)'); eg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = eg; g.fillRect(0, 0, W, H);
+    night(c, 0.5, 0.62); save(c, 'lane_snow');
+  }
+  {
+    const S2 = 1024, c = createCanvas(S2, S2), g = c.getContext('2d'); g.fillStyle = 'rgb(180,178,176)'; g.fillRect(0, 0, S2, S2); g.globalAlpha = 0.6; tile(g, mud, S2, 2); g.globalAlpha = 1; blobs(g, mud2, S2, 6, 100, 260, 0.4, 2);
+    g.globalCompositeOperation = 'destination-in'; const gr = g.createRadialGradient(S2 / 2, S2 / 2, S2 * 0.3, S2 / 2, S2 / 2, S2 * 0.5); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, S2, S2);
+    night(c, 0.5, 0.62); save(c, 'yard_snow');
   }
   console.log('fields baked');
 })();

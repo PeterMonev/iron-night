@@ -14,6 +14,7 @@ namespace IronNight
     {
         class Shell { public Vector3 pos, vel; public bool friendly, he, bounced; public float dmg, life, trail; public Transform vis; }
         enum Weather { Clear, Overcast, Fog, Rain }
+        static bool LowQuality { get => PlayerPrefs.GetInt("quality", 1) == 0; set { PlayerPrefs.SetInt("quality", value ? 0 : 1); PlayerPrefs.Save(); } }
         class Sky { public Color ambient, fog, moonColor; public float fogDensity, moonIntensity, shadow; }
         class Flare { public Vector3 pos; public float age; public Transform vis; public Light light; public Material mat; }
         class Wreck { public Vehicle v; public float age, burnTimer; public Light fire; }
@@ -27,7 +28,7 @@ namespace IronNight
 
         Camera cam; Hud hud; TouchStick stick; Fx fx; Props props; Tracks tracks;
         Weather weather; Sky sky; float rumbleTimer = 12f, flicker, enemyRangeMul = 1f, ammoMul = 1f, ammoLeft, dropTimer = 35f; ParticleSystem rain; Material groundMaterial;
-        Objective objective; int objectivesReached; readonly List<Drop> drops = new List<Drop>(); Material crateMaterial, chuteMaterial;
+        Objective objective; int objectivesReached; bool winter; readonly List<Drop> drops = new List<Drop>(); Material crateMaterial, chuteMaterial;
         Transform ground; Light flareLight, moon; float shake; int banked, nightTigers, nightPaks, nightFlares; bool nightRecorded, bossKilled;
         readonly List<Vehicle> platoon = new List<Vehicle>(); readonly List<Vehicle> foes = new List<Vehicle>();
         readonly List<Shell> shells = new List<Shell>(); readonly List<Flare> flares = new List<Flare>(); readonly List<Wreck> wrecks = new List<Wreck>();
@@ -56,7 +57,8 @@ namespace IronNight
             Depot.Load(); firstNight = Depot.NightsFought == 0;
             reloadMul = Depot.ReloadMul; rangeMul = Depot.RangeMul; speedMul = Depot.SpeedMul; maxPlatoon = 3;
             if (weather == Weather.Fog) { rangeMul *= 0.8f; enemyRangeMul = 0.8f; } else if (weather == Weather.Overcast) enemyRangeMul = 0.9f; else if (weather == Weather.Rain) { speedMul *= 0.92f; enemyRangeMul = 0.95f; }
-            hud.SetConditions(weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Overcast ? "a dark night, the enemy sees 10% less" : weather == Weather.Rain ? "mud slows the platoon, the enemy sees 5% less" : "");
+            hud.SetConditions(winter ? "Ardennes" : "Normandy", winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Overcast ? "a dark night, the enemy sees 10% less" : weather == Weather.Rain ? (winter ? "the platoon slows in the drifts, the enemy sees 5% less" : "mud slows the platoon, the enemy sees 5% less") : "");
+            hud.OnQuality = () => { LowQuality = !LowQuality; ApplyQuality(); hud.ShowPause(!Sfx.Muted, !LowQuality); };
             hud.OnDaily = () => { Depot.ClaimDaily(); hud.ShowTitle(reserveGranted); };
             platoon.Add(Vehicle.Create(VehicleSpec.ById(Depot.LeaderId), true, Vector3.zero, 0f)); Leader.hp = Depot.LeaderHp;
             NextObjective();
@@ -66,7 +68,7 @@ namespace IronNight
             hud.OnDepot = () => { stick.Blocked = true; hud.ShowDepot(); };
             hud.OnBack = () => { if (phase == Phase.End) SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); else hud.ShowTitle(reserveGranted); };
             hud.OnReserveAd = () => { reserveGranted = true; maxPlatoon = 4; hud.ShowTitle(true); };   // the ad is a mock: granted at once
-            hud.OnPause = Pause; hud.OnResume = Resume; hud.OnSound = () => { Sfx.Muted = !Sfx.Muted; hud.ShowPause(!Sfx.Muted); };
+            hud.OnPause = Pause; hud.OnResume = Resume; hud.OnSound = () => { Sfx.Muted = !Sfx.Muted; hud.ShowPause(!Sfx.Muted, !LowQuality); };
             hud.OnQuit = () => { Resume(); revived = true; End(false); };   // no rewarded repair after walking away
             if (debugDawn) t = 250f;
             hud.Set(t, platoon.Count); hud.SetLevel(level, 0f);
@@ -81,10 +83,10 @@ namespace IronNight
             var g = GameObject.CreatePrimitive(PrimitiveType.Plane); g.name = "Ground"; Destroy(g.GetComponent<Collider>());
             g.transform.localScale = new Vector3(GroundTile, 1f, GroundTile);
             var gm = new Material(Resources.Load<Material>("GroundLit"));
-            gm.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/field_pasture")); gm.SetTextureScale("_BaseMap", new Vector2(10f, 10f)); gm.SetColor("_BaseColor", new Color(0.9f, 0.9f, 0.88f));
+            gm.SetTexture("_BaseMap", Resources.Load<Texture2D>(winter ? "Textures/field_snow_pasture" : "Textures/field_pasture")); gm.SetTextureScale("_BaseMap", new Vector2(10f, 10f)); gm.SetColor("_BaseColor", new Color(0.9f, 0.9f, 0.88f));
             g.GetComponent<Renderer>().sharedMaterial = gm; g.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             ground = g.transform;
-            props = new GameObject("Props").AddComponent<Props>(); props.Build(cam); props.fx = fx;
+            props = new GameObject("Props").AddComponent<Props>(); props.winter = winter; props.Build(cam); props.fx = fx;
             tracks = new GameObject("Tracks").AddComponent<Tracks>(); tracks.Build();
 
             // night: moonlight with soft shadows, a cold ambient, fog swallowing the distance
@@ -92,7 +94,8 @@ namespace IronNight
             RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = sky.fogDensity; RenderSettings.fogColor = sky.fog;
             var moonGo = new GameObject("Moon"); moon = moonGo.AddComponent<Light>();
             moon.type = LightType.Directional; moon.color = sky.moonColor; moon.intensity = sky.moonIntensity; moon.shadows = LightShadows.Soft; moon.shadowStrength = sky.shadow;
-            if (weather == Weather.Rain) { BuildRain(); gm.SetFloat("_Smoothness", 0.55f); } groundMaterial = gm; Sfx.Ambient(weather == Weather.Rain);
+            if (weather == Weather.Rain) { BuildRain(); if (!winter) gm.SetFloat("_Smoothness", 0.55f); } groundMaterial = gm; Sfx.Ambient(weather == Weather.Rain && !winter);
+            ApplyQuality();
             moonGo.transform.rotation = Quaternion.Euler(52f, -35f, 0f);
             // the flare light over the platoon: warm, follows the leader, grows with the platoon
             var fl = new GameObject("FlareLight"); flareLight = fl.AddComponent<Light>();
@@ -452,8 +455,10 @@ namespace IronNight
         void PickWeather()
         {
             float r = Random.value; weather = r < 0.45f ? Weather.Clear : r < 0.7f ? Weather.Overcast : r < 0.85f ? Weather.Fog : Weather.Rain;
-            var args = System.Environment.GetCommandLineArgs();   // test switches: --fog, --rain, --overcast, --clear
+            Depot.Load(); winter = Depot.NightsFought >= 1 && Random.value < 0.5f;   // the first night is always Normandy
+            var args = System.Environment.GetCommandLineArgs();   // test switches: --fog, --rain, --overcast, --clear, --winter, --summer
             foreach (Weather w in System.Enum.GetValues(typeof(Weather))) if (System.Array.IndexOf(args, "--" + w.ToString().ToLowerInvariant()) >= 0) weather = w;
+            if (System.Array.IndexOf(args, "--winter") >= 0) winter = true; if (System.Array.IndexOf(args, "--summer") >= 0) winter = false;
             switch (weather)
             {
                 case Weather.Overcast: sky = new Sky { ambient = new Color(0.17f, 0.19f, 0.27f), fog = new Color(0.025f, 0.03f, 0.045f), fogDensity = 0.008f, moonColor = new Color(0.7f, 0.74f, 0.9f), moonIntensity = 1.7f, shadow = 0.5f }; break;
@@ -461,7 +466,17 @@ namespace IronNight
                 case Weather.Rain: sky = new Sky { ambient = new Color(0.15f, 0.17f, 0.24f), fog = new Color(0.03f, 0.035f, 0.05f), fogDensity = 0.009f, moonColor = new Color(0.66f, 0.7f, 0.86f), moonIntensity = 1.5f, shadow = 0.4f }; break;
                 default: sky = new Sky { ambient = new Color(0.24f, 0.27f, 0.36f), fog = new Color(0.03f, 0.045f, 0.07f), fogDensity = 0.0065f, moonColor = new Color(0.82f, 0.86f, 1f), moonIntensity = 2.6f, shadow = 0.8f }; break;
             }
+            if (winter) { sky.ambient = sky.ambient * 1.15f + new Color(0.02f, 0.02f, 0.04f); sky.fog = sky.fog * 1.4f + new Color(0.02f, 0.02f, 0.03f); sky.moonColor = new Color(sky.moonColor.r * 0.95f, sky.moonColor.g, Mathf.Min(1f, sky.moonColor.b * 1.05f)); }
             LightShaft.boost = weather == Weather.Fog ? 1.8f : weather == Weather.Rain ? 1.3f : 1f;
+        }
+
+        /// <summary>Low quality for weak phones: no moon shadows, no post-processing, no rain or snow.</summary>
+        void ApplyQuality()
+        {
+            bool low = LowQuality;
+            moon.shadows = low ? LightShadows.None : LightShadows.Soft;
+            var volume = FindAnyObjectByType<UnityEngine.Rendering.Volume>(); if (volume != null) volume.weight = low ? 0f : 1f;
+            if (rain != null) { if (low) rain.Stop(); else if (!rain.isPlaying) rain.Play(); }
         }
 
         /// <summary>The night's light every frame: the sky of the weather, then the last 45 seconds turning to dawn
@@ -483,11 +498,12 @@ namespace IronNight
         void BuildRain()
         {
             var go = new GameObject("Rain"); rain = go.AddComponent<ParticleSystem>(); rain.Stop();
-            var main = rain.main; main.startSpeed = 40f; main.startLifetime = 1.1f; main.startSize = 0.07f; main.maxParticles = 2000; main.simulationSpace = ParticleSystemSimulationSpace.World; main.gravityModifier = 1.5f;
-            main.startColor = new Color(0.7f, 0.75f, 0.85f, 0.45f);
-            var em = rain.emission; em.rateOverTime = 1300f;
+            var main = rain.main; main.startSpeed = winter ? 3f : 40f; main.startLifetime = winter ? 14f : 1.1f; main.startSize = winter ? 0.28f : 0.07f; main.maxParticles = 2000; main.simulationSpace = ParticleSystemSimulationSpace.World; main.gravityModifier = winter ? 0.08f : 1.5f;
+            main.startColor = winter ? new Color(0.9f, 0.92f, 0.98f, 0.7f) : new Color(0.7f, 0.75f, 0.85f, 0.45f);
+            var em = rain.emission; em.rateOverTime = winter ? 140f : 1300f;
+            if (winter) { var vel = rain.velocityOverLifetime; vel.enabled = true; vel.x = new ParticleSystem.MinMaxCurve(-1.2f, 1.2f); vel.z = new ParticleSystem.MinMaxCurve(-1.2f, 1.2f); }
             var sh = rain.shape; sh.shapeType = ParticleSystemShapeType.Box; sh.scale = new Vector3(70f, 1f, 90f); sh.rotation = new Vector3(90f, 0f, 0f);
-            var r = go.GetComponent<ParticleSystemRenderer>(); r.renderMode = ParticleSystemRenderMode.Stretch; r.lengthScale = 22f; r.velocityScale = 0f;
+            var r = go.GetComponent<ParticleSystemRenderer>(); if (winter) r.renderMode = ParticleSystemRenderMode.Billboard; else { r.renderMode = ParticleSystemRenderMode.Stretch; r.lengthScale = 22f; r.velocityScale = 0f; }
             var m = new Material(Resources.Load<Material>("Additive")); m.SetTexture("_BaseMap", glowTex); m.SetColor("_BaseColor", new Color(0.5f, 0.55f, 0.65f, 0.35f)); r.sharedMaterial = m;
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false;
             go.transform.position = Vector3.up * 30f; rain.Play();
@@ -597,7 +613,7 @@ namespace IronNight
 
         void RemoveDrop(Drop d) { Destroy(d.crate.gameObject); Destroy(d.chute.gameObject); Destroy(d.lines.gameObject); if (d.marker != null) Destroy(d.marker.gameObject); }
 
-        void Pause() { if (phase != Phase.Play) return; phase = Phase.Pause; stick.Blocked = true; Sfx.Quiet(true); hud.ShowPause(!Sfx.Muted); }
+        void Pause() { if (phase != Phase.Play) return; phase = Phase.Pause; stick.Blocked = true; Sfx.Quiet(true); hud.ShowPause(!Sfx.Muted, !LowQuality); }
         void Resume() { if (phase != Phase.Pause) return; hud.HidePause(); Sfx.Quiet(false); phase = Phase.Play; stick.Blocked = false; }
         void OnApplicationPause(bool paused) { if (paused) Pause(); }   // the phone: a call, the home button
 

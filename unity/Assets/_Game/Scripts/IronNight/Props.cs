@@ -43,9 +43,11 @@ namespace IronNight
         readonly List<GameObject> craters = new List<GameObject>(); int nextCrater;   // shell craters of the night, oldest reused
         public Fx fx;
 
+        public bool winter;   // the Ardennes: snow on the fields, bare trees
+
         public void Build(Camera camera)
         {
-            cam = camera.transform; LightShaft.cam = camera;
+            cam = camera.transform; LightShaft.cam = camera; string sn = winter ? "_snow" : "";
             var lit = Resources.Load<Material>("VehicleLit"); var groundLit = Resources.Load<Material>("GroundLit"); var decal = Resources.Load<Material>("GroundDecal");
             foreach (var k in Kinds)
             {
@@ -54,12 +56,12 @@ namespace IronNight
                 var m = new Material(lit); m.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + k.mesh + "_tex")); m.SetColor("_BaseColor", Tint(k.mesh)); m.SetFloat("_Smoothness", 0.15f); m.SetFloat("_Cull", 0f);
                 materials[k.mesh] = m;
             }
-            fieldMaterials = new Material[4]; string[] names = { "field_plough", "field_pasture", "field_mown", "field_stubble" };
+            fieldMaterials = new Material[4]; string[] names = { "field" + sn + "_plough", "field" + sn + "_pasture", "field" + sn + "_mown", "field" + sn + "_stubble" };
             for (int i = 0; i < 4; i++) { var m = new Material(groundLit); m.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/" + names[i])); m.SetColor("_BaseColor", new Color(0.95f, 0.95f, 0.95f)); fieldMaterials[i] = m; }
             Material Decal(string tex, int queue) { var m = new Material(decal); m.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/" + tex)); m.SetColor("_BaseColor", new Color(0.95f, 0.95f, 0.95f)); m.renderQueue = queue; return m; }
-            yardMaterial = Decal("yard", 2440); laneMaterial = Decal("lane", 2442); laneMaterial.SetTextureScale("_BaseMap", new Vector2(1f, 2f)); craterMaterial = Decal("crater", 2446);
+            yardMaterial = Decal("yard" + sn, 2440); laneMaterial = Decal("lane" + sn, 2442); laneMaterial.SetTextureScale("_BaseMap", new Vector2(1f, 2f)); craterMaterial = Decal("crater", 2446);
             patchMaterial = new Material(Resources.Load<Material>("Smoke")); patchMaterial.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.GroundShadow(128).texture); patchMaterial.SetColor("_BaseColor", new Color(0.05f, 0.04f, 0.03f, 0.3f)); patchMaterial.renderQueue = 2450;
-            hedgeMaterial = new Material(lit); hedgeMaterial.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/hedge")); hedgeMaterial.SetColor("_BaseColor", new Color(0.9f, 0.95f, 0.85f)); hedgeMaterial.SetFloat("_Smoothness", 0.08f); hedgeMaterial.SetFloat("_Cull", 0f);
+            hedgeMaterial = new Material(lit); hedgeMaterial.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/hedge")); hedgeMaterial.SetColor("_BaseColor", winter ? new Color(0.72f, 0.78f, 0.82f) : new Color(0.9f, 0.95f, 0.85f)); hedgeMaterial.SetFloat("_Smoothness", 0.08f); hedgeMaterial.SetFloat("_Cull", 0f);
             canopyMaterial = new Material(hedgeMaterial); canopyMaterial.SetColor("_BaseColor", new Color(0.95f, 1f, 0.8f));
             trunkMaterial = new Material(Resources.Load<Material>("BarrelLit")); trunkMaterial.SetColor("_BaseColor", new Color(0.26f, 0.21f, 0.15f)); trunkMaterial.SetFloat("_Smoothness", 0.1f); trunkMaterial.SetFloat("_Metallic", 0f);
             blobs = new Mesh[4]; for (int i = 0; i < 4; i++) blobs[i] = Blob(11 + i * 7);
@@ -102,6 +104,7 @@ namespace IronNight
 
         void Tree(List<Prop> list, Vector3 pos, int seed)
         {
+            if (winter) { Place(list, "deadtree", pos, (seed % 360) * Mathf.Deg2Rad); return; }   // bare in the snow
             list.Add(new Prop { what = What.Tree, pos = pos, seed = seed, yaw = (seed % 360) * Mathf.Deg2Rad, bound = 5f, circleCenters = new[] { new Vector2(pos.x, pos.z) }, radii = new[] { 0.8f } });
         }
 

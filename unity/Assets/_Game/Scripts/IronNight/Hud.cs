@@ -13,9 +13,9 @@ namespace IronNight
         public class Card { public string id, title, desc; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain, OnStart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily;
+        public System.Action OnAd, OnAgain, OnStart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality;
 
-        Text clock, count, fps, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions; GameObject dailyBtn;
+        Text clock, count, fps, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel; GameObject dailyBtn, helpSheet;
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
         class Rising { public Text t; public float life; public Vector3 world; }
         readonly List<Rising> popups = new List<Rising>(); readonly Stack<Text> popupPool = new Stack<Text>(); RectTransform canvasRect;
@@ -106,7 +106,9 @@ namespace IronNight
             var resume = MakeButton(pauseSheet.transform, "Resume", new Vector2(0.5f, 0.5f), new Vector2(0, 160), new Vector2(880, 150), 52, () => OnResume?.Invoke());
             resume.GetComponent<Image>().color = amber; resume.transform.Find("Label").GetComponent<Text>().color = new Color(0.1f, 0.08f, 0.05f);
             var snd = MakeButton(pauseSheet.transform, "Sound: on", new Vector2(0.5f, 0.5f), new Vector2(0, -20), new Vector2(880, 130), 40, () => OnSound?.Invoke()); soundLabel = snd.transform.Find("Label").GetComponent<Text>();
-            MakeButton(pauseSheet.transform, "Abandon the assault", new Vector2(0.5f, 0.5f), new Vector2(0, -200), new Vector2(880, 130), 40, () => OnQuit?.Invoke());
+            var qb = MakeButton(pauseSheet.transform, "Quality: high", new Vector2(0.5f, 0.5f), new Vector2(0, -180), new Vector2(880, 130), 40, () => OnQuality?.Invoke()); qualityLabel = qb.transform.Find("Label").GetComponent<Text>();
+            MakeText(pauseSheet.transform, "QualityNote", new Vector2(0.5f, 0.5f), new Vector2(0, -270), TextAnchor.MiddleCenter, 26, dim).text = "Low: no shadows, no glow, no rain. For phones that stutter.";
+            MakeButton(pauseSheet.transform, "Abandon the assault", new Vector2(0.5f, 0.5f), new Vector2(0, -400), new Vector2(880, 130), 40, () => OnQuit?.Invoke());
             pauseSheet.SetActive(false);
 
             // title sheet
@@ -128,7 +130,23 @@ namespace IronNight
             var ort = orders.GetComponent<RectTransform>(); ort.anchorMin = ort.anchorMax = new Vector2(0.5f, 0.5f); ort.anchoredPosition = new Vector2(0, -370); ort.sizeDelta = Vector2.zero; missionRoot = orders.transform;
             titleStats = MakeText(titleSheet.transform, "Stats", new Vector2(0.5f, 0.5f), new Vector2(0, -700), TextAnchor.MiddleCenter, 32, dim); titleStats.rectTransform.sizeDelta = new Vector2(900, 200);
             MakeText(titleSheet.transform, "Credits", new Vector2(0.5f, 0f), new Vector2(0, 70), TextAnchor.MiddleCenter, 24, new Color(0.45f, 0.44f, 0.4f)).text = "Built with DINOv3 · TRELLIS 2 · Unity";
+            MakeButton(titleSheet.transform, "How to play", new Vector2(0.5f, 0f), new Vector2(0, 215), new Vector2(420, 70), 30, () => { helpSheet.SetActive(true); });
             titleSheet.SetActive(false);
+
+            // how to play
+            helpSheet = new GameObject("Help", typeof(RectTransform), typeof(Image)); helpSheet.transform.SetParent(root, false);
+            Stretch(helpSheet); helpSheet.GetComponent<Image>().color = new Color(0.02f, 0.03f, 0.04f, 0.92f);
+            MakeText(helpSheet.transform, "Title", new Vector2(0.5f, 1f), new Vector2(0, -170), TextAnchor.MiddleCenter, 96, ink).text = "How to play";
+            var help = MakeText(helpSheet.transform, "Text", new Vector2(0.5f, 1f), new Vector2(0, -320), TextAnchor.UpperLeft, 34, new Color(0.85f, 0.83f, 0.78f)); help.rectTransform.sizeDelta = new Vector2(920, 1400);
+            help.text = "Drag anywhere to drive the leader. The turrets aim and fire on their own.\n\n" +
+                "Every enemy you destroy leaves a flare. Drive over it: a new tank joins the platoon, up to three (a fourth with the ad).\n\n" +
+                "Pick a formation at the bottom. Wedge for the open field, column for the lanes, line to bring every gun to bear.\n\n" +
+                "Hedges stop tanks; drive through the gates. Farm buildings stop shells: use them as cover, or deny them to the enemy.\n\n" +
+                "Anti-tank guns dig in behind sandbags and the 88s stand with the searchlights. Hit them from the side.\n\n" +
+                "Green smoke marks the objective. Supply crates come down by parachute. Level up and choose a card.\n\n" +
+                "Hold until 5:00. Dawn is a win.";
+            MakeButton(helpSheet.transform, "Back", new Vector2(0.5f, 0f), new Vector2(0, 150), new Vector2(880, 130), 40, () => helpSheet.SetActive(false));
+            helpSheet.SetActive(false);
 
             // depot sheet
             depotSheet = new GameObject("Depot", typeof(RectTransform), typeof(Image)); depotSheet.transform.SetParent(root, false);
@@ -345,8 +363,8 @@ namespace IronNight
         }
         public void HideEnd() { endSheet.SetActive(false); }
         /// <summary>Tonight's weather on the title and in the corner of the HUD.</summary>
-        public void SetConditions(string name, string note) { conditions.text = name == "Clear" ? "Tonight: clear skies · full moon" : "Tonight: " + name.ToLowerInvariant() + " · " + note; assaultLabel.text = "NIGHT ASSAULT · " + name.ToUpperInvariant(); }
-        public void ShowPause(bool soundOn) { soundLabel.text = soundOn ? "Sound: on" : "Sound: off"; pauseSheet.SetActive(true); }
+        public void SetConditions(string sector, string name, string note) { conditions.text = "Tonight: " + sector + " · " + (name == "Clear" ? "clear skies, full moon" : name.ToLowerInvariant() + " · " + note); assaultLabel.text = sector.ToUpperInvariant() + " · " + name.ToUpperInvariant(); }
+        public void ShowPause(bool soundOn, bool highQuality) { soundLabel.text = soundOn ? "Sound: on" : "Sound: off"; qualityLabel.text = highQuality ? "Quality: high" : "Quality: low"; pauseSheet.SetActive(true); }
         public void HidePause() { pauseSheet.SetActive(false); }
         public void SetAdNote(string s) { adNote.text = s; }
 
