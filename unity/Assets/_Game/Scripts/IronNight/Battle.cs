@@ -14,7 +14,7 @@ namespace IronNight
         class Shell { public Vector3 pos, vel; public bool friendly, he; public float dmg, life; public Transform vis; public Material mat; }
         class Flare { public Vector3 pos; public float age; public Transform vis; public Light light; public Material mat; }
         class Wreck { public Vehicle v; public float age, burnTimer; public Light fire; }
-        enum Phase { Play, LevelUp, End }
+        enum Phase { Title, Play, LevelUp, End }
 
         const float NightLength = 300f;         // five minutes of darkness, dawn at 5:00
         const float ShellSpeed = 62f, EnemyShellSpeed = 55f, GroundTile = 40f;
@@ -24,7 +24,7 @@ namespace IronNight
         readonly List<Vehicle> platoon = new List<Vehicle>(); readonly List<Vehicle> foes = new List<Vehicle>();
         readonly List<Shell> shells = new List<Shell>(); readonly List<Flare> flares = new List<Flare>(); readonly List<Wreck> wrecks = new List<Wreck>();
         Material shellTemplate; Texture2D glowTex;
-        Formation formation = Formation.Wedge; Phase phase = Phase.Play;
+        Formation formation = Formation.Wedge; Phase phase = Phase.Title; bool reserveGranted;
         float t, spawnTimer = 6f, leaderShield; int level = 1, xp, xpNeed = 6, score, kills, maxPlatoon = 4, reinforcements;
         bool wave2, wave4, revived, doubled;
         float damageMul = 1f, reloadMul = 1f, rangeMul = 1f, speedMul = 1f; bool he;
@@ -36,12 +36,20 @@ namespace IronNight
             cam = camera; hud = h; stick = s; fx = effects;
             shellTemplate = Resources.Load<Material>("Additive"); glowTex = Lightswarm.ProceduralSprites.Glow(64, 0.3f).texture;
             BuildWorld();
-            platoon.Add(Vehicle.Create(VehicleSpec.Sherman, true, Vector3.zero, 0f)); Leader.hp = 8f;
-            platoon.Add(Vehicle.Create(VehicleSpec.Sherman, true, new Vector3(-6f, 0f, -5.5f), 0f));
+            // the depot's permanent upgrades set the starting numbers of the night; the platoon holds 3, a rewarded ad opens a 4th slot
+            Depot.Load();
+            reloadMul = Depot.ReloadMul; rangeMul = Depot.RangeMul; speedMul = Depot.SpeedMul; maxPlatoon = 3;
+            platoon.Add(Vehicle.Create(VehicleSpec.Sherman, true, Vector3.zero, 0f)); Leader.hp = Depot.LeaderHp;
+            for (int i = 0; i < Depot.StartWingmen; i++) { var w = Vehicle.Create(VehicleSpec.Sherman, true, Slot(i + 1), 0f); w.hp += Depot.WingmanHpBonus; platoon.Add(w); }
             hud.OnFormation = f => formation = f;
             hud.OnAd = OnAd; hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            hud.OnStart = () => { hud.HideTitle(); phase = Phase.Play; stick.Blocked = false; };
+            hud.OnDepot = () => { stick.Blocked = true; hud.ShowDepot(); };
+            hud.OnBack = () => { if (phase == Phase.End) SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); else hud.ShowTitle(reserveGranted); };
+            hud.OnReserveAd = () => { reserveGranted = true; maxPlatoon = 4; hud.ShowTitle(true); };   // the ad is a mock: granted at once
             hud.Set(0f, platoon.Count); hud.SetLevel(level, 0f);
             PlaceCamera(true);
+            stick.Blocked = true; hud.ShowTitle(false);
         }
 
         void BuildWorld()
@@ -128,7 +136,7 @@ namespace IronNight
             KeepApart();
             flareLight.range = 34f + platoon.Count * 3f;
             PlaceCamera(false);
-            hud.Set(t, platoon.Count); hud.SetLeader(Mathf.CeilToInt(L.hp), 8);
+            hud.Set(t, platoon.Count); hud.SetLeader(Mathf.CeilToInt(L.hp), Mathf.CeilToInt(Depot.LeaderHp));
             hud.Indicators(foes, cam);
             if (t >= NightLength) End(true);
         }
@@ -243,7 +251,7 @@ namespace IronNight
         {
             reinforcements++;
             var spec = reinforcements % 3 == 0 ? VehicleSpec.Firefly : VehicleSpec.Sherman;
-            var L = Leader; var v = Vehicle.Create(spec, true, L.transform.position - L.Forward * 12f, L.yaw);
+            var L = Leader; var v = Vehicle.Create(spec, true, L.transform.position - L.Forward * 12f, L.yaw); v.hp += Depot.WingmanHpBonus;
             platoon.Add(v); hud.Toast("Reinforcement · " + spec.name); hud.Set(t, platoon.Count);
         }
 
@@ -336,7 +344,7 @@ namespace IronNight
                 new Hud.Card { id = "radar", title = "Night optics", desc = "Gunners see 15% farther in the dark." },
                 new Hud.Card { id = "engine", title = "Tuned engines", desc = "The platoon drives 15% faster." },
                 new Hud.Card { id = "repair", title = "Field repair", desc = "The leader is fully repaired and toughened by 1." },
-                new Hud.Card { id = "reinf", title = "Reinforcements", desc = "A Sherman joins now; the platoon can grow by one more." },
+                new Hud.Card { id = "reinf", title = "Reinforcements", desc = "A Sherman joins the platoon right now (if there is a slot)." },
             };
             if (he) all.RemoveAll(c => c.id == "he");
             var pick = new List<Hud.Card>(); while (pick.Count < 3 && all.Count > 0) { int i = Random.Range(0, all.Count); pick.Add(all[i]); all.RemoveAt(i); }
@@ -350,8 +358,8 @@ namespace IronNight
                     case "rapid": reloadMul *= 0.8f; break;
                     case "radar": rangeMul *= 1.15f; break;
                     case "engine": speedMul *= 1.15f; break;
-                    case "repair": Leader.hp = 9f; break;
-                    case "reinf": maxPlatoon = Mathf.Min(6, maxPlatoon + 1); Reinforce(); break;
+                    case "repair": Leader.hp = Depot.LeaderHp + 1f; break;
+                    case "reinf": Reinforce(); break;
                 }
                 phase = Phase.Play; stick.Blocked = false;
             });
@@ -361,6 +369,8 @@ namespace IronNight
         {
             if (phase == Phase.End) return;
             phase = Phase.End; stick.Blocked = true;
+            int earned = score * (doubled ? 2 : 1) + (dawn ? 500 : 0);
+            Depot.RecordNight(earned, kills, t); hud.SetEndPoints(earned);
             int m = Mathf.FloorToInt(t / 60f), s = Mathf.FloorToInt(t % 60f);
             hud.ShowEnd(dawn, $"{kills} enemy vehicles destroyed\n{m}:{s:00} held · level {level}\nScore {score * (doubled ? 2 : 1)}", dawn ? !doubled : !revived);
         }
@@ -370,10 +380,10 @@ namespace IronNight
             // the rewarded video is a mock here: the reward is granted after a moment
             if (phase != Phase.End) return;
             hud.SetAdNote("30 s ad · mock, skipping…");
-            if (t >= NightLength) { doubled = true; hud.ShowEnd(true, $"{kills} enemy vehicles destroyed\nScore {score * 2} (doubled)", false); return; }
+            if (t >= NightLength) { doubled = true; Depot.RecordNight(score, 0, 0f); hud.SetEndPoints(score * 2 + 500); hud.ShowEnd(true, $"{kills} enemy vehicles destroyed\nScore {score * 2} (doubled)", false); return; }
             revived = true;
             var L = Vehicle.Create(VehicleSpec.Sherman, true, platoon.Count > 0 ? platoon[0].transform.position - platoon[0].Forward * 8f : Vector3.zero, platoon.Count > 0 ? platoon[0].yaw : 0f);
-            L.hp = 8f; platoon.Insert(0, L); leaderShield = 4f;
+            L.hp = Depot.LeaderHp; platoon.Insert(0, L); leaderShield = 4f;
             hud.HideEnd(); phase = Phase.Play; stick.Blocked = false; hud.Toast("Field repair · back in the fight");
         }
     }

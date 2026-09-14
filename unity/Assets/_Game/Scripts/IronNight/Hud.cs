@@ -13,10 +13,10 @@ namespace IronNight
         public class Card { public string id, title, desc; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain;
+        public System.Action OnAd, OnAgain, OnStart, OnDepot, OnBack, OnReserveAd;
 
         Text clock, count, fps, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp;
-        Image levelFill; GameObject sheet, endSheet, adBtn; Transform cardRoot; Canvas canvas;
+        Image levelFill; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn; Transform cardRoot, depotRows; Canvas canvas; Text depotPoints, titleStats, endPoints, reserveNote;
         readonly Button[] formButtons = new Button[4];
         readonly List<Image> arrows = new List<Image>(); Sprite arrowSprite;
         float fpsAccum, fpsTimer, toastLeft; int fpsFrames;
@@ -34,7 +34,8 @@ namespace IronNight
             if (!FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>())
                 new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(UnityEngine.InputSystem.UI.InputSystemUIInputModule));
 
-            var t = canvasGo.transform;
+            var hg = new GameObject("PlayHud", typeof(RectTransform)); hg.transform.SetParent(canvasGo.transform, false); Stretch(hg); hudGroup = hg;
+            var t = hg.transform;
             var ink = new Color(0.93f, 0.91f, 0.86f); var amber = new Color(0.95f, 0.66f, 0.23f); var dim = new Color(0.66f, 0.64f, 0.59f);
             MakeText(t, "ClockLabel", new Vector2(0, 1), new Vector2(60, -70), TextAnchor.UpperLeft, 30, dim).text = "NIGHT ASSAULT";
             clock = MakeText(t, "Clock", new Vector2(0, 1), new Vector2(60, -108), TextAnchor.UpperLeft, 82, ink);
@@ -78,7 +79,74 @@ namespace IronNight
             MakeButton(endSheet.transform, "New assault", new Vector2(0.5f, 0.5f), new Vector2(0, -260), new Vector2(880, 130), 40, () => OnAgain?.Invoke());
             endSheet.SetActive(false);
             arrowSprite = ArrowSprite();
+            var root = canvasGo.transform;
+            endPoints = MakeText(endSheet.transform, "Points", new Vector2(0.5f, 0.5f), new Vector2(0, 120), TextAnchor.MiddleCenter, 44, amber);
+            MakeButton(endSheet.transform, "Depot", new Vector2(0.5f, 0.5f), new Vector2(0, -400), new Vector2(880, 130), 40, () => OnDepot?.Invoke());
+
+            // title sheet
+            titleSheet = new GameObject("Title", typeof(RectTransform), typeof(Image)); titleSheet.transform.SetParent(root, false);
+            Stretch(titleSheet); titleSheet.GetComponent<Image>().color = new Color(0.02f, 0.03f, 0.04f, 0.72f);
+            MakeText(titleSheet.transform, "Eyebrow", new Vector2(0.5f, 0.5f), new Vector2(0, 660), TextAnchor.MiddleCenter, 34, dim).text = "WWII · NIGHT ASSAULT";
+            var big = MakeText(titleSheet.transform, "Name", new Vector2(0.5f, 0.5f), new Vector2(0, 540), TextAnchor.MiddleCenter, 150, ink); big.text = "IRON NIGHT"; big.fontStyle = FontStyle.Bold; big.rectTransform.sizeDelta = new Vector2(1000, 200);
+            MakeText(titleSheet.transform, "Tag", new Vector2(0.5f, 0.5f), new Vector2(0, 420), TextAnchor.MiddleCenter, 36, dim).text = "Lead a Sherman platoon through five minutes of darkness.";
+            var start = MakeButton(titleSheet.transform, "Night assault", new Vector2(0.5f, 0.5f), new Vector2(0, 80), new Vector2(880, 150), 52, () => OnStart?.Invoke());
+            start.GetComponent<Image>().color = amber; start.transform.Find("Label").GetComponent<Text>().color = new Color(0.1f, 0.08f, 0.05f);
+            MakeButton(titleSheet.transform, "Depot", new Vector2(0.5f, 0.5f), new Vector2(0, -100), new Vector2(880, 130), 40, () => OnDepot?.Invoke());
+            reserveBtn = MakeButton(titleSheet.transform, "4th tank tonight · watch an ad", new Vector2(0.5f, 0.5f), new Vector2(0, -260), new Vector2(880, 110), 34, () => OnReserveAd?.Invoke());
+            reserveNote = MakeText(titleSheet.transform, "ReserveNote", new Vector2(0.5f, 0.5f), new Vector2(0, -345), TextAnchor.MiddleCenter, 26, dim); reserveNote.text = "The platoon holds 3 tanks. A rewarded video opens a 4th slot for this night (mock).";
+            titleStats = MakeText(titleSheet.transform, "Stats", new Vector2(0.5f, 0.5f), new Vector2(0, -480), TextAnchor.MiddleCenter, 32, dim); titleStats.rectTransform.sizeDelta = new Vector2(900, 200);
+            MakeText(titleSheet.transform, "Credits", new Vector2(0.5f, 0f), new Vector2(0, 70), TextAnchor.MiddleCenter, 24, new Color(0.45f, 0.44f, 0.4f)).text = "Built with DINOv3 · TRELLIS 2 · Unity";
+            titleSheet.SetActive(false);
+
+            // depot sheet
+            depotSheet = new GameObject("Depot", typeof(RectTransform), typeof(Image)); depotSheet.transform.SetParent(root, false);
+            Stretch(depotSheet); depotSheet.GetComponent<Image>().color = new Color(0.02f, 0.03f, 0.04f, 0.9f);
+            MakeText(depotSheet.transform, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -90), TextAnchor.MiddleCenter, 30, dim).text = "THE DEPOT";
+            MakeText(depotSheet.transform, "Title", new Vector2(0.5f, 1f), new Vector2(0, -170), TextAnchor.MiddleCenter, 96, ink).text = "Upgrades";
+            depotPoints = MakeText(depotSheet.transform, "Points", new Vector2(0.5f, 1f), new Vector2(0, -300), TextAnchor.MiddleCenter, 40, amber);
+            var rows = new GameObject("Rows", typeof(RectTransform)); rows.transform.SetParent(depotSheet.transform, false);
+            var rrt = rows.GetComponent<RectTransform>(); rrt.anchorMin = rrt.anchorMax = new Vector2(0.5f, 1f); rrt.pivot = new Vector2(0.5f, 1f); rrt.anchoredPosition = new Vector2(0, -400); rrt.sizeDelta = Vector2.zero;
+            depotRows = rows.transform;
+            MakeButton(depotSheet.transform, "Back", new Vector2(0.5f, 0f), new Vector2(0, 150), new Vector2(880, 130), 40, () => OnBack?.Invoke());
+            depotSheet.SetActive(false);
         }
+
+        public void ShowTitle(bool reserveGranted)
+        {
+            Depot.Load(); hudGroup.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(false);
+            int m = Mathf.FloorToInt(Depot.BestTime / 60f), s = Mathf.FloorToInt(Depot.BestTime % 60f);
+            titleStats.text = Depot.NightsFought == 0 ? "First night. Drag anywhere to drive; the turrets fire on their own." : $"{Depot.NightsFought} nights fought · best {Depot.BestKills} kills · longest {m}:{s:00}\n{Depot.Points} depot points";
+            reserveBtn.SetActive(!reserveGranted); reserveNote.text = reserveGranted ? "Reserve tank granted: the platoon can grow to 4 tonight." : "The platoon holds 3 tanks. A rewarded video opens a 4th slot for this night (mock).";
+            titleSheet.SetActive(true);
+        }
+        public void HideTitle() { titleSheet.SetActive(false); hudGroup.SetActive(true); }
+
+        public void ShowDepot()
+        {
+            Depot.Load(); titleSheet.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(true); RefreshDepot();
+        }
+
+        void RefreshDepot()
+        {
+            depotPoints.text = $"{Depot.Points} points";
+            foreach (Transform c in depotRows) Destroy(c.gameObject);
+            for (int i = 0; i < Depot.Upgrades.Count; i++)
+            {
+                var u = Depot.Upgrades[i]; float y = -i * 250f;
+                var row = MakeImage(depotRows, "Row " + u.id, new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 230), new Color(0.08f, 0.09f, 0.1f, 0.96f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);
+                var title = MakeText(row.transform, "Title", new Vector2(0f, 1f), new Vector2(30, -20), TextAnchor.UpperLeft, 44, new Color(0.93f, 0.91f, 0.86f)); title.text = u.title; title.rectTransform.sizeDelta = new Vector2(600, 60);
+                var pips = new System.Text.StringBuilder(); for (int k = 0; k < u.MaxLevel; k++) pips.Append(k < u.level ? "■" : "□");
+                var lvl = MakeText(row.transform, "Level", new Vector2(1f, 1f), new Vector2(-30, -26), TextAnchor.UpperRight, 40, new Color(0.95f, 0.66f, 0.23f)); lvl.text = pips.ToString(); lvl.rectTransform.sizeDelta = new Vector2(300, 60);
+                var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(30, -80), TextAnchor.UpperLeft, 28, new Color(0.66f, 0.64f, 0.59f)); desc.text = u.desc; desc.rectTransform.sizeDelta = new Vector2(880, 80);
+                bool maxed = u.level >= u.MaxLevel, can = !maxed && Depot.Points >= u.Cost;
+                var b = MakeButton(row.transform, maxed ? "Maxed" : $"Upgrade · {u.Cost}", new Vector2(1f, 0f), new Vector2(-190, 50), new Vector2(340, 80), 32, () => { if (Depot.Buy(u)) RefreshDepot(); });
+                b.GetComponent<Image>().color = can ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : new Color(0.2f, 0.2f, 0.22f, 0.9f);
+                b.transform.Find("Label").GetComponent<Text>().color = can ? new Color(0.1f, 0.08f, 0.05f) : new Color(0.55f, 0.53f, 0.5f);
+                b.GetComponent<Button>().interactable = can;
+            }
+        }
+
+        public void SetEndPoints(int points) { endPoints.text = points > 0 ? $"+{points} depot points" : ""; }
 
         /// <summary>Red chevrons on the screen edge pointing at enemies that are outside the view.</summary>
         public void Indicators(List<Vehicle> foes, Camera cam)
