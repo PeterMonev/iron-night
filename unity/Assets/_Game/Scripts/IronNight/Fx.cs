@@ -92,6 +92,13 @@ namespace IronNight
             Spawn(pos, 6f + Random.value * 4f, new Color(0.6f, 0.6f, 0.62f, 0.75f), life, true, new Vector3(Random.Range(-0.4f, 0.4f), 0.35f, Random.Range(-0.4f, 0.4f)));
         }
 
+        /// <summary>A flak tracer climbing from a post: a warm streak that burns out high up.</summary>
+        public void Flak(Vector3 from, Vector3 dir)
+        {
+            Spawn(from, 1.6f, new Color(1f, 0.7f, 0.35f, 0.9f), 1.3f, false, dir * 130f);
+            Spawn(from + dir * 0.5f, 3f, new Color(1f, 0.8f, 0.5f, 0.8f), 0.08f, false, Vector3.zero);
+        }
+
         /// <summary>An artillery shell falling onto the point: a glowing streak that arrives when the timer ends.</summary>
         public void Incoming(Vector3 at, float seconds)
         {

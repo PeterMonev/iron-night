@@ -78,6 +78,7 @@ namespace IronNight
         }
 
         public static void Shot(Vector3 pos, bool friendly, bool heavy) { if (instance) instance.PlayAt(heavy ? instance.shot : instance.shotFar, pos, heavy ? 0.9f : 0.7f, (friendly ? 1f : 0.85f) * Random.Range(0.94f, 1.06f)); }
+        public static void Flak(Vector3 pos) { if (instance) instance.PlayAt(instance.shotFar, pos, 0.35f, 1.6f); }
         public static void Whistle(Vector3 pos) { if (instance) instance.PlayAt(instance.whistle, pos, 0.7f, Random.Range(0.95f, 1.05f)); }
         public static void Hit(Vector3 pos) { if (instance) instance.PlayAt(instance.hit, pos, 0.8f, Random.Range(0.9f, 1.1f)); }
         public static void Explosion(Vector3 pos) { if (instance) instance.PlayAt(instance.explosion, pos, 1f, Random.Range(0.9f, 1.05f)); }

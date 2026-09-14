@@ -54,13 +54,33 @@ namespace IronNight
             Points -= u.Cost; u.level++; Save(); return true;
         }
 
-        /// <summary>Called once at the end of a night with what the player earned and did.</summary>
-        public static void RecordNight(int score, int kills, float seconds)
+        public static void AddPoints(int points) { Load(); Points += points; Save(); }
+
+        /// <summary>Called once per night, at its end, with what the player did; the points go in through AddPoints.</summary>
+        public static void RecordNight(int kills, float seconds)
         {
-            Load();
-            Points += score; NightsFought++;
+            Load(); NightsFought++;
             if (kills > BestKills) BestKills = kills; if (seconds > BestTime) BestTime = seconds;
             Save();
+        }
+
+        // camouflage: a tint over the platoon's paint; the first one is free, the others cost points (an IAP later)
+        public class Camo { public string id, name; public Color tint; public int cost; }
+        public static readonly Camo[] Camos =
+        {
+            new Camo { id = "olive", name = "Olive drab", tint = Color.white, cost = 0 },
+            new Camo { id = "winter", name = "Winter", tint = new Color(1.7f, 1.7f, 1.95f), cost = 800 },
+            new Camo { id = "desert", name = "Desert", tint = new Color(1.55f, 1.35f, 0.95f), cost = 800 },
+            new Camo { id = "night", name = "Night", tint = new Color(0.62f, 0.68f, 0.85f), cost = 1500 },
+        };
+        public static string CamoId { get { Load(); return PlayerPrefs.GetString("depot.camo", "olive"); } }
+        public static Color CamoTint { get { foreach (var c in Camos) if (c.id == CamoId) return c.tint; return Color.white; } }
+        public static bool OwnsCamo(Camo c) => c.cost == 0 || PlayerPrefs.GetInt("depot.camo." + c.id, 0) == 1;
+        public static bool PickCamo(Camo c)
+        {
+            Load();
+            if (!OwnsCamo(c)) { if (Points < c.cost) return false; Points -= c.cost; PlayerPrefs.SetInt("depot.camo." + c.id, 1); }
+            PlayerPrefs.SetString("depot.camo", c.id); Save(); return true;
         }
 
         // what the upgrades mean in the fight

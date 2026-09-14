@@ -19,7 +19,7 @@ namespace IronNight
             public What what; public Kind kind; public Vector3 pos; public float yaw, size, bound = 8f, height = -1f; public int seed;
             public Vector2[] circleCenters = new Vector2[0]; public float[] radii = new float[0];
             public Vector3 a, b; public float[] gaps; public float clearA, clearB;              // hedges: the line and its openings
-            public GameObject go; public Mesh mesh; public LightShaft shaft; public Transform yoke, drum, lamp;
+            public GameObject go; public Mesh mesh; public LightShaft shaft; public Transform yoke, drum, lamp; public float flakTimer = 4f; public int burst;
         }
 
         // circles: triples (offsetAlong, offsetSide, radius) in metres, along the prop's own forward axis
@@ -41,6 +41,7 @@ namespace IronNight
         Transform cam; Material patchMaterial, laneMaterial, yardMaterial, craterMaterial, hedgeMaterial, canopyMaterial, trunkMaterial;
         Material[] fieldMaterials; Mesh[] blobs; GameObject lampTemplate;
         readonly List<GameObject> craters = new List<GameObject>(); int nextCrater;   // shell craters of the night, oldest reused
+        public Fx fx;
 
         public void Build(Camera camera)
         {
@@ -203,6 +204,9 @@ namespace IronNight
                 p.yoke.localRotation = Quaternion.Euler(0f, az, 0f); p.drum.localRotation = Quaternion.Euler(-el, 0f, 0f);
                 p.lamp.rotation = cam.rotation;
                 p.shaft.Set(p.drum.position + p.drum.forward * 0.6f, p.drum.forward);
+                // the post's gun fires a burst at the sky now and then: five tracers climbing along the beam
+                p.flakTimer -= Time.deltaTime;
+                if (p.flakTimer <= 0f) { if (p.burst == 0) p.burst = 5; p.flakTimer = p.burst > 1 ? 0.13f : 7f + Rnd(p.seed, (int)(time * 10f), 3) * 12f; p.burst--; if (fx != null) { var from = p.pos + Quaternion.Euler(0f, p.yaw * Mathf.Rad2Deg, 0f) * new Vector3(5f, 1.2f, 1f); fx.Flak(from, (p.drum.forward + Random.insideUnitSphere * 0.06f).normalized); Sfx.Flak(from); } }
             }
         }
 
@@ -382,6 +386,19 @@ namespace IronNight
                 for (int c = 0; c < p.radii.Length; c++) { float min = p.radii[c] + radius; if ((new Vector2(pos.x, pos.z) - p.circleCenters[c]).sqrMagnitude < min * min) return false; }
             }
             return true;
+        }
+
+        /// <summary>Sandbag positions ahead of a point: where an anti-tank gun would dig in.</summary>
+        public List<Vector3> Nests(Vector3 from, Vector3 dir, float min, float max)
+        {
+            var list = new List<Vector3>();
+            foreach (var p in active)
+            {
+                if (p.what != What.Model || p.kind.mesh != "sandbags") continue;
+                var d = p.pos - from; d.y = 0f; float len = d.magnitude; if (len < min || len > max) continue;
+                if (Vector3.Dot(d / len, dir) > 0.35f) list.Add(p.pos);
+            }
+            return list;
         }
 
         /// <summary>A fresh shell crater on the ground; the field keeps the last forty.</summary>

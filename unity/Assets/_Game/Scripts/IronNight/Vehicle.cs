@@ -39,7 +39,7 @@ namespace IronNight
         {
             if (vehicleTemplate == null) { vehicleTemplate = Resources.Load<Material>("VehicleLit"); barrelMaterial = Resources.Load<Material>("BarrelLit"); }
             var tex = Resources.Load<Texture2D>("Models/" + spec.texture);
-            var mat = new Material(vehicleTemplate); mat.SetTexture("_BaseMap", tex); mat.SetColor("_BaseColor", spec.tint);
+            var mat = new Material(vehicleTemplate); mat.SetTexture("_BaseMap", tex); mat.SetColor("_BaseColor", friendly ? spec.tint * Depot.CamoTint : spec.tint);
 
             // hull: mesh origin is the turret ring, so it hangs ringHeight below the pivot and the tracks touch the ground
             var hull = Instantiate(Resources.Load<GameObject>("Models/" + spec.hullMesh), transform);
