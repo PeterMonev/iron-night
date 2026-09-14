@@ -198,6 +198,14 @@ namespace IronNight
             return root;
         }
 
+        /// <summary>A star shell: a big white glow hanging under its parachute; moved by the caller every frame.</summary>
+        public Transform StarFlare()
+        {
+            var root = new GameObject("StarShell").transform; root.SetParent(transform, false);
+            var q = Quad(); q.transform.SetParent(root, false); q.transform.localScale = Vector3.one * 7f; var r = q.GetComponent<Renderer>(); r.sharedMaterial = addGlow; mpb.SetColor(BaseColor, new Color(1f, 0.97f, 0.9f, 1f)); r.SetPropertyBlock(mpb);
+            return root;
+        }
+
         /// <summary>A thin puff left behind a shell in flight.</summary>
         public void Trail(Vector3 pos) { Spawn(smokeSoft, pos, 0.9f, new Color(0.7f, 0.68f, 0.64f, 0.3f), 0.55f, Vector3.up * 0.3f, 1.6f, true); }
 

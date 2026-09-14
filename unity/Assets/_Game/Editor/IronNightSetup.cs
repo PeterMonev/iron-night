@@ -31,6 +31,24 @@ namespace IronNight.EditorTools
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
             PlayerSettings.colorSpace = ColorSpace.Linear;
 
+            // the launcher icon: one 1024 px image, Unity scales it for every density
+            var iconImp = AssetImporter.GetAtPath("Assets/_Game/Icon/icon.png") as TextureImporter;
+            if (iconImp != null) { iconImp.textureType = TextureImporterType.Default; iconImp.textureCompression = TextureImporterCompression.Uncompressed; iconImp.mipmapEnabled = false; iconImp.SaveAndReimport(); }
+            foreach (var n in new[] { "icon_fg", "icon_bg" }) { var imp = AssetImporter.GetAtPath("Assets/_Game/Icon/" + n + ".png") as TextureImporter; if (imp != null) { imp.textureType = TextureImporterType.Default; imp.textureCompression = TextureImporterCompression.Uncompressed; imp.mipmapEnabled = false; imp.alphaIsTransparency = true; imp.SaveAndReimport(); } }
+            var icon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Game/Icon/icon.png");
+            var iconFg = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Game/Icon/icon_fg.png"); var iconBg = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Game/Icon/icon_bg.png");
+            if (icon != null)
+            {
+                PlayerSettings.SetIcons(NamedBuildTarget.Unknown, new[] { icon }, IconKind.Any);
+                // Android: the adaptive icon (background + foreground), the round and the legacy ones, every size from the same art
+                foreach (var kind in PlayerSettings.GetSupportedIconKinds(NamedBuildTarget.Android))
+                {
+                    var icons = PlayerSettings.GetPlatformIcons(NamedBuildTarget.Android, kind);
+                    foreach (var pi in icons) { if (pi.maxLayerCount >= 2 && iconFg != null && iconBg != null) pi.SetTextures(iconBg, iconFg); else pi.SetTexture(icon); }
+                    PlayerSettings.SetPlatformIcons(NamedBuildTarget.Android, kind, icons);
+                }
+            }
+
             Directory.CreateDirectory(Res);
             SetupPipeline();
             CreateMaterials();
