@@ -1,24 +1,22 @@
 """Turns a TRELLIS prop GLB into a game asset: long axis along Z, base on the ground, centred, scaled to a real length in
-metres, exported as OBJ + texture into the Unity project. Usage: python prop_export.py <in.glb> <name> <length_m>"""
+metres, exported as OBJ + texture into the Unity project. Usage: python prop_export.py <in.glb> <name> <size_m> [y]
+With "y" the size is the height (poles, trees, a standing figure) and the model is not turned."""
 import sys, os
 import numpy as np
 import trimesh
 
-src, name, length = sys.argv[1], sys.argv[2], float(sys.argv[3])
+src, name, length = sys.argv[1], sys.argv[2], float(sys.argv[3]); by_height = len(sys.argv) > 4 and sys.argv[4] == 'y'
 out = 'D:/Codes/Projects/lightswarm/unity/Assets/_Game/Resources/Props'
 os.makedirs(out, exist_ok=True)
 s = trimesh.load(src); m = list(s.geometry.values())[0] if isinstance(s, trimesh.Scene) else s
 lo, hi = m.bounds; size = hi - lo
-if size[0] > size[2]:  # long axis to Z
+if not by_height and size[0] > size[2]:  # long axis to Z
     m.apply_transform(trimesh.transformations.rotation_matrix(np.pi / 2, [0, 1, 0]))
     lo, hi = m.bounds; size = hi - lo
-scale = length / size[2]
+scale = length / (size[1] if by_height else size[2])
 m.apply_translation([-(lo[0] + hi[0]) / 2, -lo[1], -(lo[2] + hi[2]) / 2])
 m.apply_scale(scale)
 lo, hi = m.bounds
-# the tree reference stood on a display disc: drop the base slab
-if name == 'deadtree':
-    keep = m.triangles_center[:, 1] > 0.3; m = m.submesh([np.where(keep)[0]], append=True); lo, hi = m.bounds
 v, f, uv = m.vertices, m.faces, m.visual.uv
 with open(os.path.join(out, f'{name}.obj'), 'w') as o:
     o.write(f'mtllib {name}.mtl\no {name}\n')

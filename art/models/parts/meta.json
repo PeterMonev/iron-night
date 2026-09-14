@@ -45,5 +45,18 @@
   "longAxis": "z",
   "forward": -1.0,
   "hullLength": 5.7
+ },
+ "panther": {
+  "hullFaces": 19180,
+  "turretFaces": 2120,
+  "ringHeight": 1.919743172338781,
+  "longAxis": "z",
+  "forward": 1.0,
+  "hullLength": 6.9,
+  "ringCenter": [
+   -0.0065164978538329405,
+   0.0,
+   -0.17672220369180044
+  ]
  }
 }

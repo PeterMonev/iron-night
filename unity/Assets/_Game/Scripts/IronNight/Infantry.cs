@@ -15,13 +15,17 @@ namespace IronNight
         public class Squad { public readonly List<Soldier> men = new List<Soldier>(); }
 
         public readonly List<Squad> squads = new List<Squad>();
+        const float SoldierYaw = -90f;   // the figure's facing in its own mesh, corrected here if the export looks the wrong way
         readonly List<Soldier> fallen = new List<Soldier>();
-        Material uniform, helmet;
+        Material uniform, helmet, skin; GameObject figure;
 
         public void Build()
         {
             uniform = new Material(Resources.Load<Material>("BarrelLit")); uniform.SetColor("_BaseColor", new Color(0.22f, 0.24f, 0.2f)); uniform.SetFloat("_Metallic", 0f); uniform.SetFloat("_Smoothness", 0.15f);
             helmet = new Material(uniform); helmet.SetColor("_BaseColor", new Color(0.18f, 0.2f, 0.18f)); helmet.SetFloat("_Smoothness", 0.4f);
+            // the figure from the reference render, when it is there; the capsules stay as the fallback
+            figure = Resources.Load<GameObject>("Props/soldier");
+            if (figure != null) { skin = new Material(Resources.Load<Material>("VehicleLit")); skin.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/soldier_tex")); skin.SetColor("_BaseColor", new Color(0.7f, 0.7f, 0.68f)); skin.SetFloat("_Smoothness", 0.1f); skin.SetFloat("_Cull", 0f); }
         }
 
         public int Alive { get { int n = 0; foreach (var s in squads) foreach (var m in s.men) if (!m.dead) n++; return n; } }
@@ -33,6 +37,12 @@ namespace IronNight
             for (int i = 0; i < 4; i++)
             {
                 var go = new GameObject("Soldier"); go.transform.SetParent(transform, false);
+                if (figure != null)
+                {
+                    var fg = Instantiate(figure, go.transform); fg.transform.localRotation = Quaternion.Euler(0f, SoldierYaw, 0f); foreach (var rr in fg.GetComponentsInChildren<Renderer>()) { rr.sharedMaterial = skin; rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+                    var m2 = new Soldier { t = go.transform, pos = at + side * ((i - 1.5f) * 2.2f) + facing * Random.Range(-1f, 1f), reload = 2f + Random.value * 3f, phase = Random.value * 6.28f, face = facing };
+                    m2.t.position = m2.pos; sq.men.Add(m2); continue;
+                }
                 var body = GameObject.CreatePrimitive(PrimitiveType.Capsule); Destroy(body.GetComponent<Collider>()); body.transform.SetParent(go.transform, false);
                 body.transform.localPosition = new Vector3(0f, 0.85f, 0f); body.transform.localScale = new Vector3(0.62f, 0.78f, 0.62f); body.GetComponent<Renderer>().sharedMaterial = uniform;
                 var head = GameObject.CreatePrimitive(PrimitiveType.Sphere); Destroy(head.GetComponent<Collider>()); head.transform.SetParent(go.transform, false);

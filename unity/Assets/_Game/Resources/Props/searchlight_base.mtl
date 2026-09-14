@@ -1,0 +1,3 @@
+newmtl searchlight_base
+Kd 1 1 1
+map_Kd searchlight_tex.png

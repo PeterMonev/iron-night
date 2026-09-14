@@ -11,7 +11,7 @@ namespace IronNight
     {
         public VehicleSpec spec;
         public bool friendly;
-        public float hp, yaw, turretYaw, reloadLeft, hitFlash, lastHit = -100f, mgTimer, mgSound; public int flank;
+        public float hp, yaw, turretYaw, reloadLeft, hitFlash, lastHit = -100f, mgTimer, mgSound; public int flank; public bool unloaded, leaving;
         public float speedMul = 1f, damageMul = 1f, rangeMul = 1f, reloadMul = 1f, turretMul = 1f;
         public bool dead;
         public Vehicle target;
@@ -84,7 +84,7 @@ namespace IronNight
             {
                 // the anti-tank gun is one mesh at ground level that turns as a whole; its muzzle is ahead of the shield
                 hull.transform.SetParent(pivot, false); hull.transform.localPosition = Vector3.zero; hull.transform.localScale = Vector3.one * spec.scale;
-                muzzle = new GameObject("Muzzle").transform; muzzle.SetParent(pivot, false); muzzle.localPosition = new Vector3(0f, 1.1f, 3.4f) * spec.scale;
+                muzzle = new GameObject("Muzzle").transform; muzzle.SetParent(pivot, false); muzzle.localPosition = spec.muzzle * spec.scale;
             }
             renderers = GetComponentsInChildren<Renderer>();
             baseColors = new Color[renderers.Length];

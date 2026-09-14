@@ -1,0 +1,3 @@
+newmtl soldier
+Kd 1 1 1
+map_Kd soldier_tex.png

@@ -30,7 +30,13 @@ namespace IronNight
             new Kind { mesh = "truck", length = 6f, height = 2.6f, circles = new[] { -1.6f, 0f, 1.4f, 1.6f, 0f, 1.4f } },
             new Kind { mesh = "haystack", length = 3.2f, height = 2.2f, circles = new[] { 0f, 0f, 1.7f } },
             new Kind { mesh = "deadtree", length = 6f, height = -1f, circles = new[] { 0f, 0f, 0.7f } },
-            new Kind { mesh = "sandbags", length = 3.5f, height = -1f, circles = new[] { 0f, 0f, 1.6f } },
+            new Kind { mesh = "sandbags", length = 7f, height = -1f, circles = new[] { 3f, 0f, 1.1f, -3f, 0f, 1.1f, 0f, 3f, 1.1f, 0f, -3f, 1.1f } },   // a ring of sandbags: the wall, not the pit
+            new Kind { mesh = "cottage", length = 9f, height = 6f, circles = new[] { -2.4f, 0f, 3.2f, 2.4f, 0f, 3.2f } },
+            new Kind { mesh = "church", length = 22f, height = 12f, circles = new[] { -8f, 0f, 5f, -3f, 0f, 5.6f, 2f, 0f, 5.6f, 7f, 0f, 5.4f } },   // the nave is eleven metres wide, the rubble skirt is driveable
+            new Kind { mesh = "wall_a", length = 6f, height = -1f, circles = new[] { -2f, 0f, 1f, 0f, 0f, 1f, 2f, 0f, 1f } },
+            new Kind { mesh = "wall_b", length = 6f, height = -1f, circles = new[] { -2f, 0f, 1f, 0f, 0f, 1f, 2f, 0f, 1f } },
+            new Kind { mesh = "cart", length = 3.5f, height = 1.8f, circles = new[] { 0f, 0f, 1.4f } },
+            new Kind { mesh = "pole", length = 1f, height = -1f, circles = new[] { 0f, 0f, 0.35f } },
         };
 
         const float Cell = 40f, Half = 20f;
@@ -82,12 +88,13 @@ namespace IronNight
         static bool LaneZ(int iz) => Hash(1, iz, 911) % 4 == 0;                               // a lane on the line z = iz*40+20
         static bool Farm(int ix, int iz) => (ix == 1 && iz == 1) || (!Start(ix, iz) && Rnd(ix, iz, 930) < 0.09f);
         static bool Battery(int ix, int iz) => (ix == -1 && iz == 0) || (!Start(ix, iz) && !Farm(ix, iz) && Rnd(ix, iz, 940) < 0.16f);
+        static bool Village(int ix, int iz) => (ix == 0 && iz == 3) || (!Start(ix, iz) && !Farm(ix, iz) && !Battery(ix, iz) && Rnd(ix, iz, 1100) < 0.05f);
         static bool HedgeX(int ix, int iz) { if (LaneX(ix)) return false; if (Farm(ix, iz) || Farm(ix + 1, iz)) return true; return Rnd(ix, iz, 920) < (FieldType(ix, iz) != FieldType(ix + 1, iz) ? 0.85f : 0.3f); }
         static bool HedgeZ(int ix, int iz) { if (LaneZ(iz)) return false; if (Farm(ix, iz) || Farm(ix, iz + 1)) return true; return Rnd(ix, iz, 921) < (FieldType(ix, iz) != FieldType(ix, iz + 1) ? 0.85f : 0.3f); }
         static Vector3 In(int ix, int iz, int salt, float r) => new Vector3((Rnd(ix, iz, salt) - 0.5f) * 2f * r, 0f, (Rnd(ix, iz, salt + 1) - 0.5f) * 2f * r);
 
         // the generated textures come out at different brightnesses; this evens them under the moon
-        static Color Tint(string mesh) { switch (mesh) { case "deadtree": return new Color(0.72f, 0.6f, 0.5f); case "barn": return new Color(0.62f, 0.6f, 0.57f); case "haystack": return new Color(0.7f, 0.62f, 0.48f); case "sandbags": return new Color(0.6f, 0.58f, 0.52f); case "truck": return new Color(0.66f, 0.64f, 0.6f); default: return new Color(0.8f, 0.78f, 0.74f); } }
+        static Color Tint(string mesh) { switch (mesh) { case "deadtree": return new Color(0.78f, 0.72f, 0.66f); case "haystack": return new Color(0.82f, 0.76f, 0.6f); case "sandbags": return new Color(0.78f, 0.74f, 0.66f); default: return new Color(0.8f, 0.78f, 0.74f); } }
 
         Kind K(string mesh) { foreach (var k in Kinds) if (k.mesh == mesh) return k; return null; }
 
@@ -141,12 +148,30 @@ namespace IronNight
             float yaw = (Rnd(ix, iz, 982) < 0.5f ? 0f : Mathf.PI / 2f) + (Rnd(ix, iz, 983) - 0.5f) * 0.2f;
             var f = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)); var r = new Vector3(f.z, 0f, -f.x);
             list.Add(new Prop { what = What.Decal, pos = o, yaw = yaw, size = 30f, seed = 0 });
-            Place(list, "farmhouse", o - r * 7f, yaw);
+            Place(list, Rnd(ix, iz, 1110) < 0.35f ? "cottage" : "farmhouse", o - r * 7f, yaw);
+            // a low wall closes the south side of the yard, with a gap for the gate
+            Place(list, Rnd(ix, iz, 1111) < 0.5f ? "wall_a" : "wall_b", o - f * 13f - r * 4f, yaw + Mathf.PI / 2f); Place(list, Rnd(ix, iz, 1112) < 0.5f ? "wall_a" : "wall_b", o - f * 13f + r * 10f, yaw + Mathf.PI / 2f);
+            if (Rnd(ix, iz, 1113) < 0.6f) Place(list, "cart", o + r * 4f - f * 4f, yaw + Rnd(ix, iz, 1114) * 6.28f);
             Place(list, "barn", o + f * 9.5f + r * 3f, yaw + Mathf.PI / 2f);
             int hay = 2 + (int)(Rnd(ix, iz, 984) * 2f);
             for (int h = 0; h < hay; h++) Place(list, "haystack", o + r * (8f + Rnd(ix, iz, 985 + h) * 3f) + f * (-6f + h * 4.5f), Rnd(ix, iz, 995 + h) * 6.28f);
             if (Rnd(ix, iz, 986) < 0.45f) Place(list, "truck", o - f * 9f + r * (Rnd(ix, iz, 987) * 5f - 1f), yaw + 1.2f + (Rnd(ix, iz, 988) - 0.5f) * 0.8f);
             if (Rnd(ix, iz, 989) < 0.5f) Tree(list, o - f * 8f - r * 9f, (int)(Hash(ix, iz, 990) & 0xffff));
+        }
+
+        /// <summary>A shelled village: the church, two cottages, a bit of wall, a cart, on a trodden square.</summary>
+        void VillageSquare(List<Prop> list, int ix, int iz, Vector3 c)
+        {
+            var o = c + In(ix, iz, 1120, 2f); float yaw = (Rnd(ix, iz, 1122) < 0.5f ? 0f : Mathf.PI / 2f) + (Rnd(ix, iz, 1123) - 0.5f) * 0.2f;
+            var f = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)); var r = new Vector3(f.z, 0f, -f.x);
+            list.Add(new Prop { what = What.Decal, pos = o, yaw = yaw, size = 34f, seed = 0 });
+            Place(list, "church", o + f * 4f, yaw);
+            Place(list, "cottage", o - r * 16f - f * 6f, yaw + Mathf.PI / 2f);
+            Place(list, "cottage", o + r * 16f - f * 2f, yaw - Mathf.PI / 2f);
+            Place(list, Rnd(ix, iz, 1124) < 0.5f ? "wall_a" : "wall_b", o - f * 14f - r * 6f, yaw + Mathf.PI / 2f); Place(list, Rnd(ix, iz, 1125) < 0.5f ? "wall_a" : "wall_b", o - f * 14f + r * 8f, yaw + Mathf.PI / 2f);
+            Place(list, "cart", o - r * 6f - f * 8f, yaw + Rnd(ix, iz, 1126) * 6.28f);
+            if (Rnd(ix, iz, 1127) < 0.6f) Place(list, "truck", o + r * 6f - f * 9f, yaw + 0.4f);
+            Tree(list, o + r * 9f + f * 12f, (int)(Hash(ix, iz, 1128) & 0xffff));
         }
 
         /// <summary>An anti-aircraft searchlight on its trailer, sandbagged, with the generator lorry beside it.</summary>
@@ -156,7 +181,7 @@ namespace IronNight
             var f = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)); var r = new Vector3(f.z, 0f, -f.x);
             list.Add(new Prop { what = What.Decal, pos = o, yaw = yaw, size = 18f, seed = 0 });
             list.Add(new Prop { what = What.Searchlight, pos = o, yaw = yaw, seed = (int)(Hash(ix, iz, 1003) & 0xffff), bound = 4f, circleCenters = new[] { new Vector2(o.x, o.z) }, radii = new[] { 1.8f } });
-            for (int i = 0; i < 3; i++) { float a = yaw + Mathf.PI * 0.75f + i * Mathf.PI * 0.25f; Place(list, "sandbags", o + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * 4.6f, a + Mathf.PI / 2f); }
+            Place(list, "sandbags", o, yaw + Mathf.PI);   // the ring round the lamp, its opening away from the front
             Place(list, "truck", o + f * 9f + r * 3f, yaw + 1.3f + (Rnd(ix, iz, 1004) - 0.5f) * 0.6f);
         }
 
@@ -178,12 +203,13 @@ namespace IronNight
             list = new List<Prop>(); var c = new Vector3(ix * Cell, 0f, iz * Cell); int type = FieldType(ix, iz);
             list.Add(new Prop { what = What.Field, pos = c, seed = type, yaw = (Hash(ix, iz, 950) % 4) * Mathf.PI / 2f, size = Cell });
             // the lanes and hedges on the cell's east and north lines; the west and south ones belong to the neighbours
-            if (LaneX(ix)) list.Add(new Prop { what = What.Lane, pos = c + new Vector3(Half, 0f, 0f), yaw = 0f, size = Cell });
-            if (LaneZ(iz)) list.Add(new Prop { what = What.Lane, pos = c + new Vector3(0f, 0f, Half), yaw = Mathf.PI / 2f, size = Cell });
+            if (LaneX(ix)) { list.Add(new Prop { what = What.Lane, pos = c + new Vector3(Half, 0f, 0f), yaw = 0f, size = Cell }); foreach (var u in new[] { -12f, 8f }) Place(list, "pole", c + new Vector3(Half + 3.6f, 0f, u), 0f); }
+            if (LaneZ(iz)) { list.Add(new Prop { what = What.Lane, pos = c + new Vector3(0f, 0f, Half), yaw = Mathf.PI / 2f, size = Cell }); foreach (var u in new[] { -12f, 8f }) Place(list, "pole", c + new Vector3(u, 0f, Half + 3.6f), Mathf.PI / 2f); }
             if (HedgeX(ix, iz)) Hedge(list, c + new Vector3(Half, 0f, -Half), c + new Vector3(Half, 0f, Half), LaneZ(iz - 1) ? 4f : 0f, LaneZ(iz) ? 4f : 0f, ix, iz, 0);
             if (HedgeZ(ix, iz)) Hedge(list, c + new Vector3(-Half, 0f, Half), c + new Vector3(Half, 0f, Half), LaneX(ix - 1) ? 4f : 0f, LaneX(ix) ? 4f : 0f, ix, iz, 1);
             if (Farm(ix, iz)) FarmYard(list, ix, iz, c);
             else if (Battery(ix, iz)) SearchlightPost(list, ix, iz, c);
+            else if (Village(ix, iz)) VillageSquare(list, ix, iz, c);
             else if (!Start(ix, iz)) Loose(list, ix, iz, c, type);
             cells[key] = list; return list;
         }
@@ -307,6 +333,8 @@ namespace IronNight
         }
 
         /// <summary>The searchlight itself: a drum on a yoke on a pedestal on a four-wheel trailer, its face glowing.</summary>
+        static readonly Vector3 LampPivot = new Vector3(0.01f, 2.39f, -0.5f); const float LampLensZ = 1.0f;   // where the drum turns on the trailer model (split_lamp.py), and how far ahead its lens is
+
         GameObject LampTemplate()
         {
             var metal = new Material(Resources.Load<Material>("BarrelLit")); metal.SetColor("_BaseColor", new Color(0.38f, 0.4f, 0.4f)); metal.SetFloat("_Smoothness", 0.45f); metal.SetFloat("_Metallic", 0.5f);
@@ -318,6 +346,19 @@ namespace IronNight
                 g.transform.localPosition = pos; g.transform.localScale = scale; g.transform.localRotation = Quaternion.Euler(euler); g.GetComponent<Renderer>().sharedMaterial = m; return g;
             }
             var root = new GameObject("SearchlightTemplate"); root.transform.SetParent(transform, false);
+            var basePf = Resources.Load<GameObject>("Props/searchlight_base"); var drumPf = Resources.Load<GameObject>("Props/searchlight_drum");
+            if (basePf != null && drumPf != null)
+            {
+                var lm = new Material(Resources.Load<Material>("VehicleLit")); lm.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/searchlight_tex")); lm.SetColor("_BaseColor", new Color(0.85f, 0.85f, 0.85f)); lm.SetFloat("_Smoothness", 0.3f); lm.SetFloat("_Cull", 0f);
+                var b = Instantiate(basePf, root.transform); foreach (var rr in b.GetComponentsInChildren<Renderer>()) rr.sharedMaterial = lm;
+                var yoke2 = new GameObject("Yoke"); yoke2.transform.SetParent(root.transform, false); yoke2.transform.localPosition = LampPivot;
+                var drum2 = new GameObject("Drum"); drum2.transform.SetParent(yoke2.transform, false);
+                var dm = Instantiate(drumPf, drum2.transform); foreach (var rr in dm.GetComponentsInChildren<Renderer>()) rr.sharedMaterial = lm;
+                var glow2 = Part(PrimitiveType.Quad, drum2.transform, new Vector3(0f, 0f, LampLensZ), Vector3.one * 4.5f, Vector3.zero, glowMat); glow2.name = "Lamp"; glow2.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                var light2 = new GameObject("LampLight").AddComponent<Light>(); light2.transform.SetParent(drum2.transform, false); light2.transform.localPosition = new Vector3(0f, 0f, LampLensZ + 0.5f);
+                light2.type = LightType.Point; light2.color = new Color(0.75f, 0.82f, 1f); light2.intensity = 26f; light2.range = 26f; light2.shadows = LightShadows.None;
+                root.SetActive(false); return root;
+            }
             Part(PrimitiveType.Cube, root.transform, new Vector3(0f, 0.8f, 0f), new Vector3(2.6f, 0.3f, 1.8f), Vector3.zero, metal);
             Part(PrimitiveType.Cube, root.transform, new Vector3(0f, 0.55f, -1.7f), new Vector3(0.2f, 0.12f, 1.4f), Vector3.zero, metal);       // the tow bar
             foreach (var x in new[] { -0.95f, 0.95f }) foreach (var z in new[] { -0.7f, 0.7f }) Part(PrimitiveType.Cylinder, root.transform, new Vector3(x, 0.5f, z), new Vector3(1f, 0.14f, 1f), new Vector3(0f, 0f, 90f), metal);

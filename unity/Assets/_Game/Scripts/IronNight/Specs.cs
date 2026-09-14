@@ -15,7 +15,10 @@ namespace IronNight
         public float gunLength, gunRadius, gunHeight, mantlet; public bool muzzleBrake;
         public Color tint = Color.white;
         public float speed, turnRate, turretRate, reload, damage, range, hp, radius;
-        public bool isGun;              // PaK: no turret, aims with its body, never moves
+        public bool isGun;              // PaK, 88: no turret, aims with its body, never moves
+        public bool casemate;           // StuG: no turret, aims by turning the hull, drives
+        public bool transport;          // half-track: no gun, brings a squad of tank hunters and leaves
+        public Vector3 muzzle = new Vector3(0f, 1.1f, 3.4f);   // where the shell leaves a turretless vehicle
         public float scale = 1f;        // the mesh scaled up: the 88 is the PaK mesh at 1.45
 
         public static readonly VehicleSpec Sherman = new VehicleSpec
@@ -57,14 +60,32 @@ namespace IronNight
 
         public static readonly VehicleSpec Flak88 = new VehicleSpec
         {
-            id = "flak88", name = "8.8 cm Flak", hullMesh = "pak40_hull", turretMesh = null, texture = "pak40", forward = -1f, ringHeight = 0f, scale = 1.45f,
-            gunLength = 0f, tint = new Color(0.78f, 0.78f, 0.76f),
+            id = "flak88", name = "8.8 cm Flak", hullMesh = "flak88_hull", turretMesh = null, texture = "flak88", forward = 1f, ringHeight = 0f, muzzle = new Vector3(0f, 3.6f, 3.2f),
+            gunLength = 0f, tint = new Color(1f, 1f, 1f),
             speed = 0f, turnRate = 0.9f, turretRate = 0.9f, reload = 3.2f, damage = 2f, range = 40f, hp = 4f, radius = 2.6f, isGun = true
+        };
+        public static readonly VehicleSpec Panther = new VehicleSpec
+        {
+            id = "panther", name = "Panther", hullMesh = "panther_hull", turretMesh = "panther_turret", texture = "panther", forward = 1f, ringHeight = 1.92f,
+            gunLength = 4.3f, gunRadius = 0.075f, gunHeight = 0.5f, mantlet = 1.5f, muzzleBrake = true, tint = new Color(1f, 0.95f, 0.76f),
+            speed = 8f, turnRate = 1.6f, turretRate = 2.2f, reload = 2.2f, damage = 2f, range = 32f, hp = 6f, radius = 2.8f
+        };
+        public static readonly VehicleSpec StuG = new VehicleSpec
+        {
+            id = "stug", name = "StuG III", hullMesh = "stug_hull", turretMesh = null, texture = "stug", forward = 1f, ringHeight = 0f, muzzle = new Vector3(0f, 1.9f, 4.2f), casemate = true,
+            gunLength = 0f, tint = new Color(1f, 0.95f, 0.76f),
+            speed = 8.5f, turnRate = 1.8f, turretRate = 1.8f, reload = 2f, damage = 2f, range = 30f, hp = 4f, radius = 2.5f
+        };
+        public static readonly VehicleSpec Halftrack = new VehicleSpec
+        {
+            id = "halftrack", name = "Sd.Kfz. 251", hullMesh = "halftrack_hull", turretMesh = null, texture = "halftrack", forward = 1f, ringHeight = 0f, transport = true,
+            gunLength = 0f, tint = new Color(1f, 0.95f, 0.76f),
+            speed = 12f, turnRate = 2.4f, turretRate = 2.4f, reload = 999f, damage = 0f, range = 0f, hp = 2f, radius = 2.4f
         };
 
         public static VehicleSpec ById(string id)
         {
-            switch (id) { case "firefly": return Firefly; case "pz4": return PanzerIV; case "tiger": return Tiger; case "pak40": return Pak40; case "flak88": return Flak88; default: return Sherman; }
+            switch (id) { case "firefly": return Firefly; case "pz4": return PanzerIV; case "tiger": return Tiger; case "pak40": return Pak40; case "flak88": return Flak88; case "panther": return Panther; case "stug": return StuG; case "halftrack": return Halftrack; default: return Sherman; }
         }
     }
 

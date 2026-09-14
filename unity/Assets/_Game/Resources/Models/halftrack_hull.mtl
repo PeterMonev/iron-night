@@ -1,0 +1,3 @@
+newmtl halftrack_hull
+Kd 1 1 1
+map_Kd halftrack.png

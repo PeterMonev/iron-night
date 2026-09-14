@@ -1,0 +1,3 @@
+newmtl cart
+Kd 1 1 1
+map_Kd cart_tex.png
