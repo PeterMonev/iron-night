@@ -110,7 +110,16 @@ namespace IronNight.EditorTools
             var smoke = MakeMaterial("Smoke", "Universal Render Pipeline/Unlit"); Transparent(smoke, false);
             // lit, alpha-blended ground decals: lanes, yards, craters
             var decal = MakeMaterial("GroundDecal", "Universal Render Pipeline/Lit"); Transparent(decal, false); decal.SetFloat("_Smoothness", 0.05f); decal.SetFloat("_Metallic", 0f);
-            foreach (var m in new[] { vehicle, barrel, ground, additive, smoke, decal }) EditorUtility.SetDirty(m);
+            Texture2D Tex(string name) => AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Game/Resources/Textures/" + name + ".png");
+            // the decals and the hedges carry normal maps; the keyword on the asset keeps the shader variant in the build
+            decal.EnableKeyword("_NORMALMAP"); decal.SetTexture("_BumpMap", Tex("lane_n"));
+            var foliage = MakeMaterial("FoliageLit", "Universal Render Pipeline/Lit");
+            foliage.SetFloat("_Smoothness", 0.08f); foliage.SetFloat("_Metallic", 0f); foliage.SetFloat("_Cull", (float)CullMode.Off); foliage.EnableKeyword("_NORMALMAP"); foliage.SetTexture("_BaseMap", Tex("hedge")); foliage.SetTexture("_BumpMap", Tex("hedge_n"));
+            // the field: four photographic ground textures blended by vertex colour, in world space
+            var field = MakeMaterial("Ground", "IronNight/Ground"); string[] set = { "plough", "pasture", "mown", "stubble" };
+            for (int i = 0; i < 4; i++) { field.SetTexture("_Tex" + i, Tex("ground_" + set[i])); field.SetTexture("_Nrm" + i, Tex("ground_" + set[i] + "_n")); }
+            field.SetTexture("_Variation", Tex("ground_variation")); field.SetFloat("_Tiling", 40f / 3f); field.SetFloat("_VariationTiling", 300f); field.SetFloat("_VariationStrength", 0.5f); field.SetFloat("_BumpScale", 1f); field.SetFloat("_Smoothness", 0.06f);
+            foreach (var m in new[] { vehicle, barrel, ground, additive, smoke, decal, foliage, field }) EditorUtility.SetDirty(m);
 
             const string profilePath = Res + "BattleProfile.asset";
             var old = AssetDatabase.LoadAssetAtPath<VolumeProfile>(profilePath); if (old != null) AssetDatabase.DeleteAsset(profilePath);
@@ -156,6 +165,9 @@ namespace IronNight.EditorTools
                 var path = AssetDatabase.GUIDToAssetPath(guid);
                 var imp = AssetImporter.GetAtPath(path) as TextureImporter; if (imp == null) continue;
                 imp.maxTextureSize = 2048; imp.mipmapEnabled = true; imp.wrapMode = TextureWrapMode.Repeat; imp.anisoLevel = 4;
+                string file = System.IO.Path.GetFileNameWithoutExtension(path);
+                imp.textureType = file.EndsWith("_n") ? TextureImporterType.NormalMap : TextureImporterType.Default;   // *_n.png are normal maps
+                imp.sRGBTexture = file != "ground_variation";                                                      // a multiplier, not a colour
                 var android = imp.GetPlatformTextureSettings("Android"); android.overridden = true; android.maxTextureSize = 1024; android.format = TextureImporterFormat.ASTC_6x6; imp.SetPlatformTextureSettings(android);
                 imp.SaveAndReimport();
             }

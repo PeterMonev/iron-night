@@ -20,7 +20,7 @@ namespace IronNight
         class Wreck { public Vehicle v; public float age, burnTimer; public Light fire; }
         class ArtyShell { public Vector3 at; public float timer; }
         class Objective { public Vector3 pos; public Transform marker; public float smokeTimer, held; public int n; public bool hold; }
-        class Drop { public Vector3 pos; public float height, age, lift, top; public int kind; public Transform crate, chute, marker; public LineRenderer lines; }   // lift: the crate origin above its base; top: where the shrouds tie
+        class Drop { public Vector3 pos; public float height, age, lift, top; public int kind; public Transform crate, chute, marker; public LineRenderer lines; public Mesh canopy; public Vector3[] rest; }   // lift: the crate origin above its base; top: where the shrouds tie
         class Mortar { public Vector3 at; public float timer; public Transform ring; }
         class Star { public Vector3 pos; public float height, life, puff; public Transform flare, chute; public Light light; }
         enum Phase { Title, Play, LevelUp, Pause, End }
@@ -30,11 +30,11 @@ namespace IronNight
 
         Camera cam; Hud hud; TouchStick stick; Fx fx; Props props; Tracks tracks; Infantry infantry;
         int nightInfantry, combo; float lastKill = -10f; bool veteran;
-        Weather weather; Sky sky; float rumbleTimer = 12f, flicker, enemyRangeMul = 1f, ammoMul = 1f, ammoLeft, dropTimer = 35f; ParticleSystem rain; Material groundMaterial;
+        Weather weather; Sky sky; float rumbleTimer = 12f, flicker, enemyRangeMul = 1f, ammoMul = 1f, ammoLeft, dropTimer = debugDrops ? 3f : 35f; ParticleSystem rain;
         Objective objective; int objectivesReached; bool winter;
         readonly List<Mortar> mortars = new List<Mortar>(); float mortarTimer = 100f, starTimer = 70f; Star star; bool lit; int shotsFired, shotsHit;
         int talliedKills, talliedTigers, talliedGuns, talliedInfantry, talliedObjectives; bool talliedAce, logged; readonly List<Drop> drops = new List<Drop>(); Material crateMaterial, chuteMaterial;
-        Transform ground; Light flareLight, moon; float shake; int banked, nightTigers, nightPaks, nightFlares; bool nightRecorded, bossKilled;
+        Light flareLight, moon; float shake; int banked, nightTigers, nightPaks, nightFlares; bool nightRecorded, bossKilled;
         readonly List<Vehicle> platoon = new List<Vehicle>(); readonly List<Vehicle> foes = new List<Vehicle>();
         readonly List<Shell> shells = new List<Shell>(); readonly List<Flare> flares = new List<Flare>(); readonly List<Wreck> wrecks = new List<Wreck>();
         Material shellTemplate; Texture2D glowTex;
@@ -45,6 +45,7 @@ namespace IronNight
         static readonly bool debugDawn = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--dawn") >= 0;   // test switch: the night starts at 4:10
         static readonly bool debugMid = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--mid") >= 0;   // test switch: 1:40, mortars and a star shell at once
         static readonly bool debugZoo = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--zoo") >= 0;   // test switch: one of each new enemy at 0:04
+        static readonly bool debugDrops = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--drops") >= 0;   // test switch: the first supply drop at 0:03
         static readonly bool debugInfantry = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--infantry") >= 0;   // test switch: a squad at 0:04
         bool debugSquadSent;
         float damageMul = 1f, reloadMul = 1f, rangeMul = 1f, speedMul = 1f, scatterMul = 1f, turretMul = 1f; bool he, gunners, hasSmoke, fireflyNext, firstNight;
@@ -88,14 +89,7 @@ namespace IronNight
 
         void BuildWorld()
         {
-            // a 400 m plain pasture plane under everything, kept under the camera on a 40 m grid; the fields, lanes,
-            // hedges, farms and searchlight posts on top of it are Props, built cell by cell around the camera
-            var g = GameObject.CreatePrimitive(PrimitiveType.Plane); g.name = "Ground"; Destroy(g.GetComponent<Collider>());
-            g.transform.localScale = new Vector3(GroundTile, 1f, GroundTile);
-            var gm = new Material(Resources.Load<Material>("GroundLit"));
-            gm.SetTexture("_BaseMap", Resources.Load<Texture2D>(winter ? "Textures/field_snow_pasture" : "Textures/field_pasture")); gm.SetTextureScale("_BaseMap", new Vector2(10f, 10f)); gm.SetColor("_BaseColor", new Color(0.9f, 0.9f, 0.88f));
-            g.GetComponent<Renderer>().sharedMaterial = gm; g.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            ground = g.transform;
+            // the ground, the fields, lanes, hedges, farms and searchlight posts are Props, built cell by cell around the camera
             props = new GameObject("Props").AddComponent<Props>(); props.winter = winter; props.Build(cam); props.fx = fx;
             tracks = new GameObject("Tracks").AddComponent<Tracks>(); tracks.Build();
             infantry = new GameObject("Infantry").AddComponent<Infantry>(); infantry.Build(); veteran = Depot.Veteran;
@@ -105,7 +99,7 @@ namespace IronNight
             RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = sky.fogDensity; RenderSettings.fogColor = sky.fog;
             var moonGo = new GameObject("Moon"); moon = moonGo.AddComponent<Light>();
             moon.type = LightType.Directional; moon.color = sky.moonColor; moon.intensity = sky.moonIntensity; moon.shadows = LightShadows.Soft; moon.shadowStrength = sky.shadow;
-            if (weather == Weather.Rain) { BuildRain(); if (!winter) gm.SetFloat("_Smoothness", 0.55f); } groundMaterial = gm; Sfx.Ambient(weather == Weather.Rain && !winter);
+            if (weather == Weather.Rain) { BuildRain(); if (!winter) props.SetWet(0.5f); } Sfx.Ambient(weather == Weather.Rain && !winter);
             ApplyQuality();
             moonGo.transform.rotation = Quaternion.Euler(52f, -35f, 0f);
             // the flare light over the platoon: warm, follows the leader, grows with the platoon
@@ -120,7 +114,6 @@ namespace IronNight
             cam.transform.position = snap ? want : Vector3.Lerp(cam.transform.position, want, 1f - Mathf.Exp(-Time.deltaTime * 4f));
             cam.transform.LookAt(cam.transform.position + new Vector3(0f, -44f, 40f));
             if (shake > 0f) { cam.transform.position += Random.insideUnitSphere * (shake * 0.5f); shake = Mathf.Max(0f, shake - Time.deltaTime * 3f); }
-            ground.position = new Vector3(Mathf.Round(cam.transform.position.x / GroundTile) * GroundTile, -0.08f, Mathf.Round(cam.transform.position.z / GroundTile) * GroundTile);
             flareLight.transform.position = L.transform.position + Vector3.up * 11f;
         }
 
@@ -663,8 +656,9 @@ namespace IronNight
                 var cratePf = Resources.Load<GameObject>("Props/crate");
                 if (cratePf != null) { d.crate = Instantiate(cratePf).transform; d.top = 1.2f; var cm = new Material(Resources.Load<Material>("VehicleLit")); cm.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/crate_tex")); cm.SetFloat("_Cull", 0f); foreach (var rr in d.crate.GetComponentsInChildren<Renderer>()) rr.sharedMaterial = cm; }
                 else { d.crate = GameObject.CreatePrimitive(PrimitiveType.Cube).transform; Destroy(d.crate.GetComponent<Collider>()); d.crate.localScale = new Vector3(1.3f, 1f, 1.3f); d.lift = 0.5f; d.top = 0.5f; d.crate.GetComponent<Renderer>().sharedMaterial = crateMaterial; }
-                d.chute = GameObject.CreatePrimitive(PrimitiveType.Sphere).transform; Destroy(d.chute.GetComponent<Collider>()); d.chute.localScale = new Vector3(6f, 3.2f, 6f); d.chute.GetComponent<Renderer>().sharedMaterial = chuteMaterial;
-                d.lines = new GameObject("Shrouds").AddComponent<LineRenderer>(); d.lines.positionCount = 8; d.lines.startWidth = d.lines.endWidth = 0.05f; d.lines.material = chuteMaterial; d.lines.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                d.canopy = Canopy(14, 6, 3.4f, 2.2f, out d.rest); d.chute = new GameObject("Canopy").transform; d.chute.gameObject.AddComponent<MeshFilter>().sharedMesh = d.canopy;
+                var cr = d.chute.gameObject.AddComponent<MeshRenderer>(); cr.sharedMaterial = new Material(chuteMaterial); cr.sharedMaterial.SetColor("_BaseColor", ChuteColour(d.kind)); cr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+                d.lines = new GameObject("Shrouds").AddComponent<LineRenderer>(); d.lines.positionCount = 12; d.lines.startWidth = d.lines.endWidth = 0.05f; d.lines.material = chuteMaterial; d.lines.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 drops.Add(d); hud.Toast("Supply drop coming down, " + Clock(pos), 2.8f);
             }
             for (int i = drops.Count - 1; i >= 0; i--)
@@ -674,11 +668,12 @@ namespace IronNight
                 {
                     d.height = Mathf.Max(0f, d.height - 6f * dt); var sway = new Vector3(Mathf.Sin(d.age * 1.3f), 0f, Mathf.Cos(d.age * 0.9f)) * 0.6f;
                     d.crate.position = d.pos + Vector3.up * (d.height + d.lift) + sway; d.chute.position = d.crate.position + Vector3.up * (4f + d.top); d.crate.rotation = Quaternion.Euler(0f, d.age * 9f, 0f);
-                    for (int k = 0; k < 4; k++) { float ang = k * Mathf.PI / 2f; d.lines.SetPosition(k * 2, d.crate.position + Vector3.up * d.top); d.lines.SetPosition(k * 2 + 1, d.chute.position + new Vector3(Mathf.Cos(ang), -1.2f, Mathf.Sin(ang)) * 2.6f); }
+                    d.chute.rotation = Quaternion.Euler(-sway.z * 6f, d.age * 9f, sway.x * 6f); Ripple(d.canopy, d.rest, d.age, 0.09f);
+                    for (int k = 0; k < 6; k++) { float ang = k * Mathf.PI / 3f; d.lines.SetPosition(k * 2, d.crate.position + Vector3.up * d.top); d.lines.SetPosition(k * 2 + 1, d.chute.TransformPoint(new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang)) * 3.4f)); }
                     if (d.height <= 0f)
                     {
-                        // landed: the canopy collapses beside the crate, a light marks it
-                        d.chute.position = d.pos + new Vector3(2.5f, 0.15f, 1f); d.chute.localScale = new Vector3(5f, 0.3f, 5f); d.lines.enabled = false;
+                        // landed: the canopy collapses in a heap beside the crate, a light marks it
+                        d.chute.position = d.pos + new Vector3(2.8f, 0.05f, 1.2f); d.chute.rotation = Quaternion.Euler(0f, d.age * 40f, 0f); Collapse(d.canopy, d.rest, d.kind); d.lines.enabled = false;
                         d.marker = fx.Marker(d.pos, new Color(1f, 0.75f, 0.35f), 5f); d.age = 0f;
                     }
                     continue;
@@ -729,7 +724,7 @@ namespace IronNight
             if (star == null && t > 60f) { starTimer -= dt; if (starTimer <= 0f) {
                 starTimer = 45f + Random.value * 25f;
                 star = new Star { pos = L.transform.position + new Vector3(Random.Range(-8f, 8f), 0f, Random.Range(-4f, 12f)), height = 42f, life = 16f, flare = fx.StarFlare() };
-                star.chute = GameObject.CreatePrimitive(PrimitiveType.Sphere).transform; Destroy(star.chute.GetComponent<Collider>()); star.chute.localScale = new Vector3(3f, 1.6f, 3f); star.chute.GetComponent<Renderer>().sharedMaterial = chuteMaterial != null ? chuteMaterial : star.chute.GetComponent<Renderer>().material;
+                star.chute = new GameObject("StarCanopy").transform; star.chute.gameObject.AddComponent<MeshFilter>().sharedMesh = Canopy(10, 4, 1.5f, 1f, out _); star.chute.gameObject.AddComponent<MeshRenderer>(); star.chute.GetComponent<Renderer>().sharedMaterial = chuteMaterial != null ? chuteMaterial : star.chute.GetComponent<Renderer>().material;
                 star.light = new GameObject("StarLight").AddComponent<Light>(); star.light.type = LightType.Point; star.light.color = new Color(1f, 0.96f, 0.86f); star.light.range = 80f; star.light.intensity = 70f; star.light.shadows = LightShadows.None;
                 Sfx.Flak(star.pos + Vector3.up * 30f); hud.Toast("Star shell! You are lit up · move", 3f);
             } }
@@ -742,7 +737,59 @@ namespace IronNight
             if (star.life <= 0f) { fx.Release(star.flare); Destroy(star.chute.gameObject); Destroy(star.light.gameObject); star = null; lit = false; }
         }
 
-        void RemoveDrop(Drop d) { Destroy(d.crate.gameObject); Destroy(d.chute.gameObject); Destroy(d.lines.gameObject); if (d.marker != null) Destroy(d.marker.gameObject); }
+        void RemoveDrop(Drop d) { Destroy(d.crate.gameObject); Destroy(d.chute.gameObject); Destroy(d.lines.gameObject); if (d.marker != null) Destroy(d.marker.gameObject); Destroy(d.canopy); }
+
+        static Color ChuteColour(int kind) { switch (kind) { case 0: return new Color(0.9f, 0.88f, 0.8f); case 1: return new Color(0.62f, 0.3f, 0.26f); case 2: return new Color(0.7f, 0.65f, 0.32f); default: return new Color(0.36f, 0.48f, 0.66f); } }   // repair white, ammunition red, smoke yellow, radio blue: the air force colour code
+
+        /// <summary>A parachute canopy: a dome of gores that bulge between their seams, the apex at the top, the skirt
+        /// at y = 0. Rendered from both sides. The rest positions come back for the ripple and the collapse.</summary>
+        static Mesh Canopy(int gores, int rings, float radius, float height, out Vector3[] rest)
+        {
+            int seg = gores * 2; var v = new List<Vector3>(); var uv = new List<Vector2>(); var tri = new List<int>();
+            v.Add(new Vector3(0f, height, 0f)); uv.Add(new Vector2(0.5f, 1f));
+            const float span = 1.35f; float c0 = Mathf.Cos(span), s0 = Mathf.Sin(span);
+            for (int r = 1; r <= rings; r++)
+            {
+                float t = (float)r / rings, ang = t * span, y = height * (Mathf.Cos(ang) - c0) / (1f - c0), rad = radius * Mathf.Sin(ang) / s0;
+                for (int s = 0; s < seg; s++)
+                {
+                    float phi = s * Mathf.PI * 2f / seg, bulge = 1f + 0.06f * t * Mathf.Cos(gores * phi);   // seams pulled in, gores puffed out
+                    v.Add(new Vector3(Mathf.Cos(phi) * rad * bulge, y - 0.12f * t * (1f - Mathf.Cos(gores * phi)) * 0.5f, Mathf.Sin(phi) * rad * bulge)); uv.Add(new Vector2((float)s / seg, 1f - t));
+                }
+            }
+            for (int s = 0; s < seg; s++) { tri.Add(0); tri.Add(1 + (s + 1) % seg); tri.Add(1 + s); }
+            for (int r = 1; r < rings; r++) for (int s = 0; s < seg; s++)
+            {
+                int a = 1 + (r - 1) * seg + s, b = 1 + (r - 1) * seg + (s + 1) % seg, c = a + seg, d = b + seg;
+                tri.Add(a); tri.Add(b); tri.Add(c); tri.Add(b); tri.Add(d); tri.Add(c);
+            }
+            var m = new Mesh(); m.SetVertices(v); m.SetUVs(0, uv); m.SetTriangles(tri, 0); m.RecalculateNormals(); m.RecalculateBounds(); m.MarkDynamic(); rest = v.ToArray(); return m;
+        }
+
+        /// <summary>The canopy breathing in the wind: the skirt flutters, the crown barely moves.</summary>
+        static readonly List<Vector3> rippleBuf = new List<Vector3>();
+        static void Ripple(Mesh m, Vector3[] rest, float time, float amount)
+        {
+            rippleBuf.Clear();
+            for (int i = 0; i < rest.Length; i++)
+            {
+                var p = rest[i]; float skirt = 1f - Mathf.Clamp01(p.y / 2.2f); float w = Mathf.Sin(time * 5.5f + p.x * 1.7f + p.z * 1.3f) * amount * skirt;
+                rippleBuf.Add(new Vector3(p.x * (1f + w * 0.5f), p.y + w, p.z * (1f + w * 0.5f)));
+            }
+            m.SetVertices(rippleBuf);
+        }
+
+        /// <summary>The canopy on the ground: flattened to a rumpled heap, a little off round.</summary>
+        static void Collapse(Mesh m, Vector3[] rest, int seed)
+        {
+            rippleBuf.Clear();
+            for (int i = 0; i < rest.Length; i++)
+            {
+                var p = rest[i]; float n = Mathf.PerlinNoise(p.x * 0.9f + seed * 3f, p.z * 0.9f);
+                rippleBuf.Add(new Vector3(p.x * (0.75f + 0.25f * n), 0.05f + p.y * 0.12f + n * 0.35f, p.z * (0.7f + 0.3f * (1f - n))));
+            }
+            m.SetVertices(rippleBuf); m.RecalculateNormals(); m.RecalculateBounds();
+        }
 
         /// <summary>The half-track drives to thirty metres of the nearest tank, drops its squad off the back, turns
         /// round and leaves; out past 120 m it is gone.</summary>

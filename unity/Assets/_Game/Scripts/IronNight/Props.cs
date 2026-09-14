@@ -13,7 +13,7 @@ namespace IronNight
     public class Props : MonoBehaviour
     {
         class Kind { public string mesh; public float length, height; public float[] circles; }
-        enum What { Model, Field, Lane, Hedge, Tree, Decal, Searchlight }
+        enum What { Model, Lane, Hedge, Tree, Decal, Searchlight }
         class Prop
         {
             public What what; public Kind kind; public Vector3 pos; public float yaw, size, bound = 8f, height = -1f; public int seed;
@@ -45,7 +45,10 @@ namespace IronNight
         readonly Dictionary<string, Material> materials = new Dictionary<string, Material>();
         readonly List<Prop> active = new List<Prop>(); readonly HashSet<Prop> wanted = new HashSet<Prop>();
         Transform cam; Material patchMaterial, laneMaterial, yardMaterial, craterMaterial, hedgeMaterial, canopyMaterial, trunkMaterial;
-        Material[] fieldMaterials; Mesh[] blobs; GameObject lampTemplate;
+        Mesh[] blobs; GameObject lampTemplate;
+        // the ground itself: one grid of 2 m quads that follows the camera; a vertex colour channel per field type
+        const float GroundSize = 240f, GroundStep = 2f; const int GroundN = (int)(GroundSize / GroundStep);
+        Transform ground; Mesh groundMesh; Material groundMat; Color[] groundColors; int gcx = int.MinValue, gcz;
         readonly List<GameObject> craters = new List<GameObject>(); int nextCrater;   // shell craters of the night, oldest reused
         public Fx fx;
 
@@ -54,7 +57,7 @@ namespace IronNight
         public void Build(Camera camera)
         {
             cam = camera.transform; LightShaft.cam = camera; string sn = winter ? "_snow" : "";
-            var lit = Resources.Load<Material>("VehicleLit"); var groundLit = Resources.Load<Material>("GroundLit"); var decal = Resources.Load<Material>("GroundDecal");
+            var lit = Resources.Load<Material>("VehicleLit"); var decal = Resources.Load<Material>("GroundDecal");
             foreach (var k in Kinds)
             {
                 var pf = Resources.Load<GameObject>("Props/" + k.mesh); if (pf == null) continue;
@@ -62,12 +65,11 @@ namespace IronNight
                 var m = new Material(lit); m.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + k.mesh + "_tex")); m.SetColor("_BaseColor", Tint(k.mesh)); m.SetFloat("_Smoothness", 0.15f); m.SetFloat("_Cull", 0f);
                 materials[k.mesh] = m;
             }
-            fieldMaterials = new Material[4]; string[] names = { "field" + sn + "_plough", "field" + sn + "_pasture", "field" + sn + "_mown", "field" + sn + "_stubble" };
-            for (int i = 0; i < 4; i++) { var m = new Material(groundLit); m.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/" + names[i])); m.SetColor("_BaseColor", new Color(0.95f, 0.95f, 0.95f)); fieldMaterials[i] = m; }
-            Material Decal(string tex, int queue) { var m = new Material(decal); m.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/" + tex)); m.SetColor("_BaseColor", new Color(0.95f, 0.95f, 0.95f)); m.renderQueue = queue; return m; }
+            BuildGround();
+            Material Decal(string tex, int queue) { var m = new Material(decal); m.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/" + tex)); m.SetTexture("_BumpMap", Resources.Load<Texture2D>("Textures/" + tex + "_n")); m.SetColor("_BaseColor", new Color(0.95f, 0.95f, 0.95f)); m.renderQueue = queue; return m; }
             yardMaterial = Decal("yard" + sn, 2440); laneMaterial = Decal("lane" + sn, 2442); laneMaterial.SetTextureScale("_BaseMap", new Vector2(1f, 2f)); craterMaterial = Decal("crater", 2446);
             patchMaterial = new Material(Resources.Load<Material>("Smoke")); patchMaterial.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.GroundShadow(128).texture); patchMaterial.SetColor("_BaseColor", new Color(0.05f, 0.04f, 0.03f, 0.3f)); patchMaterial.renderQueue = 2450;
-            hedgeMaterial = new Material(lit); hedgeMaterial.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/hedge")); hedgeMaterial.SetColor("_BaseColor", winter ? new Color(0.72f, 0.78f, 0.82f) : new Color(0.9f, 0.95f, 0.85f)); hedgeMaterial.SetFloat("_Smoothness", 0.08f); hedgeMaterial.SetFloat("_Cull", 0f);
+            hedgeMaterial = new Material(Resources.Load<Material>("FoliageLit")); hedgeMaterial.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/hedge")); hedgeMaterial.SetTexture("_BumpMap", Resources.Load<Texture2D>("Textures/hedge_n")); hedgeMaterial.SetColor("_BaseColor", winter ? new Color(0.72f, 0.78f, 0.82f) : new Color(0.9f, 0.95f, 0.85f)); hedgeMaterial.SetFloat("_Smoothness", 0.08f); hedgeMaterial.SetFloat("_Cull", 0f);
             canopyMaterial = new Material(hedgeMaterial); canopyMaterial.SetColor("_BaseColor", new Color(0.95f, 1f, 0.8f));
             trunkMaterial = new Material(Resources.Load<Material>("BarrelLit")); trunkMaterial.SetColor("_BaseColor", new Color(0.26f, 0.21f, 0.15f)); trunkMaterial.SetFloat("_Smoothness", 0.1f); trunkMaterial.SetFloat("_Metallic", 0f);
             blobs = new Mesh[4]; for (int i = 0; i < 4; i++) blobs[i] = Blob(11 + i * 7);
@@ -200,8 +202,7 @@ namespace IronNight
         List<Prop> CellProps(int ix, int iz)
         {
             long key = ((long)ix << 32) ^ (uint)iz; if (cells.TryGetValue(key, out var list)) return list;
-            list = new List<Prop>(); var c = new Vector3(ix * Cell, 0f, iz * Cell); int type = FieldType(ix, iz);
-            list.Add(new Prop { what = What.Field, pos = c, seed = type, yaw = (Hash(ix, iz, 950) % 4) * Mathf.PI / 2f, size = Cell });
+            list = new List<Prop>(); var c = new Vector3(ix * Cell, 0f, iz * Cell);
             // the lanes and hedges on the cell's east and north lines; the west and south ones belong to the neighbours
             if (LaneX(ix)) { list.Add(new Prop { what = What.Lane, pos = c + new Vector3(Half, 0f, 0f), yaw = 0f, size = Cell }); foreach (var u in new[] { -12f, 8f }) Place(list, "pole", c + new Vector3(Half + 3.6f, 0f, u), 0f); }
             if (LaneZ(iz)) { list.Add(new Prop { what = What.Lane, pos = c + new Vector3(0f, 0f, Half), yaw = Mathf.PI / 2f, size = Cell }); foreach (var u in new[] { -12f, 8f }) Place(list, "pole", c + new Vector3(u, 0f, Half + 3.6f), Mathf.PI / 2f); }
@@ -210,9 +211,47 @@ namespace IronNight
             if (Farm(ix, iz)) FarmYard(list, ix, iz, c);
             else if (Battery(ix, iz)) SearchlightPost(list, ix, iz, c);
             else if (Village(ix, iz)) VillageSquare(list, ix, iz, c);
-            else if (!Start(ix, iz)) Loose(list, ix, iz, c, type);
+            else if (!Start(ix, iz)) Loose(list, ix, iz, c, FieldType(ix, iz));
             cells[key] = list; return list;
         }
+
+        // ---- the ground: a 240 m grid under the camera, vertex colours saying which field each corner is in ----
+
+        void BuildGround()
+        {
+            groundMat = new Material(Resources.Load<Material>("Ground"));
+            if (winter)
+            {
+                string[] set = { "plough", "pasture", "mown", "stubble" };
+                for (int i = 0; i < 4; i++) { groundMat.SetTexture("_Tex" + i, Resources.Load<Texture2D>("Textures/ground_snow_" + set[i])); groundMat.SetTexture("_Nrm" + i, Resources.Load<Texture2D>("Textures/ground_snow_" + set[i] + "_n")); }
+                groundMat.SetFloat("_VariationStrength", 0.25f);
+            }
+            int n = GroundN + 1; var v = new Vector3[n * n]; var nm = new Vector3[n * n]; groundColors = new Color[n * n];
+            for (int z = 0; z < n; z++) for (int x = 0; x < n; x++) { v[z * n + x] = new Vector3(x * GroundStep - GroundSize / 2f, 0f, z * GroundStep - GroundSize / 2f); nm[z * n + x] = Vector3.up; }
+            var t = new int[GroundN * GroundN * 6]; int k = 0;
+            for (int z = 0; z < GroundN; z++) for (int x = 0; x < GroundN; x++) { int a = z * n + x; t[k++] = a; t[k++] = a + n; t[k++] = a + 1; t[k++] = a + 1; t[k++] = a + n; t[k++] = a + n + 1; }
+            groundMesh = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 }; groundMesh.vertices = v; groundMesh.normals = nm; groundMesh.triangles = t; groundMesh.colors = groundColors;
+            groundMesh.bounds = new Bounds(Vector3.zero, new Vector3(GroundSize, 2f, GroundSize));
+            var go = new GameObject("Ground"); go.transform.SetParent(transform, false); go.AddComponent<MeshFilter>().sharedMesh = groundMesh;
+            var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = groundMat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; ground = go.transform;
+        }
+
+        /// <summary>Moves the grid to the cell under the camera and recolours it: a corner deep inside a field is that
+        /// field, a corner near a boundary is a mix of the two, so the textures cross-fade over five metres or so.</summary>
+        void Recentre(int cx, int cz)
+        {
+            gcx = cx; gcz = cz; var origin = new Vector3(cx * Cell, 0f, cz * Cell); ground.position = origin; int n = GroundN + 1;
+            for (int z = 0; z < n; z++) for (int x = 0; x < n; x++)
+            {
+                float wx = origin.x + x * GroundStep - GroundSize / 2f, wz = origin.z + z * GroundStep - GroundSize / 2f; var c = new Color(0f, 0f, 0f, 0f);
+                for (int dz = -1; dz <= 1; dz++) for (int dx = -1; dx <= 1; dx++) c[FieldType(Mathf.RoundToInt((wx + dx * 2.5f) / Cell), Mathf.RoundToInt((wz + dz * 2.5f) / Cell))] += 1f / 9f;
+                groundColors[z * n + x] = c;
+            }
+            groundMesh.colors = groundColors;
+        }
+
+        /// <summary>Rain: the ground goes glossy under the moon.</summary>
+        public void SetWet(float smoothness) { groundMat.SetFloat("_Smoothness", smoothness); }
 
         // ---- objects: only the cells around the camera exist ----
 
@@ -220,6 +259,7 @@ namespace IronNight
         public void Tick()
         {
             var g = cam.position + cam.forward * 45f; int cx = Mathf.RoundToInt(g.x / Cell), cz = Mathf.RoundToInt(g.z / Cell);
+            if (cx != gcx || cz != gcz) Recentre(cx, cz);
             wanted.Clear();
             for (int ix = cx - 2; ix <= cx + 2; ix++) for (int iz = cz - 2; iz <= cz + 2; iz++) foreach (var p in CellProps(ix, iz)) wanted.Add(p);
             for (int i = active.Count - 1; i >= 0; i--) if (!wanted.Contains(active[i])) { Unload(active[i]); active.RemoveAt(i); }
@@ -258,13 +298,6 @@ namespace IronNight
             float yawDeg = p.yaw * Mathf.Rad2Deg;
             switch (p.what)
             {
-                case What.Field:
-                {
-                    p.go = Quad(transform, p.pos, yawDeg, Cell, Cell, fieldMaterials[p.seed], 0f); p.go.name = "Field";
-                    var mpb = new MaterialPropertyBlock(); float v = 0.9f + (p.seed * 0.03f) + Rnd(p.seed, (int)p.pos.x, (int)p.pos.z) * 0.12f;
-                    mpb.SetColor("_BaseColor", new Color(v, v, v * 0.98f)); p.go.GetComponent<Renderer>().SetPropertyBlock(mpb);
-                    break;
-                }
                 case What.Lane: p.go = Quad(transform, p.pos, yawDeg, 6f, Cell, laneMaterial, 0.02f); p.go.name = "Lane"; break;
                 case What.Decal: p.go = Quad(transform, p.pos, yawDeg, p.size, p.size, p.seed == 0 ? yardMaterial : craterMaterial, p.seed == 0 ? 0.03f : 0.05f); p.go.name = p.seed == 0 ? "Yard" : "Crater"; break;
                 case What.Hedge: SpawnHedge(p); break;
