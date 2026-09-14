@@ -92,6 +92,9 @@ namespace IronNight
             PlayerPrefs.SetString("depot.leader", c.id); Save(); return true;
         }
 
+        /// <summary>Veteran nights: the enemy takes half again as many hits, the night pays half again as much.</summary>
+        public static bool Veteran { get => PlayerPrefs.GetInt("depot.veteran", 0) == 1; set { PlayerPrefs.SetInt("depot.veteran", value ? 1 : 0); PlayerPrefs.Save(); } }
+
         /// <summary>A rank for the title screen, by nights fought.</summary>
         public static string Rank { get { Load(); int n = NightsFought; return n < 1 ? "Recruit" : n < 5 ? "Trooper" : n < 10 ? "Corporal" : n < 20 ? "Sergeant" : n < 40 ? "Lieutenant" : n < 80 ? "Captain" : "Major"; } }
         public static Color CamoTint { get { foreach (var c in Camos) if (c.id == CamoId) return c.tint; return Color.white; } }

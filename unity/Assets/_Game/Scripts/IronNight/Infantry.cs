@@ -1,0 +1,110 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace IronNight
+{
+    /// <summary>
+    /// Enemy infantry: squads of four tank hunters with Panzerfausts. They come out of the dark on foot, close to
+    /// within fifteen metres of the nearest tank and fire; each man reloads for nine seconds. The tanks' machine guns
+    /// cut them down, HE and artillery blasts kill them in bunches, and a tank simply runs over the ones in its way.
+    /// A soldier is a capsule with a helmet; the dead lie where they fell for a while.
+    /// </summary>
+    public class Infantry : MonoBehaviour
+    {
+        public class Soldier { public Transform t; public Vector3 pos; public float reload, phase, deadAge; public bool dead; public Vector3 face = Vector3.forward; }
+        public class Squad { public readonly List<Soldier> men = new List<Soldier>(); }
+
+        public readonly List<Squad> squads = new List<Squad>();
+        readonly List<Soldier> fallen = new List<Soldier>();
+        Material uniform, helmet;
+
+        public void Build()
+        {
+            uniform = new Material(Resources.Load<Material>("BarrelLit")); uniform.SetColor("_BaseColor", new Color(0.22f, 0.24f, 0.2f)); uniform.SetFloat("_Metallic", 0f); uniform.SetFloat("_Smoothness", 0.15f);
+            helmet = new Material(uniform); helmet.SetColor("_BaseColor", new Color(0.18f, 0.2f, 0.18f)); helmet.SetFloat("_Smoothness", 0.4f);
+        }
+
+        public int Alive { get { int n = 0; foreach (var s in squads) foreach (var m in s.men) if (!m.dead) n++; return n; } }
+
+        /// <summary>Four men in a loose line at the point, facing the way they were sent.</summary>
+        public Squad Spawn(Vector3 at, Vector3 facing)
+        {
+            var sq = new Squad(); var side = new Vector3(facing.z, 0f, -facing.x);
+            for (int i = 0; i < 4; i++)
+            {
+                var go = new GameObject("Soldier"); go.transform.SetParent(transform, false);
+                var body = GameObject.CreatePrimitive(PrimitiveType.Capsule); Destroy(body.GetComponent<Collider>()); body.transform.SetParent(go.transform, false);
+                body.transform.localPosition = new Vector3(0f, 0.85f, 0f); body.transform.localScale = new Vector3(0.62f, 0.78f, 0.62f); body.GetComponent<Renderer>().sharedMaterial = uniform;
+                var head = GameObject.CreatePrimitive(PrimitiveType.Sphere); Destroy(head.GetComponent<Collider>()); head.transform.SetParent(go.transform, false);
+                head.transform.localPosition = new Vector3(0f, 1.72f, 0f); head.transform.localScale = new Vector3(0.44f, 0.34f, 0.48f); head.GetComponent<Renderer>().sharedMaterial = helmet;
+                var tube = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(tube.GetComponent<Collider>()); tube.transform.SetParent(go.transform, false);
+                tube.transform.localPosition = new Vector3(0.28f, 1.35f, 0.2f); tube.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); tube.transform.localScale = new Vector3(0.08f, 0.5f, 0.08f); tube.GetComponent<Renderer>().sharedMaterial = helmet;
+                var m = new Soldier { t = go.transform, pos = at + side * ((i - 1.5f) * 2.2f) + facing * Random.Range(-1f, 1f), reload = 2f + Random.value * 3f, phase = Random.value * 6.28f, face = facing };
+                m.t.position = m.pos; sq.men.Add(m);
+            }
+            squads.Add(sq); return sq;
+        }
+
+        /// <summary>Moves every man toward the nearest tank and calls fire for the ones in range and ready.</summary>
+        public void Tick(float dt, List<Vehicle> platoon, Props props, System.Action<Soldier, Vehicle> fire)
+        {
+            float time = Time.time;
+            for (int q = squads.Count - 1; q >= 0; q--)
+            {
+                var sq = squads[q]; bool any = false;
+                foreach (var m in sq.men)
+                {
+                    if (m.dead) continue; any = true;
+                    Vehicle target = null; float best = float.MaxValue;
+                    foreach (var v in platoon) { if (v.dead) continue; var d = v.transform.position - m.pos; d.y = 0f; if (d.sqrMagnitude < best) { best = d.sqrMagnitude; target = v; } }
+                    if (target == null) continue;
+                    var to = target.transform.position - m.pos; to.y = 0f; float dist = to.magnitude; to /= Mathf.Max(dist, 0.01f);
+                    if (dist > 13f) { m.pos += to * (2.4f * dt); m.face = to; }
+                    else if (dist < 7f) { m.pos -= to * (1.8f * dt); m.face = to; }   // too close for the rocket: back off
+                    m.pos = props.PushOut(m.pos, 0.5f);
+                    m.reload -= dt;
+                    if (dist < 15f && m.reload <= 0f) { m.reload = 9f + Random.value * 3f; fire(m, target); }
+                    bool moving = dist > 13f || dist < 7f;
+                    m.t.position = m.pos + Vector3.up * (moving ? Mathf.Abs(Mathf.Sin(time * 9f + m.phase)) * 0.08f : 0f);
+                    m.t.rotation = Quaternion.LookRotation(m.face, Vector3.up);
+                }
+                if (!any) squads.RemoveAt(q);
+            }
+            for (int i = fallen.Count - 1; i >= 0; i--) { var m = fallen[i]; m.deadAge += dt; if (m.deadAge > 25f) { Destroy(m.t.gameObject); fallen.RemoveAt(i); } }
+        }
+
+        /// <summary>The nearest living soldier to a point within reach, or null.</summary>
+        public Soldier Nearest(Vector3 from, float reach)
+        {
+            Soldier best = null; float bd = reach * reach;
+            foreach (var s in squads) foreach (var m in s.men) { if (m.dead) continue; var d = m.pos - from; d.y = 0f; float q = d.sqrMagnitude; if (q < bd) { bd = q; best = m; } }
+            return best;
+        }
+
+        public void Kill(Soldier m)
+        {
+            if (m.dead) return; m.dead = true; m.deadAge = 0f; fallen.Add(m);
+            m.t.position = m.pos + Vector3.up * 0.25f; m.t.rotation = Quaternion.LookRotation(m.face, Vector3.up) * Quaternion.Euler(-90f, 0f, Random.Range(-30f, 30f));
+        }
+
+        /// <summary>Kills every man within the radius of a blast; returns how many.</summary>
+        public int Blast(Vector3 at, float radius)
+        {
+            int n = 0;
+            foreach (var s in squads) foreach (var m in s.men) { if (m.dead) continue; var d = m.pos - at; d.y = 0f; if (d.magnitude < radius) { Kill(m); n++; } }
+            return n;
+        }
+
+        /// <summary>Anyone under the tracks of a moving tank.</summary>
+        public int Crush(List<Vehicle> vehicles)
+        {
+            int n = 0;
+            foreach (var s in squads) foreach (var m in s.men)
+            {
+                if (m.dead) continue;
+                foreach (var v in vehicles) { if (v.dead || v.spec.isGun) continue; var d = m.pos - v.transform.position; d.y = 0f; if (d.magnitude < v.spec.radius * 0.7f) { Kill(m); n++; break; } }
+            }
+            return n;
+        }
+    }
+}

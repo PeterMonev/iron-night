@@ -218,6 +218,17 @@ namespace IronNight
                     b.GetComponent<Button>().interactable = can && !chosen;
                 }
             }
+            // veteran nights
+            {
+                float y = -(Depot.Upgrades.Count + 2) * 250f;
+                var row = MakeImage(depotRows, "Row veteran", new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 230), new Color(0.08f, 0.09f, 0.1f, 0.96f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);
+                var title = MakeText(row.transform, "Title", new Vector2(0f, 1f), new Vector2(30, -20), TextAnchor.UpperLeft, 44, new Color(0.93f, 0.91f, 0.86f)); title.text = "Veteran nights"; title.rectTransform.sizeDelta = new Vector2(600, 60);
+                var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(30, -80), TextAnchor.UpperLeft, 28, new Color(0.66f, 0.64f, 0.59f)); desc.text = "The enemy takes half again as many hits; the night pays half again as many points."; desc.rectTransform.sizeDelta = new Vector2(880, 80);
+                bool on = Depot.Veteran;
+                var b = MakeButton(row.transform, on ? "Veteran: on" : "Veteran: off", new Vector2(1f, 0f), new Vector2(-190, 50), new Vector2(340, 80), 32, () => { Depot.Veteran = !Depot.Veteran; RefreshDepot(); });
+                b.GetComponent<Image>().color = on ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : new Color(0.2f, 0.22f, 0.24f, 0.95f);
+                b.transform.Find("Label").GetComponent<Text>().color = on ? new Color(0.1f, 0.08f, 0.05f) : new Color(0.93f, 0.91f, 0.86f);
+            }
             // the leader's tank
             {
                 float y = -(Depot.Upgrades.Count + 1) * 250f;
@@ -292,7 +303,7 @@ namespace IronNight
         public void Objective(Vector3 pos, float dist, Camera cam, bool show)
         {
             if (!show) { objectiveArrow.enabled = false; objectiveLabel.text = ""; return; }
-            var rect = canvas.GetComponent<RectTransform>().rect; float hw = rect.width * 0.5f - 60f, hh = rect.height * 0.5f - 200f;
+            var rect = canvas.GetComponent<RectTransform>().rect; float hw = rect.width * 0.5f - 60f, hh = rect.height * 0.5f - 340f;
             var vp = cam.WorldToViewportPoint(pos);
             if (vp.z > 0f && vp.x > 0.05f && vp.x < 0.95f && vp.y > 0.1f && vp.y < 0.85f) { objectiveArrow.enabled = false; objectiveLabel.text = ""; return; }
             var d = new Vector2(vp.x - 0.5f, vp.y - 0.5f); if (vp.z < 0f) d = -d; if (d.sqrMagnitude < 1e-6f) d = Vector2.up; d.Normalize();

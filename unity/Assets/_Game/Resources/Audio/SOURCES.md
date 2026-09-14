@@ -12,6 +12,8 @@ Sound Effects Free License (free for commercial use). Neither may be redistribut
 | shotFar | Pixabay 39685 "Distant Explosion" | freesound_community |
 | flak | Pixabay 85147 "antiair" | freesound_community |
 | reload | Pixabay 47828 "Tank Reload" | freesound_community |
+| mg | Pixabay 43670 "Machine Gun Burst" | freesound_community |
+| faust | Pixabay 307512 "Rocket Launcher" | 49053354 |
 | hit | Pixabay 454390 "Hammer Steel Impact" | Universfield |
 | ricochet | Pixabay 101553 "Ricochet 2" | freesound_community |
 | ricochet2 | Pixabay 41134 "Whizzby" | freesound_community |

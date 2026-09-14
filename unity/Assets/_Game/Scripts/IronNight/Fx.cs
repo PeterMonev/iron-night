@@ -149,6 +149,13 @@ namespace IronNight
             Spawn(smokeRagged, pos, 6f + Random.value * 4f, new Color(0.62f, 0.62f, 0.64f, 0.8f), life, new Vector3(Random.Range(-0.4f, 0.4f), 0.35f, Random.Range(-0.4f, 0.4f)), 0.9f, true);
         }
 
+        /// <summary>A machine-gun tracer: a short bright streak that is gone in a quarter second.</summary>
+        public void MgTracer(Vector3 from, Vector3 dir)
+        {
+            var t = Spawn(addSpark, from, 0.55f, new Color(1f, 0.85f, 0.45f, 1f), 0.24f, dir * 110f, 0f); t.aligned = true; t.axis = dir; t.stretch = 5f;
+            Spawn(addGlow, from, 1.1f, new Color(1f, 0.8f, 0.5f, 0.8f), 0.04f, Vector3.zero, 0f);
+        }
+
         /// <summary>A flak tracer climbing from a post: a warm streak that burns out high up.</summary>
         public void Flak(Vector3 from, Vector3 dir)
         {

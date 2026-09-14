@@ -39,6 +39,8 @@ clip('shotHeavy', 'mixkit_gunecho_1700.wav', length=3.2, fade=0.6)
 clip('shotFar', 'distantexpl_39685.mp3', length=1.2)
 clip('flak', 'antiair_85147.mp3', length=1.3, fade=0.3)
 clip('reload', 'reload_47828.mp3', peak=0.7)
+clip('mg', 'mgburst_43670.mp3', length=0.7, fade=0.12, peak=0.75)
+clip('faust', 'rocket_307512.mp3', length=1.0, fade=0.25, peak=0.85)
 # hits and blasts
 clip('hit', 'hammersteel_454390.mp3', length=0.9)
 clip('ricochet', 'ricochet2_101553.mp3', length=0.8)

@@ -13,7 +13,7 @@ namespace IronNight
     {
         const int Rate = 44100;
         static Sfx instance;
-        AudioClip shot, shotHeavy, shotFar, hit, explosion, artillery, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, front, whistle, rumble, ricochet, ricochet2, flak, reload, turretLoop;
+        AudioClip shot, shotHeavy, shotFar, hit, explosion, artillery, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, front, whistle, rumble, ricochet, ricochet2, flak, reload, turretLoop, mg, faust;
         readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, turret, ambient, frontLine, ui; Transform listener;
 
         public static void Build(Camera cam)
@@ -224,6 +224,7 @@ namespace IronNight
         {
             shot = Load("shot", () => Gun(0f, 1.8f, false)); shotHeavy = Load("shotHeavy", () => Gun(1f, 2.4f, false)); shotFar = Load("shotFar", () => Gun(0.4f, 2f, true));
             flak = Load("flak", () => Gun(0.3f, 0.6f, false)); reload = Resources.Load<AudioClip>("Audio/reload"); turretLoop = Resources.Load<AudioClip>("Audio/turret");
+            mg = Load("mg", () => Gun(0f, 0.3f, false)); faust = Load("faust", () => Gun(0.2f, 0.8f, false));
             explosion = Load("explosion", MakeExplosion); artillery = Load("artillery", MakeExplosion); hit = Load("hit", ArmourHit); ricochet = Load("ricochet", MakeRicochet); ricochet2 = Resources.Load<AudioClip>("Audio/ricochet2");
             engineLoop = Load("engine", MakeEngine); tracksLoop = Load("tracks", Tracks);
             whistle = Load("whistle", MakeWhistle); rumble = Load("shotFar", MakeRumble); wind = Load("wind", Wind); rain = Load("rain", Rain); front = Resources.Load<AudioClip>("Audio/front");
@@ -263,6 +264,8 @@ namespace IronNight
         /// <summary>The leader's turret motor: audible while the turret swings, quiet when it rests.</summary>
         public static void Turret(float swing) { if (!instance || instance.turretLoop == null) return; var t = instance.turret; t.volume = Mathf.Lerp(t.volume, Mathf.Clamp01(swing * 0.6f) * 0.35f, 0.2f); }
         public static void Whistle(Vector3 pos) { if (instance) instance.PlayAt(instance.whistle, pos, 0.7f, Random.Range(0.95f, 1.05f)); }
+        public static void Mg(Vector3 pos) { if (instance) instance.PlayAt(instance.mg, pos, 0.55f, Random.Range(0.95f, 1.05f)); }
+        public static void Faust(Vector3 pos) { if (instance) instance.PlayAt(instance.faust, pos, 0.8f, Random.Range(0.95f, 1.05f)); }
         public static void Flak(Vector3 pos) { if (instance) instance.PlayAt(instance.flak, pos, 0.4f, Random.Range(1.1f, 1.3f)); }
         /// <summary>Distant barrage somewhere over the horizon.</summary>
         public static void Rumble() { if (instance) { instance.ui.pitch = 0.75f; instance.ui.PlayOneShot(instance.rumble, 0.5f); instance.ui.pitch = 1f; } }
