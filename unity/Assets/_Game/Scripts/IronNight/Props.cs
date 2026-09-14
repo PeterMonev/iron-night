@@ -37,7 +37,7 @@ namespace IronNight
         readonly Dictionary<long, List<Prop>> cells = new Dictionary<long, List<Prop>>();
         readonly Dictionary<string, GameObject> prefabs = new Dictionary<string, GameObject>();
         readonly Dictionary<string, Material> materials = new Dictionary<string, Material>();
-        readonly List<Prop> active = new List<Prop>();
+        readonly List<Prop> active = new List<Prop>(); readonly HashSet<Prop> wanted = new HashSet<Prop>();
         Transform cam; Material patchMaterial, laneMaterial, yardMaterial, craterMaterial, hedgeMaterial, canopyMaterial, trunkMaterial;
         Material[] fieldMaterials; Mesh[] blobs; GameObject lampTemplate;
         readonly List<GameObject> craters = new List<GameObject>(); int nextCrater;   // shell craters of the night, oldest reused
@@ -194,7 +194,7 @@ namespace IronNight
         public void Tick()
         {
             var g = cam.position + cam.forward * 45f; int cx = Mathf.RoundToInt(g.x / Cell), cz = Mathf.RoundToInt(g.z / Cell);
-            var wanted = new HashSet<Prop>();
+            wanted.Clear();
             for (int ix = cx - 2; ix <= cx + 2; ix++) for (int iz = cz - 2; iz <= cz + 2; iz++) foreach (var p in CellProps(ix, iz)) wanted.Add(p);
             for (int i = active.Count - 1; i >= 0; i--) if (!wanted.Contains(active[i])) { Unload(active[i]); active.RemoveAt(i); }
             foreach (var p in wanted) if (p.go == null) { Spawn(p); active.Add(p); }

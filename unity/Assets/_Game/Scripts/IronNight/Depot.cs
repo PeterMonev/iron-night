@@ -95,6 +95,20 @@ namespace IronNight
         /// <summary>Veteran nights: the enemy takes half again as many hits, the night pays half again as much.</summary>
         public static bool Veteran { get => PlayerPrefs.GetInt("depot.veteran", 0) == 1; set { PlayerPrefs.SetInt("depot.veteran", value ? 1 : 0); PlayerPrefs.Save(); } }
 
+        // running tallies across every night (kills, tigers, guns, infantry, objectives, aces, dawns...) for the medals
+        public static int Total(string key) => PlayerPrefs.GetInt("tally." + key, 0);
+        public static void Tally(string key, int add) { if (add <= 0) return; PlayerPrefs.SetInt("tally." + key, Total(key) + add); }
+
+        /// <summary>The last ten nights, newest first: date, sector, kills, time, score, dawn.</summary>
+        public static void LogNight(string sector, int kills, float seconds, int score, bool dawn)
+        {
+            var lines = new List<string> { System.DateTime.Now.ToString("dd MMM") + "|" + sector + "|" + kills + "|" + Mathf.FloorToInt(seconds / 60f) + ":" + (Mathf.FloorToInt(seconds % 60f)).ToString("00") + "|" + score + "|" + (dawn ? "1" : "0") };
+            for (int i = 0; i < 9; i++) { var s = PlayerPrefs.GetString("log." + i, ""); if (s != "") lines.Add(s); }
+            for (int i = 0; i < lines.Count && i < 10; i++) PlayerPrefs.SetString("log." + i, lines[i]);
+            PlayerPrefs.Save();
+        }
+        public static List<string[]> NightLog() { var list = new List<string[]>(); for (int i = 0; i < 10; i++) { var s = PlayerPrefs.GetString("log." + i, ""); if (s != "") list.Add(s.Split('|')); } return list; }
+
         /// <summary>A rank for the title screen, by nights fought.</summary>
         public static string Rank { get { Load(); int n = NightsFought; return n < 1 ? "Recruit" : n < 5 ? "Trooper" : n < 10 ? "Corporal" : n < 20 ? "Sergeant" : n < 40 ? "Lieutenant" : n < 80 ? "Captain" : "Major"; } }
         public static Color CamoTint { get { foreach (var c in Camos) if (c.id == CamoId) return c.tint; return Color.white; } }

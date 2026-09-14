@@ -15,7 +15,7 @@ namespace IronNight
         public System.Action<Formation> OnFormation;
         public System.Action OnAd, OnAgain, OnStart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality;
 
-        Text clock, count, fps, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel; GameObject dailyBtn, helpSheet;
+        Text clock, count, fps, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel; GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
         class Rising { public Text t; public float life; public Vector3 world; }
         readonly List<Rising> popups = new List<Rising>(); readonly Stack<Text> popupPool = new Stack<Text>(); RectTransform canvasRect;
@@ -130,12 +130,14 @@ namespace IronNight
             var ort = orders.GetComponent<RectTransform>(); ort.anchorMin = ort.anchorMax = new Vector2(0.5f, 0.5f); ort.anchoredPosition = new Vector2(0, -370); ort.sizeDelta = Vector2.zero; missionRoot = orders.transform;
             titleStats = MakeText(titleSheet.transform, "Stats", new Vector2(0.5f, 0.5f), new Vector2(0, -700), TextAnchor.MiddleCenter, 32, dim); titleStats.rectTransform.sizeDelta = new Vector2(900, 200);
             MakeText(titleSheet.transform, "Credits", new Vector2(0.5f, 0f), new Vector2(0, 70), TextAnchor.MiddleCenter, 24, new Color(0.45f, 0.44f, 0.4f)).text = "Built with DINOv3 · TRELLIS 2 · Unity";
-            MakeButton(titleSheet.transform, "How to play", new Vector2(0.5f, 0f), new Vector2(0, 215), new Vector2(420, 70), 30, () => { helpSheet.SetActive(true); });
+            MakeButton(titleSheet.transform, "How to play", new Vector2(0.5f, 0f), new Vector2(-310, 215), new Vector2(290, 70), 28, () => { helpSheet.SetActive(true); });
+            MakeButton(titleSheet.transform, "Medals", new Vector2(0.5f, 0f), new Vector2(0, 215), new Vector2(290, 70), 28, () => { ShowMedals(); });
+            MakeButton(titleSheet.transform, "Records", new Vector2(0.5f, 0f), new Vector2(310, 215), new Vector2(290, 70), 28, () => { ShowRecords(); });
             titleSheet.SetActive(false);
 
             // how to play
             helpSheet = new GameObject("Help", typeof(RectTransform), typeof(Image)); helpSheet.transform.SetParent(root, false);
-            Stretch(helpSheet); helpSheet.GetComponent<Image>().color = new Color(0.02f, 0.03f, 0.04f, 0.92f);
+            Stretch(helpSheet); helpSheet.GetComponent<Image>().color = new Color(0.03f, 0.04f, 0.05f, 1f);
             MakeText(helpSheet.transform, "Title", new Vector2(0.5f, 1f), new Vector2(0, -170), TextAnchor.MiddleCenter, 96, ink).text = "How to play";
             var help = MakeText(helpSheet.transform, "Text", new Vector2(0.5f, 1f), new Vector2(0, -320), TextAnchor.UpperLeft, 34, new Color(0.85f, 0.83f, 0.78f)); help.rectTransform.sizeDelta = new Vector2(920, 1400);
             help.text = "Drag anywhere to drive the leader. The turrets aim and fire on their own.\n\n" +
@@ -147,6 +149,24 @@ namespace IronNight
                 "Hold until 5:00. Dawn is a win.";
             MakeButton(helpSheet.transform, "Back", new Vector2(0.5f, 0f), new Vector2(0, 150), new Vector2(880, 130), 40, () => helpSheet.SetActive(false));
             helpSheet.SetActive(false);
+
+            // medals
+            medalsSheet = new GameObject("Medals", typeof(RectTransform), typeof(Image)); medalsSheet.transform.SetParent(root, false);
+            Stretch(medalsSheet); medalsSheet.GetComponent<Image>().color = new Color(0.03f, 0.04f, 0.05f, 1f);
+            MakeText(medalsSheet.transform, "Title", new Vector2(0.5f, 1f), new Vector2(0, -150), TextAnchor.MiddleCenter, 96, ink).text = "Medals";
+            var mrows = new GameObject("Rows", typeof(RectTransform)); mrows.transform.SetParent(medalsSheet.transform, false);
+            var mrt = mrows.GetComponent<RectTransform>(); mrt.anchorMin = mrt.anchorMax = new Vector2(0.5f, 1f); mrt.pivot = new Vector2(0.5f, 1f); mrt.anchoredPosition = new Vector2(0, -260); mrt.sizeDelta = Vector2.zero; medalRows = mrows.transform;
+            MakeButton(medalsSheet.transform, "Back", new Vector2(0.5f, 0f), new Vector2(0, 150), new Vector2(880, 130), 40, () => medalsSheet.SetActive(false));
+            medalsSheet.SetActive(false);
+
+            // records
+            recordsSheet = new GameObject("Records", typeof(RectTransform), typeof(Image)); recordsSheet.transform.SetParent(root, false);
+            Stretch(recordsSheet); recordsSheet.GetComponent<Image>().color = new Color(0.03f, 0.04f, 0.05f, 1f);
+            MakeText(recordsSheet.transform, "Title", new Vector2(0.5f, 1f), new Vector2(0, -150), TextAnchor.MiddleCenter, 96, ink).text = "Records";
+            var rrows2 = new GameObject("Rows", typeof(RectTransform)); rrows2.transform.SetParent(recordsSheet.transform, false);
+            var rrt2 = rrows2.GetComponent<RectTransform>(); rrt2.anchorMin = rrt2.anchorMax = new Vector2(0.5f, 1f); rrt2.pivot = new Vector2(0.5f, 1f); rrt2.anchoredPosition = new Vector2(0, -260); rrt2.sizeDelta = Vector2.zero; recordRows = rrows2.transform;
+            MakeButton(recordsSheet.transform, "Back", new Vector2(0.5f, 0f), new Vector2(0, 150), new Vector2(880, 130), 40, () => recordsSheet.SetActive(false));
+            recordsSheet.SetActive(false);
 
             // depot sheet
             depotSheet = new GameObject("Depot", typeof(RectTransform), typeof(Image)); depotSheet.transform.SetParent(root, false);
@@ -163,7 +183,7 @@ namespace IronNight
 
         public void ShowTitle(bool reserveGranted)
         {
-            Depot.Load(); hudGroup.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(false); dailyBtn.SetActive(Depot.DailyReady);
+            Depot.Load(); Medals.Check(); hudGroup.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(false); dailyBtn.SetActive(Depot.DailyReady);
             int m = Mathf.FloorToInt(Depot.BestTime / 60f), s = Mathf.FloorToInt(Depot.BestTime % 60f);
             titleStats.text = Depot.NightsFought == 0 ? "First night. Drag anywhere to drive; the turrets fire on their own." : $"{Depot.Rank} · {Depot.NightsFought} nights fought · best {Depot.BestKills} kills · longest {m}:{s:00}\n{Depot.Points} depot points";
             reserveBtn.SetActive(!reserveGranted); reserveNote.text = reserveGranted ? "Reserve tank granted: the platoon can grow to 4 tonight." : "The platoon holds 3 tanks. A rewarded video opens a 4th slot for this night (mock).";
@@ -373,6 +393,39 @@ namespace IronNight
             endSheet.SetActive(true);
         }
         public void HideEnd() { endSheet.SetActive(false); }
+
+        void ShowMedals()
+        {
+            foreach (Transform c in medalRows) Destroy(c.gameObject);
+            var amber = new Color(0.95f, 0.66f, 0.23f); var dim = new Color(0.5f, 0.48f, 0.45f);
+            for (int i = 0; i < Medals.All.Length; i++)
+            {
+                var m = Medals.All[i]; bool got = Medals.Earned(m); float y = -i * 130f;
+                var row = MakeImage(medalRows, "Medal", new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 118), new Color(0.08f, 0.09f, 0.1f, got ? 0.96f : 0.6f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);
+                var disc = MakeImage(row.transform, "Disc", new Vector2(0f, 0.5f), new Vector2(60, 0), new Vector2(64, 64), got ? amber : new Color(0.2f, 0.2f, 0.22f)); disc.sprite = Lightswarm.ProceduralSprites.Glow(32, 0.95f); disc.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                var name = MakeText(row.transform, "Name", new Vector2(0f, 1f), new Vector2(120, -14), TextAnchor.UpperLeft, 38, got ? new Color(0.93f, 0.91f, 0.86f) : dim); name.text = m.name; name.rectTransform.sizeDelta = new Vector2(700, 50);
+                var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(120, -62), TextAnchor.UpperLeft, 26, got ? new Color(0.66f, 0.64f, 0.59f) : dim); desc.text = m.desc + (got ? "" : "  · +" + Medals.Reward); desc.rectTransform.sizeDelta = new Vector2(780, 50);
+            }
+            medalsSheet.SetActive(true);
+        }
+
+        void ShowRecords()
+        {
+            foreach (Transform c in recordRows) Destroy(c.gameObject);
+            var ink = new Color(0.93f, 0.91f, 0.86f); var dim = new Color(0.66f, 0.64f, 0.59f); var amber = new Color(0.95f, 0.66f, 0.23f);
+            var totals = MakeText(recordRows, "Totals", new Vector2(0.5f, 1f), new Vector2(0, 0), TextAnchor.UpperCenter, 30, dim); totals.rectTransform.sizeDelta = new Vector2(940, 120);
+            totals.text = $"{Depot.NightsFought} nights · {Depot.Total("kills")} vehicles · {Depot.Total("tigers")} Tigers · {Depot.Total("guns")} guns · {Depot.Total("infantry")} infantry\n{Depot.Total("dawns")} dawns · {Depot.Total("objectives")} objectives · {Medals.Count}/{Medals.All.Length} medals";
+            var log = Depot.NightLog();
+            if (log.Count == 0) { var none = MakeText(recordRows, "None", new Vector2(0.5f, 1f), new Vector2(0, -160), TextAnchor.UpperCenter, 30, dim); none.text = "No nights fought yet."; }
+            for (int i = 0; i < log.Count; i++)
+            {
+                var e = log[i]; if (e.Length < 6) continue; float y = -150f - i * 90f;
+                var row = MakeImage(recordRows, "Night", new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 80), new Color(0.08f, 0.09f, 0.1f, 0.9f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);
+                var left = MakeText(row.transform, "Left", new Vector2(0f, 0.5f), new Vector2(24, 0), TextAnchor.MiddleLeft, 28, ink); left.text = e[0] + " · " + e[1] + (e[5] == "1" ? " · dawn" : ""); left.rectTransform.sizeDelta = new Vector2(500, 80);
+                var right = MakeText(row.transform, "Right", new Vector2(1f, 0.5f), new Vector2(-24, 0), TextAnchor.MiddleRight, 28, amber); right.text = e[2] + " kills · " + e[3] + " · " + e[4]; right.rectTransform.sizeDelta = new Vector2(520, 80);
+            }
+            recordsSheet.SetActive(true);
+        }
         /// <summary>Tonight's weather on the title and in the corner of the HUD.</summary>
         public void SetConditions(string sector, string name, string note) { conditions.text = "Tonight: " + sector + " · " + (name == "Clear" ? "clear skies, full moon" : name.ToLowerInvariant() + " · " + note); assaultLabel.text = sector.ToUpperInvariant() + " · " + name.ToUpperInvariant(); }
         public void ShowPause(bool soundOn, bool highQuality) { soundLabel.text = soundOn ? "Sound: on" : "Sound: off"; qualityLabel.text = highQuality ? "Quality: high" : "Quality: low"; pauseSheet.SetActive(true); }
