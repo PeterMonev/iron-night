@@ -71,7 +71,7 @@ namespace IronNight.EditorTools
             void Set(string field, System.Action<SerializedProperty> apply) { var p = so.FindProperty(field); if (p != null) apply(p); else Debug.LogWarning("URP asset: no field " + field); }
             Set("m_MainLightShadowsSupported", p => p.boolValue = true);
             Set("m_MainLightShadowmapResolution", p => p.intValue = 2048);
-            Set("m_ShadowDistance", p => p.floatValue = 90f);
+            Set("m_ShadowDistance", p => p.floatValue = 115f);
             Set("m_ShadowCascadeCount", p => p.intValue = 2);
             Set("m_SoftShadowsSupported", p => p.boolValue = true);
             Set("m_AdditionalLightsRenderingMode", p => p.intValue = 1);   // per pixel

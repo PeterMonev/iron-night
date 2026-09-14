@@ -116,7 +116,7 @@ namespace IronNight
         void PlaceCamera(bool snap)
         {
             var L = Leader; if (L == null) return;
-            var want = L.transform.position + new Vector3(0f, 44f, -36f);
+            var want = L.transform.position + new Vector3(0f, 52f, -42.5f);   // a little higher than before: more field in view, same 48-degree tilt
             cam.transform.position = snap ? want : Vector3.Lerp(cam.transform.position, want, 1f - Mathf.Exp(-Time.deltaTime * 4f));
             cam.transform.LookAt(cam.transform.position + new Vector3(0f, -44f, 40f));
             if (shake > 0f) { cam.transform.position += Random.insideUnitSphere * (shake * 0.5f); shake = Mathf.Max(0f, shake - Time.deltaTime * 3f); }
