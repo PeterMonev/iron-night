@@ -131,6 +131,7 @@ namespace IronNight
             foreach (var v in platoon) { v.speedMul = speedMul; v.damageMul = damageMul; v.rangeMul = rangeMul; v.reloadMul = reloadMul; v.turretMul = turretMul; }
 
             // turrets: nearest foe in range, else drift home
+            float leaderTurret = L.turretYaw;
             foreach (var v in platoon)
             {
                 v.reloadLeft -= dt;
@@ -139,6 +140,8 @@ namespace IronNight
                 else v.IdleTurret(dt);
                 v.Apply();
             }
+
+            Sfx.Turret(Mathf.Abs(Mathf.DeltaAngle(leaderTurret * Mathf.Rad2Deg, L.turretYaw * Mathf.Rad2Deg)) * Mathf.Deg2Rad / Mathf.Max(dt, 1e-4f));
 
             // enemies: close in, then hold and shoot
             for (int i = 0; i < foes.Count; i++)
@@ -199,7 +202,7 @@ namespace IronNight
             var vis = fx.Tracer(v.friendly ? new Color(1f, 1f, 0.9f, 1f) : new Color(1f, 0.75f, 0.55f, 1f), v.friendly ? new Color(1f, 0.85f, 0.45f, 0.6f) : new Color(1f, 0.45f, 0.25f, 0.6f));
             vis.position = pos; vis.rotation = Quaternion.LookRotation(cam.transform.forward, dir);
             shells.Add(new Shell { pos = pos, vel = dir * speed, friendly = v.friendly, he = v.friendly && he, dmg = v.spec.damage * v.damageMul, life = v.Range / speed + 0.25f, vis = vis });
-            fx.MuzzleFlash(pos, dir); Sfx.Shot(pos, v.friendly, v.spec.gunLength > 3f || v.spec.isGun);
+            fx.MuzzleFlash(pos, dir); Sfx.Shot(pos, v.friendly, v.spec.gunLength > 3f || v.spec.isGun); if (v.friendly) Sfx.Reload(v.transform.position);
         }
 
         void TickShells(float dt)
@@ -560,7 +563,7 @@ namespace IronNight
             for (int i = arty.Count - 1; i >= 0; i--)
             {
                 var a = arty[i]; a.timer -= dt; if (a.timer > 0f) continue;
-                fx.Explosion(a.at); Sfx.Explosion(a.at); props.Crater(a.at, 5f); arty.RemoveAt(i);
+                fx.Explosion(a.at); Sfx.Artillery(a.at); props.Crater(a.at, 5f); arty.RemoveAt(i);
                 foreach (var e in foes.ToArray()) { if (e.dead) continue; var d = e.transform.position - a.at; d.y = 0f; if (d.magnitude < 7f) Damage(e, d.magnitude < 3.5f ? 2f : 1f, a.at); }
             }
         }

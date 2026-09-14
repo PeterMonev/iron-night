@@ -4,17 +4,17 @@ using UnityEngine;
 namespace IronNight
 {
     /// <summary>
-    /// All sound is synthesised at start-up (no audio files, no licenses) with a small DSP kit: layered noise through
-    /// biquad filters, swept sines, soft clipping and a multi-tap outdoor echo. Guns are a crack, a body, a sub thump
-    /// and a rolling tail; armour rings with inharmonic partials; the engine is a pulse train with exhaust harmonics.
-    /// Clips are mono buffers played from a pool of positional sources.
+    /// The sounds of the night. The clips are library recordings (Resources/Audio, Pixabay and Mixkit licences, see
+    /// SOURCES.md there); anything missing is synthesised at start-up with the small DSP kit below, so the game never
+    /// goes silent. Guns, hits and blasts play from a pool of positional sources; the engine, the tracks, the turret
+    /// motor, the wind or rain and the far front line are loops.
     /// </summary>
     public class Sfx : MonoBehaviour
     {
         const int Rate = 44100;
         static Sfx instance;
-        AudioClip shot, shotHeavy, shotFar, hit, explosion, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, whistle, rumble, ricochet, flak;
-        readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, ambient, ui; Transform listener;
+        AudioClip shot, shotHeavy, shotFar, hit, explosion, artillery, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, front, whistle, rumble, ricochet, ricochet2, flak, reload, turretLoop;
+        readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, turret, ambient, frontLine, ui; Transform listener;
 
         public static void Build(Camera cam)
         {
@@ -122,21 +122,23 @@ namespace IronNight
         static float[] ArmourHit()
         {
             int n = Dsp.N(0.9f); var mix = new float[n];
-            float[] freqs = { 640f, 1130f, 1780f, 2500f, 3300f, 4400f }, decays = { 9f, 12f, 15f, 20f, 26f, 32f }, gains = { 1f, 0.8f, 0.6f, 0.45f, 0.3f, 0.2f };
+            float[] freqs = { 640f, 1130f, 1780f, 2500f, 3300f, 4400f }, decays = { 14f, 18f, 22f, 28f, 34f, 40f }, gains = { 1f, 0.8f, 0.6f, 0.45f, 0.3f, 0.2f };
             for (int k = 0; k < 6; k++) { float f = freqs[k] * (1f + ((float)Dsp.rng.NextDouble() - 0.5f) * 0.04f); var p = Dsp.Sine(n, t => f); float dk = decays[k]; Dsp.Env(p, t => Dsp.Exp(t, dk)); Dsp.Add(mix, p, gains[k] * 0.35f); }
             var click = Dsp.Noise(n); Dsp.Highpass(click, 3000f); Dsp.Env(click, t => Dsp.Exp(t, 400f)); Dsp.Add(mix, click, 0.8f);
             var thud = Dsp.Sine(n, t => Mathf.Lerp(130f, 70f, Mathf.Min(1f, t / 0.1f))); Dsp.Env(thud, t => Dsp.Exp(t, 22f)); Dsp.Add(mix, thud, 0.7f);
-            var body = Dsp.Noise(n); Dsp.Bandpass(body, 900f, 1f); Dsp.Env(body, t => Dsp.Exp(t, 40f)); Dsp.Add(mix, body, 0.5f);
+            var body = Dsp.Noise(n); Dsp.Bandpass(body, 900f, 1f); Dsp.Env(body, t => Dsp.Exp(t, 40f)); Dsp.Add(mix, body, 0.8f);
             Dsp.Clip(mix, 1.4f); Dsp.Echo(mix, (0.12f, 0.2f, 2000f)); Dsp.Normalize(mix, 0.9f); return mix;
         }
 
+        /// <summary>A ricochet: a hard metallic slap, then the whizz of the shell tumbling away, made of noise squeezed
+        /// through a narrow band that falls in pitch (no pure tones: those sound like a ray gun).</summary>
         static float[] MakeRicochet()
         {
-            int n = Dsp.N(0.7f); var mix = new float[n];
-            var whine = Dsp.Sine(n, t => 2800f * Mathf.Pow(0.35f, t / 0.5f) * (1f + 0.02f * Mathf.Sin(2f * Mathf.PI * 40f * t))); Dsp.Env(whine, t => Dsp.Exp(t, 5.5f)); Dsp.Add(mix, whine, 0.7f);
-            var click = Dsp.Noise(n); Dsp.Highpass(click, 2500f); Dsp.Env(click, t => Dsp.Exp(t, 300f)); Dsp.Add(mix, click, 0.7f);
-            foreach (var f in new[] { 3200f, 4700f, 6100f }) { var p = Dsp.Sine(n, t => f); Dsp.Env(p, t => Dsp.Exp(t, 40f)); Dsp.Add(mix, p, 0.12f); }
-            Dsp.Normalize(mix, 0.85f); return mix;
+            int n = Dsp.N(0.6f); var mix = new float[n];
+            var slap = Dsp.Noise(n); Dsp.Bandpass(slap, 2600f, 1.2f); Dsp.Env(slap, t => Dsp.Exp(t, 180f)); Dsp.Add(mix, slap, 1f);
+            var clank = Dsp.Noise(n); Dsp.Bandpass(clank, 700f, 2f); Dsp.Env(clank, t => Dsp.Exp(t, 60f)); Dsp.Add(mix, clank, 0.6f);
+            var whizz = Dsp.Noise(n); Dsp.BandpassSweep(whizz, t => 3400f * Mathf.Pow(0.28f, t / 0.45f), 9f); Dsp.Normalize(whizz, 1f); Dsp.Env(whizz, t => t < 0.02f ? 0f : Dsp.Exp(t - 0.02f, 7f)); Dsp.Add(mix, whizz, 0.9f);
+            Dsp.Clip(mix, 1.3f); Dsp.Normalize(mix, 0.85f); return mix;
         }
 
         /// <summary>The engine: thirty firing pulses a second (seamless in one second), exhaust harmonics, intake hiss.</summary>
@@ -153,17 +155,20 @@ namespace IronNight
             Dsp.Lowpass(mix, 2500f); Dsp.Clip(mix, 1.3f); Dsp.Normalize(mix, 0.7f); return mix;
         }
 
-        /// <summary>Track clatter: metallic ticks, fourteen a second, played louder and faster with the engine.</summary>
+        /// <summary>Track clatter: the running gear as a low rumble that pulses with the wheels, and a dozen loose
+        /// metallic clanks a second, each a burst of noise in its own band. Louder and faster with the engine.</summary>
         static float[] Tracks()
         {
             int n = Rate; var mix = new float[n];
-            for (int k = 0; k < 14; k++)
+            var gear = Dsp.Noise(n); Dsp.Lowpass(gear, 250f); Dsp.Env(gear, t => 0.6f + 0.4f * Mathf.Sin(2f * Mathf.PI * 9f * t)); Dsp.Add(mix, gear, 0.5f);
+            for (int k = 0; k < 12; k++)
             {
-                float at = k / 14f + ((float)Dsp.rng.NextDouble() - 0.5f) * 0.03f; if (at < 0f) at += 1f; float f = 1600f + (float)Dsp.rng.NextDouble() * 2000f;
-                var tick = Dsp.Sine(Dsp.N(0.06f), t => f); Dsp.Env(tick, t => Dsp.Exp(t, 70f)); Dsp.Add(mix, tick, 0.35f, at);
-                var c = Dsp.Noise(Dsp.N(0.006f)); Dsp.Highpass(c, 2000f); Dsp.Add(mix, c, 0.5f, at);
+                float at = k / 12f + ((float)Dsp.rng.NextDouble() - 0.5f) * 0.05f; if (at < 0f) at += 1f; if (at > 0.97f) at -= 0.97f;
+                float f = 900f + (float)Dsp.rng.NextDouble() * 2600f, g = 0.3f + (float)Dsp.rng.NextDouble() * 0.3f;
+                var clank = Dsp.Noise(Dsp.N(0.03f)); Dsp.Bandpass(clank, f, 2f); Dsp.Env(clank, t => Dsp.Exp(t, 150f)); Dsp.Add(mix, clank, g, at);
+                var thud = Dsp.Noise(Dsp.N(0.03f)); Dsp.Bandpass(thud, 300f, 1.5f); Dsp.Env(thud, t => Dsp.Exp(t, 120f)); Dsp.Add(mix, thud, g * 0.6f, at);
             }
-            Dsp.Normalize(mix, 0.5f); return mix;
+            Dsp.Normalize(mix, 0.45f); return mix;
         }
 
         static float[] MakeWhistle()
@@ -212,29 +217,34 @@ namespace IronNight
             var p = Dsp.Sine(n, t => 2400f); Dsp.Env(p, t => Dsp.Exp(t, 120f)); Dsp.Add(mix, p, 0.5f); Dsp.Normalize(mix, 0.5f); return mix;
         }
 
+        /// <summary>The library clip when it is there, else the synthesised stand-in.</summary>
+        AudioClip Load(string name, System.Func<float[]> fallback) { var c = Resources.Load<AudioClip>("Audio/" + name); return c != null ? c : Clip(name, fallback()); }
+
         void Make()
         {
-            shot = Clip("shot", Gun(0f, 1.8f, false)); shotHeavy = Clip("shotHeavy", Gun(1f, 2.4f, false)); shotFar = Clip("shotFar", Gun(0.4f, 2f, true));
-            flak = Clip("flak", Gun(0.3f, 0.6f, false));
-            explosion = Clip("explosion", MakeExplosion()); hit = Clip("hit", ArmourHit()); ricochet = Clip("ricochet", MakeRicochet());
-            engineLoop = Clip("engine", MakeEngine()); tracksLoop = Clip("tracks", Tracks());
-            whistle = Clip("whistle", MakeWhistle()); rumble = Clip("rumble", MakeRumble()); wind = Clip("wind", Wind()); rain = Clip("rain", Rain());
-            pickup = Clip("pickup", Radio(new[] { 880f, 1320f }, 0.12f)); levelUp = Clip("levelUp", Radio(new[] { 523f, 659f, 784f }, 0.2f)); click = Clip("click", MakeClick());
+            shot = Load("shot", () => Gun(0f, 1.8f, false)); shotHeavy = Load("shotHeavy", () => Gun(1f, 2.4f, false)); shotFar = Load("shotFar", () => Gun(0.4f, 2f, true));
+            flak = Load("flak", () => Gun(0.3f, 0.6f, false)); reload = Resources.Load<AudioClip>("Audio/reload"); turretLoop = Resources.Load<AudioClip>("Audio/turret");
+            explosion = Load("explosion", MakeExplosion); artillery = Load("artillery", MakeExplosion); hit = Load("hit", ArmourHit); ricochet = Load("ricochet", MakeRicochet); ricochet2 = Resources.Load<AudioClip>("Audio/ricochet2");
+            engineLoop = Load("engine", MakeEngine); tracksLoop = Load("tracks", Tracks);
+            whistle = Load("whistle", MakeWhistle); rumble = Load("shotFar", MakeRumble); wind = Load("wind", Wind); rain = Load("rain", Rain); front = Resources.Load<AudioClip>("Audio/front");
+            pickup = Load("pickup", () => Radio(new[] { 880f, 1320f }, 0.12f)); levelUp = Load("levelUp", () => Radio(new[] { 523f, 659f, 784f }, 0.2f)); click = Load("click", MakeClick);
 
             for (int i = 0; i < 12; i++) { var s = NewSource("Voice " + i); s.spatialBlend = 0.75f; s.rolloffMode = AudioRolloffMode.Linear; s.minDistance = 12f; s.maxDistance = 140f; pool.Add(s); }
             engine = NewSource("Engine"); engine.clip = engineLoop; engine.loop = true; engine.spatialBlend = 0f; engine.volume = 0f; engine.Play();
             tracks = NewSource("Tracks"); tracks.clip = tracksLoop; tracks.loop = true; tracks.spatialBlend = 0f; tracks.volume = 0f; tracks.Play();
+            turret = NewSource("Turret"); turret.clip = turretLoop; turret.loop = true; turret.spatialBlend = 0f; turret.volume = 0f; if (turretLoop != null) turret.Play();
+            frontLine = NewSource("Front"); frontLine.clip = front; frontLine.loop = true; frontLine.spatialBlend = 0f; frontLine.volume = 0.14f; if (front != null) frontLine.Play();
             ui = NewSource("Ui"); ui.spatialBlend = 0f;
             ambient = NewSource("Wind"); ambient.clip = wind; ambient.loop = true; ambient.spatialBlend = 0f; ambient.volume = 0.18f; ambient.Play();
         }
 
         AudioSource NewSource(string name) { var go = new GameObject(name); go.transform.SetParent(transform, false); var s = go.AddComponent<AudioSource>(); s.playOnAwake = false; s.dopplerLevel = 0f; return s; }
 
-        void PlayAt(AudioClip clip, Vector3 pos, float volume, float pitch)
+        void PlayAt(AudioClip clip, Vector3 pos, float volume, float pitch, float delay = 0f)
         {
             AudioSource best = null; float oldest = float.MaxValue;
             foreach (var s in pool) { if (!s.isPlaying) { best = s; break; } if (s.time < oldest) { oldest = s.time; best = s; } }
-            best.transform.position = pos; best.clip = clip; best.volume = volume; best.pitch = pitch; best.Play();
+            best.transform.position = pos; best.clip = clip; best.volume = volume; best.pitch = pitch; if (delay > 0f) best.PlayDelayed(delay); else best.Play();
         }
 
         /// <summary>A gun firing: the heavy clip for the 17-pounder, the 88 and the Tigers; the far clip when the listener is more than 45 m away.</summary>
@@ -244,12 +254,18 @@ namespace IronNight
             instance.PlayAt(far ? instance.shotFar : heavy ? instance.shotHeavy : instance.shot, pos, friendly ? 0.9f : 0.8f, (heavy ? 0.9f : 1f) * Random.Range(0.94f, 1.06f));
         }
         public static void Hit(Vector3 pos) { if (instance) instance.PlayAt(instance.hit, pos, 0.85f, Random.Range(0.9f, 1.1f)); }
-        public static void Ricochet(Vector3 pos) { if (instance) instance.PlayAt(instance.ricochet, pos, 0.8f, Random.Range(0.9f, 1.15f)); }
-        public static void Explosion(Vector3 pos) { if (instance) instance.PlayAt(instance.explosion, pos, 1f, Random.Range(0.9f, 1.05f)); }
+        public static void Ricochet(Vector3 pos) { if (instance) instance.PlayAt(instance.ricochet2 != null && Random.value < 0.4f ? instance.ricochet2 : instance.ricochet, pos, 0.85f, Random.Range(0.92f, 1.1f)); }
+        public static void Explosion(Vector3 pos) { if (instance) instance.PlayAt(instance.explosion, pos, 1f, Random.Range(0.92f, 1.05f)); }
+        /// <summary>An artillery shell landing: a shorter, harder blast than a vehicle going up.</summary>
+        public static void Artillery(Vector3 pos) { if (instance) instance.PlayAt(instance.artillery, pos, 0.9f, Random.Range(0.95f, 1.1f)); }
+        /// <summary>The breech after one of ours fires: a clank half a second later, from the tank.</summary>
+        public static void Reload(Vector3 pos) { if (instance && instance.reload != null) instance.PlayAt(instance.reload, pos, 0.5f, Random.Range(0.95f, 1.05f), 0.5f); }
+        /// <summary>The leader's turret motor: audible while the turret swings, quiet when it rests.</summary>
+        public static void Turret(float swing) { if (!instance || instance.turretLoop == null) return; var t = instance.turret; t.volume = Mathf.Lerp(t.volume, Mathf.Clamp01(swing * 0.6f) * 0.35f, 0.2f); }
         public static void Whistle(Vector3 pos) { if (instance) instance.PlayAt(instance.whistle, pos, 0.7f, Random.Range(0.95f, 1.05f)); }
         public static void Flak(Vector3 pos) { if (instance) instance.PlayAt(instance.flak, pos, 0.4f, Random.Range(1.1f, 1.3f)); }
         /// <summary>Distant barrage somewhere over the horizon.</summary>
-        public static void Rumble() { if (instance) instance.ui.PlayOneShot(instance.rumble, 0.55f); }
+        public static void Rumble() { if (instance) { instance.ui.pitch = 0.75f; instance.ui.PlayOneShot(instance.rumble, 0.5f); instance.ui.pitch = 1f; } }
         /// <summary>The night's ambient bed: wind, or rain on the hull.</summary>
         public static void Ambient(bool raining) { if (!instance) return; var a = instance.ambient; a.clip = raining ? instance.rain : instance.wind; a.volume = raining ? 0.32f : 0.18f; a.Play(); }
         public static void Pickup() { if (instance) instance.ui.PlayOneShot(instance.pickup, 0.6f); }
@@ -259,8 +275,8 @@ namespace IronNight
         public static void Engine(float throttle)
         {
             if (!instance) return; var e = instance.engine; e.volume = Mathf.Lerp(e.volume, 0.12f + 0.3f * throttle, 0.1f); e.pitch = Mathf.Lerp(e.pitch, 0.85f + 0.45f * throttle, 0.08f);
-            var tr = instance.tracks; tr.volume = Mathf.Lerp(tr.volume, 0.22f * throttle, 0.15f); tr.pitch = Mathf.Lerp(tr.pitch, 0.8f + 0.4f * throttle, 0.1f);
+            var tr = instance.tracks; tr.volume = Mathf.Lerp(tr.volume, 0.16f * throttle, 0.15f); tr.pitch = Mathf.Lerp(tr.pitch, 0.8f + 0.4f * throttle, 0.1f);
         }
-        public static void Quiet(bool q) { if (instance) { instance.engine.mute = q; instance.tracks.mute = q; instance.ambient.mute = q; } }
+        public static void Quiet(bool q) { if (instance) { instance.engine.mute = q; instance.tracks.mute = q; instance.turret.mute = q; instance.ambient.mute = q; instance.frontLine.mute = q; } }
     }
 }
