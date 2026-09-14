@@ -16,7 +16,7 @@ namespace IronNight
         public System.Action OnAd, OnAgain, OnStart, OnDepot, OnBack, OnReserveAd;
 
         Text clock, count, fps, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp;
-        Image levelFill; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn; Transform cardRoot, depotRows; Canvas canvas; Text depotPoints, titleStats, endPoints, reserveNote;
+        Image levelFill; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn; Transform cardRoot, depotRows; Canvas canvas; Text depotPoints, titleStats, endPoints, reserveNote, bossName; Image bossFill; GameObject bossBar;
         readonly Button[] formButtons = new Button[4];
         readonly List<Image> arrows = new List<Image>(); Sprite arrowSprite;
         float fpsAccum, fpsTimer, toastLeft; int fpsFrames;
@@ -46,6 +46,12 @@ namespace IronNight
             levelText = MakeText(t, "Level", new Vector2(0.5f, 1), new Vector2(0, -262), TextAnchor.UpperCenter, 30, dim);
             var barBg = MakeImage(t, "LevelBar", new Vector2(0.5f, 1), new Vector2(0, -240), new Vector2(960, 8), new Color(1f, 1f, 1f, 0.12f));
             levelFill = MakeImage(barBg.transform, "Fill", new Vector2(0, 0.5f), Vector2.zero, new Vector2(0, 8), amber);
+            bossBar = new GameObject("BossBar", typeof(RectTransform)); bossBar.transform.SetParent(t, false);
+            var brt = bossBar.GetComponent<RectTransform>(); brt.anchorMin = brt.anchorMax = new Vector2(0.5f, 1f); brt.pivot = new Vector2(0.5f, 1f); brt.anchoredPosition = new Vector2(0, -300); brt.sizeDelta = new Vector2(960, 60);
+            bossName = MakeText(bossBar.transform, "Name", new Vector2(0.5f, 1f), new Vector2(0, 0), TextAnchor.UpperCenter, 30, new Color(0.95f, 0.35f, 0.3f));
+            var bbg = MakeImage(bossBar.transform, "Bg", new Vector2(0.5f, 1f), new Vector2(0, -40), new Vector2(960, 10), new Color(1f, 1f, 1f, 0.12f));
+            bossFill = MakeImage(bbg.transform, "Fill", new Vector2(0, 0.5f), Vector2.zero, new Vector2(960, 10), new Color(0.95f, 0.35f, 0.3f));
+            bossBar.SetActive(false);
             toast = MakeText(t, "Toast", new Vector2(0.5f, 0.5f), new Vector2(0, 420), TextAnchor.MiddleCenter, 60, ink); toast.text = "";
 
             var names = new[] { "WEDGE", "COLUMN", "LINE", "ECHELON" };
@@ -185,6 +191,9 @@ namespace IronNight
         public void SetLeader(int hp, int max) { var s = new System.Text.StringBuilder("LEADER "); for (int i = 0; i < max; i++) s.Append(i < hp ? "■" : "□"); leaderHp.text = s.ToString(); }
         public void SetLevel(int level, float progress) { levelText.text = $"Level {level}"; levelFill.rectTransform.sizeDelta = new Vector2(960f * Mathf.Clamp01(progress), 8f); }
         public void Toast(string text) { toast.text = text; toastLeft = 2.2f; }
+        public void ShowBoss(string name) { bossName.text = name.ToUpperInvariant(); bossBar.SetActive(true); }
+        public void SetBoss(float frac) { bossFill.rectTransform.sizeDelta = new Vector2(960f * Mathf.Clamp01(frac), 10f); }
+        public void HideBoss() { bossBar.SetActive(false); }
 
         public void ShowCards(List<Card> cards, System.Action<string> onPick)
         {
@@ -246,7 +255,7 @@ namespace IronNight
             var go = new GameObject("Btn " + label, typeof(RectTransform), typeof(Image), typeof(Button)); go.transform.SetParent(parent, false);
             var rt = go.GetComponent<RectTransform>(); rt.anchorMin = rt.anchorMax = anchor; rt.pivot = new Vector2(0.5f, 0.5f); rt.anchoredPosition = pos; rt.sizeDelta = size;
             go.GetComponent<Image>().color = new Color(0.03f, 0.04f, 0.06f, 0.6f);
-            go.GetComponent<Button>().onClick.AddListener(() => onClick());
+            go.GetComponent<Button>().onClick.AddListener(() => { Sfx.Click(); onClick(); });
             var t = MakeText(go.transform, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, TextAnchor.MiddleCenter, fontSize, new Color(0.93f, 0.91f, 0.86f));
             t.GetComponent<RectTransform>().sizeDelta = size; t.text = label;
             return go;

@@ -26,7 +26,8 @@ namespace IronNight
         Material shellTemplate; Texture2D glowTex;
         Formation formation = Formation.Wedge; Phase phase = Phase.Title; bool reserveGranted;
         float t, spawnTimer = 6f, leaderShield; int level = 1, xp, xpNeed = 6, score, kills, maxPlatoon = 4, reinforcements;
-        bool wave2, wave4, revived, doubled;
+        bool wave2, wave4, revived, doubled, bossSpawned; Vehicle boss;
+        static readonly bool debugBoss = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--boss") >= 0;   // test switch: the boss comes at 0:06
         float damageMul = 1f, reloadMul = 1f, rangeMul = 1f, speedMul = 1f; bool he;
 
         Vehicle Leader => platoon.Count > 0 ? platoon[0] : null;
@@ -49,7 +50,7 @@ namespace IronNight
             hud.OnReserveAd = () => { reserveGranted = true; maxPlatoon = 4; hud.ShowTitle(true); };   // the ad is a mock: granted at once
             hud.Set(0f, platoon.Count); hud.SetLevel(level, 0f);
             PlaceCamera(true);
-            stick.Blocked = true; hud.ShowTitle(false);
+            stick.Blocked = true; hud.ShowTitle(false); Debug.Log("Iron Night: battle built, debugBoss=" + debugBoss + " args=" + string.Join(" ", System.Environment.GetCommandLineArgs()));
         }
 
         void BuildWorld()
@@ -96,7 +97,7 @@ namespace IronNight
         {
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             fx.Tick(dt);
-            if (phase != Phase.Play) { PlaceCamera(false); TickWrecks(dt); return; }
+            if (phase != Phase.Play) { PlaceCamera(false); TickWrecks(dt); Sfx.Engine(0f); return; }
             t += dt;
             var L = Leader;
             if (leaderShield > 0f) leaderShield -= dt;
@@ -135,6 +136,7 @@ namespace IronNight
             TickShells(dt); TickFlares(dt); TickWrecks(dt); TickSpawns(dt); TickSearchlights(dt);
             KeepApart();
             flareLight.range = 34f + platoon.Count * 3f;
+            Sfx.Engine(stick.Active ? stick.Direction.magnitude : 0f);
             PlaceCamera(false);
             hud.Set(t, platoon.Count); hud.SetLeader(Mathf.CeilToInt(L.hp), Mathf.CeilToInt(Depot.LeaderHp));
             hud.Indicators(foes, cam);
@@ -174,7 +176,7 @@ namespace IronNight
             var r = go.GetComponent<Renderer>(); r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             go.transform.localScale = new Vector3(0.7f, 2.6f, 1f);
             shells.Add(new Shell { pos = pos, vel = dir * speed, friendly = v.friendly, he = v.friendly && he, dmg = v.spec.damage * v.damageMul, life = v.Range / speed + 0.25f, vis = go.transform, mat = m });
-            fx.MuzzleFlash(pos, dir);
+            fx.MuzzleFlash(pos, dir); Sfx.Shot(pos, v.friendly, v.spec.gunLength > 3f || v.spec.isGun);
         }
 
         void TickShells(float dt)
@@ -199,9 +201,9 @@ namespace IronNight
         void Damage(Vehicle v, float dmg, Vector3 at)
         {
             if (v.friendly && v == Leader && leaderShield > 0f) return;
-            v.Hit(dmg);
+            v.Hit(dmg); Sfx.Hit(v.transform.position);
             if (v.hp > 0f) { if (v == Leader) hud.Toast("Leader hit"); return; }
-            v.Wreck(); fx.Explosion(v.transform.position);
+            v.Wreck(); fx.Explosion(v.transform.position); Sfx.Explosion(v.transform.position);
             var fire = new GameObject("WreckFire").AddComponent<Light>(); fire.type = LightType.Point; fire.color = new Color(1f, 0.5f, 0.2f); fire.range = 16f; fire.intensity = 6f; fire.shadows = LightShadows.None;
             fire.transform.position = v.transform.position + Vector3.up * 2.5f;
             wrecks.Add(new Wreck { v = v, fire = fire });
@@ -214,7 +216,8 @@ namespace IronNight
             else
             {
                 foes.Remove(v); kills++;
-                int worth = v.spec == VehicleSpec.Tiger ? 5 : 2; score += worth * 50; xp += worth;
+                int worth = v.spec == VehicleSpec.Tiger ? 5 : v.spec == VehicleSpec.TigerAce ? 12 : 2; score += worth * 50; xp += worth;
+                if (v == boss) { score += 1500; hud.HideBoss(); hud.Toast("Tiger Ace destroyed · +1500"); }
                 SpawnFlare(v.transform.position);
                 if (xp >= xpNeed) LevelUp(); else hud.SetLevel(level, (float)xp / xpNeed);
             }
@@ -240,6 +243,7 @@ namespace IronNight
                 var d = L.transform.position - f.pos; d.y = 0f;
                 if (d.magnitude < 4f)
                 {
+                    Sfx.Pickup();
                     if (platoon.Count < maxPlatoon) Reinforce(); else { score += 50; hud.Toast("+50"); }
                     Destroy(f.mat); Destroy(f.vis.gameObject); Destroy(f.light.gameObject); flares.RemoveAt(i);
                 }
@@ -291,6 +295,17 @@ namespace IronNight
             }
             if (t >= 120f && !wave2) { wave2 = true; Column(); }
             if (t >= 240f && !wave4) { wave4 = true; Column(); }
+            if ((t >= 270f || (debugBoss && t >= 6f)) && !bossSpawned) { bossSpawned = true; Boss(); }
+            if (boss != null && !boss.dead) hud.SetBoss(boss.hp / boss.spec.hp);
+        }
+
+        /// <summary>The 4:30 boss: a Tiger ace with two Panzer IV escorts, straight at the platoon from the dark ahead.</summary>
+        void Boss()
+        {
+            var L = Leader; var f = L.Forward; var r = new Vector3(f.z, 0f, -f.x);
+            boss = Vehicle.Create(VehicleSpec.TigerAce, false, L.transform.position + f * 52f, L.yaw + Mathf.PI); boss.turretYaw = boss.yaw; foes.Add(boss);
+            foreach (var side in new[] { -1f, 1f }) { var e = Vehicle.Create(VehicleSpec.PanzerIV, false, L.transform.position + f * 58f + r * side * 9f, L.yaw + Mathf.PI); e.turretYaw = e.yaw; foes.Add(e); }
+            hud.ShowBoss(VehicleSpec.TigerAce.name); hud.Toast("Tiger Ace · kill it before dawn"); Debug.Log("Iron Night: boss spawned at " + t.ToString("0.0"));
         }
 
         /// <summary>An armoured column crossing the front 34 m ahead: four Panzer IV and a Tiger in a line.</summary>
@@ -348,7 +363,7 @@ namespace IronNight
             };
             if (he) all.RemoveAll(c => c.id == "he");
             var pick = new List<Hud.Card>(); while (pick.Count < 3 && all.Count > 0) { int i = Random.Range(0, all.Count); pick.Add(all[i]); all.RemoveAt(i); }
-            phase = Phase.LevelUp; stick.Blocked = true;
+            phase = Phase.LevelUp; stick.Blocked = true; Sfx.LevelUp();
             hud.ShowCards(pick, id =>
             {
                 switch (id)

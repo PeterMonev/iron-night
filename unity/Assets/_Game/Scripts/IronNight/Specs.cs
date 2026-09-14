@@ -41,6 +41,12 @@ namespace IronNight
             gunLength = 3.9f, gunRadius = 0.085f, gunHeight = 0.45f, mantlet = 1.5f, muzzleBrake = true, tint = new Color(1f, 0.95f, 0.74f),
             speed = 6f, turnRate = 1.4f, turretRate = 2f, reload = 2.6f, damage = 2f, range = 30f, hp = 8f, radius = 2.8f
         };
+        public static readonly VehicleSpec TigerAce = new VehicleSpec
+        {
+            id = "tigerace", name = "Tiger Ace", hullMesh = "tiger_hull", turretMesh = "tiger_turret", texture = "tiger", forward = 1f, ringHeight = 2.249f,
+            gunLength = 3.9f, gunRadius = 0.085f, gunHeight = 0.45f, mantlet = 1.5f, muzzleBrake = true, tint = new Color(0.72f, 0.66f, 0.5f),
+            speed = 5.5f, turnRate = 1.3f, turretRate = 2.2f, reload = 1.9f, damage = 2f, range = 34f, hp = 30f, radius = 2.9f
+        };
         public static readonly VehicleSpec Pak40 = new VehicleSpec
         {
             id = "pak40", name = "PaK 40", hullMesh = "pak40_hull", turretMesh = null, texture = "pak40", forward = -1f, ringHeight = 0f,

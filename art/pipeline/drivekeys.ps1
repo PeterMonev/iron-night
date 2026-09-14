@@ -8,7 +8,7 @@ public class K {
 }
 "@
 Add-Type -AssemblyName System.Windows.Forms
-$p = Get-Process $proc -ErrorAction Stop | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+$p = if ($proc -match "^[0-9]+$") { Get-Process -Id ([int]$proc) -ErrorAction Stop } else { Get-Process $proc -ErrorAction Stop | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1 }
 [System.Windows.Forms.SendKeys]::SendWait("%"); [K]::SetForegroundWindow($p.MainWindowHandle) | Out-Null; Start-Sleep -Milliseconds 400
 [K]::keybd_event(0x57, 0x11, 0, [UIntPtr]::Zero)            # W down
 if ($right) { [K]::keybd_event(0x44, 0x20, 0, [UIntPtr]::Zero) }  # D down

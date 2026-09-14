@@ -13,7 +13,7 @@ public class W {
 "@
 [W]::SetProcessDPIAware() | Out-Null
 if ($delay -gt 0) { Start-Sleep -Seconds $delay }
-$p = Get-Process $proc -ErrorAction Stop | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+$p = if ($proc -match "^[0-9]+$") { Get-Process -Id ([int]$proc) -ErrorAction Stop } else { Get-Process $proc -ErrorAction Stop | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1 }
 $h = $p.MainWindowHandle
 $r = New-Object W+RECT; [W]::GetClientRect($h, [ref]$r) | Out-Null
 $w = $r.R - $r.L; $hh = $r.B - $r.T

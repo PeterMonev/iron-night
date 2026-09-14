@@ -30,6 +30,7 @@ namespace IronNight
 
             var hud = new GameObject("Hud").AddComponent<Hud>(); hud.Build();
             var stick = new GameObject("Stick").AddComponent<TouchStick>(); stick.Build(hud.Canvas);
+            Sfx.Build(cam);
             var fx = new GameObject("Fx").AddComponent<Fx>(); fx.Build(cam);
             var battle = new GameObject("Battle").AddComponent<Battle>(); battle.Build(cam, hud, stick, fx);
         }
