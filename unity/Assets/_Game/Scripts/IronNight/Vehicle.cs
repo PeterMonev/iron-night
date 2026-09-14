@@ -16,7 +16,8 @@ namespace IronNight
         public bool dead;
         public Vehicle target;
 
-        Transform turret; Renderer[] renderers; Color[] baseColors; Transform muzzle;
+        Transform turret; Renderer[] renderers; Color[] baseColors; Transform muzzle, hullT, barrelT; Vector3 barrelHome; float hullYaw, recoil;
+        public float smokeTimer;
         static Material vehicleTemplate, barrelMaterial;
 
         public Vector3 Forward => new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
@@ -44,6 +45,7 @@ namespace IronNight
             // hull: mesh origin is the turret ring, so it hangs ringHeight below the pivot and the tracks touch the ground
             var hull = Instantiate(Resources.Load<GameObject>("Models/" + spec.hullMesh), transform);
             hull.name = "Hull"; hull.transform.localPosition = new Vector3(0f, spec.ringHeight, 0f); hull.transform.localRotation = Quaternion.Euler(0f, spec.forward > 0f ? 0f : 180f, 0f);
+            hullT = hull.transform; hullYaw = spec.forward > 0f ? 0f : 180f;
             foreach (var r in hull.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
 
             var pivot = new GameObject("Turret").transform; pivot.SetParent(transform, false); pivot.localPosition = new Vector3(0f, spec.ringHeight, 0f);
@@ -58,7 +60,7 @@ namespace IronNight
                 barrel.name = "Barrel"; barrel.transform.SetParent(pivot, false);
                 barrel.transform.localScale = new Vector3(spec.gunRadius * 2f, spec.gunLength * 0.5f, spec.gunRadius * 2f);
                 barrel.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                barrel.transform.localPosition = new Vector3(0f, spec.gunHeight, spec.mantlet + spec.gunLength * 0.5f);
+                barrel.transform.localPosition = new Vector3(0f, spec.gunHeight, spec.mantlet + spec.gunLength * 0.5f); barrelT = barrel.transform; barrelHome = barrel.transform.localPosition;
                 barrel.GetComponent<Renderer>().sharedMaterial = barrelMaterial;
                 // a short wide collar at the base hides where the generated gun was cut out of the mantlet
                 var collar = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(collar.GetComponent<Collider>());
@@ -122,10 +124,19 @@ namespace IronNight
             turretYaw += Mathf.Clamp(diff, -rate, rate);
         }
 
+        /// <summary>The gun has just fired: the barrel slams back and the hull rocks on its springs.</summary>
+        public void Recoil() { recoil = 1f; }
+
         public void Apply()
         {
             transform.rotation = Quaternion.Euler(0f, yaw * Mathf.Rad2Deg, 0f);
             if (turret != null) turret.rotation = Quaternion.Euler(0f, turretYaw * Mathf.Rad2Deg, 0f);
+            if (recoil > 0f)
+            {
+                recoil = Mathf.Max(0f, recoil - Time.deltaTime * 4f); float k = Mathf.Sin(recoil * Mathf.PI);
+                if (barrelT != null) barrelT.localPosition = barrelHome - Vector3.forward * (0.35f * k);
+                if (hullT != null && !spec.isGun) { float back = Mathf.Cos(turretYaw - yaw); hullT.localRotation = Quaternion.Euler(-2.5f * k * back, hullYaw, 2.5f * k * Mathf.Sin(turretYaw - yaw)); }
+            }
             if (hitFlash > 0f)
             {
                 hitFlash = Mathf.Max(0f, hitFlash - Time.deltaTime * 4f);

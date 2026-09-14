@@ -10,7 +10,7 @@ namespace IronNight
     /// </summary>
     public class Hud : MonoBehaviour
     {
-        public class Card { public string id, title, desc; }
+        public class Card { public string id, title, desc; public bool rare; }
 
         public System.Action<Formation> OnFormation;
         public System.Action OnAd, OnAgain, OnStart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality;
@@ -320,7 +320,7 @@ namespace IronNight
         }
 
         /// <summary>A green chevron on the screen edge toward the objective, with the distance; hidden while it is in view.</summary>
-        public void Objective(Vector3 pos, float dist, Camera cam, bool show)
+        public void Objective(Vector3 pos, float dist, Camera cam, bool show, string label = null)
         {
             if (!show) { objectiveArrow.enabled = false; objectiveLabel.text = ""; return; }
             var rect = canvas.GetComponent<RectTransform>().rect; float hw = rect.width * 0.5f - 60f, hh = rect.height * 0.5f - 340f;
@@ -329,7 +329,7 @@ namespace IronNight
             var d = new Vector2(vp.x - 0.5f, vp.y - 0.5f); if (vp.z < 0f) d = -d; if (d.sqrMagnitude < 1e-6f) d = Vector2.up; d.Normalize();
             float k = Mathf.Min(hw / Mathf.Max(0.001f, Mathf.Abs(d.x)), hh / Mathf.Max(0.001f, Mathf.Abs(d.y)));
             objectiveArrow.enabled = true; objectiveArrow.rectTransform.anchoredPosition = d * k; objectiveArrow.rectTransform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg - 90f);
-            objectiveLabel.rectTransform.anchoredPosition = d * k - d * 70f; objectiveLabel.text = Mathf.RoundToInt(dist) + " m";
+            objectiveLabel.rectTransform.anchoredPosition = d * k - d * 70f; objectiveLabel.text = label ?? (Mathf.RoundToInt(dist) + " m");
         }
 
         static Sprite ArrowSprite()
@@ -372,8 +372,8 @@ namespace IronNight
             {
                 var card = cards[i];
                 var b = MakeButton(cardRoot, card.title, new Vector2(0.5f, 0.5f), new Vector2(0, 300 - i * 290), new Vector2(900, 250), 56, () => { sheet.SetActive(false); onPick(card.id); });
-                b.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.1f, 0.96f);
-                var title = b.transform.Find("Label").GetComponent<Text>();
+                b.GetComponent<Image>().color = card.rare ? new Color(0.16f, 0.12f, 0.05f, 0.97f) : new Color(0.08f, 0.09f, 0.1f, 0.96f);
+                var title = b.transform.Find("Label").GetComponent<Text>(); if (card.rare) title.color = new Color(0.95f, 0.66f, 0.23f);
                 title.alignment = TextAnchor.UpperLeft; title.rectTransform.anchorMin = title.rectTransform.anchorMax = title.rectTransform.pivot = new Vector2(0f, 1f);
                 title.rectTransform.anchoredPosition = new Vector2(30f, -22f); title.rectTransform.sizeDelta = new Vector2(840f, 70f);
                 var desc = MakeText(b.transform, "Desc", new Vector2(0f, 1f), new Vector2(30f, -100f), TextAnchor.UpperLeft, 34, new Color(0.66f, 0.64f, 0.59f));

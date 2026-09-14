@@ -206,6 +206,12 @@ namespace IronNight
             return root;
         }
 
+        /// <summary>Engine smoke from a badly hit vehicle: a small dark puff off the deck.</summary>
+        public void EngineSmoke(Vector3 pos) { Spawn(smokeRagged, pos + Random.insideUnitSphere * 0.4f, 1.4f + Random.value * 0.8f, new Color(0.2f, 0.19f, 0.18f, 0.6f), 1.6f + Random.value * 0.8f, new Vector3(Random.Range(-0.3f, 0.3f), 1.3f, Random.Range(-0.3f, 0.3f)), 2f, true); }
+
+        /// <summary>Recolours a marker's ring.</summary>
+        public void Tint(Transform marker, Color color) { var r = marker.GetChild(0).GetComponent<Renderer>(); mpb.SetColor(BaseColor, color); r.SetPropertyBlock(mpb); marker.GetComponentInChildren<Light>().color = color; }
+
         /// <summary>A thin puff left behind a shell in flight.</summary>
         public void Trail(Vector3 pos) { Spawn(smokeSoft, pos, 0.9f, new Color(0.7f, 0.68f, 0.64f, 0.3f), 0.55f, Vector3.up * 0.3f, 1.6f, true); }
 

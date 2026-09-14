@@ -19,7 +19,7 @@ namespace IronNight
         class Flare { public Vector3 pos; public float age; public Transform vis; public Light light; public Material mat; }
         class Wreck { public Vehicle v; public float age, burnTimer; public Light fire; }
         class ArtyShell { public Vector3 at; public float timer; }
-        class Objective { public Vector3 pos; public Transform marker; public float smokeTimer; public int n; }
+        class Objective { public Vector3 pos; public Transform marker; public float smokeTimer, held; public int n; public bool hold; }
         class Drop { public Vector3 pos; public float height, age; public int kind; public Transform crate, chute, marker; public LineRenderer lines; }
         class Mortar { public Vector3 at; public float timer; public Transform ring; }
         class Star { public Vector3 pos; public float height, life, puff; public Transform flare, chute; public Light light; }
@@ -40,7 +40,7 @@ namespace IronNight
         Material shellTemplate; Texture2D glowTex;
         Formation formation = Formation.Wedge; Phase phase = Phase.Title; bool reserveGranted;
         float t, spawnTimer = 6f, leaderShield; int level = 1, xp, xpNeed = 6, score, kills, maxPlatoon = 4, reinforcements;
-        bool wave2, wave4, revived, doubled, bossSpawned; Vehicle boss;
+        bool wave2, wave3, wave4, revived, doubled, bossSpawned; Vehicle boss;
         static readonly bool debugBoss = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--boss") >= 0;   // test switch: the boss comes at 0:06
         static readonly bool debugDawn = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--dawn") >= 0;   // test switch: the night starts at 4:10
         static readonly bool debugMid = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--mid") >= 0;   // test switch: 1:40, mortars and a star shell at once
@@ -187,6 +187,7 @@ namespace IronNight
             foreach (var v in platoon) v.transform.position = props.PushOut(v.transform.position, v.spec.radius * 0.7f);
             foreach (var e in foes) if (!e.spec.isGun) e.transform.position = props.PushOut(e.transform.position, e.spec.radius * 0.7f);
             foreach (var v in platoon) tracks.Mark(v); foreach (var e in foes) if (!e.spec.isGun) tracks.Mark(e);
+            foreach (var v in platoon) Smoulder(v, dt); foreach (var e in foes) Smoulder(e, dt);
             props.Tick();
             flareLight.range = 34f + platoon.Count * 3f;
             Sfx.Engine(stick.Active ? stick.Direction.magnitude : 0f);
@@ -198,6 +199,7 @@ namespace IronNight
             hud.Radar(foes, platoon, L.transform.position, objective != null ? objective.pos : Vector3.zero, objective != null);
             hud.HpBars(foes, cam, boss);
             if (objective != null) { var od = objective.pos - L.transform.position; od.y = 0f; hud.Objective(objective.pos, od.magnitude, cam, true); }
+            TickObjectiveLabel();
             if (t >= NightLength) End(true);
         }
 
@@ -225,7 +227,7 @@ namespace IronNight
 
         void Fire(Vehicle v, Vehicle target)
         {
-            v.reloadLeft = v.spec.reload * v.reloadMul * (v.friendly ? 1f : Mathf.Lerp(1.9f, 1.1f, t / 120f));
+            v.reloadLeft = v.spec.reload * v.reloadMul * (v.friendly ? 1f : Mathf.Lerp(1.9f, 1.1f, t / 120f) * (firstNight ? 1.3f : 1f)); v.Recoil();
             var scatter = (v.friendly ? 1.5f * scatterMul : 4f * (smokeLeft > 0f ? 3f : 1f) * (lit ? 0.5f : 1f)) * Mathf.Deg2Rad * Random.Range(-1f, 1f);
             if (v.friendly) shotsFired++;
             var dir = Quaternion.Euler(0f, scatter * Mathf.Rad2Deg, 0f) * v.GunDirection; var pos = v.MuzzlePosition;
@@ -350,7 +352,7 @@ namespace IronNight
         void TickSpawns(float dt)
         {
             spawnTimer -= dt;
-            float interval = Mathf.Lerp(8f, 2.8f, t / 240f);
+            float interval = Mathf.Lerp(8f, 2.8f, t / 240f) * (firstNight ? 1.25f : 1f);
             if (debugInfantry && !debugSquadSent && t > 4f) { debugSquadSent = true; var L0 = Leader; infantry.Spawn(L0.transform.position + L0.Forward * 30f, -L0.Forward); hud.Toast("Infantry! Panzerfausts, 12 o'clock", 2.8f); }
             if (spawnTimer <= 0f && foes.Count < 12)
             {
@@ -389,6 +391,7 @@ namespace IronNight
                 }
             }
             if (t >= 120f && !wave2) { wave2 = true; Column(); }
+            if (t >= 200f && !wave3) { wave3 = true; Counterattack(); }
             if (t >= 240f && !wave4) { wave4 = true; Column(); }
             if ((t >= 270f || (debugBoss && t >= 6f)) && !bossSpawned) { bossSpawned = true; Boss(); }
             if (boss != null && !boss.dead) hud.SetBoss(boss.hp / boss.spec.hp);
@@ -443,10 +446,10 @@ namespace IronNight
                 new Hud.Card { id = "engine", title = "Tuned engines", desc = "The platoon drives 15% faster." },
                 new Hud.Card { id = "repair", title = "Field repair", desc = "The leader is fully repaired and toughened by 1." },
                 new Hud.Card { id = "reinf", title = "Reinforcements", desc = "A Sherman joins the platoon right now (if there is a slot)." },
-                new Hud.Card { id = "arty", title = "Artillery support", desc = artyInterval > 0f ? "The battery answers faster: a salvo every " + Mathf.Max(10f, artyInterval - 6f).ToString("0") + " s." : "A battery of 25-pounders on call: a salvo lands on the enemy every 24 s." },
-                new Hud.Card { id = "smoke", title = "Smoke dischargers", desc = "When the leader is hit the platoon vanishes in smoke for 6 s; the enemy loses its aim." },
-                new Hud.Card { id = "firefly", title = "Firefly conversion", desc = "One Sherman is refitted with the 17-pounder now; the next reinforcement is a Firefly too." },
-                new Hud.Card { id = "gunners", title = "Veteran gunners", desc = "Crews that fire true: scatter cut by two thirds, turrets swing 30% faster." },
+                new Hud.Card { id = "arty", rare = true, title = "Artillery support", desc = artyInterval > 0f ? "The battery answers faster: a salvo every " + Mathf.Max(10f, artyInterval - 6f).ToString("0") + " s." : "A battery of 25-pounders on call: a salvo lands on the enemy every 24 s." },
+                new Hud.Card { id = "smoke", rare = true, title = "Smoke dischargers", desc = "When the leader is hit the platoon vanishes in smoke for 6 s; the enemy loses its aim." },
+                new Hud.Card { id = "firefly", rare = true, title = "Firefly conversion", desc = "One Sherman is refitted with the 17-pounder now; the next reinforcement is a Firefly too." },
+                new Hud.Card { id = "gunners", rare = true, title = "Veteran gunners", desc = "Crews that fire true: scatter cut by two thirds, turrets swing 30% faster." },
                 new Hud.Card { id = "plates", title = "Applique armour", desc = "Welded plates: every wingman, now and later, takes 2 more hits." },
             };
             if (he) all.RemoveAll(c => c.id == "he"); if (gunners) all.RemoveAll(c => c.id == "gunners"); if (hasSmoke) all.RemoveAll(c => c.id == "smoke");
@@ -572,8 +575,9 @@ namespace IronNight
         {
             var L = Leader; float ang = (Random.value - 0.5f) * 80f * Mathf.Deg2Rad, dist = 110f + Random.value * 60f;
             var pos = L.transform.position + new Vector3(Mathf.Sin(ang), 0f, Mathf.Cos(ang)) * dist;
-            objective = new Objective { pos = pos, n = objectivesReached + 1, marker = fx.Marker(pos, new Color(0.35f, 0.95f, 0.45f), 9f) };
-            if (phase == Phase.Play) hud.Toast("Objective " + objective.n + " · " + Mathf.RoundToInt(dist) + " m ahead", 3f);
+            bool hold = objectivesReached > 0 && Random.value < 0.5f;
+            objective = new Objective { pos = pos, n = objectivesReached + 1, hold = hold, marker = fx.Marker(pos, new Color(0.35f, 0.95f, 0.45f), hold ? 15f : 9f) };
+            if (phase == Phase.Play) hud.Toast("Objective " + objective.n + " · " + (hold ? "hold the crossing, " : "") + Mathf.RoundToInt(dist) + " m ahead", 3f);
         }
 
         void TickObjective(float dt)
@@ -583,12 +587,44 @@ namespace IronNight
             objective.pos = props.PushOut(objective.pos, 5f);   // once its cell is loaded, it steps out of hedges and walls
             objective.marker.position = objective.pos;
             var d = objective.pos - L.transform.position; d.y = 0f;
+            if (objective.hold)
+            {
+                // hold: twenty-five seconds inside the ring, in one go or in pieces; the ring turns amber while it counts
+                bool inside = d.magnitude < 15f; if (inside) objective.held += dt;
+                if (inside != (objective.marker.GetComponentInChildren<Light>().color.g < 0.8f)) fx.Tint(objective.marker, inside ? new Color(1f, 0.75f, 0.3f) : new Color(0.35f, 0.95f, 0.45f));
+                if (inside) hud.Objective(objective.pos, 0f, cam, true, "Hold " + Mathf.CeilToInt(25f - objective.held) + " s");
+                if (objective.held >= 25f)
+                {
+                    score += 450; objectivesReached++; shake = Mathf.Max(shake, 0.3f); Sfx.Pickup();
+                    hud.Popup(objective.pos, "+450", new Color(0.35f, 0.95f, 0.45f)); hud.Toast("Crossing held · +450", 2.6f);
+                    Destroy(objective.marker.gameObject); objective = null; NextObjective();
+                }
+                return;
+            }
             if (d.magnitude < 12f)
             {
                 score += 300; objectivesReached++; shake = Mathf.Max(shake, 0.3f); Sfx.Pickup();
                 hud.Popup(objective.pos, "+300", new Color(0.35f, 0.95f, 0.45f)); hud.Toast("Objective " + objective.n + " reached · +300", 2.6f);
                 Destroy(objective.marker.gameObject); objective = null; NextObjective();
             }
+        }
+
+        void TickObjectiveLabel() { }
+
+        /// <summary>A badly hit vehicle trails engine smoke.</summary>
+        void Smoulder(Vehicle v, float dt)
+        {
+            if (v.dead || v.spec.isGun || v.hp > v.spec.hp * 0.45f) return;
+            v.smokeTimer -= dt; if (v.smokeTimer > 0f) return; v.smokeTimer = 0.3f;
+            fx.EngineSmoke(v.transform.position - v.Forward * 2f + Vector3.up * 2f);
+        }
+
+        /// <summary>3:20: four Panzer IV and a Tiger come up from behind the platoon.</summary>
+        void Counterattack()
+        {
+            var L = Leader; var f = L.Forward; var r = new Vector3(f.z, 0f, -f.x);
+            for (int i = 0; i < 5; i++) Foe(i == 2 ? VehicleSpec.Tiger : VehicleSpec.PanzerIV, L.transform.position - f * (42f + i * 4f) + r * ((i - 2) * 9f), L.yaw);
+            hud.Toast("Counterattack from the rear, 6 o'clock", 3f);
         }
 
         /// <summary>Supply drops: a crate under a parachute comes down near the platoon every minute or so. The leader
