@@ -1,0 +1,3 @@
+newmtl sandbags
+Kd 1 1 1
+map_Kd sandbags_tex.png

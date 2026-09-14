@@ -1,0 +1,3 @@
+newmtl truck
+Kd 1 1 1
+map_Kd truck_tex.png

@@ -19,7 +19,7 @@ namespace IronNight
         const float NightLength = 300f;         // five minutes of darkness, dawn at 5:00
         const float ShellSpeed = 62f, EnemyShellSpeed = 55f, GroundTile = 40f;
 
-        Camera cam; Hud hud; TouchStick stick; Fx fx;
+        Camera cam; Hud hud; TouchStick stick; Fx fx; Props props;
         Transform ground; Light flareLight; readonly List<Transform> searchlights = new List<Transform>();
         readonly List<Vehicle> platoon = new List<Vehicle>(); readonly List<Vehicle> foes = new List<Vehicle>();
         readonly List<Shell> shells = new List<Shell>(); readonly List<Flare> flares = new List<Flare>(); readonly List<Wreck> wrecks = new List<Wreck>();
@@ -62,6 +62,7 @@ namespace IronNight
             gm.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/ground")); gm.SetTextureScale("_BaseMap", new Vector2(10f, 10f)); gm.SetColor("_BaseColor", new Color(0.58f, 0.6f, 0.55f));
             g.GetComponent<Renderer>().sharedMaterial = gm; g.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             ground = g.transform;
+            props = new GameObject("Props").AddComponent<Props>(); props.Build(cam);
 
             // night: moonlight with soft shadows, a cold ambient, fog swallowing the distance
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat; RenderSettings.ambientLight = new Color(0.17f, 0.2f, 0.3f);
@@ -97,7 +98,7 @@ namespace IronNight
         {
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             fx.Tick(dt);
-            if (phase != Phase.Play) { PlaceCamera(false); TickWrecks(dt); Sfx.Engine(0f); return; }
+            if (phase != Phase.Play) { PlaceCamera(false); TickWrecks(dt); Sfx.Engine(0f); props.Tick(); return; }
             t += dt;
             var L = Leader;
             if (leaderShield > 0f) leaderShield -= dt;
@@ -135,6 +136,9 @@ namespace IronNight
 
             TickShells(dt); TickFlares(dt); TickWrecks(dt); TickSpawns(dt); TickSearchlights(dt);
             KeepApart();
+            foreach (var v in platoon) v.transform.position = props.PushOut(v.transform.position, v.spec.radius * 0.7f);
+            foreach (var e in foes) if (!e.spec.isGun) e.transform.position = props.PushOut(e.transform.position, e.spec.radius * 0.7f);
+            props.Tick();
             flareLight.range = 34f + platoon.Count * 3f;
             Sfx.Engine(stick.Active ? stick.Direction.magnitude : 0f);
             PlaceCamera(false);
@@ -194,6 +198,7 @@ namespace IronNight
                     if (s.he) foreach (var v in hitList) if (v != hit && !v.dead && Dist(v, hit) < 5f) Damage(v, s.dmg * 0.5f, v.transform.position);
                     fx.Hit(new Vector3(s.pos.x, 1.6f, s.pos.z), s.he ? 1.5f : 1f);
                 }
+                if (hit == null && props.Blocks(s.pos)) { fx.Hit(s.pos, 0.6f); Sfx.Hit(s.pos); s.life = 0f; }
                 if (hit != null || s.life <= 0f) { Destroy(s.mat); Destroy(s.vis.gameObject); shells.RemoveAt(i); }
             }
         }

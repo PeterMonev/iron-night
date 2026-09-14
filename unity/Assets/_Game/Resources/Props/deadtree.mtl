@@ -1,0 +1,3 @@
+newmtl deadtree
+Kd 1 1 1
+map_Kd deadtree_tex.png

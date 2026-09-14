@@ -1,0 +1,3 @@
+newmtl haystack
+Kd 1 1 1
+map_Kd haystack_tex.png

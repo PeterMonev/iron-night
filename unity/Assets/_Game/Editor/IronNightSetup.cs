@@ -122,7 +122,7 @@ namespace IronNight.EditorTools
         // the generated vehicles: smooth normals, no importer materials (the code assigns its own, textured per vehicle)
         static void ImportModels()
         {
-            foreach (var guid in AssetDatabase.FindAssets("t:Model", new[] { "Assets/_Game/Resources/Models" }))
+            foreach (var guid in AssetDatabase.FindAssets("t:Model", new[] { "Assets/_Game/Resources/Models", "Assets/_Game/Resources/Props" }))
             {
                 var path = AssetDatabase.GUIDToAssetPath(guid);
                 var imp = AssetImporter.GetAtPath(path) as ModelImporter; if (imp == null) continue;
@@ -131,7 +131,7 @@ namespace IronNight.EditorTools
                 imp.meshCompression = ModelImporterMeshCompression.Medium; imp.isReadable = false;
                 imp.SaveAndReimport();
             }
-            foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { "Assets/_Game/Resources/Models", "Assets/_Game/Resources/Textures" }))
+            foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { "Assets/_Game/Resources/Models", "Assets/_Game/Resources/Textures", "Assets/_Game/Resources/Props" }))
             {
                 var path = AssetDatabase.GUIDToAssetPath(guid);
                 var imp = AssetImporter.GetAtPath(path) as TextureImporter; if (imp == null) continue;
