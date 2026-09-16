@@ -55,7 +55,7 @@ namespace IronNight
             if (spec.turretMesh != null)
             {
                 var tm = Instantiate(Resources.Load<GameObject>("Models/" + spec.turretMesh), pivot);
-                tm.name = "TurretMesh"; tm.transform.localRotation = Quaternion.Euler(0f, spec.forward > 0f ? 0f : 180f, 0f); turretMesh = tm.transform;
+                tm.name = "TurretMesh"; tm.transform.localRotation = Quaternion.Euler(0f, spec.forward > 0f ? 0f : 180f, 0f); tm.transform.localPosition = new Vector3(spec.turretShift, 0f, 0f); turretMesh = tm.transform;   // the turret turns about its own centre
                 foreach (var r in tm.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
                 // the generated barrel was cut off (it comes out bent and short); this one has the real length
                 var barrel = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(barrel.GetComponent<Collider>());
@@ -160,32 +160,32 @@ namespace IronNight
             for (int i = 0; i < renderers.Length; i++) { var m = renderers[i].material; m.SetColor("_BaseColor", new Color(0.16f, 0.14f, 0.12f)); m.SetFloat("_Smoothness", 0.1f); }
             gameObject.name = "Wreck " + spec.name;
         }
-        /// <summary>National markings, painted on as small quads: the Allied white star on the engine deck and both
-        /// turret sides, the Balkenkreuz on German turret sides (hull sides when there is no turret).</summary>
+        /// <summary>National markings, painted on as small quads: the Allied white star on the hull and turret sides,
+        /// the Balkenkreuz on German turret sides (hull sides when there is no turret). Nothing on top.</summary>
         void Markings(Transform hull, Transform pivot, Transform turretMesh)
         {
             if (spec.isGun) return;
             if (starMaterial == null)
             {
                 starMaterial = new Material(Resources.Load<Material>("GroundDecal")); starMaterial.SetTexture("_BumpMap", null);   // the keyword stays on: the variant without it is not in the build and the quad would render opaque
-                starMaterial.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.Star(256).texture); starMaterial.SetColor("_BaseColor", new Color(0.5f, 0.5f, 0.46f, 0.95f));   // weathered paint: white would bloom under the flare light starMaterial.renderQueue = 2470;
-                crossMaterial = new Material(starMaterial); crossMaterial.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.Balkenkreuz(256).texture); crossMaterial.SetColor("_BaseColor", new Color(0.6f, 0.6f, 0.6f, 0.95f));
+                starMaterial.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.Star(256).texture); starMaterial.SetColor("_BaseColor", new Color(0.68f, 0.68f, 0.62f, 0.97f));   // weathered paint: white would bloom under the flare light starMaterial.renderQueue = 2470;
+                crossMaterial = new Material(starMaterial); crossMaterial.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.Balkenkreuz(256).texture); crossMaterial.SetColor("_BaseColor", new Color(0.7f, 0.7f, 0.7f, 0.97f));
             }
             var hb = LocalBounds(hull, transform);
             if (friendly)
             {
-                // the air-recognition star on the engine deck, behind the turret
-                Mark(hull, transform, new Vector3(0f, hb.max.y + 0.04f, hb.center.z - hb.extents.z * 0.45f), Quaternion.Euler(90f, 0f, 0f), 0.8f, starMaterial);
-                if (turretMesh != null) { var tb = LocalBounds(turretMesh, pivot); for (int s = -1; s <= 1; s += 2) Mark(turretMesh, pivot, new Vector3(tb.center.x + s * (tb.extents.x + 0.04f), tb.center.y + tb.extents.y * 0.05f, tb.center.z + tb.extents.z * 0.1f), Quaternion.Euler(0f, -s * 90f, 0f), 0.6f, starMaterial); }
+                // the white star on both sides of the hull (the sponsons are as wide as the tracks) and of the turret
+                for (int s = -1; s <= 1; s += 2) Mark(hull, transform, new Vector3(s > 0 ? hb.max.x + 0.03f : hb.min.x - 0.03f, spec.ringHeight - 0.38f, hb.center.z + hb.extents.z * 0.05f), Quaternion.Euler(0f, -s * 90f, 0f), 0.95f, starMaterial);
+                if (turretMesh != null) { var tb = LocalBounds(turretMesh, pivot); for (int s = -1; s <= 1; s += 2) Mark(turretMesh, pivot, new Vector3(s > 0 ? tb.max.x + 0.04f : tb.min.x - 0.04f, 0.5f, tb.center.z + tb.extents.z * 0.1f), Quaternion.Euler(0f, -s * 90f, 0f), 0.62f, starMaterial); }
             }
             else if (turretMesh != null)
             {
                 var tb = LocalBounds(turretMesh, pivot);
-                for (int s = -1; s <= 1; s += 2) Mark(turretMesh, pivot, new Vector3(tb.center.x + s * (tb.extents.x + 0.04f), tb.center.y + tb.extents.y * 0.05f, tb.center.z + tb.extents.z * 0.15f), Quaternion.Euler(0f, -s * 90f, 0f), 0.55f, crossMaterial);
+                for (int s = -1; s <= 1; s += 2) Mark(turretMesh, pivot, new Vector3(s > 0 ? tb.max.x + 0.04f : tb.min.x - 0.04f, 0.5f, tb.center.z + tb.extents.z * 0.15f), Quaternion.Euler(0f, -s * 90f, 0f), 0.6f, crossMaterial);
             }
             else
             {
-                for (int s = -1; s <= 1; s += 2) Mark(hull, transform, new Vector3(hb.center.x + s * (hb.extents.x + 0.04f), hb.center.y + hb.extents.y * 0.35f, hb.center.z - hb.extents.z * 0.25f), Quaternion.Euler(0f, -s * 90f, 0f), 0.55f, crossMaterial);
+                for (int s = -1; s <= 1; s += 2) Mark(hull, transform, new Vector3(s > 0 ? hb.max.x + 0.04f : hb.min.x - 0.04f, hb.center.y + hb.extents.y * 0.35f, hb.center.z - hb.extents.z * 0.25f), Quaternion.Euler(0f, -s * 90f, 0f), 0.6f, crossMaterial);
             }
         }
 

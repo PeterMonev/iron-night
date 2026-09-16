@@ -12,7 +12,7 @@ namespace IronNight
         public string id, name, hullMesh, turretMesh, texture;
         public float forward = 1f;      // +1 when the mesh's nose points +Z, -1 when it points -Z
         public float ringHeight;        // metres from the ground to the turret ring (the mesh origin)
-        public float gunLength, gunRadius, gunHeight, mantlet, gunX; public bool muzzleBrake;   // gunX: where the mantlet sits across the turret (the generated turrets are not centred on the ring)
+        public float gunLength, gunRadius, gunHeight, mantlet, gunX, turretShift; public bool muzzleBrake;   // turretShift: the generated turret centred on the ring (game X: Unity mirrors the OBJ); gunX: the gun across the turret
         public Color tint = Color.white;
         public float speed, turnRate, turretRate, reload, damage, range, hp, radius;
         public bool isGun;              // PaK, 88: no turret, aims with its body, never moves
@@ -24,13 +24,13 @@ namespace IronNight
         public static readonly VehicleSpec Sherman = new VehicleSpec
         {
             id = "sherman", name = "M4 Sherman", hullMesh = "sherman_hull", turretMesh = "sherman_turret", texture = "sherman", forward = 1f, ringHeight = 2.178f,
-            gunLength = 1.9f, gunRadius = 0.08f, gunHeight = 0.42f, mantlet = 1.15f, gunX = 0.28f, tint = new Color(0.86f, 0.9f, 0.68f),
+            gunLength = 1.9f, gunRadius = 0.08f, gunHeight = 0.5f, mantlet = 1.15f, turretShift = 0.21f, tint = new Color(0.86f, 0.9f, 0.68f),
             speed = 9f, turnRate = 2.2f, turretRate = 3.2f, reload = 1.3f, damage = 1f, range = 26f, hp = 3f, radius = 2.4f
         };
         public static readonly VehicleSpec Firefly = new VehicleSpec
         {
             id = "firefly", name = "Sherman Firefly", hullMesh = "sherman_hull", turretMesh = "sherman_turret", texture = "sherman", forward = 1f, ringHeight = 2.178f,
-            gunLength = 3.6f, gunRadius = 0.075f, gunHeight = 0.42f, mantlet = 1.15f, gunX = 0.28f, muzzleBrake = true, tint = new Color(0.8f, 0.85f, 0.64f),
+            gunLength = 3.6f, gunRadius = 0.075f, gunHeight = 0.5f, mantlet = 1.15f, turretShift = 0.21f, muzzleBrake = true, tint = new Color(0.8f, 0.85f, 0.64f),
             speed = 8.5f, turnRate = 2f, turretRate = 2.8f, reload = 1.6f, damage = 2f, range = 30f, hp = 3f, radius = 2.4f
         };
         public static readonly VehicleSpec PanzerIV = new VehicleSpec
@@ -67,7 +67,7 @@ namespace IronNight
         public static readonly VehicleSpec Panther = new VehicleSpec
         {
             id = "panther", name = "Panther", hullMesh = "panther_hull", turretMesh = "panther_turret", texture = "panther", forward = 1f, ringHeight = 1.92f,
-            gunLength = 4.3f, gunRadius = 0.075f, gunHeight = 0.5f, mantlet = 1.5f, gunX = -0.1f, muzzleBrake = true, tint = new Color(0.95f, 0.96f, 1f),
+            gunLength = 4.3f, gunRadius = 0.075f, gunHeight = 0.5f, mantlet = 1.5f, muzzleBrake = true, tint = new Color(0.95f, 0.96f, 1f),
             speed = 8f, turnRate = 1.6f, turretRate = 2.2f, reload = 2.2f, damage = 2f, range = 32f, hp = 6f, radius = 2.8f
         };
         public static readonly VehicleSpec StuG = new VehicleSpec
