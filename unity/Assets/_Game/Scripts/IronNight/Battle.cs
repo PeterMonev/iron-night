@@ -45,6 +45,7 @@ namespace IronNight
         static readonly bool debugDawn = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--dawn") >= 0;   // test switch: the night starts at 4:10
         static readonly bool debugMid = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--mid") >= 0;   // test switch: 1:40, mortars and a star shell at once
         static readonly bool debugZoo = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--zoo") >= 0;   // test switch: one of each new enemy at 0:04
+        static readonly bool debugGuns = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--guns") >= 0;   // test switch: a PaK and an 88 out of range ahead, to look at
         static readonly bool debugDrops = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--drops") >= 0;   // test switch: the first supply drop at 0:03
         static readonly bool debugInfantry = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--infantry") >= 0;   // test switch: a squad at 0:04
         bool debugSquadSent;
@@ -351,11 +352,16 @@ namespace IronNight
             spawnTimer -= dt;
             float interval = Mathf.Lerp(8f, 2.8f, t / 240f) * (firstNight ? 1.25f : 1f);
             if (debugInfantry && !debugSquadSent && t > 4f) { debugSquadSent = true; var L0 = Leader; infantry.Spawn(L0.transform.position + L0.Forward * 30f, -L0.Forward); hud.Toast("Infantry! Panzerfausts, 12 o'clock", 2.8f); }
+            if (debugGuns && !debugSquadSent && t > 2f)
+            {
+                debugSquadSent = true; var L0 = Leader; var f0 = L0.Forward; var r0 = new Vector3(f0.z, 0f, -f0.x);
+                var g1 = Foe(VehicleSpec.Pak40, L0.transform.position + f0 * 20f - r0 * 8f, L0.yaw + Mathf.PI); var g2 = Foe(VehicleSpec.Flak88, L0.transform.position + f0 * 26f + r0 * 8f, L0.yaw + Mathf.PI); g1.hp = g2.hp = 999f; hud.Toast("Guns", 2f);
+            }
             if (debugZoo && !debugSquadSent && t > 4f)
             {
                 debugSquadSent = true; var L0 = Leader; var f0 = L0.Forward; var r0 = new Vector3(f0.z, 0f, -f0.x);
                 Foe(VehicleSpec.Panther, L0.transform.position + f0 * 34f - r0 * 12f, L0.yaw + Mathf.PI); Foe(VehicleSpec.StuG, L0.transform.position + f0 * 34f + r0 * 12f, L0.yaw + Mathf.PI);
-                Foe(VehicleSpec.Halftrack, L0.transform.position + f0 * 60f, L0.yaw + Mathf.PI); Foe(VehicleSpec.Flak88, L0.transform.position + f0 * 40f, L0.yaw + Mathf.PI);
+                Foe(VehicleSpec.Halftrack, L0.transform.position + f0 * 60f, L0.yaw + Mathf.PI); Foe(VehicleSpec.Flak88, L0.transform.position + f0 * 40f, L0.yaw + Mathf.PI); Foe(VehicleSpec.Pak40, L0.transform.position + f0 * 26f + r0 * 8f, L0.yaw + Mathf.PI);
                 infantry.Spawn(L0.transform.position + f0 * 24f, -f0); hud.Toast("Zoo", 2f);
             }
             if (spawnTimer <= 0f && foes.Count < 12)

@@ -12,7 +12,7 @@ namespace IronNight
         public string id, name, hullMesh, turretMesh, texture;
         public float forward = 1f;      // +1 when the mesh's nose points +Z, -1 when it points -Z
         public float ringHeight;        // metres from the ground to the turret ring (the mesh origin)
-        public float gunLength, gunRadius, gunHeight, mantlet, gunX, turretShift; public bool muzzleBrake;   // turretShift: the generated turret centred on the ring (game X: Unity mirrors the OBJ); gunX: the gun across the turret
+        public float gunLength, gunRadius, gunHeight, mantlet, gunX, turretShift, meshYaw; public bool muzzleBrake;   // meshYaw: degrees the model is turned so its barrel points +Z (TRELLIS guns come out diagonal)   // turretShift: the generated turret centred on the ring (game X: Unity mirrors the OBJ); gunX: the gun across the turret
         public Color tint = Color.white;
         public float speed, turnRate, turretRate, reload, damage, range, hp, radius;
         public bool isGun;              // PaK, 88: no turret, aims with its body, never moves
@@ -53,16 +53,16 @@ namespace IronNight
         };
         public static readonly VehicleSpec Pak40 = new VehicleSpec
         {
-            id = "pak40", name = "PaK 40", hullMesh = "pak40_hull", turretMesh = null, texture = "pak40", forward = -1f, ringHeight = 0f,
+            id = "pak40", name = "PaK 40", hullMesh = "pak40_hull", turretMesh = null, texture = "pak40", forward = 1f, ringHeight = 0f, scale = 0.72f, meshYaw = -47.9f, muzzle = new Vector3(0f, 1.72f, 3.15f),
             gunLength = 0f, tint = new Color(0.95f, 0.96f, 1f),
-            speed = 0f, turnRate = 1.4f, turretRate = 1.4f, reload = 2.2f, damage = 1f, range = 32f, hp = 2f, radius = 1.8f, isGun = true
+            speed = 0f, turnRate = 1.4f, turretRate = 1.4f, reload = 2.2f, damage = 1f, range = 32f, hp = 2f, radius = 1.5f, isGun = true
         };
 
         public static readonly VehicleSpec Flak88 = new VehicleSpec
         {
-            id = "flak88", name = "8.8 cm Flak", hullMesh = "flak88_hull", turretMesh = null, texture = "flak88", forward = 1f, ringHeight = 0f, muzzle = new Vector3(0f, 3.6f, 3.2f),
+            id = "flak88", name = "8.8 cm Flak", hullMesh = "flak88_hull", turretMesh = null, texture = "flak88", forward = 1f, ringHeight = 0f, scale = 0.6f, meshYaw = 41.3f, muzzle = new Vector3(0f, 5.39f, 4.83f),
             gunLength = 0f, tint = new Color(1f, 1f, 1f),
-            speed = 0f, turnRate = 0.9f, turretRate = 0.9f, reload = 3.2f, damage = 2f, range = 40f, hp = 4f, radius = 2.6f, isGun = true
+            speed = 0f, turnRate = 0.9f, turretRate = 0.9f, reload = 3.2f, damage = 2f, range = 40f, hp = 4f, radius = 2.0f, isGun = true
         };
         public static readonly VehicleSpec Panther = new VehicleSpec
         {

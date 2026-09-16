@@ -45,7 +45,7 @@ namespace IronNight
 
             // hull: mesh origin is the turret ring, so it hangs ringHeight below the pivot and the tracks touch the ground
             var hull = Instantiate(Resources.Load<GameObject>("Models/" + spec.hullMesh), transform);
-            hull.name = "Hull"; hull.transform.localPosition = new Vector3(0f, spec.ringHeight, 0f); hull.transform.localRotation = Quaternion.Euler(0f, spec.forward > 0f ? 0f : 180f, 0f);
+            hull.name = "Hull"; hull.transform.localPosition = new Vector3(0f, spec.ringHeight, 0f); hull.transform.localRotation = Quaternion.Euler(0f, (spec.forward > 0f ? 0f : 180f) + spec.meshYaw, 0f);
             hullT = hull.transform; hullYaw = spec.forward > 0f ? 0f : 180f;
             foreach (var r in hull.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
             Transform turretMesh = null;
