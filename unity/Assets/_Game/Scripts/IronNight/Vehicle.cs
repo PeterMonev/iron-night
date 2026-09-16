@@ -175,7 +175,7 @@ namespace IronNight
             if (friendly)
             {
                 // the white star on both sides of the hull (the sponsons are as wide as the tracks) and of the turret
-                for (int s = -1; s <= 1; s += 2) Mark(hull, transform, new Vector3(s > 0 ? hb.max.x + 0.03f : hb.min.x - 0.03f, spec.ringHeight - 0.38f, hb.center.z + hb.extents.z * 0.05f), Quaternion.Euler(0f, -s * 90f, 0f), 0.95f, starMaterial);
+                for (int s = -1; s <= 1; s += 2) Mark(hull, transform, new Vector3(s > 0 ? hb.max.x + 0.03f : hb.min.x - 0.03f, spec.ringHeight - 0.18f, hb.center.z + hb.extents.z * 0.05f), Quaternion.Euler(0f, -s * 90f, 0f), 0.95f, starMaterial);
                 if (turretMesh != null) { var tb = LocalBounds(turretMesh, pivot); for (int s = -1; s <= 1; s += 2) Mark(turretMesh, pivot, new Vector3(s > 0 ? tb.max.x + 0.04f : tb.min.x - 0.04f, 0.5f, tb.center.z + tb.extents.z * 0.3f), Quaternion.Euler(0f, -s * 90f, 0f), 0.62f, starMaterial); }
             }
             else if (turretMesh != null)
