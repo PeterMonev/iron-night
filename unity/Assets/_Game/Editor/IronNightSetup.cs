@@ -145,6 +145,9 @@ namespace IronNight.EditorTools
             m.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha); m.SetFloat("_DstBlend", additive ? (float)BlendMode.One : (float)BlendMode.OneMinusSrcAlpha);
             m.SetFloat("_ZWrite", 0f); m.SetFloat("_Cull", (float)CullMode.Off);
             m.SetOverrideTag("RenderType", "Transparent"); m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            // straight alpha: with premultiply and preserve-specular the Lit shader keeps the specular of fully transparent texels, and a runtime
+            // marking texture shows as a faint lit square
+            m.DisableKeyword("_ALPHAPREMULTIPLY_ON"); m.DisableKeyword("_ALPHAMODULATE_ON"); m.SetFloat("_BlendModePreserveSpecular", 0f);
             m.renderQueue = (int)RenderQueue.Transparent + (additive ? 10 : 0);
         }
 

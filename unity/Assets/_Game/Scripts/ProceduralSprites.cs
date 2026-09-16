@@ -94,6 +94,38 @@ namespace Lightswarm
             return Finish(tex);
         }
 
+        /// <summary>The Allied white star: five points, a thin ring round it the way the 1944 invasion markings had.</summary>
+        public static Sprite Star(int size = 128)
+        {
+            var tex = NewTexture(size, size); float c = size * 0.5f;
+            // the outline: five tips and five inner corners, filled by the even-odd rule; a thin ring round it
+            var poly = new Vector2[10]; for (int i = 0; i < 10; i++) { float a = Mathf.PI / 2f + i * Mathf.PI / 5f, rr = i % 2 == 0 ? 0.78f : 0.78f * 0.382f; poly[i] = new Vector2(c + Mathf.Cos(a) * c * rr, c + Mathf.Sin(a) * c * rr); }
+            for (int y = 0; y < size; y++) for (int x = 0; x < size; x++)
+            {
+                var p = new Vector2(x + 0.5f, y + 0.5f); float r = Vector2.Distance(p, new Vector2(c, c)) / c; bool inside = false;
+                for (int i = 0, j = 9; i < 10; j = i++) if ((poly[i].y > p.y) != (poly[j].y > p.y) && p.x < (poly[j].x - poly[i].x) * (p.y - poly[i].y) / (poly[j].y - poly[i].y) + poly[i].x) inside = !inside;
+                bool ring = r > 0.88f && r < 0.97f;
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, inside ? 1f : ring ? 0.85f : 0f));
+            }
+            return Finish(tex);
+        }
+
+        /// <summary>The Balkenkreuz: a black cross with white bars along the arms, on nothing.</summary>
+        public static Sprite Balkenkreuz(int size = 128)
+        {
+            var tex = NewTexture(size, size); float c = size * 0.5f;
+            for (int y = 0; y < size; y++) for (int x = 0; x < size; x++)
+            {
+                float u = Mathf.Abs(x + 0.5f - c) / c, v = Mathf.Abs(y + 0.5f - c) / c;   // 0 at the centre, 1 at the edge
+                bool armX = v < 0.3f && u < 0.9f, armY = u < 0.3f && v < 0.9f;             // the black cross
+                bool barX = v > 0.3f && v < 0.44f && u > 0.3f && u < 0.9f, barY = u > 0.3f && u < 0.44f && v > 0.3f && v < 0.9f;   // the white bars beside the arms
+                bool tipX = u > 0.76f && u < 0.9f && v < 0.44f && v > 0.3f, tipY = v > 0.76f && v < 0.9f && u < 0.44f && u > 0.3f;
+                Color col = armX || armY ? new Color(0.05f, 0.05f, 0.05f, 1f) : barX || barY || tipX || tipY ? new Color(1f, 1f, 1f, 1f) : new Color(0f, 0f, 0f, 0f);
+                tex.SetPixel(x, y, col);
+            }
+            return Finish(tex);
+        }
+
         static Texture2D NewTexture(int w, int h)
         {
             var tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };

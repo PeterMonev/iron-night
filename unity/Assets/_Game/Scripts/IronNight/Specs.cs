@@ -36,25 +36,25 @@ namespace IronNight
         public static readonly VehicleSpec PanzerIV = new VehicleSpec
         {
             id = "pz4", name = "Panzer IV", hullMesh = "pz4_hull", turretMesh = "pz4_turret", texture = "pz4", forward = 1f, ringHeight = 2.022f,
-            gunLength = 3.2f, gunRadius = 0.07f, gunHeight = 0.4f, mantlet = 1.15f, muzzleBrake = true, tint = new Color(1f, 0.95f, 0.74f),
+            gunLength = 3.2f, gunRadius = 0.07f, gunHeight = 0.4f, mantlet = 1.15f, muzzleBrake = true, tint = new Color(0.95f, 0.96f, 1f),
             speed = 8f, turnRate = 1.9f, turretRate = 2.6f, reload = 1.7f, damage = 1f, range = 24f, hp = 3f, radius = 2.4f
         };
         public static readonly VehicleSpec Tiger = new VehicleSpec
         {
             id = "tiger", name = "Tiger I", hullMesh = "tiger_hull", turretMesh = "tiger_turret", texture = "tiger", forward = 1f, ringHeight = 2.249f,
-            gunLength = 3.9f, gunRadius = 0.085f, gunHeight = 0.45f, mantlet = 1.5f, muzzleBrake = true, tint = new Color(1f, 0.95f, 0.74f),
+            gunLength = 3.9f, gunRadius = 0.085f, gunHeight = 0.45f, mantlet = 1.5f, muzzleBrake = true, tint = new Color(0.95f, 0.96f, 1f),
             speed = 6f, turnRate = 1.4f, turretRate = 2f, reload = 2.6f, damage = 2f, range = 30f, hp = 8f, radius = 2.8f
         };
         public static readonly VehicleSpec TigerAce = new VehicleSpec
         {
             id = "tigerace", name = "Tiger Ace", hullMesh = "tiger_hull", turretMesh = "tiger_turret", texture = "tiger", forward = 1f, ringHeight = 2.249f,
-            gunLength = 3.9f, gunRadius = 0.085f, gunHeight = 0.45f, mantlet = 1.5f, muzzleBrake = true, tint = new Color(0.72f, 0.66f, 0.5f),
+            gunLength = 3.9f, gunRadius = 0.085f, gunHeight = 0.45f, mantlet = 1.5f, muzzleBrake = true, tint = new Color(0.7f, 0.7f, 0.74f),
             speed = 5.5f, turnRate = 1.3f, turretRate = 2.2f, reload = 1.9f, damage = 2f, range = 34f, hp = 30f, radius = 2.9f
         };
         public static readonly VehicleSpec Pak40 = new VehicleSpec
         {
             id = "pak40", name = "PaK 40", hullMesh = "pak40_hull", turretMesh = null, texture = "pak40", forward = -1f, ringHeight = 0f,
-            gunLength = 0f, tint = new Color(1f, 0.95f, 0.74f),
+            gunLength = 0f, tint = new Color(0.95f, 0.96f, 1f),
             speed = 0f, turnRate = 1.4f, turretRate = 1.4f, reload = 2.2f, damage = 1f, range = 32f, hp = 2f, radius = 1.8f, isGun = true
         };
 
@@ -67,19 +67,19 @@ namespace IronNight
         public static readonly VehicleSpec Panther = new VehicleSpec
         {
             id = "panther", name = "Panther", hullMesh = "panther_hull", turretMesh = "panther_turret", texture = "panther", forward = 1f, ringHeight = 1.92f,
-            gunLength = 4.3f, gunRadius = 0.075f, gunHeight = 0.5f, mantlet = 1.5f, muzzleBrake = true, tint = new Color(1f, 0.95f, 0.76f),
+            gunLength = 4.3f, gunRadius = 0.075f, gunHeight = 0.5f, mantlet = 1.5f, muzzleBrake = true, tint = new Color(0.95f, 0.96f, 1f),
             speed = 8f, turnRate = 1.6f, turretRate = 2.2f, reload = 2.2f, damage = 2f, range = 32f, hp = 6f, radius = 2.8f
         };
         public static readonly VehicleSpec StuG = new VehicleSpec
         {
             id = "stug", name = "StuG III", hullMesh = "stug_hull", turretMesh = null, texture = "stug", forward = 1f, ringHeight = 0f, muzzle = new Vector3(0f, 1.9f, 4.2f), casemate = true,
-            gunLength = 0f, tint = new Color(1f, 0.95f, 0.76f),
+            gunLength = 0f, tint = new Color(0.95f, 0.96f, 1f),
             speed = 8.5f, turnRate = 1.8f, turretRate = 1.8f, reload = 2f, damage = 2f, range = 30f, hp = 4f, radius = 2.5f
         };
         public static readonly VehicleSpec Halftrack = new VehicleSpec
         {
             id = "halftrack", name = "Sd.Kfz. 251", hullMesh = "halftrack_hull", turretMesh = null, texture = "halftrack", forward = 1f, ringHeight = 0f, transport = true,
-            gunLength = 0f, tint = new Color(1f, 0.95f, 0.76f),
+            gunLength = 0f, tint = new Color(0.95f, 0.96f, 1f),
             speed = 12f, turnRate = 2.4f, turretRate = 2.4f, reload = 999f, damage = 0f, range = 0f, hp = 2f, radius = 2.4f
         };
 

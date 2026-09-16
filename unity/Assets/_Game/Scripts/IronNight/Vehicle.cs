@@ -17,6 +17,7 @@ namespace IronNight
         public Vehicle target;
 
         Transform turret; Renderer[] renderers; Color[] baseColors; Transform muzzle, hullT, barrelT; Vector3 barrelHome; float hullYaw, recoil;
+        static Material starMaterial, crossMaterial;
         public float smokeTimer;
         static Material vehicleTemplate, barrelMaterial;
 
@@ -47,13 +48,14 @@ namespace IronNight
             hull.name = "Hull"; hull.transform.localPosition = new Vector3(0f, spec.ringHeight, 0f); hull.transform.localRotation = Quaternion.Euler(0f, spec.forward > 0f ? 0f : 180f, 0f);
             hullT = hull.transform; hullYaw = spec.forward > 0f ? 0f : 180f;
             foreach (var r in hull.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+            Transform turretMesh = null;
 
             var pivot = new GameObject("Turret").transform; pivot.SetParent(transform, false); pivot.localPosition = new Vector3(0f, spec.ringHeight, 0f);
             turret = pivot;
             if (spec.turretMesh != null)
             {
                 var tm = Instantiate(Resources.Load<GameObject>("Models/" + spec.turretMesh), pivot);
-                tm.name = "TurretMesh"; tm.transform.localRotation = Quaternion.Euler(0f, spec.forward > 0f ? 0f : 180f, 0f);
+                tm.name = "TurretMesh"; tm.transform.localRotation = Quaternion.Euler(0f, spec.forward > 0f ? 0f : 180f, 0f); turretMesh = tm.transform;
                 foreach (var r in tm.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
                 // the generated barrel was cut off (it comes out bent and short); this one has the real length
                 var barrel = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(barrel.GetComponent<Collider>());
@@ -86,6 +88,7 @@ namespace IronNight
                 hull.transform.SetParent(pivot, false); hull.transform.localPosition = Vector3.zero; hull.transform.localScale = Vector3.one * spec.scale;
                 muzzle = new GameObject("Muzzle").transform; muzzle.SetParent(pivot, false); muzzle.localPosition = spec.muzzle * spec.scale;
             }
+            Markings(hull.transform, pivot, turretMesh);
             renderers = GetComponentsInChildren<Renderer>();
             baseColors = new Color[renderers.Length];
             for (int i = 0; i < renderers.Length; i++) baseColors[i] = renderers[i].sharedMaterial.GetColor("_BaseColor");
@@ -157,5 +160,59 @@ namespace IronNight
             for (int i = 0; i < renderers.Length; i++) { var m = renderers[i].material; m.SetColor("_BaseColor", new Color(0.16f, 0.14f, 0.12f)); m.SetFloat("_Smoothness", 0.1f); }
             gameObject.name = "Wreck " + spec.name;
         }
+        /// <summary>National markings, painted on as small quads: the Allied white star on the engine deck and both
+        /// turret sides, the Balkenkreuz on German turret sides (hull sides when there is no turret).</summary>
+        void Markings(Transform hull, Transform pivot, Transform turretMesh)
+        {
+            if (spec.isGun) return;
+            if (starMaterial == null)
+            {
+                starMaterial = new Material(Resources.Load<Material>("GroundDecal")); starMaterial.SetTexture("_BumpMap", null);   // the keyword stays on: the variant without it is not in the build and the quad would render opaque
+                starMaterial.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.Star(128).texture); starMaterial.SetColor("_BaseColor", new Color(0.5f, 0.5f, 0.46f, 0.95f));   // weathered paint: white would bloom under the flare light starMaterial.renderQueue = 2470;
+                crossMaterial = new Material(starMaterial); crossMaterial.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.Balkenkreuz(128).texture); crossMaterial.SetColor("_BaseColor", new Color(0.6f, 0.6f, 0.6f, 0.95f));
+            }
+            var hb = LocalBounds(hull, transform);
+            if (friendly)
+            {
+                // the air-recognition star on the engine deck, behind the turret
+                Mark(hull, transform, new Vector3(0f, hb.max.y + 0.04f, hb.center.z - hb.extents.z * 0.45f), Quaternion.Euler(90f, 0f, 0f), 1.1f, starMaterial);
+                if (turretMesh != null) { var tb = LocalBounds(turretMesh, pivot); for (int s = -1; s <= 1; s += 2) Mark(turretMesh, pivot, new Vector3(tb.center.x + s * (tb.extents.x + 0.04f), tb.center.y + tb.extents.y * 0.05f, tb.center.z + tb.extents.z * 0.1f), Quaternion.Euler(0f, -s * 90f, 0f), 0.5f, starMaterial); }
+            }
+            else if (turretMesh != null)
+            {
+                var tb = LocalBounds(turretMesh, pivot);
+                for (int s = -1; s <= 1; s += 2) Mark(turretMesh, pivot, new Vector3(tb.center.x + s * (tb.extents.x + 0.04f), tb.center.y + tb.extents.y * 0.05f, tb.center.z + tb.extents.z * 0.15f), Quaternion.Euler(0f, -s * 90f, 0f), 0.55f, crossMaterial);
+            }
+            else
+            {
+                for (int s = -1; s <= 1; s += 2) Mark(hull, transform, new Vector3(hb.center.x + s * (hb.extents.x + 0.04f), hb.center.y + hb.extents.y * 0.35f, hb.center.z - hb.extents.z * 0.25f), Quaternion.Euler(0f, -s * 90f, 0f), 0.55f, crossMaterial);
+            }
+        }
+
+        /// <summary>The box round every mesh under a part, measured in the given frame.</summary>
+        static Bounds LocalBounds(Transform part, Transform frame)
+        {
+            bool first = true; var b = new Bounds();
+            foreach (var mf in part.GetComponentsInChildren<MeshFilter>())
+            {
+                if (mf.sharedMesh == null) continue; var mb = mf.sharedMesh.bounds;
+                for (int i = 0; i < 8; i++)
+                {
+                    var corner = new Vector3((i & 1) == 0 ? mb.min.x : mb.max.x, (i & 2) == 0 ? mb.min.y : mb.max.y, (i & 4) == 0 ? mb.min.z : mb.max.z);
+                    var p = frame.InverseTransformPoint(mf.transform.TransformPoint(corner));
+                    if (first) { b = new Bounds(p, Vector3.zero); first = false; } else b.Encapsulate(p);
+                }
+            }
+            return b;
+        }
+
+        /// <summary>One marking quad, placed in the frame but parented to the part so it moves with it.</summary>
+        static void Mark(Transform part, Transform frame, Vector3 pos, Quaternion rot, float size, Material m)
+        {
+            var q = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(q.GetComponent<Collider>()); q.name = "Marking";
+            q.transform.SetParent(part, false); q.transform.position = frame.TransformPoint(pos); q.transform.rotation = frame.rotation * rot; q.transform.localScale = Vector3.one * size;
+            var r = q.GetComponent<Renderer>(); r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = true;
+        }
+
     }
 }
