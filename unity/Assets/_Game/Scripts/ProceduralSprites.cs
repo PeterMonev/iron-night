@@ -95,25 +95,24 @@ namespace Lightswarm
         }
 
         /// <summary>The Allied white star: five points, a thin ring round it the way the 1944 invasion markings had.</summary>
-        public static Sprite Star(int size = 128)
+        public static Sprite Star(int size = 256)
         {
-            var tex = NewTexture(size, size); float c = size * 0.5f;
-            // the outline: five tips and five inner corners, filled by the even-odd rule; a thin ring round it
-            var poly = new Vector2[10]; for (int i = 0; i < 10; i++) { float a = Mathf.PI / 2f + i * Mathf.PI / 5f, rr = i % 2 == 0 ? 0.78f : 0.78f * 0.382f; poly[i] = new Vector2(c + Mathf.Cos(a) * c * rr, c + Mathf.Sin(a) * c * rr); }
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { filterMode = FilterMode.Trilinear, wrapMode = TextureWrapMode.Clamp }; float c = size * 0.5f;
+            // the outline: five tips and five inner corners, filled by the even-odd rule; four by four samples a pixel for clean edges
+            var poly = new Vector2[10]; for (int i = 0; i < 10; i++) { float a = Mathf.PI / 2f + i * Mathf.PI / 5f, rr = i % 2 == 0 ? 0.92f : 0.92f * 0.382f; poly[i] = new Vector2(c + Mathf.Cos(a) * c * rr, c + Mathf.Sin(a) * c * rr); }
+            bool Inside(Vector2 p) { bool inside = false; for (int i = 0, j = 9; i < 10; j = i++) if ((poly[i].y > p.y) != (poly[j].y > p.y) && p.x < (poly[j].x - poly[i].x) * (p.y - poly[i].y) / (poly[j].y - poly[i].y) + poly[i].x) inside = !inside; return inside; }
             for (int y = 0; y < size; y++) for (int x = 0; x < size; x++)
             {
-                var p = new Vector2(x + 0.5f, y + 0.5f); float r = Vector2.Distance(p, new Vector2(c, c)) / c; bool inside = false;
-                for (int i = 0, j = 9; i < 10; j = i++) if ((poly[i].y > p.y) != (poly[j].y > p.y) && p.x < (poly[j].x - poly[i].x) * (p.y - poly[i].y) / (poly[j].y - poly[i].y) + poly[i].x) inside = !inside;
-                bool ring = r > 0.88f && r < 0.97f;
-                tex.SetPixel(x, y, new Color(1f, 1f, 1f, inside ? 1f : ring ? 0.85f : 0f));
+                int hits = 0; for (int sy = 0; sy < 4; sy++) for (int sx = 0; sx < 4; sx++) if (Inside(new Vector2(x + (sx + 0.5f) / 4f, y + (sy + 0.5f) / 4f))) hits++;
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, hits / 16f));
             }
             return Finish(tex);
         }
 
         /// <summary>The Balkenkreuz: a black cross with white bars along the arms, on nothing.</summary>
-        public static Sprite Balkenkreuz(int size = 128)
+        public static Sprite Balkenkreuz(int size = 256)
         {
-            var tex = NewTexture(size, size); float c = size * 0.5f;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { filterMode = FilterMode.Trilinear, wrapMode = TextureWrapMode.Clamp }; float c = size * 0.5f;
             for (int y = 0; y < size; y++) for (int x = 0; x < size; x++)
             {
                 float u = Mathf.Abs(x + 0.5f - c) / c, v = Mathf.Abs(y + 0.5f - c) / c;   // 0 at the centre, 1 at the edge
