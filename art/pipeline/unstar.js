@@ -1,10 +1,10 @@
-// Paints the reference's white stars out of the Sherman texture (the game draws its own, centred, crisp): every
-// bright low-saturation blob of a star's size is filled with the olive around it. node unstar.js
+// Paints the reference's white stars out of a tank texture (the game draws its own, centred, crisp): every
+// bright low-saturation blob of a star's size is filled with the olive around it. node unstar.js [name ...] (default sherman)
 const { createCanvas, loadImage } = require('@napi-rs/canvas'); const fs = require('fs');
 const M = 'D:/Codes/Projects/lightswarm/unity/Assets/_Game/Resources/Models/', RAW = 'D:/Codes/Projects/lightswarm/art/models/raw-tex/';
-(async () => {
-  if (!fs.existsSync(RAW + 'sherman.png')) fs.copyFileSync(M + 'sherman.png', RAW + 'sherman.png');
-  const im = await loadImage(RAW + 'sherman.png'); const W = im.width, H = im.height; const c = createCanvas(W, H), g = c.getContext('2d'); g.drawImage(im, 0, 0);
+(async () => { for (const name of (process.argv.length > 2 ? process.argv.slice(2) : ['sherman'])) {
+  if (!fs.existsSync(RAW + name + '.png')) fs.copyFileSync(M + name + '.png', RAW + name + '.png');
+  const im = await loadImage(RAW + name + '.png'); const W = im.width, H = im.height; const c = createCanvas(W, H), g = c.getContext('2d'); g.drawImage(im, 0, 0);
   const img = g.getImageData(0, 0, W, H), d = img.data; const white = new Uint8Array(W * H);
   for (let i = 0; i < W * H; i++) { const r = d[i * 4], gg = d[i * 4 + 1], b = d[i * 4 + 2]; const mx = Math.max(r, gg, b), mn = Math.min(r, gg, b); if (mx > 165 && (mx - mn) < 0.22 * mx) white[i] = 1; }
   // connected blobs (4-neighbour flood fill)
@@ -24,5 +24,5 @@ const M = 'D:/Codes/Projects/lightswarm/unity/Assets/_Game/Resources/Models/', R
     for (const p of fill) { const x = p % W, y = (p - x) / W; const jitter = ((x * 7 + y * 13) % 9) - 4; d[p * 4] = mr + jitter; d[p * 4 + 1] = mg + jitter; d[p * 4 + 2] = mb + jitter; }
     painted++;
   }
-  g.putImageData(img, 0, 0); fs.writeFileSync(M + 'sherman.png', c.toBuffer('image/png')); console.log('blobs', blobs.length, 'painted out', painted);
-})();
+  g.putImageData(img, 0, 0); fs.writeFileSync(M + name + '.png', c.toBuffer('image/png')); console.log(name, 'blobs', blobs.length, 'painted out', painted);
+} })();

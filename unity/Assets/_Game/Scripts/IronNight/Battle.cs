@@ -19,7 +19,7 @@ namespace IronNight
         class Flare { public Vector3 pos; public float age; public Transform vis; public Light light; public Material mat; }
         class Wreck { public Vehicle v; public float age, burnTimer; public Light fire; }
         class ArtyShell { public Vector3 at; public float timer; }
-        class Objective { public Vector3 pos; public Transform marker; public float smokeTimer, held; public int n; public bool hold; }
+        class Objective { public Vector3 pos; public Transform marker; public GameObject grenade; public float smokeTimer, held; public int n; public bool hold; }
         class Drop { public Vector3 pos; public float height, age, lift, top; public int kind; public Transform crate, chute, marker; public LineRenderer lines; public Mesh canopy; public Vector3[] rest; }   // lift: the crate origin above its base; top: where the shrouds tie
         class Mortar { public Vector3 at; public float timer; public Transform ring; }
         class Star { public Vector3 pos; public float height, life, puff; public Transform flare, chute; public Light light; }
@@ -49,7 +49,8 @@ namespace IronNight
         static readonly bool debugDrops = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--drops") >= 0;   // test switch: the first supply drop at 0:03
         static readonly bool debugInfantry = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--infantry") >= 0;   // test switch: a squad at 0:04
         bool debugSquadSent;
-        float damageMul = 1f, reloadMul = 1f, rangeMul = 1f, speedMul = 1f, scatterMul = 1f, turretMul = 1f; bool he, gunners, hasSmoke, fireflyNext, firstNight;
+        float damageMul = 1f, reloadMul = 1f, rangeMul = 1f, speedMul = 1f, scatterMul = 1f, turretMul = 1f; bool he, gunners, hasSmoke, fireflyNext, firstNight; string bonus = "";
+        VehicleSpec Wingman => VehicleSpec.ById(Depot.WingmanId);
         float artyInterval, artyTimer, smokeLeft, smokeCooldown; int wingmanBonus, hintIndex; readonly List<ArtyShell> arty = new List<ArtyShell>();
         static readonly float[] steerAngles = { 0f, 35f, -35f, 70f, -70f, 110f, -110f };
         static readonly string[] hints = { "Drag anywhere to drive", "The turrets aim and fire on their own", "Flares of destroyed enemies bring reinforcements", "Hedges stop tanks: gates and lanes lead through", "Farm buildings stop shells: use them as cover" };
@@ -72,7 +73,10 @@ namespace IronNight
             hud.OnQuality = () => { LowQuality = !LowQuality; ApplyQuality(); hud.ShowPause(!Sfx.Muted, !LowQuality); };
             if (veteran) hud.Toast("Veteran night · points ×1.5", 3f);
             hud.OnDaily = () => { Depot.ClaimDaily(); hud.ShowTitle(reserveGranted); };
-            platoon.Add(Vehicle.Create(VehicleSpec.ById(Depot.LeaderId), true, Vector3.zero, 0f)); Leader.hp = Depot.LeaderHp;
+            var leaderSpec = VehicleSpec.ById(Depot.LeaderId); if (!VehicleSpec.Available(leaderSpec)) leaderSpec = VehicleSpec.ById(Depot.WingmanId);
+            platoon.Add(Vehicle.Create(leaderSpec, true, Vector3.zero, 0f)); Leader.hp = Depot.LeaderHp;
+            // the commander riding with the leader
+            bonus = Depot.CommanderBonus; if (bonus == "reload") reloadMul *= 0.85f; if (bonus == "speed") speedMul *= 1.12f; if (bonus == "armour") Leader.hp += 1f;
             NextObjective();
             hud.OnFormation = f => formation = f;
             hud.OnAd = OnAd; hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
@@ -148,7 +152,18 @@ namespace IronNight
             {
                 v.reloadLeft -= dt;
                 var target = Nearest(foes, v.transform.position, v.Range * 1.15f);
-                if (target != null) { bool on = v.Aim(target.transform.position, dt); if (on && v.reloadLeft <= 0f && Dist(v, target) <= v.Range) Fire(v, target); }
+                if (target != null)
+                {
+                    bool on = v.Aim(target.transform.position, dt);
+                    if (v.spec.casemate)
+                    {
+                        // no turret: the gun swings a little either side of the hull; a wingman holding its slot turns the hull itself
+                        float off = Mathf.DeltaAngle(v.yaw * Mathf.Rad2Deg, v.turretYaw * Mathf.Rad2Deg);
+                        if (v != L && Mathf.Abs(off) > 6f && (Slot(platoon.IndexOf(v)) - v.transform.position).magnitude <= 1.2f) v.yaw += Mathf.Sign(off) * v.spec.turnRate * 0.6f * dt;
+                        v.turretYaw = v.yaw + Mathf.Clamp(off, -14f, 14f) * Mathf.Deg2Rad; on = on && Mathf.Abs(off) <= 14f;
+                    }
+                    if (on && v.reloadLeft <= 0f && Dist(v, target) <= v.Range) Fire(v, target);
+                }
                 else v.IdleTurret(dt);
                 v.Apply();
             }
@@ -270,6 +285,7 @@ namespace IronNight
         void Damage(Vehicle v, float dmg, Vector3 at)
         {
             if (v.friendly && v == Leader && leaderShield > 0f) return;
+            if (!v.friendly && bonus == "heavy" && v.spec.hp >= 6f) dmg *= 1.5f;
             v.Hit(dmg); Sfx.Hit(v.transform.position);
             if (v.friendly && v == Leader) { hud.Flash(); shake = Mathf.Max(shake, 0.8f); Buzz(); }
             if (v.hp > 0f) { if (v == Leader) { hud.Toast("Leader hit"); if (hasSmoke && smokeCooldown <= 0f) PopSmoke(); } return; }
@@ -331,7 +347,7 @@ namespace IronNight
         void Reinforce()
         {
             reinforcements++;
-            var spec = reinforcements % 3 == 0 || fireflyNext ? VehicleSpec.Firefly : VehicleSpec.Sherman; fireflyNext = false;
+            var spec = Depot.Nation == "us" && (reinforcements % 3 == 0 || fireflyNext) ? VehicleSpec.Firefly : Wingman; fireflyNext = false;
             var L = Leader; var v = Vehicle.Create(spec, true, L.transform.position - L.Forward * 12f, L.yaw); v.hp += Depot.WingmanHpBonus + wingmanBonus;
             platoon.Add(v); hud.Toast("Reinforcement · " + spec.name); hud.Set(t, platoon.Count);
         }
@@ -475,7 +491,7 @@ namespace IronNight
             };
             if (he) all.RemoveAll(c => c.id == "he"); if (gunners) all.RemoveAll(c => c.id == "gunners"); if (hasSmoke) all.RemoveAll(c => c.id == "smoke");
             if (artyInterval > 0f && artyInterval <= 12f) all.RemoveAll(c => c.id == "arty");
-            if (!platoon.Exists(p => p != Leader && p.spec == VehicleSpec.Sherman) && platoon.Count >= maxPlatoon) all.RemoveAll(c => c.id == "firefly");
+            if (Depot.Nation != "us" || (!platoon.Exists(p => p != Leader && p.spec == VehicleSpec.Sherman) && platoon.Count >= maxPlatoon)) all.RemoveAll(c => c.id == "firefly");
             var pick = new List<Hud.Card>(); while (pick.Count < 3 && all.Count > 0) { int i = Random.Range(0, all.Count); pick.Add(all[i]); all.RemoveAt(i); }
             phase = Phase.LevelUp; stick.Blocked = true; Sfx.LevelUp();
             hud.ShowCards(pick, id =>
@@ -598,6 +614,7 @@ namespace IronNight
             var pos = L.transform.position + new Vector3(Mathf.Sin(ang), 0f, Mathf.Cos(ang)) * dist;
             bool hold = objectivesReached > 0 && Random.value < 0.5f;
             objective = new Objective { pos = pos, n = objectivesReached + 1, hold = hold, marker = fx.Marker(pos, new Color(0.35f, 0.95f, 0.45f), hold ? 15f : 9f, true) };
+            objective.grenade = props.Spawn("marker_smoke", pos, Random.value * 360f);   // the coloured smoke grenade marking the spot
             if (phase == Phase.Play) hud.Toast("Objective " + objective.n + " · " + (hold ? "hold the crossing, " : "") + Mathf.RoundToInt(dist) + " m ahead", 3f);
         }
 
@@ -618,7 +635,7 @@ namespace IronNight
                 {
                     score += 450; objectivesReached++; shake = Mathf.Max(shake, 0.3f); Sfx.Pickup();
                     hud.Popup(objective.pos, "+450", new Color(0.35f, 0.95f, 0.45f)); hud.Toast("Crossing held · +450", 2.6f);
-                    Destroy(objective.marker.gameObject); objective = null; NextObjective();
+                    Destroy(objective.marker.gameObject); if (objective.grenade != null) Destroy(objective.grenade); objective = null; NextObjective();
                 }
                 return;
             }
@@ -626,7 +643,7 @@ namespace IronNight
             {
                 score += 300; objectivesReached++; shake = Mathf.Max(shake, 0.3f); Sfx.Pickup();
                 hud.Popup(objective.pos, "+300", new Color(0.35f, 0.95f, 0.45f)); hud.Toast("Objective " + objective.n + " reached · +300", 2.6f);
-                Destroy(objective.marker.gameObject); objective = null; NextObjective();
+                Destroy(objective.marker.gameObject); if (objective.grenade != null) Destroy(objective.grenade); objective = null; NextObjective();
             }
         }
 
@@ -690,7 +707,7 @@ namespace IronNight
                     Sfx.Pickup();
                     switch (d.kind)
                     {
-                        case 0: L.hp = Mathf.Min(Depot.LeaderHp + 2f, L.hp + 2f); hud.Toast("Repair kit · leader +2", 2.6f); break;
+                        case 0: { float mend = bonus == "repair" ? 3f : 2f; L.hp = Mathf.Min(Depot.LeaderHp + 2f, L.hp + mend); hud.Toast("Repair kit · leader +" + mend, 2.6f); break; }
                         case 1: ammoMul = 1.5f; ammoLeft = 25f; hud.Toast("APCR ammunition · +50% damage for 25 s", 2.8f); break;
                         case 2: if (smokeCooldown <= 0f) PopSmoke(); else { L.hp = Mathf.Min(Depot.LeaderHp + 2f, L.hp + 1f); hud.Toast("Spare parts · leader +1", 2.6f); } break;
                         default: if (!FireMission()) { score += 150; hud.Toast("Radio set · +150", 2.6f); } break;
@@ -938,7 +955,7 @@ namespace IronNight
             hud.SetAdNote("30 s ad · mock, skipping…");
             if (t >= NightLength) { doubled = true; Depot.AddPoints(score); banked += score; hud.SetEndPoints(banked); hud.ShowEnd(true, $"{kills} enemy vehicles destroyed\nScore {score * 2} (doubled)", false); return; }
             revived = true;
-            var L = Vehicle.Create(VehicleSpec.Sherman, true, platoon.Count > 0 ? platoon[0].transform.position - platoon[0].Forward * 8f : Vector3.zero, platoon.Count > 0 ? platoon[0].yaw : 0f);
+            var L = Vehicle.Create(Wingman, true, platoon.Count > 0 ? platoon[0].transform.position - platoon[0].Forward * 8f : Vector3.zero, platoon.Count > 0 ? platoon[0].yaw : 0f);
             L.hp = Depot.LeaderHp; platoon.Insert(0, L); leaderShield = 4f;
             hud.HideEnd(); phase = Phase.Play; stick.Blocked = false; hud.Toast("Field repair · back in the fight");
         }

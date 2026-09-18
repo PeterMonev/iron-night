@@ -17,7 +17,7 @@ namespace IronNight
         public Vehicle target;
 
         Transform turret; Renderer[] renderers; Color[] baseColors; Transform muzzle, hullT, barrelT; Vector3 barrelHome; float hullYaw, recoil;
-        static Material starMaterial, crossMaterial;
+        static Material starMaterial, crossMaterial, commanderMaterial; const float CommanderYaw = 0f;   // the figure's facing in its mesh, corrected here if it looks the wrong way
         public float smokeTimer;
         static Material vehicleTemplate, barrelMaterial;
 
@@ -56,7 +56,14 @@ namespace IronNight
             {
                 var tm = Instantiate(Resources.Load<GameObject>("Models/" + spec.turretMesh), pivot);
                 tm.name = "TurretMesh"; tm.transform.localRotation = Quaternion.Euler(0f, spec.forward > 0f ? 0f : 180f, 0f); tm.transform.localPosition = new Vector3(spec.turretShift, 0f, 0f); turretMesh = tm.transform;   // the turret turns about its own centre
-                foreach (var r in tm.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+                var tmat = mat; if (spec.turretTexture != null) { tmat = new Material(mat); tmat.SetTexture("_BaseMap", Resources.Load<Texture2D>("Models/" + spec.turretTexture)); }
+                if (spec.turretTexture != null)
+                {
+                    // a turret made on its own does not fill the hole the old one was cut from: a plate under it covers the ring
+                    var plate = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(plate.GetComponent<Collider>()); plate.name = "RingPlate"; plate.transform.SetParent(pivot, false);
+                    plate.transform.localPosition = new Vector3(0f, 0.03f, 0f); plate.transform.localScale = new Vector3(2.9f, 0.04f, 2.9f); plate.GetComponent<Renderer>().sharedMaterial = mat; plate.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                }
+                foreach (var r in tm.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = tmat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
                 // the generated barrel was cut off (it comes out bent and short); this one has the real length
                 var barrel = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(barrel.GetComponent<Collider>());
                 barrel.name = "Barrel"; barrel.transform.SetParent(pivot, false);
@@ -89,6 +96,18 @@ namespace IronNight
                 muzzle = new GameObject("Muzzle").transform; muzzle.SetParent(pivot, false); muzzle.localPosition = spec.muzzle * spec.scale;
             }
             Markings(hull.transform, pivot, turretMesh);
+            // the commander in his hatch on the platoon's tanks
+            if (friendly && turretMesh != null)
+            {
+                var cmd = Resources.Load<GameObject>("Props/commander");
+                if (cmd != null)
+                {
+                    var tb = LocalBounds(turretMesh, pivot); var c = Instantiate(cmd, pivot); c.name = "Commander";
+                    c.transform.localPosition = new Vector3(tb.center.x + tb.extents.x * 0.35f, tb.max.y - 0.5f, tb.center.z - tb.extents.z * 0.15f); c.transform.localRotation = Quaternion.Euler(0f, CommanderYaw, 0f);
+                    if (commanderMaterial == null) { commanderMaterial = new Material(Resources.Load<Material>("VehicleLit")); commanderMaterial.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/commander_tex")); commanderMaterial.SetFloat("_Cull", 0f); }
+                    foreach (var r in c.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = commanderMaterial; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+                }
+            }
             renderers = GetComponentsInChildren<Renderer>();
             baseColors = new Color[renderers.Length];
             for (int i = 0; i < renderers.Length; i++) baseColors[i] = renderers[i].sharedMaterial.GetColor("_BaseColor");

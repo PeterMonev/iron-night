@@ -15,7 +15,7 @@ namespace IronNight
         public class Squad { public readonly List<Soldier> men = new List<Soldier>(); }
 
         public readonly List<Squad> squads = new List<Squad>();
-        const float SoldierYaw = -90f;   // the figure's facing in its own mesh, corrected here if the export looks the wrong way
+        const float SoldierYaw = -90f, SoldierBYaw = -90f; GameObject figureB; Material skinB;   // the figure's facing in its own mesh, corrected here if the export looks the wrong way
         readonly List<Soldier> fallen = new List<Soldier>();
         Material uniform, helmet, skin; GameObject figure;
 
@@ -24,7 +24,7 @@ namespace IronNight
             uniform = new Material(Resources.Load<Material>("BarrelLit")); uniform.SetColor("_BaseColor", new Color(0.22f, 0.24f, 0.2f)); uniform.SetFloat("_Metallic", 0f); uniform.SetFloat("_Smoothness", 0.15f);
             helmet = new Material(uniform); helmet.SetColor("_BaseColor", new Color(0.18f, 0.2f, 0.18f)); helmet.SetFloat("_Smoothness", 0.4f);
             // the figure from the reference render, when it is there; the capsules stay as the fallback
-            figure = Resources.Load<GameObject>("Props/soldier");
+            figure = Resources.Load<GameObject>("Props/soldier"); figureB = Resources.Load<GameObject>("Props/soldier_b");   // the second pose: kneeling with the Panzerfaust up
             if (figure != null) { skin = new Material(Resources.Load<Material>("VehicleLit")); skin.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/soldier_tex")); skin.SetColor("_BaseColor", new Color(0.7f, 0.7f, 0.68f)); skin.SetFloat("_Smoothness", 0.1f); skin.SetFloat("_Cull", 0f); }
         }
 
@@ -39,7 +39,8 @@ namespace IronNight
                 var go = new GameObject("Soldier"); go.transform.SetParent(transform, false);
                 if (figure != null)
                 {
-                    var fg = Instantiate(figure, go.transform); fg.transform.localRotation = Quaternion.Euler(0f, SoldierYaw, 0f); foreach (var rr in fg.GetComponentsInChildren<Renderer>()) { rr.sharedMaterial = skin; rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+                    bool kneel = figureB != null && i % 2 == 1; if (kneel && skinB == null) { skinB = new Material(skin); skinB.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/soldier_b_tex")); }
+                    var fg = Instantiate(kneel ? figureB : figure, go.transform); fg.transform.localRotation = Quaternion.Euler(0f, kneel ? SoldierBYaw : SoldierYaw, 0f); foreach (var rr in fg.GetComponentsInChildren<Renderer>()) { rr.sharedMaterial = kneel ? skinB : skin; rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
                     var m2 = new Soldier { t = go.transform, pos = at + side * ((i - 1.5f) * 2.2f) + facing * Random.Range(-1f, 1f), reload = 2f + Random.value * 3f, phase = Random.value * 6.28f, face = facing };
                     m2.t.position = m2.pos; sq.men.Add(m2); continue;
                 }

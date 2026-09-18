@@ -58,5 +58,96 @@
    0.0,
    -0.17672220369180044
   ]
+ },
+ "easy8": {
+  "hullFaces": 21351,
+  "turretFaces": 1682,
+  "ringHeight": 2.1878046635200668,
+  "longAxis": "z",
+  "forward": 1.0,
+  "hullLength": 6.3,
+  "ringCenter": [
+   -0.020023973969121773,
+   0.03441385716199885,
+   -0.05789578085144361
+  ]
+ },
+ "hellcat": {
+  "hullFaces": 19087,
+  "turretFaces": 2711,
+  "ringHeight": 1.7079192075387757,
+  "longAxis": "z",
+  "forward": 1.0,
+  "hullLength": 5.5,
+  "ringCenter": [
+   -0.05395790127416451,
+   -0.01634356081485744,
+   -0.06586252090831597
+  ]
+ },
+ "chaffee": {
+  "hullFaces": 20692,
+  "turretFaces": 2023,
+  "ringHeight": 1.7136175237741471,
+  "longAxis": "z",
+  "forward": 1.0,
+  "hullLength": 5.0,
+  "ringCenter": [
+   -0.004346970779200395,
+   -0.03389539182186119,
+   -0.08141470327973366
+  ]
+ },
+ "pershing": {
+  "hullFaces": 20280,
+  "turretFaces": 2312,
+  "ringHeight": 2.073641385987571,
+  "longAxis": "z",
+  "forward": 1.0,
+  "hullLength": 6.3,
+  "ringCenter": [
+   -0.006631731986999512,
+   -0.017323480546474368,
+   -0.07292108237743378
+  ]
+ },
+ "t34_85": {
+  "hullFaces": 17636,
+  "turretFaces": 3365,
+  "ringHeight": 1.3621937018955899,
+  "longAxis": "z",
+  "forward": 1.0,
+  "hullLength": 6.1,
+  "ringCenter": [
+   -0.0068117800789574785,
+   -0.022085427045822115,
+   -0.2288399189710617
+  ]
+ },
+ "kv85": {
+  "hullFaces": 18236,
+  "turretFaces": 2584,
+  "ringHeight": 1.4456228436015681,
+  "longAxis": "z",
+  "forward": 1.0,
+  "hullLength": 6.7,
+  "ringCenter": [
+   -0.029468536182927586,
+   -0.044192307591438273,
+   -0.11612108287711939
+  ]
+ },
+ "is2": {
+  "hullFaces": 18633,
+  "turretFaces": 3247,
+  "ringHeight": 1.5645419971976002,
+  "longAxis": "z",
+  "forward": -1.0,
+  "hullLength": 6.8,
+  "ringCenter": [
+   -0.01716407248750329,
+   -0.0023240141570567696,
+   -0.16625481843948364
+  ]
  }
 }

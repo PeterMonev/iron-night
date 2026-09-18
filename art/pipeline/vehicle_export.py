@@ -1,5 +1,5 @@
 """Writes a vehicle into the Unity project: hull (+ turret) OBJs from art/models/parts and one brightened texture.
-  python vehicle_export.py parts <name>                 -> <name>_hull.obj, <name>_turret.obj, <name>.png (split_turret output)
+  python vehicle_export.py parts <name> [xscale]        -> <name>_hull.obj, <name>_turret.obj, <name>.png (split_turret output)
   python vehicle_export.py whole <in.glb> <name> <len_m> -> <name>_hull.obj, <name>.png: a turretless vehicle or a gun, long
                                                             axis on Z, base on the ground, centred, scaled to the length
 The texture gets the same lift as the first tanks (gamma 0.62, contrast 1.18, colour 1.25) so it reads under moonlight."""
@@ -31,8 +31,9 @@ def load(path):
 
 mode = sys.argv[1]
 if mode == 'parts':
-    name = sys.argv[2]
+    name = sys.argv[2]; xscale = float(sys.argv[3]) if len(sys.argv) > 3 else 1.0   # the generated Soviet tanks come out too wide: squeeze across
     hull = load(os.path.join(PARTS, f'{name}_hull.glb')); tur = load(os.path.join(PARTS, f'{name}_turret.glb'))
+    if xscale != 1.0: hull.apply_scale([xscale, 1, 1]); tur.apply_scale([xscale, 1, 1])
     lift(hull.visual.material.baseColorTexture).save(os.path.join(OUT, f'{name}.png'))
     write(hull, f'{name}_hull', f'{name}.png'); write(tur, f'{name}_turret', f'{name}.png')
 else:

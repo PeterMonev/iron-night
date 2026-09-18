@@ -75,21 +75,59 @@ namespace IronNight
         {
             new Camo { id = "olive", name = "Olive drab", tint = Color.white, cost = 0 },
             new Camo { id = "winter", name = "Winter", tint = new Color(1.7f, 1.7f, 1.95f), cost = 800 },
-            new Camo { id = "desert", name = "Desert", tint = new Color(1.55f, 1.35f, 0.95f), cost = 800 },
+            new Camo { id = "desert", name = "Desert", tint = new Color(1.25f, 1.15f, 0.88f), cost = 800 },
             new Camo { id = "night", name = "Night", tint = new Color(0.62f, 0.68f, 0.85f), cost = 1500 },
         };
         public static string CamoId { get { Load(); return PlayerPrefs.GetString("depot.camo", "olive"); } }
 
-        // the leader's tank: the Sherman, or the Firefly with the 17-pounder once it is bought
-        public class LeaderChoice { public string id, name; public int cost; }
-        public static readonly LeaderChoice[] Leaders = { new LeaderChoice { id = "sherman", name = "M4 Sherman", cost = 0 }, new LeaderChoice { id = "firefly", name = "Sherman Firefly", cost = 2000 } };
-        public static string LeaderId { get { Load(); return PlayerPrefs.GetString("depot.leader", "sherman"); } }
+        // the nation: which tree of tanks the platoon comes from, and which commanders
+        public static string Nation { get { Load(); return PlayerPrefs.GetString("depot.nation", "us"); } set { PlayerPrefs.SetString("depot.nation", value); Save(); } }
+        public static string WingmanId => Nation == "su" ? "t34_85" : "sherman";
+
+        // the leader's tank: one of the nation's tree, bought once and kept
+        public class LeaderChoice { public string id, name, desc, nation; public int cost; }
+        public static readonly LeaderChoice[] Leaders =
+        {
+            new LeaderChoice { id = "sherman", name = "M4 Sherman", nation = "us", cost = 0, desc = "The workhorse: quick turret, quick loader, an ordinary gun." },
+            new LeaderChoice { id = "chaffee", name = "M24 Chaffee", nation = "us", cost = 1200, desc = "Light and fast, a small gun, thin armour: run rings round them." },
+            new LeaderChoice { id = "m10", name = "M10 Wolverine", nation = "us", cost = 1600, desc = "A tank destroyer: a good 3-inch gun on an open turret, thin armour." },
+            new LeaderChoice { id = "hellcat", name = "M18 Hellcat", nation = "us", cost = 1800, desc = "The fastest thing on tracks, a 76 mm gun, no armour to speak of." },
+            new LeaderChoice { id = "easy8", name = "M4A3E8 Easy Eight", nation = "us", cost = 2000, desc = "The Sherman grown up: 76 mm gun, wide tracks, a hit more." },
+            new LeaderChoice { id = "firefly", name = "Sherman Firefly", nation = "us", cost = 2000, desc = "The 17-pounder hits twice as hard and reaches farther; the turret is slower." },
+            new LeaderChoice { id = "pershing", name = "M26 Pershing", nation = "us", cost = 3500, desc = "A heavy: the 90 mm gun and thick armour, slow to load and to turn." },
+            new LeaderChoice { id = "t34_85", name = "T-34-85", nation = "su", cost = 0, desc = "Fast, sloped, an 85 mm gun: the best all-rounder of the war." },
+            new LeaderChoice { id = "kv85", name = "KV-85", nation = "su", cost = 2000, desc = "A heavy hull under the 85: slow, and it takes a beating." },
+            new LeaderChoice { id = "su100", name = "SU-100", nation = "su", cost = 2200, desc = "No turret: the 100 mm gun aims with the hull. Point the tank, kill anything." },
+            new LeaderChoice { id = "is2", name = "IS-2", nation = "su", cost = 4000, desc = "The 122 mm gun: one shot, one wreck. Slow to load, slow to turn, hard to kill." },
+        };
+        public static string LeaderId { get { Load(); return PlayerPrefs.GetString("depot.leader." + Nation, Nation == "su" ? "t34_85" : "sherman"); } }
         public static bool OwnsLeader(LeaderChoice c) => c.cost == 0 || PlayerPrefs.GetInt("depot.leader." + c.id, 0) == 1;
         public static bool PickLeader(LeaderChoice c)
         {
             Load();
             if (!OwnsLeader(c)) { if (Points < c.cost) return false; Points -= c.cost; PlayerPrefs.SetInt("depot.leader." + c.id, 1); }
-            PlayerPrefs.SetString("depot.leader", c.id); Save(); return true;
+            PlayerPrefs.SetString("depot.leader." + c.nation, c.id); Save(); return true;
+        }
+
+        // the commanders: one bonus each, three to a nation, bought once and kept; the chosen one rides with the leader
+        public class Commander { public string id, name, nation, bonus, desc, picture; public int cost; }
+        public static readonly Commander[] Commanders =
+        {
+            new Commander { id = "kowalski", name = "Sgt. Kowalski", nation = "us", bonus = "reload", desc = "Iron nerves: the crew loads 15% faster.", picture = "cmd_us_sergeant", cost = 1500 },
+            new Commander { id = "hale", name = "Lt. Hale", nation = "us", bonus = "radar", desc = "Map reader: the radar reaches a third farther.", picture = "cmd_us_lieutenant", cost = 1500 },
+            new Commander { id = "rivers", name = "Cpl. Rivers, 761st", nation = "us", bonus = "heavy", desc = "Panther hunter: +50% damage against heavy tanks.", picture = "cmd_us_corporal", cost = 2000 },
+            new Commander { id = "orlov", name = "Kpt. Orlov", nation = "su", bonus = "armour", desc = "Kursk armour: the leader takes one hit more.", picture = "cmd_su_captain", cost = 1500 },
+            new Commander { id = "samusenko", name = "Lt. Samusenko", nation = "su", bonus = "repair", desc = "Field mechanic: repair kits mend one hit more.", picture = "cmd_su_woman", cost = 1500 },
+            new Commander { id = "belov", name = "Serzh. Belov", nation = "su", bonus = "speed", desc = "Siberian engines: the platoon drives 12% faster.", picture = "cmd_su_siberian", cost = 2000 },
+        };
+        public static string CommanderId { get { Load(); return PlayerPrefs.GetString("depot.commander." + Nation, ""); } }
+        public static string CommanderBonus { get { var c = System.Array.Find(Commanders, x => x.id == CommanderId && x.nation == Nation); return c != null ? c.bonus : ""; } }
+        public static bool OwnsCommander(Commander c) => PlayerPrefs.GetInt("depot.commander." + c.id, 0) == 1;
+        public static bool PickCommander(Commander c)
+        {
+            Load();
+            if (!OwnsCommander(c)) { if (Points < c.cost) return false; Points -= c.cost; PlayerPrefs.SetInt("depot.commander." + c.id, 1); }
+            PlayerPrefs.SetString("depot.commander." + c.nation, CommanderId == c.id ? "" : c.id); Save(); return true;   // picking the chosen one again rides without a commander
         }
 
         /// <summary>Veteran nights: the enemy takes half again as many hits, the night pays half again as much.</summary>

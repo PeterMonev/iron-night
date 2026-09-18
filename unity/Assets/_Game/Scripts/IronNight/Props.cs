@@ -37,6 +37,16 @@ namespace IronNight
             new Kind { mesh = "wall_b", length = 6f, height = -1f, circles = new[] { -2f, 0f, 1f, 0f, 0f, 1f, 2f, 0f, 1f } },
             new Kind { mesh = "cart", length = 3.5f, height = 1.8f, circles = new[] { 0f, 0f, 1.4f } },
             new Kind { mesh = "pole", length = 1f, height = -1f, circles = new[] { 0f, 0f, 0.35f } },
+            new Kind { mesh = "tree_oak", length = 10f, height = -1f, circles = new[] { 0f, 0f, 0.7f } },
+            new Kind { mesh = "tree_poplar", length = 4f, height = -1f, circles = new[] { 0f, 0f, 0.45f } },
+            new Kind { mesh = "spruce_snow", length = 8f, height = -1f, circles = new[] { 0f, 0f, 0.7f } },
+            new Kind { mesh = "bunker", length = 6f, height = 2.6f, circles = new[] { -1.5f, 0f, 2.2f, 1.5f, 0f, 2.2f } },
+            new Kind { mesh = "barrels", length = 2f, height = 1.2f, circles = new[] { 0f, 0f, 1f } },
+            new Kind { mesh = "well", length = 2.5f, height = 2.4f, circles = new[] { 0f, 0f, 1.3f } },
+            new Kind { mesh = "gate", length = 3.5f, height = -1f, circles = new[] { -1.6f, 0f, 0.5f, 1.6f, 0f, 0.5f } },
+            new Kind { mesh = "signpost", length = 1f, height = -1f, circles = new[] { 0f, 0f, 0.3f } },
+            new Kind { mesh = "wreck", length = 6f, height = 2.2f, circles = new[] { -1.6f, 0f, 1.7f, 1.6f, 0f, 1.7f } },
+            new Kind { mesh = "marker_smoke", length = 0.5f, height = -1f, circles = new float[0] },
         };
 
         const float Cell = 40f, Half = 20f;
@@ -113,7 +123,8 @@ namespace IronNight
 
         void Tree(List<Prop> list, Vector3 pos, int seed)
         {
-            if (winter) { Place(list, "deadtree", pos, (seed % 360) * Mathf.Deg2Rad); return; }   // bare in the snow
+            if (winter) { if (Place(list, seed % 3 == 0 ? "deadtree" : "spruce_snow", pos, (seed % 360) * Mathf.Deg2Rad) == null) Place(list, "deadtree", pos, (seed % 360) * Mathf.Deg2Rad); return; }   // firs and bare trees in the snow
+            if (Place(list, "tree_oak", pos, (seed % 360) * Mathf.Deg2Rad) != null) return;
             list.Add(new Prop { what = What.Tree, pos = pos, seed = seed, yaw = (seed % 360) * Mathf.Deg2Rad, bound = 5f, circleCenters = new[] { new Vector2(pos.x, pos.z) }, radii = new[] { 0.8f } });
         }
 
@@ -154,7 +165,9 @@ namespace IronNight
             // a low wall closes the south side of the yard, with a gap for the gate
             Place(list, Rnd(ix, iz, 1111) < 0.5f ? "wall_a" : "wall_b", o - f * 13f - r * 4f, yaw + Mathf.PI / 2f); Place(list, Rnd(ix, iz, 1112) < 0.5f ? "wall_a" : "wall_b", o - f * 13f + r * 10f, yaw + Mathf.PI / 2f);
             if (Rnd(ix, iz, 1113) < 0.6f) Place(list, "cart", o + r * 4f - f * 4f, yaw + Rnd(ix, iz, 1114) * 6.28f);
+            Place(list, "gate", o - f * 13f + r * 3f, yaw + Mathf.PI / 2f);
             Place(list, "barn", o + f * 9.5f + r * 3f, yaw + Mathf.PI / 2f);
+            if (Rnd(ix, iz, 1145) < 0.35f) Place(list, "barrels", o + f * 4f + r * 9f, Rnd(ix, iz, 1146) * 6.28f);
             int hay = 2 + (int)(Rnd(ix, iz, 984) * 2f);
             for (int h = 0; h < hay; h++) Place(list, "haystack", o + r * (8f + Rnd(ix, iz, 985 + h) * 3f) + f * (-6f + h * 4.5f), Rnd(ix, iz, 995 + h) * 6.28f);
             if (Rnd(ix, iz, 986) < 0.45f) Place(list, "truck", o - f * 9f + r * (Rnd(ix, iz, 987) * 5f - 1f), yaw + 1.2f + (Rnd(ix, iz, 988) - 0.5f) * 0.8f);
@@ -172,7 +185,8 @@ namespace IronNight
             Place(list, "cottage", o + r * 16f - f * 2f, yaw - Mathf.PI / 2f);
             Place(list, Rnd(ix, iz, 1124) < 0.5f ? "wall_a" : "wall_b", o - f * 14f - r * 6f, yaw + Mathf.PI / 2f); Place(list, Rnd(ix, iz, 1125) < 0.5f ? "wall_a" : "wall_b", o - f * 14f + r * 8f, yaw + Mathf.PI / 2f);
             Place(list, "cart", o - r * 6f - f * 8f, yaw + Rnd(ix, iz, 1126) * 6.28f);
-            if (Rnd(ix, iz, 1127) < 0.6f) Place(list, "truck", o + r * 6f - f * 9f, yaw + 0.4f);
+            Place(list, "well", o - r * 4f - f * 12f, yaw);
+            if (Rnd(ix, iz, 1127) < 0.6f) Place(list, "truck", o + r * 9f - f * 11f, yaw + 0.4f);
             Tree(list, o + r * 9f + f * 12f, (int)(Hash(ix, iz, 1128) & 0xffff));
         }
 
@@ -185,6 +199,8 @@ namespace IronNight
             list.Add(new Prop { what = What.Searchlight, pos = o, yaw = yaw, seed = (int)(Hash(ix, iz, 1003) & 0xffff), bound = 4f, circleCenters = new[] { new Vector2(o.x, o.z) }, radii = new[] { 1.8f } });
             Place(list, "sandbags", o, yaw + Mathf.PI);   // the ring round the lamp, its opening away from the front
             Place(list, "truck", o + f * 9f + r * 3f, yaw + 1.3f + (Rnd(ix, iz, 1004) - 0.5f) * 0.6f);
+            Place(list, "barrels", o + f * 9f - r * 3f, Rnd(ix, iz, 1005) * 6.28f);
+            if (Rnd(ix, iz, 1006) < 0.5f) Place(list, "bunker", o - f * 8f + r * 2f, yaw);
         }
 
         /// <summary>Hay bales in the mown and stubble fields, a wreck or a crater anywhere, a lone tree, a dead one.</summary>
@@ -197,6 +213,7 @@ namespace IronNight
             int craters = Rnd(ix, iz, 1052) < 0.35f ? 1 + (int)(Rnd(ix, iz, 1053) * 2f) : 0;
             for (int k = 0; k < craters; k++) list.Add(new Prop { what = What.Decal, seed = 1, pos = c + In(ix, iz, 1054 + k * 2, 16f), yaw = Rnd(ix, iz, 1060 + k) * 6.28f, size = 4f + Rnd(ix, iz, 1064 + k) * 3f });
             if (Rnd(ix, iz, 1070) < 0.05f) Place(list, "sandbags", c + In(ix, iz, 1071, 12f), Rnd(ix, iz, 1073) * 6.28f);
+            if (Rnd(ix, iz, 1074) < 0.04f) Place(list, "wreck", c + In(ix, iz, 1075, 12f), Rnd(ix, iz, 1077) * 6.28f);
         }
 
         List<Prop> CellProps(int ix, int iz)
@@ -206,6 +223,10 @@ namespace IronNight
             // the lanes and hedges on the cell's east and north lines; the west and south ones belong to the neighbours
             if (LaneX(ix)) { list.Add(new Prop { what = What.Lane, pos = c + new Vector3(Half, 0f, 0f), yaw = 0f, size = Cell }); foreach (var u in new[] { -12f, 8f }) Place(list, "pole", c + new Vector3(Half + 3.6f, 0f, u), 0f); }
             if (LaneZ(iz)) { list.Add(new Prop { what = What.Lane, pos = c + new Vector3(0f, 0f, Half), yaw = Mathf.PI / 2f, size = Cell }); foreach (var u in new[] { -12f, 8f }) Place(list, "pole", c + new Vector3(u, 0f, Half + 3.6f), Mathf.PI / 2f); }
+            // a row of poplars on the other side of every third lane; a signpost where two lanes cross
+            if (LaneX(ix) && !winter && Rnd(ix, iz, 1140) < 0.35f) foreach (var u in new[] { -16f, -4f, 8f }) Place(list, "tree_poplar", c + new Vector3(Half - 4.2f, 0f, u + Rnd(ix, iz, 1141 + (int)u) * 2f), Rnd(ix, iz, 1150 + (int)u) * 6.28f);
+            if (LaneZ(iz) && !winter && Rnd(ix, iz, 1142) < 0.35f) foreach (var u in new[] { -16f, -4f, 8f }) Place(list, "tree_poplar", c + new Vector3(u + Rnd(ix, iz, 1143 + (int)u) * 2f, 0f, Half - 4.2f), Rnd(ix, iz, 1160 + (int)u) * 6.28f);
+            if (LaneX(ix) && LaneZ(iz)) Place(list, "signpost", c + new Vector3(Half + 4.5f, 0f, Half + 4.5f), Rnd(ix, iz, 1144) * 6.28f);
             if (HedgeX(ix, iz)) Hedge(list, c + new Vector3(Half, 0f, -Half), c + new Vector3(Half, 0f, Half), LaneZ(iz - 1) ? 4f : 0f, LaneZ(iz) ? 4f : 0f, ix, iz, 0);
             if (HedgeZ(ix, iz)) Hedge(list, c + new Vector3(-Half, 0f, Half), c + new Vector3(Half, 0f, Half), LaneX(ix - 1) ? 4f : 0f, LaneX(ix) ? 4f : 0f, ix, iz, 1);
             if (Farm(ix, iz)) FarmYard(list, ix, iz, c);
@@ -248,6 +269,15 @@ namespace IronNight
                 groundColors[z * n + x] = c;
             }
             groundMesh.colors = groundColors;
+        }
+
+        /// <summary>One model for the battle to place itself (no collision): null when the model is not there.</summary>
+        public GameObject Spawn(string mesh, Vector3 pos, float yawDeg)
+        {
+            if (!prefabs.ContainsKey(mesh)) return null;
+            var go = Instantiate(prefabs[mesh], transform); go.name = mesh; go.transform.position = pos; go.transform.rotation = Quaternion.Euler(0f, yawDeg, 0f);
+            foreach (var r in go.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = materials[mesh]; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+            return go;
         }
 
         /// <summary>Rain: the ground goes glossy under the moon.</summary>
