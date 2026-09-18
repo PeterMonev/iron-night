@@ -69,8 +69,10 @@ namespace IronNight
             for (int i = 0; i < 4; i++)
             {
                 var f = forms[i]; int idx = i;
-                var b = MakeButton(t, names[i], new Vector2(0.5f, 0f), new Vector2(-390 + i * 260, 120), new Vector2(244, 92), 34, () => { OnFormation?.Invoke(f); Highlight(idx); });
+                var b = MakeButton(t, names[i], new Vector2(0.5f, 0f), new Vector2(-390 + i * 260, 120), new Vector2(244, 92), 30, () => { OnFormation?.Invoke(f); Highlight(idx); });
                 formButtons[i] = b.GetComponent<Button>();
+                var icon = MakeImage(b.transform, "Icon", new Vector2(0f, 0.5f), new Vector2(10f, 0f), new Vector2(64f, 64f), new Color(0.93f, 0.91f, 0.86f, 0.9f)); icon.sprite = UiSprite("formation_icons", new Rect(i * 256, 0, 256, 256));
+                var lbl = b.transform.Find("Label").GetComponent<Text>(); lbl.alignment = TextAnchor.MiddleLeft; lbl.rectTransform.anchorMin = new Vector2(0f, 0f); lbl.rectTransform.anchorMax = new Vector2(1f, 1f); lbl.rectTransform.offsetMin = new Vector2(82f, 0f); lbl.rectTransform.offsetMax = Vector2.zero;
             }
             Highlight(0);
 
@@ -114,6 +116,7 @@ namespace IronNight
             // title sheet
             titleSheet = new GameObject("Title", typeof(RectTransform), typeof(Image)); titleSheet.transform.SetParent(root, false);
             Stretch(titleSheet); titleSheet.GetComponent<Image>().color = new Color(0.02f, 0.03f, 0.04f, 0.72f);
+            { var art = UiSprite("keyart"); if (art != null) { var bg = MakeImage(titleSheet.transform, "KeyArt", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1320f, 2347f), new Color(0.78f, 0.78f, 0.8f, 1f)); bg.sprite = art; bg.transform.SetAsFirstSibling(); var shade = MakeImage(titleSheet.transform, "Shade", new Vector2(0.5f, 0.5f), new Vector2(0f, -130f), new Vector2(1080f, 1400f), new Color(0.02f, 0.03f, 0.04f, 0.55f)); shade.transform.SetSiblingIndex(1); } }
             MakeText(titleSheet.transform, "Eyebrow", new Vector2(0.5f, 0.5f), new Vector2(0, 660), TextAnchor.MiddleCenter, 34, dim).text = "WWII · NIGHT ASSAULT";
             var big = MakeText(titleSheet.transform, "Name", new Vector2(0.5f, 0.5f), new Vector2(0, 540), TextAnchor.MiddleCenter, 150, ink); big.text = "IRON NIGHT"; big.fontStyle = FontStyle.Bold; big.rectTransform.sizeDelta = new Vector2(1000, 200);
             MakeText(titleSheet.transform, "Tag", new Vector2(0.5f, 0.5f), new Vector2(0, 430), TextAnchor.MiddleCenter, 36, dim).text = "Lead a Sherman platoon through five minutes of darkness.";
@@ -213,10 +216,12 @@ namespace IronNight
             {
                 var u = Depot.Upgrades[i]; float y = -i * 250f;
                 var row = MakeImage(depotRows, "Row " + u.id, new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 230), new Color(0.08f, 0.09f, 0.1f, 0.96f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);
-                var title = MakeText(row.transform, "Title", new Vector2(0f, 1f), new Vector2(30, -20), TextAnchor.UpperLeft, 44, new Color(0.93f, 0.91f, 0.86f)); title.text = u.title; title.rectTransform.sizeDelta = new Vector2(600, 60);
+                var pic = UiSprite(CardPicture(u.id)); float left = pic != null ? 200f : 30f;
+                if (pic != null) { var art = MakeImage(row.transform, "Art", new Vector2(0f, 1f), new Vector2(18f, -18f), new Vector2(150f, 150f), Color.white); art.sprite = pic; }
+                var title = MakeText(row.transform, "Title", new Vector2(0f, 1f), new Vector2(left, -20), TextAnchor.UpperLeft, 44, new Color(0.93f, 0.91f, 0.86f)); title.text = u.title; title.rectTransform.sizeDelta = new Vector2(600, 60);
                 var pips = new System.Text.StringBuilder(); for (int k = 0; k < u.MaxLevel; k++) pips.Append(k < u.level ? "■" : "□");
                 var lvl = MakeText(row.transform, "Level", new Vector2(1f, 1f), new Vector2(-30, -26), TextAnchor.UpperRight, 40, new Color(0.95f, 0.66f, 0.23f)); lvl.text = pips.ToString(); lvl.rectTransform.sizeDelta = new Vector2(300, 60);
-                var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(30, -80), TextAnchor.UpperLeft, 28, new Color(0.66f, 0.64f, 0.59f)); desc.text = u.desc; desc.rectTransform.sizeDelta = new Vector2(880, 80);
+                var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(left, -80), TextAnchor.UpperLeft, 28, new Color(0.66f, 0.64f, 0.59f)); desc.text = u.desc; desc.rectTransform.sizeDelta = new Vector2(910 - left, 80);
                 bool maxed = u.level >= u.MaxLevel, can = !maxed && Depot.Points >= u.Cost;
                 var b = MakeButton(row.transform, maxed ? "Maxed" : $"Upgrade · {u.Cost}", new Vector2(1f, 0f), new Vector2(-190, 50), new Vector2(340, 80), 32, () => { if (Depot.Buy(u)) RefreshDepot(); });
                 b.GetComponent<Image>().color = can ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : new Color(0.2f, 0.2f, 0.22f, 0.9f);
@@ -375,9 +380,11 @@ namespace IronNight
                 b.GetComponent<Image>().color = card.rare ? new Color(0.16f, 0.12f, 0.05f, 0.97f) : new Color(0.08f, 0.09f, 0.1f, 0.96f);
                 var title = b.transform.Find("Label").GetComponent<Text>(); if (card.rare) title.color = new Color(0.95f, 0.66f, 0.23f);
                 title.alignment = TextAnchor.UpperLeft; title.rectTransform.anchorMin = title.rectTransform.anchorMax = title.rectTransform.pivot = new Vector2(0f, 1f);
-                title.rectTransform.anchoredPosition = new Vector2(30f, -22f); title.rectTransform.sizeDelta = new Vector2(840f, 70f);
-                var desc = MakeText(b.transform, "Desc", new Vector2(0f, 1f), new Vector2(30f, -100f), TextAnchor.UpperLeft, 34, new Color(0.66f, 0.64f, 0.59f));
-                desc.rectTransform.sizeDelta = new Vector2(840f, 130f); desc.text = card.desc;
+                var pic = UiSprite(CardPicture(card.id)); float left = pic != null ? 262f : 30f;
+                if (pic != null) { var art = MakeImage(b.transform, "Art", new Vector2(0f, 0.5f), new Vector2(18f, 0f), new Vector2(214f, 214f), Color.white); art.sprite = pic; }
+                title.rectTransform.anchoredPosition = new Vector2(left, -22f); title.rectTransform.sizeDelta = new Vector2(900f - left - 20f, 70f);
+                var desc = MakeText(b.transform, "Desc", new Vector2(0f, 1f), new Vector2(left, -100f), TextAnchor.UpperLeft, 34, new Color(0.66f, 0.64f, 0.59f));
+                desc.rectTransform.sizeDelta = new Vector2(900f - left - 20f, 130f); desc.text = card.desc;
             }
             sheet.SetActive(true);
         }
@@ -402,7 +409,7 @@ namespace IronNight
             {
                 var m = Medals.All[i]; bool got = Medals.Earned(m); float y = -i * 130f;
                 var row = MakeImage(medalRows, "Medal", new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 118), new Color(0.08f, 0.09f, 0.1f, got ? 0.96f : 0.6f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);
-                var disc = MakeImage(row.transform, "Disc", new Vector2(0f, 0.5f), new Vector2(60, 0), new Vector2(64, 64), got ? amber : new Color(0.2f, 0.2f, 0.22f)); disc.sprite = Lightswarm.ProceduralSprites.Glow(32, 0.95f); disc.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                var disc = MakeImage(row.transform, "Disc", new Vector2(0f, 0.5f), new Vector2(60, 0), new Vector2(104, 104), got ? Color.white : new Color(0.3f, 0.3f, 0.32f)); disc.sprite = i < MedalPictures.Length ? UiSprite(MedalPictures[i]) : Lightswarm.ProceduralSprites.Glow(32, 0.95f); disc.rectTransform.pivot = new Vector2(0.5f, 0.5f);
                 var name = MakeText(row.transform, "Name", new Vector2(0f, 1f), new Vector2(120, -14), TextAnchor.UpperLeft, 38, got ? new Color(0.93f, 0.91f, 0.86f) : dim); name.text = m.name; name.rectTransform.sizeDelta = new Vector2(700, 50);
                 var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(120, -62), TextAnchor.UpperLeft, 26, got ? new Color(0.66f, 0.64f, 0.59f) : dim); desc.text = m.desc + (got ? "" : "  · +" + Medals.Reward); desc.rectTransform.sizeDelta = new Vector2(780, 50);
             }
@@ -458,6 +465,26 @@ namespace IronNight
             var t = go.GetComponent<Text>(); t.font = DefaultFont(); t.fontSize = size; t.alignment = align; t.color = color; t.raycastTarget = false;
             return t;
         }
+
+        static readonly Dictionary<string, Sprite> uiSprites = new Dictionary<string, Sprite>();
+        /// <summary>A painted picture from Resources/UI as a sprite; a rect (in pixels) picks one cell of a sheet.</summary>
+        public static Sprite UiSprite(string name, Rect? cell = null)
+        {
+            string key = name + (cell.HasValue ? cell.Value.ToString() : ""); if (uiSprites.TryGetValue(key, out var s)) return s;
+            var tex = Resources.Load<Texture2D>("UI/" + name); if (tex == null) return null;
+            s = Sprite.Create(tex, cell ?? new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f); uiSprites[key] = s; return s;
+        }
+        static string CardPicture(string id)
+        {
+            switch (id)
+            {
+                case "he": return "card_he"; case "apcr": return "card_apcr"; case "rapid": case "loaders": return "card_loader"; case "radar": case "optics": return "card_optics";
+                case "engine": case "engines": return "card_engines"; case "repair": return "card_repair"; case "reinf": return "card_reinf"; case "arty": return "card_artillery";
+                case "smoke": return "card_smoke"; case "firefly": return "card_firefly"; case "gunners": return "card_gunner"; case "plates": case "armor": return "card_armour";
+                case "reserve": return "card_crews"; case "veteran": return "card_veteran"; default: return null;
+            }
+        }
+        static readonly string[] MedalPictures = { "medal_recruit", "medal_nightfighter", "medal_bocage", "medal_sharpshooter", "medal_tankace", "medal_tigerslayer", "medal_gunbuster", "medal_trenchbroom", "medal_pathfinder", "medal_aceofaces", "medal_oldguard", "medal_ironnight" };
 
         public static Image MakeImage(Transform parent, string name, Vector2 anchor, Vector2 offset, Vector2 size, Color color)
         {

@@ -597,7 +597,7 @@ namespace IronNight
             var L = Leader; float ang = (Random.value - 0.5f) * 80f * Mathf.Deg2Rad, dist = 110f + Random.value * 60f;
             var pos = L.transform.position + new Vector3(Mathf.Sin(ang), 0f, Mathf.Cos(ang)) * dist;
             bool hold = objectivesReached > 0 && Random.value < 0.5f;
-            objective = new Objective { pos = pos, n = objectivesReached + 1, hold = hold, marker = fx.Marker(pos, new Color(0.35f, 0.95f, 0.45f), hold ? 15f : 9f) };
+            objective = new Objective { pos = pos, n = objectivesReached + 1, hold = hold, marker = fx.Marker(pos, new Color(0.35f, 0.95f, 0.45f), hold ? 15f : 9f, true) };
             if (phase == Phase.Play) hud.Toast("Objective " + objective.n + " · " + (hold ? "hold the crossing, " : "") + Mathf.RoundToInt(dist) + " m ahead", 3f);
         }
 
@@ -658,7 +658,7 @@ namespace IronNight
                 dropTimer = 50f + Random.value * 25f;
                 float a = Random.value * Mathf.PI * 2f; var pos = props.PushOut(L.transform.position + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * (16f + Random.value * 14f), 3f);
                 var d = new Drop { pos = pos, height = 55f, kind = Random.Range(0, 4) };
-                if (crateMaterial == null) { crateMaterial = new Material(Resources.Load<Material>("BarrelLit")); crateMaterial.SetColor("_BaseColor", new Color(0.45f, 0.36f, 0.22f)); crateMaterial.SetFloat("_Metallic", 0f); crateMaterial.SetFloat("_Smoothness", 0.2f); chuteMaterial = new Material(Resources.Load<Material>("VehicleLit")); chuteMaterial.SetColor("_BaseColor", new Color(0.85f, 0.82f, 0.72f)); chuteMaterial.SetFloat("_Cull", 0f); }
+                if (crateMaterial == null) { crateMaterial = new Material(Resources.Load<Material>("BarrelLit")); crateMaterial.SetColor("_BaseColor", new Color(0.45f, 0.36f, 0.22f)); crateMaterial.SetFloat("_Metallic", 0f); crateMaterial.SetFloat("_Smoothness", 0.2f); chuteMaterial = new Material(Resources.Load<Material>("VehicleLit")); chuteMaterial.SetTexture("_BaseMap", Resources.Load<Texture2D>("Fx/chute_fabric")); chuteMaterial.SetTextureScale("_BaseMap", new Vector2(3f, 1f)); chuteMaterial.SetColor("_BaseColor", new Color(1.3f, 1.3f, 1.2f)); chuteMaterial.SetFloat("_Cull", 0f); chuteMaterial.SetFloat("_Smoothness", 0.12f); }
                 var cratePf = Resources.Load<GameObject>("Props/crate");
                 if (cratePf != null) { d.crate = Instantiate(cratePf).transform; d.top = 1.2f; var cm = new Material(Resources.Load<Material>("VehicleLit")); cm.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/crate_tex")); cm.SetFloat("_Cull", 0f); foreach (var rr in d.crate.GetComponentsInChildren<Renderer>()) rr.sharedMaterial = cm; }
                 else { d.crate = GameObject.CreatePrimitive(PrimitiveType.Cube).transform; Destroy(d.crate.GetComponent<Collider>()); d.crate.localScale = new Vector3(1.3f, 1f, 1.3f); d.lift = 0.5f; d.top = 0.5f; d.crate.GetComponent<Renderer>().sharedMaterial = crateMaterial; }
@@ -745,7 +745,7 @@ namespace IronNight
 
         void RemoveDrop(Drop d) { Destroy(d.crate.gameObject); Destroy(d.chute.gameObject); Destroy(d.lines.gameObject); if (d.marker != null) Destroy(d.marker.gameObject); Destroy(d.canopy); }
 
-        static Color ChuteColour(int kind) { switch (kind) { case 0: return new Color(0.9f, 0.88f, 0.8f); case 1: return new Color(0.62f, 0.3f, 0.26f); case 2: return new Color(0.7f, 0.65f, 0.32f); default: return new Color(0.36f, 0.48f, 0.66f); } }   // repair white, ammunition red, smoke yellow, radio blue: the air force colour code
+        static Color ChuteColour(int kind) { switch (kind) { case 0: return new Color(1.5f, 1.5f, 1.35f); case 1: return new Color(1.9f, 0.6f, 0.5f); case 2: return new Color(1.8f, 1.5f, 0.45f); default: return new Color(0.55f, 0.95f, 1.8f); } }   // repair white, ammunition red, smoke yellow, radio blue: the air force colour code
 
         /// <summary>A parachute canopy: a dome of gores that bulge between their seams, the apex at the top, the skirt
         /// at y = 0. Rendered from both sides. The rest positions come back for the ripple and the collapse.</summary>

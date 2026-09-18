@@ -1,0 +1,691 @@
+fileFormatVersion: 2
+guid: c6c1a161a19133d4ba813fa4e885763c
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -373051852361823248
+    second: formation_icons_0
+  - first:
+      213: 4063305896216396010
+    second: formation_icons_1
+  - first:
+      213: 3401174095701148401
+    second: formation_icons_2
+  - first:
+      213: -6016341394685580804
+    second: formation_icons_3
+  - first:
+      213: -4081518651908274267
+    second: formation_icons_4
+  - first:
+      213: -5278467847243067268
+    second: formation_icons_5
+  - first:
+      213: -2720762716595386533
+    second: formation_icons_6
+  - first:
+      213: 7793040891279525017
+    second: formation_icons_7
+  - first:
+      213: 6451294962280964451
+    second: formation_icons_8
+  - first:
+      213: -2027617044297322596
+    second: formation_icons_9
+  - first:
+      213: -1975656222198450931
+    second: formation_icons_10
+  - first:
+      213: -9026014164116114061
+    second: formation_icons_11
+  - first:
+      213: -1427566319538581524
+    second: formation_icons_12
+  - first:
+      213: -4336090187167521958
+    second: formation_icons_13
+  - first:
+      213: 5805976468354306989
+    second: formation_icons_14
+  - first:
+      213: -3886236842388060453
+    second: formation_icons_15
+  - first:
+      213: -8711371169936171228
+    second: formation_icons_16
+  - first:
+      213: 3977306841565019860
+    second: formation_icons_17
+  - first:
+      213: -3573226159329207427
+    second: formation_icons_18
+  - first:
+      213: 5313469073353055236
+    second: formation_icons_19
+  - first:
+      213: -3354317418568255356
+    second: formation_icons_20
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationMethod: 0
+  spriteTessellationDetail: -1
+  spriteGeometrySubdivision: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: formation_icons_0
+      rect:
+        serializedVersion: 2
+        x: 113
+        y: 153
+        width: 43
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0fb0c291157a2daf0800000000000000
+      internalID: -373051852361823248
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_1
+      rect:
+        serializedVersion: 2
+        x: 338
+        y: 152
+        width: 58
+        height: 38
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ae08abd2f23c36830800000000000000
+      internalID: 4063305896216396010
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_2
+      rect:
+        serializedVersion: 2
+        x: 805
+        y: 147
+        width: 62
+        height: 16
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1f20781e1d5633f20800000000000000
+      internalID: 3401174095701148401
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_3
+      rect:
+        serializedVersion: 2
+        x: 815
+        y: 162
+        width: 41
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: cf9a942a069a18ca0800000000000000
+      internalID: -6016341394685580804
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_4
+      rect:
+        serializedVersion: 2
+        x: 54
+        y: 115
+        width: 43
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5a740e039688b57c0800000000000000
+      internalID: -4081518651908274267
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_5
+      rect:
+        serializedVersion: 2
+        x: 103
+        y: 137
+        width: 63
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c7091ce957d1fb6b0800000000000000
+      internalID: -5278467847243067268
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_6
+      rect:
+        serializedVersion: 2
+        x: 172
+        y: 115
+        width: 43
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b57843779b8ed3ad0800000000000000
+      internalID: -2720762716595386533
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_7
+      rect:
+        serializedVersion: 2
+        x: 338
+        y: 114
+        width: 58
+        height: 37
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9944fccb661762c60800000000000000
+      internalID: 7793040891279525017
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_8
+      rect:
+        serializedVersion: 2
+        x: 521
+        y: 131
+        width: 43
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3612608769a978950800000000000000
+      internalID: 6451294962280964451
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_9
+      rect:
+        serializedVersion: 2
+        x: 602
+        y: 131
+        width: 44
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c9f612e7a057cd3e0800000000000000
+      internalID: -2027617044297322596
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_10
+      rect:
+        serializedVersion: 2
+        x: 684
+        y: 131
+        width: 43
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d053295222f0594e0800000000000000
+      internalID: -1975656222198450931
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_11
+      rect:
+        serializedVersion: 2
+        x: 862
+        y: 116
+        width: 61
+        height: 38
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 375f63a80f72db280800000000000000
+      internalID: -9026014164116114061
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_12
+      rect:
+        serializedVersion: 2
+        x: 44
+        y: 99
+        width: 63
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: cef4796fef3403ce0800000000000000
+      internalID: -1427566319538581524
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_13
+      rect:
+        serializedVersion: 2
+        x: 162
+        y: 99
+        width: 63
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a53a2d7c2fc13d3c0800000000000000
+      internalID: -4336090187167521958
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_14
+      rect:
+        serializedVersion: 2
+        x: 511
+        y: 115
+        width: 63
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: da3198a26d8f29050800000000000000
+      internalID: 5805976468354306989
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_15
+      rect:
+        serializedVersion: 2
+        x: 592
+        y: 115
+        width: 64
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bd68c689e20511ac0800000000000000
+      internalID: -3886236842388060453
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_16
+      rect:
+        serializedVersion: 2
+        x: 673
+        y: 115
+        width: 64
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 42f1065631efa1780800000000000000
+      internalID: -8711371169936171228
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_17
+      rect:
+        serializedVersion: 2
+        x: 928
+        y: 101
+        width: 42
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4deb63eef7b323730800000000000000
+      internalID: 3977306841565019860
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_18
+      rect:
+        serializedVersion: 2
+        x: 338
+        y: 75
+        width: 58
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d7b9c076db9596ec0800000000000000
+      internalID: -3573226159329207427
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_19
+      rect:
+        serializedVersion: 2
+        x: 347
+        y: 91
+        width: 40
+        height: 22
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 40c9b3268fb3db940800000000000000
+      internalID: 5313469073353055236
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: formation_icons_20
+      rect:
+        serializedVersion: 2
+        x: 919
+        y: 85
+        width: 61
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 488755a64121371d0800000000000000
+      internalID: -3354317418568255356
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      formation_icons_0: -373051852361823248
+      formation_icons_1: 4063305896216396010
+      formation_icons_10: -1975656222198450931
+      formation_icons_11: -9026014164116114061
+      formation_icons_12: -1427566319538581524
+      formation_icons_13: -4336090187167521958
+      formation_icons_14: 5805976468354306989
+      formation_icons_15: -3886236842388060453
+      formation_icons_16: -8711371169936171228
+      formation_icons_17: 3977306841565019860
+      formation_icons_18: -3573226159329207427
+      formation_icons_19: 5313469073353055236
+      formation_icons_2: 3401174095701148401
+      formation_icons_20: -3354317418568255356
+      formation_icons_3: -6016341394685580804
+      formation_icons_4: -4081518651908274267
+      formation_icons_5: -5278467847243067268
+      formation_icons_6: -2720762716595386533
+      formation_icons_7: 7793040891279525017
+      formation_icons_8: 6451294962280964451
+      formation_icons_9: -2027617044297322596
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
