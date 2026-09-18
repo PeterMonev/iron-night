@@ -1,0 +1,3 @@
+newmtl tree_poplar
+Kd 1 1 1
+map_Kd tree_poplar_tex.png

@@ -4,7 +4,7 @@ const { createCanvas, loadImage } = require('@napi-rs/canvas'); const fs = requi
 const M = 'D:/Codes/Projects/lightswarm/unity/Assets/_Game/Resources/Models/', RAW = 'D:/Codes/Projects/lightswarm/art/models/raw-tex/';
 fs.mkdirSync(RAW, { recursive: true });
 (async () => {
-  for (const name of ['pz4', 'tiger', 'panther', 'stug', 'halftrack', 'pak40']) {
+  for (const name of (process.argv.length > 2 ? process.argv.slice(2) : ['pz4', 'tiger', 'panther', 'stug', 'halftrack', 'pak40'])) {
     if (!fs.existsSync(RAW + name + '.png')) fs.copyFileSync(M + name + '.png', RAW + name + '.png');
     const im = await loadImage(RAW + name + '.png'); const c = createCanvas(im.width, im.height), g = c.getContext('2d'); g.drawImage(im, 0, 0);
     const img = g.getImageData(0, 0, c.width, c.height), d = img.data;

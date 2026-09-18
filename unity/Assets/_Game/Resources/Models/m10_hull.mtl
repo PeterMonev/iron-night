@@ -1,0 +1,3 @@
+newmtl m10_hull
+Kd 1 1 1
+map_Kd m10.png

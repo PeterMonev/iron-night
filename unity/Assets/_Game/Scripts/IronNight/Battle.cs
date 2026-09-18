@@ -19,7 +19,7 @@ namespace IronNight
         class Flare { public Vector3 pos; public float age; public Transform vis; public Light light; public Material mat; }
         class Wreck { public Vehicle v; public float age, burnTimer; public Light fire; }
         class ArtyShell { public Vector3 at; public float timer; }
-        class Objective { public Vector3 pos; public Transform marker; public GameObject grenade; public float smokeTimer, held; public int n; public bool hold; }
+        class Objective { public Vector3 pos; public Transform marker; public GameObject grenade; public float smokeTimer, held, salvo, clock; public int n; public bool hold; public string kind = "reach"; public List<Vehicle> targets = new List<Vehicle>(); }
         class Drop { public Vector3 pos; public float height, age, lift, top; public int kind; public Transform crate, chute, marker; public LineRenderer lines; public Mesh canopy; public Vector3[] rest; }   // lift: the crate origin above its base; top: where the shrouds tie
         class Mortar { public Vector3 at; public float timer; public Transform ring; }
         class Star { public Vector3 pos; public float height, life, puff; public Transform flare, chute; public Light light; }
@@ -74,6 +74,7 @@ namespace IronNight
             if (veteran) hud.Toast("Veteran night · points ×1.5", 3f);
             hud.OnDaily = () => { Depot.ClaimDaily(); hud.ShowTitle(reserveGranted); };
             var leaderSpec = VehicleSpec.ById(Depot.LeaderId); if (!VehicleSpec.Available(leaderSpec)) leaderSpec = VehicleSpec.ById(Depot.WingmanId);
+            foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--tank=")) leaderSpec = VehicleSpec.ById(arg.Substring(7));   // test switch: --tank=is2
             platoon.Add(Vehicle.Create(leaderSpec, true, Vector3.zero, 0f)); Leader.hp = Depot.LeaderHp;
             // the commander riding with the leader
             bonus = Depot.CommanderBonus; if (bonus == "reload") reloadMul *= 0.85f; if (bonus == "speed") speedMul *= 1.12f; if (bonus == "armour") Leader.hp += 1f;
@@ -189,7 +190,7 @@ namespace IronNight
                 bool on = e.Aim(target.transform.position, dt);
                 if (e.spec.casemate) { if (dist > e.Range * 0.8f) e.turretYaw = e.yaw; else e.yaw = e.turretYaw; }   // the StuG aims with the whole hull
                 bool blind = smokeLeft > 0f && dist > 9f;                 // the smoke screen: they cannot see us from afar
-                if (on && !blind && e.reloadLeft <= 0f && dist <= e.Range) Fire(e, target);
+                if (on && !blind && e.reloadLeft <= 0f && dist <= e.Range && e.spec.damage > 0f) Fire(e, target);
                 e.Apply();
             }
 
@@ -303,8 +304,8 @@ namespace IronNight
             else
             {
                 foes.Remove(v); kills++;
-                if (v.spec == VehicleSpec.Tiger || v.spec == VehicleSpec.TigerAce) nightTigers++; if (v.spec.isGun) nightPaks++;
-                int worth = v.spec == VehicleSpec.Tiger ? 5 : v.spec == VehicleSpec.TigerAce ? 12 : v.spec == VehicleSpec.Flak88 ? 4 : v.spec == VehicleSpec.Panther ? 5 : v.spec == VehicleSpec.StuG ? 3 : 2; score += worth * 50; xp += worth;
+                if (v.spec == VehicleSpec.Tiger || v.spec == VehicleSpec.TigerAce || v.spec == VehicleSpec.KingTiger) nightTigers++; if (v.spec.isGun) nightPaks++;
+                int worth = v.spec == VehicleSpec.Tiger ? 5 : v.spec == VehicleSpec.TigerAce ? 12 : v.spec == VehicleSpec.KingTiger ? 14 : v.spec == VehicleSpec.Flak88 ? 4 : v.spec == VehicleSpec.Hetzer ? 3 : v.spec == VehicleSpec.Nebelwerfer ? 3 : v.spec == VehicleSpec.Kubelwagen ? 4 : v.spec == VehicleSpec.Flak38 ? 1 : v.spec == VehicleSpec.Panther ? 5 : v.spec == VehicleSpec.StuG ? 3 : 2; score += worth * 50; xp += worth;
                 if (v.spec == VehicleSpec.Panther) nightTigers++;   // the big cats count together for the missions
                 hud.Popup(v.transform.position, "+" + worth * 50, new Color(0.95f, 0.66f, 0.23f)); shake = Mathf.Max(shake, Dist(v, Leader) < 25f ? 0.5f : 0.2f);
                 combo = Time.time - lastKill < 4f ? combo + 1 : 1; lastKill = Time.time;
@@ -378,6 +379,7 @@ namespace IronNight
                 debugSquadSent = true; var L0 = Leader; var f0 = L0.Forward; var r0 = new Vector3(f0.z, 0f, -f0.x);
                 Foe(VehicleSpec.Panther, L0.transform.position + f0 * 34f - r0 * 12f, L0.yaw + Mathf.PI); Foe(VehicleSpec.StuG, L0.transform.position + f0 * 34f + r0 * 12f, L0.yaw + Mathf.PI);
                 Foe(VehicleSpec.Halftrack, L0.transform.position + f0 * 60f, L0.yaw + Mathf.PI); Foe(VehicleSpec.Flak88, L0.transform.position + f0 * 40f, L0.yaw + Mathf.PI); Foe(VehicleSpec.Pak40, L0.transform.position + f0 * 26f + r0 * 8f, L0.yaw + Mathf.PI);
+                foreach (var sp in new[] { VehicleSpec.Hetzer, VehicleSpec.KingTiger, VehicleSpec.Flak38, VehicleSpec.Nebelwerfer, VehicleSpec.Kubelwagen }) if (VehicleSpec.Available(sp)) { var z = Foe(sp, L0.transform.position + f0 * (44f + 8f * System.Array.IndexOf(new[] { VehicleSpec.Hetzer, VehicleSpec.KingTiger, VehicleSpec.Flak38, VehicleSpec.Nebelwerfer, VehicleSpec.Kubelwagen }, sp)) - r0 * 14f, L0.yaw + Mathf.PI); z.hp = 999f; }
                 infantry.Spawn(L0.transform.position + f0 * 24f, -f0); hud.Toast("Zoo", 2f);
             }
             if (spawnTimer <= 0f && foes.Count < 12)
@@ -408,6 +410,12 @@ namespace IronNight
                     var nests = props.Nests(L.transform.position, L.Forward, 26f, 60f);
                     if (nests.Count > 0) { var nest = nests[Random.Range(0, nests.Count)]; var toL = L.transform.position - nest; toL.y = 0f; toL.Normalize(); pos = nest - toL * 3.2f; gyaw = Mathf.Atan2(toL.x, toL.z); }   // behind the sandbags, facing us
                     var gspec = VehicleSpec.Pak40;
+                    if (t > 40f && t <= 100f && Random.value < 0.3f && VehicleSpec.Available(VehicleSpec.Flak38))
+                    {
+                        // the light flak by a searchlight: it shoots at the sky, not at us, but it is worth the shell
+                        var posts = props.Posts(L.transform.position, L.Forward, 30f, 66f);
+                        if (posts.Count > 0) { var post = posts[Random.Range(0, posts.Count)]; var toL = L.transform.position - post; toL.y = 0f; toL.Normalize(); pos = props.PushOut(post - toL * 7f, 3f); gyaw = Random.value * 6.28f; gspec = VehicleSpec.Flak38; }
+                    }
                     if (t > 100f && Random.value < 0.35f)
                     {
                         // the searchlight posts have an 88 with them: long reach, hard hit, slow to turn
@@ -415,13 +423,14 @@ namespace IronNight
                         if (posts.Count > 0) { var post = posts[Random.Range(0, posts.Count)]; var toL = L.transform.position - post; toL.y = 0f; toL.Normalize(); pos = props.PushOut(post + toL * 8f, 3f); gyaw = Mathf.Atan2(toL.x, toL.z); gspec = VehicleSpec.Flak88; }
                     }
                     var gun = Foe(gspec, pos, gyaw);
-                    hud.Toast((gspec == VehicleSpec.Flak88 ? "88! Flak gun, " : "Anti-tank gun dug in, ") + Clock(pos), 2.8f);
+                    hud.Toast((gspec == VehicleSpec.Flak88 ? "88! Flak gun, " : gspec == VehicleSpec.Flak38 ? "Flak battery, " : "Anti-tank gun dug in, ") + Clock(pos), 2.8f);
                 }
                 else
                 {
                     var spec = (t > 90f && Random.value < Mathf.Lerp(0.1f, 0.35f, (t - 90f) / 180f)) ? VehicleSpec.Tiger : VehicleSpec.PanzerIV;
                     if (spec == VehicleSpec.Tiger && t > 150f && Random.value < 0.5f) spec = VehicleSpec.Panther;
                     else if (spec == VehicleSpec.PanzerIV && t > 60f && Random.value < 0.25f) spec = VehicleSpec.StuG;
+                    if (spec == VehicleSpec.StuG && Random.value < 0.5f && VehicleSpec.Available(VehicleSpec.Hetzer)) spec = VehicleSpec.Hetzer;
                     var pos = L.transform.position + dir * Random.Range(44f, 52f);
                     Foe(spec, pos, Mathf.Atan2(-dir.x, -dir.z));
                     if (spec == VehicleSpec.Tiger) hud.Toast("Tiger! " + Clock(pos), 2.8f); else if (spec == VehicleSpec.Panther) hud.Toast("Panther! " + Clock(pos), 2.8f);
@@ -438,9 +447,10 @@ namespace IronNight
         void Boss()
         {
             var L = Leader; var f = L.Forward; var r = new Vector3(f.z, 0f, -f.x);
-            boss = Foe(VehicleSpec.TigerAce, L.transform.position + f * 52f, L.yaw + Mathf.PI);
+            var bossSpec = winter && VehicleSpec.Available(VehicleSpec.KingTiger) ? VehicleSpec.KingTiger : VehicleSpec.TigerAce;
+            boss = Foe(bossSpec, L.transform.position + f * 52f, L.yaw + Mathf.PI);
             foreach (var side in new[] { -1f, 1f }) Foe(VehicleSpec.PanzerIV, L.transform.position + f * 58f + r * side * 9f, L.yaw + Mathf.PI);
-            hud.ShowBoss(VehicleSpec.TigerAce.name); hud.Toast("Tiger Ace · kill it before dawn"); Debug.Log("Iron Night: boss spawned at " + t.ToString("0.0"));
+            hud.ShowBoss(bossSpec.name); hud.Toast(bossSpec == VehicleSpec.KingTiger ? "King Tiger · kill it before dawn" : "Tiger Ace · kill it before dawn"); Debug.Log("Iron Night: boss spawned at " + t.ToString("0.0"));
         }
 
         /// <summary>An armoured column crossing the front 34 m ahead: four Panzer IV and a Tiger in a line.</summary>
@@ -613,14 +623,67 @@ namespace IronNight
             var L = Leader; float ang = (Random.value - 0.5f) * 80f * Mathf.Deg2Rad, dist = 110f + Random.value * 60f;
             var pos = L.transform.position + new Vector3(Mathf.Sin(ang), 0f, Mathf.Cos(ang)) * dist;
             bool hold = objectivesReached > 0 && Random.value < 0.5f;
-            objective = new Objective { pos = pos, n = objectivesReached + 1, hold = hold, marker = fx.Marker(pos, new Color(0.35f, 0.95f, 0.45f), hold ? 15f : 9f, true) };
-            objective.grenade = props.Spawn("marker_smoke", pos, Random.value * 360f);   // the coloured smoke grenade marking the spot
-            if (phase == Phase.Play) hud.Toast("Objective " + objective.n + " · " + (hold ? "hold the crossing, " : "") + Mathf.RoundToInt(dist) + " m ahead", 3f);
+            // from the second objective on, one in three is a battery to destroy or a staff car to stop
+            string kind = "reach"; float roll = Random.value;
+            if (objectivesReached > 0 && roll < 0.2f && VehicleSpec.Available(VehicleSpec.Nebelwerfer)) kind = "battery";
+            else if (objectivesReached > 0 && roll < 0.35f && VehicleSpec.Available(VehicleSpec.Kubelwagen)) kind = "car";
+            if (kind != "reach") hold = false;
+            objective = new Objective { pos = pos, n = objectivesReached + 1, hold = hold, kind = kind, marker = fx.Marker(pos, kind == "reach" ? new Color(0.35f, 0.95f, 0.45f) : new Color(1f, 0.45f, 0.3f), hold ? 15f : 9f, true) };
+            if (kind == "reach") objective.grenade = props.Spawn("marker_smoke", pos, Random.value * 360f);   // the coloured smoke grenade marking the spot
+            if (kind == "battery")
+            {
+                // two launchers dug in at the spot, facing us; the objective is done when both are wrecks
+                var toL = L.transform.position - pos; toL.y = 0f; float gy = Mathf.Atan2(toL.x, toL.z); var side = new Vector3(toL.z, 0f, -toL.x).normalized;
+                foreach (float s in new[] { -1f, 1f }) objective.targets.Add(Foe(VehicleSpec.Nebelwerfer, props.PushOut(pos + side * s * 5f, 2f), gy));
+            }
+            if (kind == "car")
+            {
+                // the staff car starts 45 m ahead and drives off away from us for forty seconds
+                var car = Foe(VehicleSpec.Kubelwagen, props.PushOut(L.transform.position + L.Forward * 45f, 2f), L.yaw); car.unloaded = true; car.leaving = true; objective.targets.Add(car); objective.clock = 40f;
+            }
+            if (phase == Phase.Play) hud.Toast("Objective " + objective.n + " · " + (kind == "battery" ? "destroy the rocket battery, " : kind == "car" ? "staff car making a run for it · stop it" : (hold ? "hold the crossing, " : "")) + (kind == "car" ? "" : Mathf.RoundToInt(dist) + " m ahead"), 3f);
         }
 
         void TickObjective(float dt)
         {
             if (objective == null) return; var L = Leader;
+            var od = objective.pos - L.transform.position; od.y = 0f;
+            if (objective.kind == "battery")
+            {
+                objective.targets.RemoveAll(v => v == null || v.dead);
+                if (objective.targets.Count == 0)
+                {
+                    score += 600; objectivesReached++; shake = Mathf.Max(shake, 0.3f); Sfx.Pickup(); hud.Popup(objective.pos, "+600", new Color(1f, 0.6f, 0.3f)); hud.Toast("Rocket battery destroyed · +600", 2.6f);
+                    Destroy(objective.marker.gameObject); objective = null; NextObjective(); return;
+                }
+                // a salvo every fourteen seconds once we are within 90 m: six rockets, each a mortar round on the platoon
+                objective.salvo -= dt;
+                if (objective.salvo <= 0f && od.magnitude < 90f)
+                {
+                    objective.salvo = 14f; var centre = L.transform.position + L.Forward * 4f; hud.Toast("Nebelwerfer salvo incoming!", 2.4f); Sfx.Artillery(objective.pos);
+                    for (int i = 0; i < 6; i++) { var at = centre + new Vector3(Random.Range(-9f, 9f), 0f, Random.Range(-9f, 9f)); float when = 3f + i * 0.25f; mortars.Add(new Mortar { at = at, timer = when, ring = fx.Marker(at, new Color(1f, 0.25f, 0.2f), 7f) }); fx.Incoming(at, when); }
+                    foreach (var w in objective.targets) for (int i = 0; i < 3; i++) fx.Flak(w.transform.position + Vector3.up * 1.4f, (Vector3.up * 1.2f + (centre - w.transform.position).normalized * 0.4f + Random.insideUnitSphere * 0.08f).normalized);
+                }
+                objective.marker.position = objective.pos; hud.Objective(objective.pos, od.magnitude, cam, true, "Battery " + objective.targets.Count + "/2");
+                return;
+            }
+            if (objective.kind == "car")
+            {
+                var car = objective.targets.Count > 0 ? objective.targets[0] : null; objective.clock -= dt;
+                if (car == null || car.dead)
+                {
+                    score += 500; objectivesReached++; Sfx.Pickup(); hud.Popup(objective.pos, "+500", new Color(1f, 0.6f, 0.3f)); hud.Toast("Staff car stopped · +500", 2.6f);
+                    Destroy(objective.marker.gameObject); objective = null; NextObjective(); return;
+                }
+                if (objective.clock <= 0f || (car.transform.position - L.transform.position).magnitude > 150f)
+                {
+                    hud.Toast("The staff car got away", 2.6f); foes.Remove(car); tracks.Forget(car); Destroy(car.gameObject);
+                    Destroy(objective.marker.gameObject); objective = null; NextObjective(); return;
+                }
+                objective.pos = car.transform.position; objective.marker.position = objective.pos; od = objective.pos - L.transform.position; od.y = 0f;
+                hud.Objective(objective.pos, od.magnitude, cam, true, "Staff car " + Mathf.CeilToInt(objective.clock) + " s");
+                return;
+            }
             objective.smokeTimer -= dt; if (objective.smokeTimer <= 0f) { objective.smokeTimer = 0.45f; fx.Signal(objective.pos + Vector3.up * 0.6f, new Color(0.3f, 0.8f, 0.4f, 0.75f)); }
             objective.pos = props.PushOut(objective.pos, 5f);   // once its cell is loaded, it steps out of hedges and walls
             objective.marker.position = objective.pos;
@@ -674,7 +737,7 @@ namespace IronNight
             {
                 dropTimer = 50f + Random.value * 25f;
                 float a = Random.value * Mathf.PI * 2f; var pos = props.PushOut(L.transform.position + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * (16f + Random.value * 14f), 3f);
-                var d = new Drop { pos = pos, height = 55f, kind = Random.Range(0, 4) };
+                var d = new Drop { pos = pos, height = 55f, kind = Random.Range(0, 4) }; Flyover(pos);
                 if (crateMaterial == null) { crateMaterial = new Material(Resources.Load<Material>("BarrelLit")); crateMaterial.SetColor("_BaseColor", new Color(0.45f, 0.36f, 0.22f)); crateMaterial.SetFloat("_Metallic", 0f); crateMaterial.SetFloat("_Smoothness", 0.2f); chuteMaterial = new Material(Resources.Load<Material>("VehicleLit")); chuteMaterial.SetTexture("_BaseMap", Resources.Load<Texture2D>("Fx/chute_fabric")); chuteMaterial.SetTextureScale("_BaseMap", new Vector2(3f, 1f)); chuteMaterial.SetColor("_BaseColor", new Color(1.3f, 1.3f, 1.2f)); chuteMaterial.SetFloat("_Cull", 0f); chuteMaterial.SetFloat("_Smoothness", 0.12f); }
                 var cratePf = Resources.Load<GameObject>("Props/crate");
                 if (cratePf != null) { d.crate = Instantiate(cratePf).transform; d.top = 1.2f; var cm = new Material(Resources.Load<Material>("VehicleLit")); cm.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/crate_tex")); cm.SetFloat("_Cull", 0f); foreach (var rr in d.crate.GetComponentsInChildren<Renderer>()) rr.sharedMaterial = cm; }
@@ -684,6 +747,7 @@ namespace IronNight
                 d.lines = new GameObject("Shrouds").AddComponent<LineRenderer>(); d.lines.positionCount = 12; d.lines.startWidth = d.lines.endWidth = 0.05f; d.lines.material = chuteMaterial; d.lines.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 drops.Add(d); hud.Toast("Supply drop coming down, " + Clock(pos), 2.8f);
             }
+            TickPlanes(dt);
             for (int i = drops.Count - 1; i >= 0; i--)
             {
                 var d = drops[i]; d.age += dt;
@@ -760,6 +824,28 @@ namespace IronNight
             if (star.life <= 0f) { fx.Release(star.flare); Destroy(star.chute.gameObject); Destroy(star.light.gameObject); star = null; lit = false; }
         }
 
+        // the transport that drops the crate: crosses the sky over the drop point and is gone
+        class Plane { public Transform t; public Vector3 from, dir; public float age; }
+        readonly List<Plane> planes = new List<Plane>(); Material planeMaterial;
+        void Flyover(Vector3 over)
+        {
+            var pf = Resources.Load<GameObject>("Models/c47_hull"); if (pf == null) return;
+            if (planeMaterial == null) { planeMaterial = new Material(Resources.Load<Material>("VehicleLit")); planeMaterial.SetTexture("_BaseMap", Resources.Load<Texture2D>("Models/c47")); planeMaterial.SetColor("_BaseColor", new Color(0.8f, 0.8f, 0.82f)); planeMaterial.SetFloat("_Cull", 0f); }
+            var root = new GameObject("C-47").transform; var body = Instantiate(pf, root); body.transform.localScale = Vector3.one * 1.5f; body.transform.localRotation = Quaternion.Euler(0f, -62f, 0f);   // the model's nose, measured
+            foreach (var r in body.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = planeMaterial; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; }
+            float a = Random.value * Mathf.PI * 2f; var dir = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
+            var p = new Plane { t = root, from = over - dir * 260f + Vector3.up * 95f, dir = dir }; root.position = p.from; root.rotation = Quaternion.LookRotation(dir); planes.Add(p);
+            Sfx.Rumble();
+        }
+        void TickPlanes(float dt)
+        {
+            for (int i = planes.Count - 1; i >= 0; i--)
+            {
+                var p = planes[i]; p.age += dt; p.t.position = p.from + p.dir * (65f * p.age) + Vector3.up * Mathf.Sin(p.age * 0.7f) * 2f;
+                if (p.age > 9f) { Destroy(p.t.gameObject); planes.RemoveAt(i); }
+            }
+        }
+
         void RemoveDrop(Drop d) { Destroy(d.crate.gameObject); Destroy(d.chute.gameObject); Destroy(d.lines.gameObject); if (d.marker != null) Destroy(d.marker.gameObject); Destroy(d.canopy); }
 
         static Color ChuteColour(int kind) { switch (kind) { case 0: return new Color(1.5f, 1.5f, 1.35f); case 1: return new Color(1.9f, 0.6f, 0.5f); case 2: return new Color(1.8f, 1.5f, 0.45f); default: return new Color(0.55f, 0.95f, 1.8f); } }   // repair white, ammunition red, smoke yellow, radio blue: the air force colour code
@@ -819,6 +905,12 @@ namespace IronNight
         void TickTransport(Vehicle e, Vehicle target, float dist, float dt)
         {
             e.turretYaw = e.yaw;
+            if (e.spec == VehicleSpec.Kubelwagen)
+            {
+                // the staff car runs straight away from us, weaving a little; it is not removed by distance here (the objective does that)
+                var away = e.transform.position - target.transform.position; away.y = 0f; var wob = new Vector3(away.z, 0f, -away.x).normalized * Mathf.Sin(t * 1.3f) * 0.35f;
+                e.Drive(Steer(e, new Vector2(away.x + wob.x * away.magnitude, away.z + wob.z * away.magnitude)), dt); e.Apply(); return;
+            }
             if (!e.unloaded)
             {
                 if (dist > 30f) { var d = target.transform.position - e.transform.position; e.Drive(Steer(e, new Vector2(d.x, d.z)), dt); }

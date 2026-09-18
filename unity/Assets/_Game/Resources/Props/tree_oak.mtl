@@ -1,0 +1,3 @@
+newmtl tree_oak
+Kd 1 1 1
+map_Kd tree_oak_tex.png

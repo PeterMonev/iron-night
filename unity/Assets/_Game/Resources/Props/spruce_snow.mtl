@@ -1,0 +1,3 @@
+newmtl spruce_snow
+Kd 1 1 1
+map_Kd spruce_snow_tex.png

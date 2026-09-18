@@ -149,5 +149,44 @@
    -0.0023240141570567696,
    -0.16625481843948364
   ]
+ },
+ "firefly": {
+  "hullFaces": 19917,
+  "turretFaces": 2647,
+  "ringHeight": 1.9753235169262204,
+  "longAxis": "z",
+  "forward": 1.0,
+  "hullLength": 6.3,
+  "ringCenter": [
+   -0.008679005705441037,
+   0.020511980652809236,
+   -0.1265107442935308
+  ]
+ },
+ "m10": {
+  "hullFaces": 13394,
+  "turretFaces": 5229,
+  "ringHeight": 1.1401335574649367,
+  "longAxis": "z",
+  "forward": 1.0,
+  "hullLength": 6.0,
+  "ringCenter": [
+   0.017525489442050457,
+   -0.03891983211040495,
+   -0.12724683930476505
+  ]
+ },
+ "kingtiger": {
+  "hullFaces": 19021,
+  "turretFaces": 2928,
+  "ringHeight": 2.12788677096233,
+  "longAxis": "z",
+  "forward": 1.0,
+  "hullLength": 7.4,
+  "ringCenter": [
+   -0.028793517500162125,
+   0.0375064417719842,
+   -0.04519249374667803
+  ]
  }
 }

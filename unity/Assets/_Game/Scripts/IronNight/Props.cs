@@ -121,6 +121,13 @@ namespace IronNight
             list.Add(p); return p;
         }
 
+        /// <summary>A hedgerow tree: the blob crown, cheap enough for a dozen a screen; the generated oak is for the few that stand alone.</summary>
+        void HedgeTree(List<Prop> list, Vector3 pos, int seed)
+        {
+            if (winter) { Place(list, "deadtree", pos, (seed % 360) * Mathf.Deg2Rad); return; }
+            list.Add(new Prop { what = What.Tree, pos = pos, seed = seed, yaw = (seed % 360) * Mathf.Deg2Rad, bound = 5f, circleCenters = new[] { new Vector2(pos.x, pos.z) }, radii = new[] { 0.8f } });
+        }
+
         void Tree(List<Prop> list, Vector3 pos, int seed)
         {
             if (winter) { if (Place(list, seed % 3 == 0 ? "deadtree" : "spruce_snow", pos, (seed % 360) * Mathf.Deg2Rad) == null) Place(list, "deadtree", pos, (seed % 360) * Mathf.Deg2Rad); return; }   // firs and bare trees in the snow
@@ -143,7 +150,7 @@ namespace IronNight
             if (Rnd(ix, iz, 968 + salt) < 0.55f)
             {
                 int n = 1 + (int)(Rnd(ix, iz, 969 + salt) * 2f); var side = new Vector3(dir.z, 0f, -dir.x);
-                for (int i = 0; i < n; i++) { float u = len * (0.1f + 0.8f * (i + Rnd(ix, iz, 970 + salt + i)) / n); if (Open(p, u)) continue; Tree(list, a + dir * u + side * 0.4f, (int)(Hash(ix, iz, 975 + salt + i) & 0xffff)); }
+                for (int i = 0; i < n; i++) { float u = len * (0.1f + 0.8f * (i + Rnd(ix, iz, 970 + salt + i)) / n); if (Open(p, u)) continue; HedgeTree(list, a + dir * u + side * 0.4f, (int)(Hash(ix, iz, 975 + salt + i) & 0xffff)); }
             }
         }
 

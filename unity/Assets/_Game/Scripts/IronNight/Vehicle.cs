@@ -191,6 +191,7 @@ namespace IronNight
                 crossMaterial = new Material(starMaterial); crossMaterial.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.Balkenkreuz(256).texture); crossMaterial.SetColor("_BaseColor", new Color(0.7f, 0.7f, 0.7f, 0.97f));
             }
             var hb = LocalBounds(hull, transform);
+            if (friendly && Depot.Nation == "su") return;   // the Soviet tanks carry their own painted numbers
             if (friendly)
             {
                 // the white star on both sides of the hull (the sponsons are as wide as the tracks) and of the turret
