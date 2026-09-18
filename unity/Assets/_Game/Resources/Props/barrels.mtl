@@ -1,0 +1,3 @@
+newmtl barrels
+Kd 1 1 1
+map_Kd barrels_tex.png

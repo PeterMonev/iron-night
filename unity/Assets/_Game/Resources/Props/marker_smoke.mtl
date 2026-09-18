@@ -1,0 +1,3 @@
+newmtl marker_smoke
+Kd 1 1 1
+map_Kd marker_smoke_tex.png

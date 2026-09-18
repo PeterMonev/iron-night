@@ -1,0 +1,3 @@
+newmtl bunker
+Kd 1 1 1
+map_Kd bunker_tex.png

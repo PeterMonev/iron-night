@@ -1,0 +1,3 @@
+newmtl well
+Kd 1 1 1
+map_Kd well_tex.png

@@ -1,0 +1,3 @@
+newmtl signpost
+Kd 1 1 1
+map_Kd signpost_tex.png

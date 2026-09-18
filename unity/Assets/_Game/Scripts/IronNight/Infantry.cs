@@ -15,7 +15,7 @@ namespace IronNight
         public class Squad { public readonly List<Soldier> men = new List<Soldier>(); }
 
         public readonly List<Squad> squads = new List<Squad>();
-        const float SoldierYaw = -90f, SoldierBYaw = -90f; GameObject figureB; Material skinB;   // the figure's facing in its own mesh, corrected here if the export looks the wrong way
+        const float SoldierYaw = -90f, SoldierBYaw = 0f; GameObject figureB; Material skinB;   // the figure's facing in its own mesh, corrected here if the export looks the wrong way
         readonly List<Soldier> fallen = new List<Soldier>();
         Material uniform, helmet, skin; GameObject figure;
 
