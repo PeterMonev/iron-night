@@ -25,7 +25,8 @@ namespace IronNight
         class Star { public Vector3 pos; public float height, life, puff; public Transform flare, chute; public Light light; }
         enum Phase { Title, Play, LevelUp, Pause, End }
 
-        const float NightLength = 300f;         // five minutes of darkness, dawn at 5:00
+        static readonly float NightLength = NightArg();   // five minutes of darkness, dawn at 5:00 (--night=30 for tests)
+        static float NightArg() { foreach (var a in System.Environment.GetCommandLineArgs()) if (a.StartsWith("--night=")) return float.Parse(a.Substring(8)); return 300f; }
         const float ShellSpeed = 62f, EnemyShellSpeed = 55f, GroundTile = 40f;
 
         Camera cam; Hud hud; TouchStick stick; Fx fx; Props props; Tracks tracks; Infantry infantry;
@@ -39,6 +40,7 @@ namespace IronNight
         readonly List<Shell> shells = new List<Shell>(); readonly List<Flare> flares = new List<Flare>(); readonly List<Wreck> wrecks = new List<Wreck>();
         Material shellTemplate; Texture2D glowTex;
         Formation formation = Formation.Wedge; Phase phase = Phase.Title; bool reserveGranted;
+        int campaignNight;   // 0: a single night; 1..3: the campaign
         float t, spawnTimer = 6f, leaderShield; int level = 1, xp, xpNeed = 6, score, kills, maxPlatoon = 4, reinforcements;
         bool wave2, wave3, wave4, revived, doubled, bossSpawned; Vehicle boss;
         static readonly bool debugBoss = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--boss") >= 0;   // test switch: the boss comes at 0:06
@@ -77,12 +79,24 @@ namespace IronNight
             foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--tank=")) leaderSpec = VehicleSpec.ById(arg.Substring(7));   // test switch: --tank=is2
             var startAt = Vector3.zero; foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--at=")) { var xz = arg.Substring(5).Split(','); startAt = new Vector3(float.Parse(xz[0]), 0f, float.Parse(xz[1])); }   // test switch: --at=0,95
             platoon.Add(Vehicle.Create(leaderSpec, true, startAt, 0f)); Leader.hp = Depot.LeaderHp;
+            if (campaignNight > 1)
+            {
+                // the leader as he was left, patched to half at least; the wingmen who lived, in their slots
+                if (Depot.CampaignLeaderHp > 0f) Leader.hp = Mathf.Max(Depot.CampaignLeaderHp, Depot.LeaderHp * 0.5f);
+                foreach (var w in Depot.CampaignPlatoon.Split(','))
+                {
+                    if (w.Length == 0 || platoon.Count >= maxPlatoon) continue; var kv = w.Split(':'); var ws = VehicleSpec.ById(kv[0]); if (!VehicleSpec.Available(ws)) continue;
+                    var v = Vehicle.Create(ws, true, startAt - Vector3.forward * (6f * platoon.Count), 0f); v.hp = Mathf.Max(1f, float.Parse(kv[1], System.Globalization.CultureInfo.InvariantCulture)); platoon.Add(v);
+                }
+                hud.Toast("Night " + campaignNight + " of 3 · the platoon rides on", 3.5f);
+            }
             // the commander riding with the leader
             bonus = Depot.CommanderBonus; if (bonus == "reload") reloadMul *= 0.85f; if (bonus == "speed") speedMul *= 1.12f; if (bonus == "armour") Leader.hp += 1f;
             NextObjective();
             hud.OnFormation = f => formation = f;
             hud.OnAd = OnAd; hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             hud.OnStart = () => { hud.HideTitle(); phase = Phase.Play; stick.Blocked = false; };
+            hud.OnCampaign = () => { if (Depot.CampaignNight == 0) Depot.CampaignStart(); PlayerPrefs.SetInt("camp.launch", Depot.CampaignNight); PlayerPrefs.Save(); SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); };
             hud.OnDepot = () => { stick.Blocked = true; hud.ShowDepot(); };
             hud.OnBack = () => { if (phase == Phase.End) SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); else hud.ShowTitle(reserveGranted); };
             hud.OnReserveAd = () => { reserveGranted = true; maxPlatoon = 4; hud.ShowTitle(true); };   // the ad is a mock: granted at once
@@ -91,7 +105,8 @@ namespace IronNight
             if (debugDawn) t = 250f; if (debugMid) { t = 100f; mortarTimer = 6f; starTimer = 9f; }
             hud.Set(t, platoon.Count); hud.SetLevel(level, 0f);
             PlaceCamera(true);
-            stick.Blocked = true; hud.ShowTitle(false); Debug.Log("Iron Night: battle built, debugBoss=" + debugBoss + " args=" + string.Join(" ", System.Environment.GetCommandLineArgs()));
+            stick.Blocked = true; hud.ShowTitle(false);
+            if (campaignNight > 0) { hud.HideTitle(); phase = Phase.Play; stick.Blocked = false; hud.Toast(campaignNight == 1 ? "Campaign · night 1 of 3 · Normandy" : campaignNight == 2 ? "Night 2 of 3 · the Ardennes" : "Night 3 of 3 · the last push", 3.5f); } Debug.Log("Iron Night: battle built, debugBoss=" + debugBoss + " args=" + string.Join(" ", System.Environment.GetCommandLineArgs()));
         }
 
         void BuildWorld()
@@ -350,6 +365,7 @@ namespace IronNight
         {
             reinforcements++;
             var spec = Depot.Nation == "us" && (reinforcements % 3 == 0 || fireflyNext) ? VehicleSpec.Firefly : Wingman; fireflyNext = false;
+            if (campaignNight > 0 && reinforcements % 2 == 0 && platoon.Count > 1) { hud.Toast("No reinforcements to spare tonight", 2.4f); score += 150; return; }
             var L = Leader; var v = Vehicle.Create(spec, true, L.transform.position - L.Forward * 12f, L.yaw); v.hp += Depot.WingmanHpBonus + wingmanBonus;
             platoon.Add(v); hud.Toast("Reinforcement · " + spec.name); hud.Set(t, platoon.Count);
         }
@@ -368,7 +384,7 @@ namespace IronNight
         void TickSpawns(float dt)
         {
             spawnTimer -= dt;
-            float interval = Mathf.Lerp(8f, 2.8f, t / 240f) * (firstNight ? 1.25f : 1f);
+            float interval = Mathf.Lerp(8f, 2.8f, t / 240f) * (firstNight ? 1.25f : 1f) * (campaignNight == 2 ? 0.85f : campaignNight == 3 ? 0.7f : 1f);
             if (debugInfantry && !debugSquadSent && t > 4f) { debugSquadSent = true; var L0 = Leader; infantry.Spawn(L0.transform.position + L0.Forward * 30f, -L0.Forward); hud.Toast("Infantry! Panzerfausts, 12 o'clock", 2.8f); }
             if (debugGuns && !debugSquadSent && t > 2f)
             {
@@ -440,7 +456,7 @@ namespace IronNight
             if (t >= 120f && !wave2) { wave2 = true; Column(); }
             if (t >= 200f && !wave3) { wave3 = true; Counterattack(); }
             if (t >= 240f && !wave4) { wave4 = true; Column(); }
-            if ((t >= 270f || (debugBoss && t >= 6f)) && !bossSpawned) { bossSpawned = true; Boss(); }
+            if ((t >= (campaignNight == 3 ? 210f : 270f) || (debugBoss && t >= 6f)) && !bossSpawned) { bossSpawned = true; Boss(); }
             if (boss != null && !boss.dead) hud.SetBoss(boss.hp / boss.spec.hp);
         }
 
@@ -536,6 +552,9 @@ namespace IronNight
         {
             float r = Random.value; weather = r < 0.45f ? Weather.Clear : r < 0.7f ? Weather.Overcast : r < 0.85f ? Weather.Fog : Weather.Rain;
             Depot.Load(); winter = Depot.NightsFought >= 1 && Random.value < 0.5f;   // the first night is always Normandy
+            campaignNight = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--campaign") >= 0 ? Mathf.Max(1, Depot.CampaignNight) : PlayerPrefs.GetInt("camp.launch", 0);
+            PlayerPrefs.SetInt("camp.launch", 0);
+            if (campaignNight > 0) { winter = campaignNight == 2; if (campaignNight == 3 && weather == Weather.Clear) weather = Weather.Overcast; }
             var args = System.Environment.GetCommandLineArgs();   // test switches: --fog, --rain, --overcast, --clear, --winter, --summer
             foreach (Weather w in System.Enum.GetValues(typeof(Weather))) if (System.Array.IndexOf(args, "--" + w.ToString().ToLowerInvariant()) >= 0) weather = w;
             if (System.Array.IndexOf(args, "--winter") >= 0) winter = true; if (System.Array.IndexOf(args, "--summer") >= 0) winter = false;
@@ -1061,8 +1080,41 @@ namespace IronNight
             hud.SetEndPoints(earned + bonus);
             int m = Mathf.FloorToInt(t / 60f), s = Mathf.FloorToInt(t % 60f);
             int acc = shotsFired > 0 ? Mathf.RoundToInt(100f * shotsHit / shotsFired) : 0;
-            hud.ShowEnd(dawn, $"{kills} enemy vehicles destroyed · {nightInfantry} infantry\n{m}:{s:00} held · level {level} · {objectivesReached} objectives\nGunnery {acc}% · Score {score * (doubled ? 2 : 1)}" + lines, dawn ? !doubled : !revived);
+            string statLine = $"{kills} enemy vehicles destroyed · {nightInfantry} infantry\n{m}:{s:00} held · level {level} · {objectivesReached} objectives\nGunnery {acc}% · Score {score * (doubled ? 2 : 1)}" + lines;
+            if (campaignNight > 0) { CampaignEnd(dawn, statLine, dawn ? !doubled : !revived); return; }
+            hud.ShowEnd(dawn, statLine, dawn ? !doubled : !revived);
         }
+
+        /// <summary>The campaign after a night: the platoon and the totals saved and the next night offered, or the
+        /// campaign result - three dawns held pay a bonus of a fifth of the campaign score; a dead leader ends it.</summary>
+        void CampaignEnd(bool dawn, string statLine, bool adAvailable)
+        {
+            if (!campaignTallied) { campaignTallied = true; Depot.CampaignKills += kills; Depot.CampaignScore += score * (doubled ? 2 : 1); }
+            string totals = $"\nCampaign so far · {Depot.CampaignKills} kills · {Depot.CampaignScore} points";
+            if (!dawn)
+            {
+                // knocked out: the ad can still bring him back; otherwise the campaign is lost
+                hud.ShowEnd(false, statLine + totals, adAvailable, "NIGHT " + campaignNight + " OF 3 · LEADER KNOCKED OUT", "Campaign lost", "Back to base");
+                hud.OnAgain = () => { Depot.CampaignClear(); SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); };
+                return;
+            }
+            // the survivors ride on
+            var sb = new System.Text.StringBuilder(); foreach (var v in platoon) if (v != Leader && !v.dead) { if (sb.Length > 0) sb.Append(','); sb.Append(v.spec.id).Append(':').Append(v.hp.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)); }
+            Depot.CampaignPlatoon = sb.ToString(); Depot.CampaignLeaderHp = Leader.hp;
+            if (campaignNight < 3)
+            {
+                Depot.CampaignNight = campaignNight + 1;
+                hud.ShowEnd(true, statLine + totals + $"\n{platoon.Count - 1} wingmen ride on", adAvailable, "05:00 · DAWN · NIGHT " + campaignNight + " OF 3", "The platoon holds", campaignNight == 1 ? "Night 2 · the Ardennes" : "Night 3 · the last push");
+                hud.OnAgain = () => { PlayerPrefs.SetInt("camp.launch", Depot.CampaignNight); PlayerPrefs.Save(); SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); };
+            }
+            else
+            {
+                int bonus = Depot.CampaignScore / 5; Depot.AddPoints(bonus); Depot.Tally("campaigns", 1); Depot.CampaignWon(Depot.CampaignScore + bonus);
+                hud.ShowEnd(true, statLine + totals + $"\nCampaign bonus · +{bonus} depot points", adAvailable, "THREE DAWNS · CAMPAIGN WON", "Iron Night", "Back to base");
+                hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            }
+        }
+        bool campaignTallied;
 
         void OnAd()
         {

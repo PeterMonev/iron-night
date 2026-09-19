@@ -13,13 +13,13 @@ namespace IronNight
         public class Card { public string id, title, desc; public bool rare; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain, OnStart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality;
+        public System.Action OnAd, OnAgain, OnStart, OnCampaign, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality;
 
         Text clock, count, fps, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel; GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
         class Rising { public Text t; public float life; public Vector3 world; }
         readonly List<Rising> popups = new List<Rising>(); readonly Stack<Text> popupPool = new Stack<Text>(); RectTransform canvasRect;
-        Image radar, objectiveArrow; Text objectiveLabel; readonly List<Image> radarDots = new List<Image>(); readonly List<Image> hpBars = new List<Image>(); readonly List<Image> hpFills = new List<Image>(); Transform cardRoot, depotRows; Image rankBadge; int depotTab; readonly Button[] depotTabs = new Button[2]; ScrollRect depotScroll; Canvas canvas; Text depotPoints, titleStats, endPoints, reserveNote, bossName; Image bossFill; GameObject bossBar;
+        Image radar, objectiveArrow; Text objectiveLabel; readonly List<Image> radarDots = new List<Image>(); readonly List<Image> hpBars = new List<Image>(); readonly List<Image> hpFills = new List<Image>(); Transform cardRoot, depotRows; Image rankBadge; GameObject campaignBtn, againBtn; int depotTab; readonly Button[] depotTabs = new Button[2]; ScrollRect depotScroll; Canvas canvas; Text depotPoints, titleStats, endPoints, reserveNote, bossName; Image bossFill; GameObject bossBar;
         readonly Button[] formButtons = new Button[4];
         readonly List<Image> arrows = new List<Image>(); Sprite arrowSprite;
         float fpsAccum, fpsTimer, toastLeft; int fpsFrames;
@@ -94,7 +94,7 @@ namespace IronNight
             adBtn = MakeButton(endSheet.transform, "Field repair · watch an ad", new Vector2(0.5f, 0.5f), new Vector2(0, -20), new Vector2(880, 130), 40, () => OnAd?.Invoke());
             adBtn.GetComponent<Image>().color = amber; adLabel = adBtn.transform.Find("Label").GetComponent<Text>(); adLabel.color = new Color(0.1f, 0.08f, 0.05f);
             adNote = MakeText(endSheet.transform, "AdNote", new Vector2(0.5f, 0.5f), new Vector2(0, -130), TextAnchor.MiddleCenter, 28, dim); adNote.rectTransform.sizeDelta = new Vector2(900, 100);
-            MakeButton(endSheet.transform, "New assault", new Vector2(0.5f, 0.5f), new Vector2(0, -260), new Vector2(880, 130), 40, () => OnAgain?.Invoke());
+            againBtn = MakeButton(endSheet.transform, "New assault", new Vector2(0.5f, 0.5f), new Vector2(0, -260), new Vector2(880, 130), 40, () => OnAgain?.Invoke());
             endSheet.SetActive(false);
             arrowSprite = ArrowSprite(); objectiveArrow.sprite = arrowSprite;
             var root = canvasGo.transform;
@@ -125,8 +125,10 @@ namespace IronNight
             dailyBtn.GetComponent<Image>().color = new Color(0.2f, 0.32f, 0.2f, 0.95f);
             var start = MakeButton(titleSheet.transform, "Night assault", new Vector2(0.5f, 0.5f), new Vector2(0, 150), new Vector2(880, 150), 52, () => OnStart?.Invoke());
             start.GetComponent<Image>().color = amber; start.transform.Find("Label").GetComponent<Text>().color = new Color(0.1f, 0.08f, 0.05f);
-            MakeButton(titleSheet.transform, "Depot", new Vector2(0.5f, 0.5f), new Vector2(0, -10), new Vector2(880, 130), 40, () => OnDepot?.Invoke());
-            reserveBtn = MakeButton(titleSheet.transform, "4th tank tonight · watch an ad", new Vector2(0.5f, 0.5f), new Vector2(0, -150), new Vector2(880, 110), 34, () => OnReserveAd?.Invoke());
+            campaignBtn = MakeButton(titleSheet.transform, "Campaign · three nights", new Vector2(0.5f, 0.5f), new Vector2(0, 20), new Vector2(880, 100), 38, () => OnCampaign?.Invoke());
+            campaignBtn.GetComponent<Image>().color = new Color(0.55f, 0.36f, 0.14f, 0.95f);
+            MakeButton(titleSheet.transform, "Depot", new Vector2(0.5f, 0.5f), new Vector2(0, -80), new Vector2(880, 90), 36, () => OnDepot?.Invoke());
+            reserveBtn = MakeButton(titleSheet.transform, "4th tank tonight · watch an ad", new Vector2(0.5f, 0.5f), new Vector2(0, -180), new Vector2(880, 90), 32, () => OnReserveAd?.Invoke());
             reserveNote = MakeText(titleSheet.transform, "ReserveNote", new Vector2(0.5f, 0.5f), new Vector2(0, -225), TextAnchor.MiddleCenter, 26, dim); reserveNote.text = "The platoon holds 3 tanks. A rewarded video opens a 4th slot for this night (mock).";
             MakeText(titleSheet.transform, "OrdersLabel", new Vector2(0.5f, 0.5f), new Vector2(0, -320), TextAnchor.MiddleCenter, 28, dim).text = "STANDING ORDERS";
             var orders = new GameObject("Orders", typeof(RectTransform)); orders.transform.SetParent(titleSheet.transform, false);
@@ -197,6 +199,7 @@ namespace IronNight
             Depot.Load(); Medals.Check(); hudGroup.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(false); dailyBtn.SetActive(Depot.DailyReady);
             int m = Mathf.FloorToInt(Depot.BestTime / 60f), s = Mathf.FloorToInt(Depot.BestTime % 60f);
             { var sheet = Resources.Load<Texture2D>("UI/rank_insignia"); if (sheet != null && rankBadge != null) { int cell = Depot.RankIndex; rankBadge.sprite = UiSprite("rank_insignia", new Rect(cell * sheet.width / 6f, 0f, sheet.width / 6f, sheet.height)); rankBadge.enabled = Depot.NightsFought > 0; } }
+            { int cn = Depot.CampaignNight; var lbl = campaignBtn.transform.Find("Label").GetComponent<Text>(); lbl.text = cn == 0 ? "Campaign · three nights" : cn == 2 ? "Campaign · night 2 of 3 · the Ardennes" : "Campaign · night 3 of 3 · the last push"; campaignBtn.GetComponent<Image>().color = cn == 0 ? new Color(0.55f, 0.36f, 0.14f, 0.95f) : new Color(0.75f, 0.45f, 0.12f, 0.95f); }
             titleStats.text = Depot.NightsFought == 0 ? "First night. Drag anywhere to drive; the turrets fire on their own." : $"{Depot.Rank} · {Depot.NightsFought} nights fought · best {Depot.BestKills} kills · longest {m}:{s:00}\n{Depot.Points} depot points";
             reserveBtn.SetActive(!reserveGranted); reserveNote.text = reserveGranted ? "Reserve tank granted: the platoon can grow to 4 tonight." : "The platoon holds 3 tanks. A rewarded video opens a 4th slot for this night (mock).";
             Missions.Load(); foreach (Transform c in missionRoot) Destroy(c.gameObject);
@@ -467,10 +470,11 @@ namespace IronNight
             sheet.SetActive(true);
         }
 
-        public void ShowEnd(bool dawn, string statLine, bool adAvailable)
+        public void ShowEnd(bool dawn, string statLine, bool adAvailable, string eyebrow = null, string title = null, string again = null)
         {
-            endEyebrow.text = dawn ? "05:00 · DAWN" : "PLATOON LEADER KNOCKED OUT";
-            endTitle.text = dawn ? "You held the line" : "Assault over";
+            endEyebrow.text = eyebrow ?? (dawn ? "05:00 · DAWN" : "PLATOON LEADER KNOCKED OUT");
+            endTitle.text = title ?? (dawn ? "You held the line" : "Assault over");
+            againBtn.transform.Find("Label").GetComponent<Text>().text = again ?? "New assault";
             stats.text = statLine;
             adBtn.SetActive(adAvailable);
             adLabel.text = dawn ? "Double score · watch an ad" : "Field repair · watch an ad";
