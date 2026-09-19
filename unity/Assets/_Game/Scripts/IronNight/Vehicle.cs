@@ -58,11 +58,11 @@ namespace IronNight
                 var tm = Instantiate(Resources.Load<GameObject>("Models/" + spec.turretMesh), pivot);
                 tm.name = "TurretMesh"; tm.transform.localRotation = Quaternion.Euler(0f, spec.forward > 0f ? 0f : 180f, 0f); tm.transform.localPosition = new Vector3(spec.turretShift, 0f, 0f); turretMesh = tm.transform;   // the turret turns about its own centre
                 var tmat = mat; if (spec.turretTexture != null) { tmat = new Material(mat); tmat.SetTexture("_BaseMap", Resources.Load<Texture2D>("Models/" + spec.turretTexture)); var tn = Resources.Load<Texture2D>("Models/" + spec.turretTexture + "_n"); if (tn != null) tmat.SetTexture("_BumpMap", tn); }
-                if (spec.turretTexture != null)
                 {
-                    // a turret made on its own does not fill the hole the old one was cut from: a plate under it covers the ring
+                    // the cut turret is open underneath and the hull open above: a plate at the ring, as wide as the turret, covers both
+                    var tb0 = LocalBounds(turretMesh, pivot); float ringW = spec.turretTexture != null ? 2.25f : Mathf.Min(tb0.size.x, tb0.size.z) * 0.95f;
                     var plate = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(plate.GetComponent<Collider>()); plate.name = "RingPlate"; plate.transform.SetParent(pivot, false);
-                    plate.transform.localPosition = new Vector3(0f, 0.03f, 0f); plate.transform.localScale = new Vector3(2.25f, 0.04f, 2.25f); plate.GetComponent<Renderer>().sharedMaterial = mat; plate.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    plate.transform.localPosition = new Vector3(spec.turretTexture != null ? 0f : tb0.center.x, 0.03f, spec.turretTexture != null ? 0f : tb0.center.z); plate.transform.localScale = new Vector3(ringW, 0.04f, ringW); plate.GetComponent<Renderer>().sharedMaterial = tmat; plate.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 }
                 foreach (var r in tm.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = tmat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
                 // the generated barrel was cut off (it comes out bent and short); this one has the real length
@@ -104,7 +104,7 @@ namespace IronNight
                 if (cmd != null)
                 {
                     var tb = LocalBounds(turretMesh, pivot); var c = Instantiate(cmd, pivot); c.name = "Commander";
-                    c.transform.localPosition = new Vector3(tb.center.x + tb.extents.x * 0.35f, tb.max.y - 0.5f, tb.center.z - tb.extents.z * 0.15f); c.transform.localRotation = Quaternion.Euler(0f, CommanderYaw, 0f);
+                    c.transform.localScale = Vector3.one * 0.55f; c.transform.localPosition = new Vector3(tb.center.x + tb.extents.x * 0.3f, RoofHeight(turretMesh, pivot) - 0.05f, tb.center.z - tb.extents.z * 0.2f); c.transform.localRotation = Quaternion.Euler(0f, CommanderYaw, 0f);
                     if (commanderMaterial == null) { commanderMaterial = new Material(Resources.Load<Material>("VehicleLit")); commanderMaterial.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/commander_tex")); commanderMaterial.SetFloat("_Cull", 0f); }
                     foreach (var r in c.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = commanderMaterial; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
                 }
@@ -193,7 +193,7 @@ namespace IronNight
                 crossMaterial = new Material(starMaterial); crossMaterial.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.Balkenkreuz(256).texture); crossMaterial.SetColor("_BaseColor", new Color(0.7f, 0.7f, 0.7f, 0.97f));
             }
             var hb = LocalBounds(hull, transform);
-            if (friendly && Depot.Nation == "su") return;   // the Soviet tanks carry their own painted numbers
+            if (spec.painted) return;   // the stars (or the Soviet numbers) are in the generated texture, on the armour itself
             if (friendly)
             {
                 // the white star on both sides of the hull (the sponsons are as wide as the tracks) and of the turret
@@ -212,6 +212,14 @@ namespace IronNight
         }
 
         /// <summary>The box round every mesh under a part, measured in the given frame.</summary>
+        /// <summary>The turret roof: the height under the top 3% of the mesh's vertices, so an aerial or a roof gun does not count.</summary>
+        static float RoofHeight(Transform part, Transform frame)
+        {
+            var ys = new System.Collections.Generic.List<float>();
+            foreach (var mf in part.GetComponentsInChildren<MeshFilter>()) { if (mf.sharedMesh == null) continue; foreach (var v in mf.sharedMesh.vertices) ys.Add(frame.InverseTransformPoint(mf.transform.TransformPoint(v)).y); }
+            if (ys.Count == 0) return 0f; ys.Sort(); return ys[Mathf.Clamp(Mathf.FloorToInt(ys.Count * 0.97f), 0, ys.Count - 1)];
+        }
+
         static Bounds LocalBounds(Transform part, Transform frame)
         {
             bool first = true; var b = new Bounds();

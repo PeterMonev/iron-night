@@ -226,6 +226,9 @@ namespace IronNight
         }
         public void HideTitle() { titleSheet.SetActive(false); hudGroup.SetActive(true); if (garage != null) garage.SetActive(false); }
 
+        /// <summary>Test switch --garage=id: straight into the garage tab with that tank on the turntable.</summary>
+        public void ShowGarage(VehicleSpec spec) { depotTab = 1; ShowDepot(); if (garage != null) garage.Show(spec); }
+
         public void ShowDepot()
         {
             Depot.Load(); titleSheet.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(true); RefreshDepot(); if (depotScroll != null) depotScroll.verticalNormalizedPosition = 1f;

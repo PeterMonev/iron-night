@@ -60,60 +60,60 @@
   ]
  },
  "easy8": {
-  "hullFaces": 21351,
-  "turretFaces": 1682,
+  "hullFaces": 21377,
+  "turretFaces": 2105,
   "ringHeight": 2.1878046635200668,
   "longAxis": "z",
   "forward": 1.0,
   "hullLength": 6.3,
   "ringCenter": [
-   -0.020023973969121773,
+   -0.029544734085599583,
    0.03441385716199885,
-   -0.05789578085144361
+   -0.060799844563007355
   ]
  },
  "hellcat": {
-  "hullFaces": 19087,
-  "turretFaces": 2711,
+  "hullFaces": 19113,
+  "turretFaces": 4417,
   "ringHeight": 1.7079192075387757,
   "longAxis": "z",
   "forward": 1.0,
   "hullLength": 5.5,
   "ringCenter": [
-   -0.05395790127416451,
+   -0.0663330995788177,
    -0.01634356081485744,
-   -0.06586252090831597
+   -0.09176101163029671
   ]
  },
  "chaffee": {
-  "hullFaces": 20692,
-  "turretFaces": 2023,
+  "hullFaces": 20715,
+  "turretFaces": 2795,
   "ringHeight": 1.7136175237741471,
   "longAxis": "z",
   "forward": 1.0,
   "hullLength": 5.0,
   "ringCenter": [
-   -0.004346970779200395,
+   -0.006670349898437659,
    -0.03389539182186119,
-   -0.08141470327973366
+   -0.04885348305106163
   ]
  },
  "pershing": {
-  "hullFaces": 20280,
-  "turretFaces": 2312,
+  "hullFaces": 20393,
+  "turretFaces": 2998,
   "ringHeight": 2.073641385987571,
   "longAxis": "z",
   "forward": 1.0,
   "hullLength": 6.3,
   "ringCenter": [
-   -0.006631731986999512,
+   -0.015660173259675503,
    -0.017323480546474368,
-   -0.07292108237743378
+   -0.03273035710056623
   ]
  },
  "t34_85": {
-  "hullFaces": 21311,
-  "turretFaces": 1181,
+  "hullFaces": 21386,
+  "turretFaces": 1548,
   "ringHeight": 1.7354078824670947,
   "longAxis": "z",
   "forward": 1.0,
@@ -125,8 +125,8 @@
   ]
  },
  "kv85": {
-  "hullFaces": 21020,
-  "turretFaces": 1492,
+  "hullFaces": 21094,
+  "turretFaces": 1608,
   "ringHeight": 2.0900571232793754,
   "longAxis": "z",
   "forward": 1.0,
@@ -138,8 +138,8 @@
   ]
  },
  "is2": {
-  "hullFaces": 20804,
-  "turretFaces": 1413,
+  "hullFaces": 20816,
+  "turretFaces": 1529,
   "ringHeight": 2.1468843872351284,
   "longAxis": "z",
   "forward": 1.0,
@@ -151,29 +151,29 @@
   ]
  },
  "firefly": {
-  "hullFaces": 19917,
-  "turretFaces": 2647,
-  "ringHeight": 1.9753235169262204,
+  "hullFaces": 19988,
+  "turretFaces": 2893,
+  "ringHeight": 2.1948039076958,
   "longAxis": "z",
   "forward": 1.0,
   "hullLength": 6.3,
   "ringCenter": [
-   -0.008679005705441037,
+   0.006773814093321562,
    0.020511980652809236,
-   -0.1265107442935308
+   -0.13246989250183105
   ]
  },
  "m10": {
-  "hullFaces": 13394,
-  "turretFaces": 5229,
-  "ringHeight": 1.1401335574649367,
+  "hullFaces": 18781,
+  "turretFaces": 4351,
+  "ringHeight": 1.9780630394572394,
   "longAxis": "z",
   "forward": 1.0,
   "hullLength": 6.0,
   "ringCenter": [
-   0.017525489442050457,
-   -0.03891983211040495,
-   -0.12724683930476505
+   0.03189161792397499,
+   0.07326086044311525,
+   -0.05482004955410957
   ]
  },
  "kingtiger": {

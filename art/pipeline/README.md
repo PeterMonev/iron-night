@@ -37,3 +37,13 @@ Licenses: TRELLIS 2 and ComfyUI-Trellis2 MIT; DINOv3 (Meta) commercial OK, "Buil
 - Ground: `node bake-fields.js` bakes the four seamless 40 m field tiles (plough, pasture, mown, stubble), the lane strip, the yard and crater
   decals and the hedge foliage from the SDXL tiles in `art/ai-ground` into `Assets/_Game/Resources/Textures`. Hedges, trees and the searchlight
   are built in code (`Props.cs`), the layout is a hash of the 40 m cell coordinates.
+
+## Up close (the 3D garage), 2026-09-19
+The raw TRELLIS model with its own texture holds up at close range; what broke the tanks was our processing:
+brightness-baked normal maps (every atlas island edge became a crack - `bake-vehicle-normals.js` is gone, no `_n.png` for
+vehicles), the flat repaint (`tankpaint.js`/`unstar.js`, no longer used), and a split that counted connectivity by vertex
+index while the atlas duplicates vertices at seams. Now: `split_turret.py` (position-merged adjacency, loose pieces < 4% of
+the turret dropped) -> `vehicle_export.py parts <name> <xscale> --raw` (raw-tex with gamma 0.8) -> `tone.py <name> r g b [k]`
+(US olive drab 84 88 64 k 0.9, Soviet 4BO 66 75 46 k 0.9, sherman_turret2 like the hull). The painted stars stay
+(`VehicleSpec.painted`). `bake_markings.py` paints a star/cross into the texture on the surface, for a model whose
+reference had none.

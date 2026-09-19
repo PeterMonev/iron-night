@@ -86,7 +86,9 @@ roof_faces = turret & (fn[:, 1] > 0.8) & (fa > np.percentile(fa[turret], 60))
 roof = np.median(cent[roof_faces, 1]) if roof_faces.sum() > 20 else ring_y + 0.1
 cand = turret & (cent[:, 1] > roof + 0.015 * height)
 idx = np.where(cand)[0]; pos = {f_: i for i, f_ in enumerate(idx)}
-adj = mesh.face_adjacency; keep = cand[adj[:, 0]] & cand[adj[:, 1]]
+# adjacency by position: the atlas seams duplicate vertices, so by index every uv island is its own piece
+merged = mesh.copy(); merged.merge_vertices(merge_tex=True, merge_norm=True); assert len(merged.faces) == len(f)
+adj = merged.face_adjacency; keep = cand[adj[:, 0]] & cand[adj[:, 1]]
 rows = [pos[x] for x in adj[keep, 0]]; cols = [pos[x] for x in adj[keep, 1]]
 graph = sp.coo_matrix((np.ones(len(rows)), (rows, cols)), shape=(len(idx), len(idx)))
 ncomp, labels = connected_components(graph, directed=False)
@@ -100,6 +102,16 @@ for c_ in range(ncomp):
     tiny = area < 0.002 * fa[turret].sum()                                          # loose shards
     if elongated or spike or tiny: clutter[members] = True
 turret = turret & ~clutter
+# loose pieces: anything in the turret not joined to its main body (shards the generator left floating above the roof,
+# bits of stowage that straddled the cut) goes back to the hull if it is below the roof, or is dropped
+idx = np.where(turret)[0]; pos = {f_: i for i, f_ in enumerate(idx)}; keep = turret[adj[:, 0]] & turret[adj[:, 1]]
+graph = sp.coo_matrix((np.ones(int(keep.sum())), ([pos[x] for x in adj[keep, 0]], [pos[x] for x in adj[keep, 1]])), shape=(len(idx), len(idx)))
+ncomp, labels = connected_components(graph, directed=False); areas = np.array([fa[idx[labels == c_]].sum() for c_ in range(ncomp)])
+loose = np.zeros(len(f), dtype=bool)
+for c_ in range(ncomp):
+    if areas[c_] < 0.04 * areas.max(): loose[idx[labels == c_]] = True
+turret = turret & ~loose; clutter = clutter | (loose & (cent[:, 1] > roof))
+print(f"turret pieces: {ncomp}, loose faces: {int(loose.sum())} ({int((loose & (cent[:, 1] > roof)).sum())} dropped, the rest back to the hull)")
 print(f"roof at {(roof - lo[1]) / height:.2f} of height, {ncomp} pieces above it, tubes/aerials/shards removed: {int(clutter.sum())}")
 hull = ~turret & ~barrel & ~clutter
 

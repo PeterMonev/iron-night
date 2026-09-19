@@ -168,7 +168,7 @@ namespace IronNight.EditorTools
                 var imp = AssetImporter.GetAtPath(path) as ModelImporter; if (imp == null) continue;
                 imp.materialImportMode = ModelImporterMaterialImportMode.None;
                 imp.importNormals = ModelImporterNormals.Calculate; imp.normalSmoothingAngle = 60f;
-                imp.meshCompression = ModelImporterMeshCompression.Medium; imp.isReadable = false;
+                imp.meshCompression = ModelImporterMeshCompression.Medium; imp.isReadable = path.Contains("_turret");   // the turrets are read at runtime for the roof height (the commander stands on it)
                 imp.SaveAndReimport();
             }
             foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { "Assets/_Game/Resources/Models", "Assets/_Game/Resources/Textures", "Assets/_Game/Resources/Props" }))
