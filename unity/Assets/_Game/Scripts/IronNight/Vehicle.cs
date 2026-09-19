@@ -227,7 +227,7 @@ namespace IronNight
         }
 
         /// <summary>An artist's model comes as one OBJ per material (<name>_m0, _m1, ...) with textures <texture>_m<i>: all of them under one node.</summary>
-        static bool HasParts(string baseName) { for (int i = 0; i < 24; i++) if (Resources.Load<GameObject>("Models/" + baseName + "_m" + i) != null) return true; return false; }
+        public static bool HasParts(string baseName) { for (int i = 0; i < 24; i++) if (Resources.Load<GameObject>("Models/" + baseName + "_m" + i) != null) return true; return false; }
 
         GameObject Assemble(string baseName, Transform parent)
         {

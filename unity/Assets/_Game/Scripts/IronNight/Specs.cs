@@ -175,7 +175,7 @@ namespace IronNight
         };
 
         /// <summary>A spec whose models are in the build; the batch still baking is not.</summary>
-        public static bool Available(VehicleSpec s) => Resources.Load<GameObject>("Models/" + s.hullMesh) != null;
+        public static bool Available(VehicleSpec s) => Resources.Load<GameObject>("Models/" + s.hullMesh) != null || Vehicle.HasParts(s.hullMesh);   // one mesh, or an artist's model in parts
 
         public static VehicleSpec ById(string id)
         {
