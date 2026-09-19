@@ -21,10 +21,12 @@ namespace IronNight
         public Vector3 muzzle = new Vector3(0f, 1.1f, 3.4f);   // where the shell leaves a turretless vehicle
         public float scale = 1f;        // the mesh scaled up: the 88 is the PaK mesh at 1.45
         public bool painted;            // the markings are in the generated texture already: no star quads
+        public Vector3 hatch;           // the commander's hatch on the turret (game coordinates about the ring axis); zero: by the turret's shape
+        public bool crewed;             // the model carries its own commander figure
 
         public static readonly VehicleSpec Sherman = new VehicleSpec
         {
-            id = "sherman", name = "M4 Sherman", hullMesh = "sherman_hull", turretMesh = "sherman_turret", texture = "sherman", painted = true, forward = 1f, ringHeight = 1.8f,
+            id = "sherman", name = "M4 Sherman", hullMesh = "sherman_hull", turretMesh = "sherman_turret", texture = "sherman", painted = true, hatch = new Vector3(-0.3f, 0f, 0.05f), forward = 1f, ringHeight = 1.8f,
             gunLength = 0f, gunHeight = 0.5f, muzzle = new Vector3(0f, 0.3f, 3.03f),
             speed = 9f, turnRate = 2.2f, turretRate = 3.2f, reload = 1.3f, damage = 1f, range = 26f, hp = 3f, radius = 2.4f
         };
@@ -36,7 +38,7 @@ namespace IronNight
         };
         public static readonly VehicleSpec PanzerIV = new VehicleSpec
         {
-            id = "pz4", name = "Panzer IV", hullMesh = "pz4_hull", turretMesh = "pz4_turret", texture = "pz4", painted = true, forward = 1f, ringHeight = 1.86f,
+            id = "pz4", name = "Panzer IV", hullMesh = "pz4_hull", turretMesh = "pz4_turret", texture = "pz4", painted = true, hatch = new Vector3(0f, 0f, -0.55f), forward = 1f, ringHeight = 1.86f,
             gunLength = 0f, gunHeight = 0.4f, muzzle = new Vector3(0f, 0.26f, 4.57f),
             speed = 8f, turnRate = 1.9f, turretRate = 2.6f, reload = 1.7f, damage = 1f, range = 24f, hp = 3f, radius = 2.4f
         };
@@ -99,13 +101,13 @@ namespace IronNight
         };
         public static readonly VehicleSpec Chaffee = new VehicleSpec
         {
-            id = "chaffee", name = "M24 Chaffee", hullMesh = "chaffee_hull", turretMesh = "chaffee_turret", texture = "chaffee", painted = true, forward = 1f, ringHeight = 1.76f,
+            id = "chaffee", name = "M24 Chaffee", hullMesh = "chaffee_hull", turretMesh = "chaffee_turret", texture = "chaffee", painted = true, hatch = new Vector3(0.1f, 0f, 0.1f), forward = 1f, ringHeight = 1.76f,
             gunLength = 0f, gunHeight = 0.4f, muzzle = new Vector3(0f, 0.07f, 3.43f),
             speed = 11.5f, turnRate = 2.9f, turretRate = 3.6f, reload = 1f, damage = 0.7f, range = 24f, hp = 2f, radius = 2.2f
         };
         public static readonly VehicleSpec Pershing = new VehicleSpec
         {
-            id = "pershing", name = "M26 Pershing", hullMesh = "pershing_hull", turretMesh = "pershing_turret", texture = "pershing", painted = true, forward = 1f, ringHeight = 1.53f,
+            id = "pershing", name = "M26 Pershing", hullMesh = "pershing_hull", turretMesh = "pershing_turret", texture = "pershing", painted = true, crewed = true, forward = 1f, ringHeight = 1.53f,
             gunLength = 0f, gunHeight = 0.5f, muzzle = new Vector3(0f, 0.43f, 5.41f),
             speed = 7.5f, turnRate = 1.7f, turretRate = 2.4f, reload = 1.9f, damage = 2.5f, range = 32f, hp = 6f, radius = 2.8f
         };
@@ -118,13 +120,13 @@ namespace IronNight
         // ---- the Soviet tree ----
         public static readonly VehicleSpec T34_85 = new VehicleSpec
         {
-            id = "t34_85", painted = true, name = "T-34-85", hullMesh = "t34_85_hull", turretMesh = "t34_85_turret", texture = "t34_85", forward = 1f, ringHeight = 1.61f,
+            id = "t34_85", painted = true, hatch = new Vector3(0.1f, 0f, 0.1f), name = "T-34-85", hullMesh = "t34_85_hull", turretMesh = "t34_85_turret", texture = "t34_85", forward = 1f, ringHeight = 1.61f,
             gunLength = 0f, gunHeight = 0.5f, muzzle = new Vector3(0f, 0.27f, 4.56f),
             speed = 10f, turnRate = 2.4f, turretRate = 3f, reload = 1.5f, damage = 1.5f, range = 27f, hp = 3.5f, radius = 2.5f
         };
         public static readonly VehicleSpec KV85 = new VehicleSpec
         {
-            id = "kv85", painted = true, name = "KV-1", hullMesh = "kv1_hull", turretMesh = "kv1_turret", texture = "kv1", forward = 1f, ringHeight = 1.96f,
+            id = "kv85", painted = true, hatch = new Vector3(0f, 0f, -0.2f), name = "KV-1", hullMesh = "kv1_hull", turretMesh = "kv1_turret", texture = "kv1", forward = 1f, ringHeight = 1.96f,
             gunLength = 0f, gunHeight = 0.5f, muzzle = new Vector3(0f, 0.21f, 3.06f),
             speed = 6.5f, turnRate = 1.5f, turretRate = 2.2f, reload = 1.8f, damage = 1.5f, range = 27f, hp = 6f, radius = 2.7f
         };
@@ -136,7 +138,7 @@ namespace IronNight
         };
         public static readonly VehicleSpec IS2 = new VehicleSpec
         {
-            id = "is2", painted = true, name = "IS-2", hullMesh = "is2_hull", turretMesh = "is2_turret", texture = "is2", forward = 1f, ringHeight = 1.73f,
+            id = "is2", painted = true, hatch = new Vector3(-0.3f, 0f, -0.35f), name = "IS-2", hullMesh = "is2_hull", turretMesh = "is2_turret", texture = "is2", forward = 1f, ringHeight = 1.73f,
             gunLength = 0f, gunHeight = 0.5f, muzzle = new Vector3(0f, 0.14f, 5.81f),
             speed = 6.5f, turnRate = 1.4f, turretRate = 2f, reload = 2.8f, damage = 3.5f, range = 32f, hp = 7f, radius = 2.9f
         };
