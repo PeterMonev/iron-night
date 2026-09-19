@@ -119,11 +119,15 @@ namespace IronNight.EditorTools
             decal.EnableKeyword("_NORMALMAP"); decal.SetTexture("_BumpMap", Tex("lane_n"));
             var foliage = MakeMaterial("FoliageLit", "Universal Render Pipeline/Lit");
             foliage.SetFloat("_Smoothness", 0.08f); foliage.SetFloat("_Metallic", 0f); foliage.SetFloat("_Cull", (float)CullMode.Off); foliage.EnableKeyword("_NORMALMAP"); foliage.SetTexture("_BaseMap", Tex("hedge")); foliage.SetTexture("_BumpMap", Tex("hedge_n"));
+            // leaf cards: alpha-cut clusters on both sides; the keyword on the asset keeps the cutout variant (and its shadow pass) in the build
+            var leaves = MakeMaterial("FoliageCut", "Universal Render Pipeline/Lit");
+            leaves.SetFloat("_AlphaClip", 1f); leaves.SetFloat("_Cutoff", 0.45f); leaves.EnableKeyword("_ALPHATEST_ON"); leaves.SetFloat("_Cull", (float)CullMode.Off); leaves.SetFloat("_Smoothness", 0.1f); leaves.SetFloat("_Metallic", 0f);
+            leaves.SetTexture("_BaseMap", Tex("leaves")); leaves.SetOverrideTag("RenderType", "TransparentCutout"); leaves.renderQueue = (int)RenderQueue.AlphaTest;
             // the field: four photographic ground textures blended by vertex colour, in world space
             var field = MakeMaterial("Ground", "IronNight/Ground"); string[] set = { "plough", "pasture", "mown", "stubble" };
             for (int i = 0; i < 4; i++) { field.SetTexture("_Tex" + i, Tex("ground_" + set[i])); field.SetTexture("_Nrm" + i, Tex("ground_" + set[i] + "_n")); }
             field.SetTexture("_Variation", Tex("ground_variation")); field.SetFloat("_Tiling", 40f / 3f); field.SetFloat("_VariationTiling", 300f); field.SetFloat("_VariationStrength", 0.5f); field.SetFloat("_BumpScale", 1f); field.SetFloat("_Smoothness", 0.06f);
-            foreach (var m in new[] { vehicle, vehicleN, barrel, ground, additive, smoke, decal, foliage, field }) EditorUtility.SetDirty(m);
+            foreach (var m in new[] { vehicle, vehicleN, barrel, ground, additive, smoke, decal, foliage, field, leaves }) EditorUtility.SetDirty(m);
 
             const string profilePath = Res + "BattleProfile.asset";
             var old = AssetDatabase.LoadAssetAtPath<VolumeProfile>(profilePath); if (old != null) AssetDatabase.DeleteAsset(profilePath);
@@ -175,6 +179,7 @@ namespace IronNight.EditorTools
                 string file = System.IO.Path.GetFileNameWithoutExtension(path);
                 imp.textureType = file.EndsWith("_n") ? TextureImporterType.NormalMap : TextureImporterType.Default;   // *_n.png are normal maps
                 imp.sRGBTexture = file != "ground_variation";                                                      // a multiplier, not a colour
+                if (file == "leaves") { imp.alphaIsTransparency = true; imp.wrapMode = TextureWrapMode.Clamp; }
                 var android = imp.GetPlatformTextureSettings("Android"); android.overridden = true; android.maxTextureSize = 1024; android.format = TextureImporterFormat.ASTC_6x6; imp.SetPlatformTextureSettings(android);
                 imp.SaveAndReimport();
             }

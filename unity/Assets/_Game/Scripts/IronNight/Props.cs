@@ -19,7 +19,7 @@ namespace IronNight
             public What what; public Kind kind; public Vector3 pos; public float yaw, size, bound = 8f, height = -1f; public int seed;
             public Vector2[] circleCenters = new Vector2[0]; public float[] radii = new float[0];
             public Vector3 a, b; public float[] gaps; public float clearA, clearB;              // hedges: the line and its openings
-            public GameObject go; public Mesh mesh; public LightShaft shaft; public Transform yoke, drum, lamp; public float flakTimer = 4f; public int burst;
+            public GameObject go; public Mesh mesh, leaves; public LightShaft shaft; public Transform yoke, drum, lamp; public float flakTimer = 4f; public int burst;
         }
 
         // circles: triples (offsetAlong, offsetSide, radius) in metres, along the prop's own forward axis
@@ -47,6 +47,7 @@ namespace IronNight
             new Kind { mesh = "signpost", length = 1f, height = -1f, circles = new[] { 0f, 0f, 0.3f } },
             new Kind { mesh = "wreck", length = 6f, height = 2.2f, circles = new[] { -1.6f, 0f, 1.7f, 1.6f, 0f, 1.7f } },
             new Kind { mesh = "marker_smoke", length = 0.5f, height = -1f, circles = new float[0] },
+            new Kind { mesh = "hedge", length = 8f, height = -1f, circles = new float[0] },   // placed by the hedge lines, which carry the collision
         };
 
         const float Cell = 40f, Half = 20f;
@@ -55,7 +56,7 @@ namespace IronNight
         readonly Dictionary<string, Material> materials = new Dictionary<string, Material>();
         readonly List<Prop> active = new List<Prop>(); readonly HashSet<Prop> wanted = new HashSet<Prop>();
         Transform cam; Material patchMaterial, laneMaterial, yardMaterial, craterMaterial, hedgeMaterial, canopyMaterial, trunkMaterial;
-        Mesh[] blobs; GameObject lampTemplate;
+        Mesh[] blobs; GameObject lampTemplate; Material leafMaterial; readonly Mesh[] cards = new Mesh[4];   // one leaf-cluster quad per cell of the leaves sheet
         // the ground itself: one grid of 2 m quads that follows the camera; a vertex colour channel per field type
         const float GroundSize = 240f, GroundStep = 2f; const int GroundN = (int)(GroundSize / GroundStep);
         Transform ground; Mesh groundMesh; Material groundMat; Color[] groundColors; int gcx = int.MinValue, gcz;
@@ -83,6 +84,9 @@ namespace IronNight
             canopyMaterial = new Material(hedgeMaterial); canopyMaterial.SetColor("_BaseColor", new Color(0.95f, 1f, 0.8f));
             trunkMaterial = new Material(Resources.Load<Material>("BarrelLit")); trunkMaterial.SetColor("_BaseColor", new Color(0.26f, 0.21f, 0.15f)); trunkMaterial.SetFloat("_Smoothness", 0.1f); trunkMaterial.SetFloat("_Metallic", 0f);
             blobs = new Mesh[4]; for (int i = 0; i < 4; i++) blobs[i] = Blob(11 + i * 7);
+            leafMaterial = Resources.Load<Material>("FoliageCut"); for (int i = 0; i < 4; i++) cards[i] = Card(i);
+            // the blobs under the leaves go dark: they are the shadowed inside of the bush
+            hedgeMaterial.SetColor("_BaseColor", winter ? new Color(0.72f, 0.78f, 0.82f) : new Color(0.55f, 0.62f, 0.5f)); canopyMaterial.SetColor("_BaseColor", winter ? new Color(0.72f, 0.78f, 0.82f) : new Color(0.52f, 0.6f, 0.48f));
             lampTemplate = LampTemplate();
         }
 
@@ -106,7 +110,7 @@ namespace IronNight
         static Vector3 In(int ix, int iz, int salt, float r) => new Vector3((Rnd(ix, iz, salt) - 0.5f) * 2f * r, 0f, (Rnd(ix, iz, salt + 1) - 0.5f) * 2f * r);
 
         // the generated textures come out at different brightnesses; this evens them under the moon
-        static Color Tint(string mesh) { switch (mesh) { case "deadtree": return new Color(0.78f, 0.72f, 0.66f); case "haystack": return new Color(0.82f, 0.76f, 0.6f); case "sandbags": return new Color(0.78f, 0.74f, 0.66f); default: return new Color(0.8f, 0.78f, 0.74f); } }
+        static Color Tint(string mesh) { switch (mesh) { case "tree_poplar": case "tree_oak": case "spruce_snow": case "hedge": return new Color(0.42f, 0.5f, 0.4f); case "deadtree": return new Color(0.78f, 0.72f, 0.66f); case "haystack": return new Color(0.82f, 0.76f, 0.6f); case "sandbags": return new Color(0.78f, 0.74f, 0.66f); default: return new Color(0.8f, 0.78f, 0.74f); } }
 
         Kind K(string mesh) { foreach (var k in Kinds) if (k.mesh == mesh) return k; return null; }
 
@@ -125,6 +129,7 @@ namespace IronNight
         void HedgeTree(List<Prop> list, Vector3 pos, int seed)
         {
             if (winter) { Place(list, "deadtree", pos, (seed % 360) * Mathf.Deg2Rad); return; }
+            if (PlayerPrefs.GetInt("quality", 1) != 0 && Place(list, "tree_oak", pos, (seed % 360) * Mathf.Deg2Rad) != null) return;
             list.Add(new Prop { what = What.Tree, pos = pos, seed = seed, yaw = (seed % 360) * Mathf.Deg2Rad, bound = 5f, circleCenters = new[] { new Vector2(pos.x, pos.z) }, radii = new[] { 0.8f } });
         }
 
@@ -319,7 +324,7 @@ namespace IronNight
         void Unload(Prop p)
         {
             if (p.shaft != null) Destroy(p.shaft.gameObject);
-            Destroy(p.go); p.go = null; if (p.mesh != null) { Destroy(p.mesh); p.mesh = null; }
+            Destroy(p.go); p.go = null; if (p.mesh != null) { Destroy(p.mesh); p.mesh = null; } if (p.leaves != null) { Destroy(p.leaves); p.leaves = null; }
         }
 
         static GameObject Quad(Transform parent, Vector3 pos, float yawDeg, float w, float h, Material m, float y)
@@ -353,8 +358,11 @@ namespace IronNight
         }
 
         /// <summary>Two staggered rows of bushes along the line, skipping the gates, combined into one mesh.</summary>
+        /// <summary>The hedge as the generated hawthorn model (from the reference picture), one 8 m section after another
+        /// along the line, skipping the gates; the blob hedge stays for the low quality setting.</summary>
         void SpawnHedge(Prop p)
         {
+            if (prefabs.ContainsKey("hedge") && PlayerPrefs.GetInt("quality", 1) != 0) { SpawnHedgeModel(p); return; }
             var rng = new System.Random(p.seed); var dir = (p.b - p.a).normalized; var side = new Vector3(dir.z, 0f, -dir.x);
             var parts = new List<CombineInstance>();
             for (float u = 0.7f; u < p.size - 0.5f; u += 1.1f)
@@ -370,7 +378,23 @@ namespace IronNight
             var go = new GameObject("Hedge"); go.transform.SetParent(transform, false); go.transform.position = p.pos;
             var mesh = new Mesh(); mesh.CombineMeshes(parts.ToArray(), true, true); mesh.RecalculateBounds();
             go.AddComponent<MeshFilter>().sharedMesh = mesh; var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = hedgeMaterial;
+            if (!winter) p.leaves = Leaves(go.transform, parts, rng, 6, 1.8f, 0f);
             p.go = go; p.mesh = mesh;
+        }
+
+        void SpawnHedgeModel(Prop p)
+        {
+            var rng = new System.Random(p.seed); var dir = (p.b - p.a).normalized; float yawDeg = p.yaw * Mathf.Rad2Deg;
+            var go = new GameObject("Hedge"); go.transform.SetParent(transform, false); go.transform.position = p.pos;
+            const float Section = 7.6f;   // the model is 8 m: a little overlap hides the joins
+            for (float u = 0f; u + Section * 0.6f < p.size; u += Section)
+            {
+                float mid = u + Section * 0.5f; if (Open(p, u + 0.8f) || Open(p, mid) || Open(p, u + Section - 0.8f)) continue;
+                var sec = Instantiate(prefabs["hedge"], go.transform); sec.transform.position = p.a + dir * mid; sec.transform.rotation = Quaternion.Euler(0f, yawDeg + (rng.Next(2) == 0 ? 0f : 180f), 0f);
+                sec.transform.localScale = new Vector3(1f, 0.85f + (float)rng.NextDouble() * 0.3f, 1f);
+                foreach (var r in sec.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = materials["hedge"]; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+            }
+            p.go = go;
         }
 
         /// <summary>A hedgerow tree: a trunk and a crown of three or four leaf blobs, nine metres tall.</summary>
@@ -390,6 +414,7 @@ namespace IronNight
             var crown = new GameObject("Crown"); crown.transform.SetParent(go.transform, false);
             var mesh = new Mesh(); mesh.CombineMeshes(parts.ToArray(), true, true); mesh.RecalculateBounds();
             crown.AddComponent<MeshFilter>().sharedMesh = mesh; crown.AddComponent<MeshRenderer>().sharedMaterial = canopyMaterial;
+            p.leaves = Leaves(crown.transform, parts, rng, 8, 1.9f, 0f);
             p.go = go; p.mesh = mesh;
         }
 
@@ -447,6 +472,40 @@ namespace IronNight
         }
 
         /// <summary>A lumpy, flat-bottomed sphere: one bush, or one clump of a tree crown. V runs from the ground up.</summary>
+        /// <summary>A unit quad showing one cell of the leaves sheet, both sides.</summary>
+        static Mesh Card(int cell)
+        {
+            float u0 = (cell % 2) * 0.5f, v0 = 1f - (cell / 2 + 1) * 0.5f;
+            var m = new Mesh();
+            m.vertices = new[] { new Vector3(-0.5f, -0.5f, 0f), new Vector3(0.5f, -0.5f, 0f), new Vector3(0.5f, 0.5f, 0f), new Vector3(-0.5f, 0.5f, 0f) };
+            m.uv = new[] { new Vector2(u0, v0), new Vector2(u0 + 0.5f, v0), new Vector2(u0 + 0.5f, v0 + 0.5f), new Vector2(u0, v0 + 0.5f) };
+            m.normals = new[] { Vector3.back, Vector3.back, Vector3.back, Vector3.back }; m.triangles = new[] { 0, 2, 1, 0, 3, 2 };
+            return m;
+        }
+
+        /// <summary>Leaf cards round each blob of a bush or crown: a few at random headings and tilts, one lying nearly
+        /// flat on top (the camera looks down), all in one mesh with the cutout material.</summary>
+        Mesh Leaves(Transform parent, List<CombineInstance> blobParts, System.Random rng, int perBlob, float size, float spread)
+        {
+            if (leafMaterial == null) return null; var parts = new List<CombineInstance>();
+            foreach (var b in blobParts)
+            {
+                // the blob's own frame: origin at its base, sx across, sy tall (the mesh runs 0..1 up)
+                var c = b.transform.GetColumn(3); var centre = new Vector3(c.x, c.y, c.z); float sx = b.transform.GetColumn(0).magnitude, sy = b.transform.GetColumn(1).magnitude;
+                for (int i = 0; i < perBlob; i++)
+                {
+                    bool top = i < perBlob / 2; float ang = (float)rng.NextDouble() * Mathf.PI * 2f; Vector3 off; float tilt, yaw;
+                    if (top) { off = new Vector3(Mathf.Cos(ang) * sx * 0.35f, sy * (0.95f + (float)rng.NextDouble() * 0.15f), Mathf.Sin(ang) * sx * 0.35f); tilt = 80f + (float)rng.NextDouble() * 10f; yaw = (float)rng.NextDouble() * 360f; }   // lying on the crown
+                    else { off = new Vector3(Mathf.Cos(ang) * sx * 0.55f, sy * (0.45f + (float)rng.NextDouble() * 0.35f), Mathf.Sin(ang) * sx * 0.55f); tilt = 30f + (float)rng.NextDouble() * 35f; yaw = -ang * Mathf.Rad2Deg + 90f; }   // leaning out of the side
+                    float s = size * sx * (0.8f + (float)rng.NextDouble() * 0.4f);
+                    parts.Add(new CombineInstance { mesh = cards[rng.Next(4)], transform = Matrix4x4.TRS(centre + off, Quaternion.Euler(tilt, yaw, (float)rng.NextDouble() * 360f), new Vector3(s, s, 1f)) });
+                }
+            }
+            var go = new GameObject("Leaves"); go.transform.SetParent(parent, false);
+            var mesh = new Mesh(); mesh.CombineMeshes(parts.ToArray(), true, true); mesh.RecalculateBounds();
+            go.AddComponent<MeshFilter>().sharedMesh = mesh; var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = leafMaterial; mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; return mesh;
+        }
+
         static Mesh Blob(int seed)
         {
             var rng = new System.Random(seed); const int rings = 6, segs = 10;
