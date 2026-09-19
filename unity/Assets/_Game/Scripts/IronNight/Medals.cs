@@ -27,6 +27,8 @@ namespace IronNight
             new Medal { id = "ace", name = "Ace of Aces", desc = "Destroy the Tiger Ace three times.", test = () => Depot.Total("aces") >= 3 },
             new Medal { id = "veteran", name = "Old Guard", desc = "See the dawn on a veteran night.", test = () => Depot.Total("veteranDawns") >= 1 },
             new Medal { id = "fifty", name = "Iron Night", desc = "Fight fifty nights.", test = () => Depot.NightsFought >= 50 },
+            new Medal { id = "campaigner", name = "Campaigner", desc = "Win a three-night campaign.", test = () => Depot.CampaignsWon >= 1 },
+            new Medal { id = "wrecker", name = "Track Wrecker", desc = "Throw twenty enemy tracks.", test = () => Depot.Total("tracked") >= 20 },
         };
 
         public static bool Earned(Medal m) => PlayerPrefs.GetInt("medal." + m.id, 0) == 1;

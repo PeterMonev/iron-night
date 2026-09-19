@@ -41,6 +41,7 @@ namespace IronNight
         Material shellTemplate; Texture2D glowTex;
         Formation formation = Formation.Wedge; Phase phase = Phase.Title; bool reserveGranted;
         int campaignNight;   // 0: a single night; 1..3: the campaign
+        int nightTracked, nightFocus, talliedTracked;
         Vehicle focus; float focusLeft; Transform focusRing;   // the enemy the platoon was told to hit
         float t, spawnTimer = 6f, leaderShield; int level = 1, xp, xpNeed = 6, score, kills, maxPlatoon = 4, reinforcements;
         bool wave2, wave3, wave4, revived, doubled, bossSpawned; Vehicle boss;
@@ -238,7 +239,8 @@ namespace IronNight
             flareLight.range = 34f + platoon.Count * 3f;
             Sfx.Engine(stick.Active ? stick.Direction.magnitude : 0f);
             PlaceCamera(false);
-            hud.Set(t, platoon.Count); hud.SetLeader(Mathf.CeilToInt(L.hp), Mathf.CeilToInt(Depot.LeaderHp));
+            hud.Set(t, platoon.Count); hud.SetLeader(Mathf.CeilToInt(L.hp), Mathf.CeilToInt(Depot.LeaderHp)); hud.SetTally(kills, score);
+            hud.ReloadArc(L.transform.position + Vector3.up * 0.2f, L.reloadLeft <= 0f ? 1f : 1f - L.reloadLeft / Mathf.Max(0.1f, L.spec.reload * L.reloadMul), cam);
             hud.Indicators(foes, cam);
             TickObjective(dt); TickDrops(dt); TickMortars(dt); TickStar(dt);
             if (ammoLeft > 0f) { ammoLeft -= dt; if (ammoLeft <= 0f) { ammoMul = 1f; hud.Toast("APCR spent"); } }
@@ -326,7 +328,7 @@ namespace IronNight
         {
             if (v.dead || v.spec.isGun || v.trackOut > 0f || Random.value > 0.2f) return;
             var d = at - v.transform.position; d.y = 0f; if (Mathf.Abs(Vector3.Dot(d.normalized, v.Forward)) > 0.7f) return;   // from the side only
-            v.trackOut = 10f; fx.Spark(new Vector3(at.x, 0.6f, at.z), d.normalized); Sfx.Ricochet(at);
+            v.trackOut = 10f; fx.Spark(new Vector3(at.x, 0.6f, at.z), d.normalized); Sfx.Ricochet(at); if (!v.friendly) nightTracked++;
             if (v.friendly) { hud.Toast((v == Leader ? "Track knocked off · " : v.spec.name + " tracked · ") + "10 s", 2.8f); if (v == Leader) Buzz(); }
             else hud.Popup(v.transform.position, "Tracked", new Color(1f, 0.8f, 0.4f));
         }
@@ -353,7 +355,7 @@ namespace IronNight
             else
             {
                 foes.Remove(v); kills++;
-                if (v.spec == VehicleSpec.Tiger || v.spec == VehicleSpec.TigerAce || v.spec == VehicleSpec.KingTiger) nightTigers++; if (Random.value < 0.35f) Radio("kill"); if (v.spec.isGun) nightPaks++;
+                if (v.spec == VehicleSpec.Tiger || v.spec == VehicleSpec.TigerAce || v.spec == VehicleSpec.KingTiger) nightTigers++; if (Random.value < 0.35f) Radio("kill"); if (v == focus) nightFocus++; if (v.spec.isGun) nightPaks++;
                 int worth = v.spec == VehicleSpec.Tiger ? 5 : v.spec == VehicleSpec.TigerAce ? 12 : v.spec == VehicleSpec.KingTiger ? 14 : v.spec == VehicleSpec.Flak88 ? 4 : v.spec == VehicleSpec.Hetzer ? 3 : v.spec == VehicleSpec.Nebelwerfer ? 3 : v.spec == VehicleSpec.Kubelwagen ? 4 : v.spec == VehicleSpec.Flak38 ? 1 : v.spec == VehicleSpec.Panther ? 5 : v.spec == VehicleSpec.StuG ? 3 : 2; score += worth * 50; xp += worth;
                 if (v.spec == VehicleSpec.Panther) nightTigers++;   // the big cats count together for the missions
                 hud.Popup(v.transform.position, "+" + worth * 50, new Color(0.95f, 0.66f, 0.23f)); shake = Mathf.Max(shake, Dist(v, Leader) < 25f ? 0.5f : 0.2f);
@@ -1102,12 +1104,12 @@ namespace IronNight
             int earned = Mathf.RoundToInt(score * (veteran ? 1.5f : 1f)) * (doubled ? 2 : 1) + (dawn ? 500 : 0);
             Depot.AddPoints(earned - banked); banked = earned;                       // a revived night banks only what is new
             if (!nightRecorded) { Depot.RecordNight(kills, t); nightRecorded = true; }
-            var done = Missions.Report(new Missions.Night { kills = kills, tigers = nightTigers, paks = nightPaks, flares = nightFlares, level = level, time = t, boss = bossKilled, objectives = objectivesReached, infantry = nightInfantry });
+            var done = Missions.Report(new Missions.Night { kills = kills, tigers = nightTigers, paks = nightPaks, flares = nightFlares, level = level, time = t, boss = bossKilled, objectives = objectivesReached, infantry = nightInfantry, tracked = nightTracked, focus = nightFocus, campaign = campaignNight == 3 && dawn ? 1 : 0 });
             Depot.Tally("kills", kills - talliedKills); talliedKills = kills; Depot.Tally("tigers", nightTigers - talliedTigers); talliedTigers = nightTigers;
             Depot.Tally("guns", nightPaks - talliedGuns); talliedGuns = nightPaks; Depot.Tally("infantry", nightInfantry - talliedInfantry); talliedInfantry = nightInfantry;
             Depot.Tally("objectives", objectivesReached - talliedObjectives); talliedObjectives = objectivesReached;
             if (bossKilled && !talliedAce) { talliedAce = true; Depot.Tally("aces", 1); }
-            if (dawn) { Depot.Tally("dawns", 1); if (veteran) Depot.Tally("veteranDawns", 1); }
+            if (dawn) { Depot.Tally("dawns", 1); if (veteran) Depot.Tally("veteranDawns", 1); } Depot.Tally("tracked", nightTracked - talliedTracked); talliedTracked = nightTracked;
             if (kills >= 15 && shotsFired > 0 && shotsHit * 2 >= shotsFired) Depot.Tally("sharp", 1);
             if (!logged) { logged = true; Depot.LogNight(winter ? "Ardennes" : "Normandy", kills, t, score, dawn); }
             var medals = Medals.Check();

@@ -15,7 +15,7 @@ namespace IronNight
         public System.Action<Formation> OnFormation;
         public System.Action OnAd, OnAgain, OnStart, OnCampaign, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality;
 
-        Text clock, count, fps, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel; GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
+        Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel; GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
         class Rising { public Text t; public float life; public Vector3 world; }
         readonly List<Rising> popups = new List<Rising>(); readonly Stack<Text> popupPool = new Stack<Text>(); RectTransform canvasRect;
@@ -43,6 +43,7 @@ namespace IronNight
             var ink = new Color(0.93f, 0.91f, 0.86f); var amber = new Color(0.95f, 0.66f, 0.23f); var dim = new Color(0.66f, 0.64f, 0.59f);
             assaultLabel = MakeText(t, "ClockLabel", new Vector2(0, 1), new Vector2(60, -70), TextAnchor.UpperLeft, 30, dim); assaultLabel.text = "NIGHT ASSAULT";
             clock = MakeText(t, "Clock", new Vector2(0, 1), new Vector2(60, -108), TextAnchor.UpperLeft, 82, ink);
+            tally = MakeText(t, "Tally", new Vector2(0.5f, 1), new Vector2(0, -150), TextAnchor.UpperCenter, 26, dim); tally.rectTransform.sizeDelta = new Vector2(500, 40);
             MakeText(t, "CountLabel", new Vector2(1, 1), new Vector2(-60, -70), TextAnchor.UpperRight, 30, dim).text = "PLATOON";
             count = MakeText(t, "Count", new Vector2(1, 1), new Vector2(-60, -108), TextAnchor.UpperRight, 82, amber);
             fps = MakeText(t, "Fps", new Vector2(0.5f, 1), new Vector2(0, -70), TextAnchor.UpperCenter, 28, dim);
@@ -434,6 +435,17 @@ namespace IronNight
             int m = Mathf.FloorToInt(seconds / 60f), s = Mathf.FloorToInt(seconds % 60f);
             clock.text = $"{m}:{s:00}"; count.text = platoon.ToString();
         }
+        public void SetTally(int kills, int score) { tally.text = kills == 0 && score == 0 ? "" : $"{kills} kills · {score}"; }
+
+        // the reload arc: a ring under the leader that fills while the gun reloads, gone when it is ready
+        Transform reloadRing; Image reloadImg; float slowFor; bool slowOffered;
+        public void ReloadArc(Vector3 at, float fraction, Camera cam)
+        {
+            if (reloadImg == null) { reloadImg = MakeImage(hudGroup.transform, "Reload", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(96, 96), new Color(1f, 0.75f, 0.35f, 0.7f)); reloadImg.sprite = Lightswarm.ProceduralSprites.Ring(96, 0.1f); reloadImg.type = Image.Type.Filled; reloadImg.fillMethod = Image.FillMethod.Radial360; reloadImg.fillOrigin = 2; reloadImg.fillClockwise = true; }
+            if (fraction >= 1f) { reloadImg.enabled = false; return; }
+            var vp = cam.WorldToViewportPoint(at); if (vp.z < 0f) { reloadImg.enabled = false; return; }
+            var rect = canvas.GetComponent<RectTransform>().rect; reloadImg.enabled = true; reloadImg.fillAmount = fraction; reloadImg.rectTransform.anchoredPosition = new Vector2((vp.x - 0.5f) * rect.width, (vp.y - 0.5f) * rect.height);
+        }
 
         public void SetLeader(int hp, int max) { var s = new System.Text.StringBuilder("LEADER "); for (int i = 0; i < max; i++) s.Append(i < hp ? "■" : "□"); leaderHp.text = s.ToString(); }
         public void SetLevel(int level, float progress) { levelText.text = $"Level {level}"; levelFill.rectTransform.sizeDelta = new Vector2(960f * Mathf.Clamp01(progress), 8f); }
@@ -504,7 +516,7 @@ namespace IronNight
             foreach (Transform c in recordRows) Destroy(c.gameObject);
             var ink = new Color(0.93f, 0.91f, 0.86f); var dim = new Color(0.66f, 0.64f, 0.59f); var amber = new Color(0.95f, 0.66f, 0.23f);
             var totals = MakeText(recordRows, "Totals", new Vector2(0.5f, 1f), new Vector2(0, 0), TextAnchor.UpperCenter, 30, dim); totals.rectTransform.sizeDelta = new Vector2(940, 120);
-            totals.text = $"{Depot.NightsFought} nights · {Depot.Total("kills")} vehicles · {Depot.Total("tigers")} Tigers · {Depot.Total("guns")} guns · {Depot.Total("infantry")} infantry\n{Depot.Total("dawns")} dawns · {Depot.Total("objectives")} objectives · {Medals.Count}/{Medals.All.Length} medals";
+            totals.text = (Depot.CampaignsWon > 0 ? $"{Depot.CampaignsWon} campaigns won · best {Depot.CampaignBest}\n" : "") + $"{Depot.NightsFought} nights · {Depot.Total("kills")} vehicles · {Depot.Total("tigers")} Tigers · {Depot.Total("guns")} guns · {Depot.Total("infantry")} infantry\n{Depot.Total("dawns")} dawns · {Depot.Total("objectives")} objectives · {Medals.Count}/{Medals.All.Length} medals";
             var log = Depot.NightLog();
             if (log.Count == 0) { var none = MakeText(recordRows, "None", new Vector2(0.5f, 1f), new Vector2(0, -160), TextAnchor.UpperCenter, 30, dim); none.text = "No nights fought yet."; }
             for (int i = 0; i < log.Count; i++)
@@ -525,7 +537,7 @@ namespace IronNight
         void Update()
         {
             fpsAccum += Time.unscaledDeltaTime; fpsFrames++; fpsTimer += Time.unscaledDeltaTime;
-            if (fpsTimer >= 0.5f) { fps.text = $"{fpsFrames / fpsAccum:0} fps"; fpsAccum = 0; fpsFrames = 0; fpsTimer = 0; }
+            if (fpsTimer >= 0.5f) { float f = fpsFrames / fpsAccum; fps.text = $"{f:0} fps"; fpsAccum = 0; fpsFrames = 0; fpsTimer = 0; if (f < 38f && hudGroup.activeSelf) slowFor += 0.5f; else slowFor = 0f; if (slowFor >= 5f && !slowOffered && PlayerPrefs.GetInt("quality", 1) != 0) { slowOffered = true; Toast("Stuttering? Pause · Quality: low turns off shadows and rain", 5f); } }
             if (toastLeft > 0f) { toastLeft -= Time.unscaledDeltaTime; if (toastLeft <= 0f) toast.text = ""; }
             if (flash.color.a > 0f) { var c = flash.color; c.a = Mathf.Max(0f, c.a - Time.unscaledDeltaTime * 0.9f); flash.color = c; }
             var cam = Camera.main;
