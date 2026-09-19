@@ -235,7 +235,7 @@ namespace IronNight
             foreach (var e in foes) if (!e.spec.isGun) e.transform.position = props.PushOut(e.transform.position, e.spec.radius * 0.7f);
             foreach (var v in platoon) tracks.Mark(v); foreach (var e in foes) if (!e.spec.isGun) tracks.Mark(e);
             foreach (var v in platoon) Smoulder(v, dt); foreach (var e in foes) Smoulder(e, dt);
-            props.platoon = L.transform.position; props.alert = t > 60f || System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--lamps") >= 0; props.Tick();
+            props.platoon = L.transform.position; props.alert = false; props.Tick();
             flareLight.range = 34f + platoon.Count * 3f;
             Sfx.Engine(stick.Active ? stick.Direction.magnitude : 0f);
             PlaceCamera(false);

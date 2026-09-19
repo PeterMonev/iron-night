@@ -334,7 +334,7 @@ namespace IronNight
                 // the beam wanders round the sky between 22 and 62 degrees up; the lamp glow faces the camera. Once the posts are
                 // alerted, one within 75 m swings down and follows the leader; the sweep is picked up again when he is gone
                 float ph = p.seed * 0.37f, az = time * 7f * (p.seed % 2 == 0 ? 1f : -1f) + ph * 57f, el = 42f + Mathf.Sin(time * 0.17f + ph) * 20f;
-                var toL = platoon - p.pos; float distL = new Vector2(toL.x, toL.z).magnitude; bool tracking = alert && distL < 75f && distL > 6f;
+                var toL = platoon - p.pos; float distL = new Vector2(toL.x, toL.z).magnitude; bool tracking = false;   // the AA posts keep to the sky: turning a Flak searchlight on tanks was a rare thing (Seelow, 1945), not a Normandy night
                 if (tracking) { az = Mathf.Atan2(toL.x, toL.z) * Mathf.Rad2Deg - p.yaw * Mathf.Rad2Deg; el = Mathf.Max(3f, Mathf.Atan2(2.4f, distL) * Mathf.Rad2Deg); p.track = Mathf.Min(1f, p.track + Time.deltaTime * 0.5f); }
                 else p.track = Mathf.Max(0f, p.track - Time.deltaTime * 0.5f);
                 p.az = Mathf.MoveTowardsAngle(p.az, az, (tracking ? 30f : 90f) * Time.deltaTime); p.el = Mathf.MoveTowards(p.el, el, 25f * Time.deltaTime);
