@@ -11,7 +11,7 @@ namespace IronNight
     {
         public VehicleSpec spec;
         public bool friendly;
-        public float hp, yaw, turretYaw, reloadLeft, hitFlash, lastHit = -100f, mgTimer, mgSound; public int flank; public bool unloaded, leaving;
+        public float hp, yaw, turretYaw, reloadLeft, hitFlash, lastHit = -100f, mgTimer, mgSound, trackOut; public int flank; public bool unloaded, leaving;   // trackOut: seconds left with a track knocked off
         public float speedMul = 1f, damageMul = 1f, rangeMul = 1f, reloadMul = 1f, turretMul = 1f;
         public bool dead;
         public Vehicle target;
@@ -118,6 +118,7 @@ namespace IronNight
         public void Drive(Vector2 wanted, float dt)
         {
             if (spec.isGun || dead) return;
+            if (trackOut > 0f) { yaw += Mathf.Clamp(Mathf.DeltaAngle(yaw * Mathf.Rad2Deg, Mathf.Atan2(wanted.x, wanted.y) * Mathf.Rad2Deg) * Mathf.Deg2Rad, -spec.turnRate * 0.25f * dt, spec.turnRate * 0.25f * dt); return; }   // a track off: it can only pivot, slowly
             float mag = wanted.magnitude; if (mag < 0.05f) return;
             float wantYaw = Mathf.Atan2(wanted.x, wanted.y);
             float diff = Mathf.DeltaAngle(yaw * Mathf.Rad2Deg, wantYaw * Mathf.Rad2Deg) * Mathf.Deg2Rad;

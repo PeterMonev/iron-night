@@ -31,7 +31,7 @@ namespace IronNight
 
         Camera cam; Hud hud; TouchStick stick; Fx fx; Props props; Tracks tracks; Infantry infantry;
         int nightInfantry, combo; float lastKill = -10f; bool veteran;
-        Weather weather; Sky sky; float rumbleTimer = 12f, flicker, enemyRangeMul = 1f, ammoMul = 1f, ammoLeft, dropTimer = debugDrops ? 3f : 35f; ParticleSystem rain;
+        Weather weather; Sky sky; float rumbleTimer = 12f, flicker, lightningTimer = 8f, lightning, thunderIn, enemyRangeMul = 1f, ammoMul = 1f, ammoLeft, dropTimer = debugDrops ? 3f : 35f; ParticleSystem rain;
         Objective objective; int objectivesReached; bool winter;
         readonly List<Mortar> mortars = new List<Mortar>(); float mortarTimer = 100f, starTimer = 70f; Star star; bool lit; int shotsFired, shotsHit;
         int talliedKills, talliedTigers, talliedGuns, talliedInfantry, talliedObjectives; bool talliedAce, logged; readonly List<Drop> drops = new List<Drop>(); Material crateMaterial, chuteMaterial;
@@ -91,7 +91,7 @@ namespace IronNight
                 hud.Toast("Night " + campaignNight + " of 3 · the platoon rides on", 3.5f);
             }
             // the commander riding with the leader
-            bonus = Depot.CommanderBonus; if (bonus == "reload") reloadMul *= 0.85f; if (bonus == "speed") speedMul *= 1.12f; if (bonus == "armour") Leader.hp += 1f;
+            bonus = Depot.CommanderBonus; commander = System.Array.Find(Depot.Commanders, c => c.id == Depot.CommanderId && c.nation == Depot.Nation); if (bonus == "reload") reloadMul *= 0.85f; if (bonus == "speed") speedMul *= 1.12f; if (bonus == "armour") Leader.hp += 1f;
             NextObjective();
             hud.OnFormation = f => formation = f;
             hud.OnAd = OnAd; hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
@@ -106,7 +106,8 @@ namespace IronNight
             hud.Set(t, platoon.Count); hud.SetLevel(level, 0f);
             PlaceCamera(true);
             stick.Blocked = true; hud.ShowTitle(false);
-            if (campaignNight > 0) { hud.HideTitle(); phase = Phase.Play; stick.Blocked = false; hud.Toast(campaignNight == 1 ? "Campaign · night 1 of 3 · Normandy" : campaignNight == 2 ? "Night 2 of 3 · the Ardennes" : "Night 3 of 3 · the last push", 3.5f); } Debug.Log("Iron Night: battle built, debugBoss=" + debugBoss + " args=" + string.Join(" ", System.Environment.GetCommandLineArgs()));
+            hud.OnStart += () => Radio("start");
+            if (campaignNight > 0) { hud.HideTitle(); phase = Phase.Play; stick.Blocked = false; Radio("start"); hud.Toast(campaignNight == 1 ? "Campaign · night 1 of 3 · Normandy" : campaignNight == 2 ? "Night 2 of 3 · the Ardennes" : "Night 3 of 3 · the last push", 3.5f); } Debug.Log("Iron Night: battle built, debugBoss=" + debugBoss + " args=" + string.Join(" ", System.Environment.GetCommandLineArgs()));
         }
 
         void BuildWorld()
@@ -161,7 +162,7 @@ namespace IronNight
                 var v = platoon[i]; var slot = Slot(i); var d = slot - v.transform.position; d.y = 0f;
                 if (d.magnitude > 1.2f) v.Drive(Steer(v, new Vector2(d.x, d.z) * (Mathf.Clamp01(d.magnitude / 5f))), dt);
             }
-            foreach (var v in platoon) { v.speedMul = speedMul; v.damageMul = damageMul; v.rangeMul = rangeMul; v.reloadMul = reloadMul; v.turretMul = turretMul; }
+            foreach (var v in platoon) { if (v.trackOut > 0f) v.trackOut -= dt; v.speedMul = speedMul; v.damageMul = damageMul; v.rangeMul = rangeMul; v.reloadMul = reloadMul; v.turretMul = turretMul; }
 
             // turrets: nearest foe in range, else drift home
             float leaderTurret = L.turretYaw;
@@ -193,7 +194,7 @@ namespace IronNight
             // enemies: close in, then hold and shoot
             for (int i = 0; i < foes.Count; i++)
             {
-                var e = foes[i]; e.reloadLeft -= dt;
+                var e = foes[i]; e.reloadLeft -= dt; if (e.trackOut > 0f) e.trackOut -= dt;
                 var target = Nearest(platoon, e.transform.position, 1000f); if (target == null) continue; e.rangeMul = enemyRangeMul * (lit ? 1.2f : 1f);
                 float dist = Dist(e, target);
                 if (e.spec.transport) { TickTransport(e, target, dist, dt); continue; }
@@ -229,7 +230,7 @@ namespace IronNight
             hud.HpBars(foes, cam, boss);
             if (objective != null) { var od = objective.pos - L.transform.position; od.y = 0f; hud.Objective(objective.pos, od.magnitude, cam, true); }
             TickObjectiveLabel();
-            if (t >= NightLength) End(true);
+            if (t >= NightLength) { Radio("dawn"); End(true); }
         }
 
         Vector3 Slot(int i)
@@ -289,6 +290,7 @@ namespace IronNight
                 {
                     if (s.friendly) shotsHit++;
                     Damage(hit, s.dmg, s.pos);
+                    TrackHit(hit, s.pos);
                     if (s.he) { foreach (var v in hitList) if (v != hit && !v.dead && Dist(v, hit) < 5f) Damage(v, s.dmg * 0.5f, v.transform.position); if (s.friendly) InfantryKilled(infantry.Blast(s.pos, 5f), s.pos); }
                     fx.Hit(new Vector3(s.pos.x, 1.6f, s.pos.z), s.he ? 1.5f : 1f);
                 }
@@ -299,13 +301,23 @@ namespace IronNight
             }
         }
 
+        /// <summary>A shell low on a tank's side, one time in five, throws a track: ten seconds stuck (the turret still works).</summary>
+        void TrackHit(Vehicle v, Vector3 at)
+        {
+            if (v.dead || v.spec.isGun || v.trackOut > 0f || Random.value > 0.2f) return;
+            var d = at - v.transform.position; d.y = 0f; if (Mathf.Abs(Vector3.Dot(d.normalized, v.Forward)) > 0.7f) return;   // from the side only
+            v.trackOut = 10f; fx.Spark(new Vector3(at.x, 0.6f, at.z), d.normalized); Sfx.Ricochet(at);
+            if (v.friendly) { hud.Toast((v == Leader ? "Track knocked off · " : v.spec.name + " tracked · ") + "10 s", 2.8f); if (v == Leader) Buzz(); }
+            else hud.Popup(v.transform.position, "Tracked", new Color(1f, 0.8f, 0.4f));
+        }
+
         void Damage(Vehicle v, float dmg, Vector3 at)
         {
             if (v.friendly && v == Leader && leaderShield > 0f) return;
             if (!v.friendly && bonus == "heavy" && v.spec.hp >= 6f) dmg *= 1.5f;
             v.Hit(dmg); Sfx.Hit(v.transform.position);
             if (v.friendly && v == Leader) { hud.Flash(); shake = Mathf.Max(shake, 0.8f); Buzz(); }
-            if (v.hp > 0f) { if (v == Leader) { hud.Toast("Leader hit"); if (hasSmoke && smokeCooldown <= 0f) PopSmoke(); } return; }
+            if (v.hp > 0f) { if (v == Leader) { hud.Toast("Leader hit"); if (Random.value < 0.4f) Radio("hit"); if (hasSmoke && smokeCooldown <= 0f) PopSmoke(); } return; }
             tracks.Forget(v);
             v.Wreck(); fx.Explosion(v.transform.position); Sfx.Explosion(v.transform.position); props.Scorch(v.transform, 6f + v.spec.radius * 1.5f); InfantryKilled(infantry.Blast(v.transform.position, 6f), v.transform.position);
             var fire = new GameObject("WreckFire").AddComponent<Light>(); fire.type = LightType.Point; fire.color = new Color(1f, 0.5f, 0.2f); fire.range = 16f; fire.intensity = 6f; fire.shadows = LightShadows.None;
@@ -320,7 +332,7 @@ namespace IronNight
             else
             {
                 foes.Remove(v); kills++;
-                if (v.spec == VehicleSpec.Tiger || v.spec == VehicleSpec.TigerAce || v.spec == VehicleSpec.KingTiger) nightTigers++; if (v.spec.isGun) nightPaks++;
+                if (v.spec == VehicleSpec.Tiger || v.spec == VehicleSpec.TigerAce || v.spec == VehicleSpec.KingTiger) nightTigers++; if (Random.value < 0.35f) Radio("kill"); if (v.spec.isGun) nightPaks++;
                 int worth = v.spec == VehicleSpec.Tiger ? 5 : v.spec == VehicleSpec.TigerAce ? 12 : v.spec == VehicleSpec.KingTiger ? 14 : v.spec == VehicleSpec.Flak88 ? 4 : v.spec == VehicleSpec.Hetzer ? 3 : v.spec == VehicleSpec.Nebelwerfer ? 3 : v.spec == VehicleSpec.Kubelwagen ? 4 : v.spec == VehicleSpec.Flak38 ? 1 : v.spec == VehicleSpec.Panther ? 5 : v.spec == VehicleSpec.StuG ? 3 : 2; score += worth * 50; xp += worth;
                 if (v.spec == VehicleSpec.Panther) nightTigers++;   // the big cats count together for the missions
                 hud.Popup(v.transform.position, "+" + worth * 50, new Color(0.95f, 0.66f, 0.23f)); shake = Mathf.Max(shake, Dist(v, Leader) < 25f ? 0.5f : 0.2f);
@@ -450,7 +462,7 @@ namespace IronNight
                     if (spec == VehicleSpec.StuG && Random.value < 0.5f && VehicleSpec.Available(VehicleSpec.Hetzer)) spec = VehicleSpec.Hetzer;
                     var pos = L.transform.position + dir * Random.Range(44f, 52f);
                     Foe(spec, pos, Mathf.Atan2(-dir.x, -dir.z));
-                    if (spec == VehicleSpec.Tiger) hud.Toast("Tiger! " + Clock(pos), 2.8f); else if (spec == VehicleSpec.Panther) hud.Toast("Panther! " + Clock(pos), 2.8f);
+                    if (spec == VehicleSpec.Tiger) { hud.Toast("Tiger! " + Clock(pos), 2.8f); Radio("tiger"); } else if (spec == VehicleSpec.Panther) hud.Toast("Panther! " + Clock(pos), 2.8f);
                 }
             }
             if (t >= 120f && !wave2) { wave2 = true; Column(); }
@@ -584,9 +596,12 @@ namespace IronNight
         {
             rumbleTimer -= dt;
             if (rumbleTimer <= 0f) { rumbleTimer = 9f + Random.value * 18f; flicker = 0.35f; Sfx.Rumble(); }
+            if (weather == Weather.Rain && !winter) { lightningTimer -= dt; if (lightningTimer <= 0f) { lightningTimer = 14f + Random.value * 30f; lightning = 1f; thunderIn = 0.8f + Random.value * 1.6f; } }
+            if (lightning > 0f) { lightning = Mathf.Max(0f, lightning - dt * 6f); }
+            if (thunderIn > 0f) { thunderIn -= dt; if (thunderIn <= 0f) { Sfx.Rumble(); shake = Mathf.Max(shake, 0.15f); } }
             if (flicker > 0f) flicker = Mathf.Max(0f, flicker - dt * 1.4f);
-            if (k <= 0f && flicker <= 0f) return;
-            float e = k * k; var fl = new Color(0.2f, 0.17f, 0.14f) * (flicker * flicker * 4f);
+            if (k <= 0f && flicker <= 0f && lightning <= 0f) return;
+            float e = k * k; var fl = new Color(0.2f, 0.17f, 0.14f) * (flicker * flicker * 4f) + new Color(0.7f, 0.75f, 0.9f) * (lightning * lightning * lightning);
             RenderSettings.ambientLight = Color.Lerp(sky.ambient, new Color(0.42f, 0.4f, 0.44f), e) + fl;
             RenderSettings.fogColor = Color.Lerp(sky.fog, new Color(0.3f, 0.26f, 0.28f), e); RenderSettings.fogDensity = Mathf.Lerp(sky.fogDensity, Mathf.Min(sky.fogDensity, 0.004f), e);
             moon.color = Color.Lerp(sky.moonColor, new Color(1f, 0.82f, 0.62f), e); moon.intensity = Mathf.Lerp(sky.moonIntensity, 3.6f, e);
@@ -1114,7 +1129,22 @@ namespace IronNight
                 hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             }
         }
-        bool campaignTallied;
+        bool campaignTallied; Depot.Commander commander; float radioCool;
+        /// <summary>A line over the radio from the commander in the hatch, in his own words; never two within eight seconds.</summary>
+        void Radio(string when)
+        {
+            if (commander == null || Time.time < radioCool) return; radioCool = Time.time + 8f; string line = null; int r = Random.Range(0, 2);
+            switch (commander.id)
+            {
+                case "kowalski": line = when == "start" ? "Kowalski: Eyes open. Nobody dies tonight." : when == "kill" ? (r == 0 ? "Kowalski: Scratch one. Keep loading." : "Kowalski: That's how it's done.") : when == "hit" ? "Kowalski: We're hit! Driver, move!" : when == "tiger" ? "Kowalski: Tiger. Flank it, don't front it." : when == "dawn" ? "Kowalski: Sun's up. Good work, all of you." : null; break;
+                case "hale": line = when == "start" ? "Hale: Map says hedgerows all the way. Stay on the lanes." : when == "kill" ? (r == 0 ? "Hale: Target down. Mark it." : "Hale: Good shooting, gunner.") : when == "hit" ? "Hale: Damage report!" : when == "tiger" ? "Hale: Heavy armour, eleven o'clock. Use the hedge." : when == "dawn" ? "Hale: Objective secured. Well done." : null; break;
+                case "rivers": line = when == "start" ? "Rivers: Come out fighting. Let's go." : when == "kill" ? (r == 0 ? "Rivers: Got him. Next." : "Rivers: Keep 'em coming.") : when == "hit" ? "Rivers: Shake it off. We're still rolling." : when == "tiger" ? "Rivers: Big cat. Mine." : when == "dawn" ? "Rivers: We held. Told you." : null; break;
+                case "orlov": line = when == "start" ? "Orlov: Forward. Kursk was worse." : when == "kill" ? (r == 0 ? "Orlov: Burn." : "Orlov: One less.") : when == "hit" ? "Orlov: Armour holds. Drive." : when == "tiger" ? "Orlov: Tiger. Close in, hit the side." : when == "dawn" ? "Orlov: Dawn. We are still here." : null; break;
+                case "samusenko": line = when == "start" ? "Samusenko: Check your engines. Go." : when == "kill" ? (r == 0 ? "Samusenko: Hit. Reload." : "Samusenko: Clean shot.") : when == "hit" ? "Samusenko: I'll patch it. Keep moving." : when == "tiger" ? "Samusenko: Heavy one. Don't stop." : when == "dawn" ? "Samusenko: Morning. Everyone still runs." : null; break;
+                case "belov": line = when == "start" ? "Belov: Engines warm. Let's run them." : when == "kill" ? (r == 0 ? "Belov: Ha! Next one." : "Belov: Too slow, Fritz.") : when == "hit" ? "Belov: Ouch. Faster, then." : when == "tiger" ? "Belov: Tiger? We're faster." : when == "dawn" ? "Belov: Sunrise. Good drive." : null; break;
+            }
+            if (line != null) hud.Toast(line, 3f);
+        }
 
         void OnAd()
         {
