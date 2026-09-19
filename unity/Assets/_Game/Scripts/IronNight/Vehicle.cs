@@ -63,7 +63,7 @@ namespace IronNight
                     // the cut turret is open underneath and the hull open above: a plate at the ring, as wide as the turret, covers both
                     var tb0 = LocalBounds(turretMesh, pivot); float ringW = spec.turretTexture != null ? 2.25f : Mathf.Min(tb0.size.x, tb0.size.z) * 0.95f;
                     var plate = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(plate.GetComponent<Collider>()); plate.name = "RingPlate"; plate.transform.SetParent(pivot, false);
-                    if (artist) { ringW = tb0.size.x * 0.92f; tmat = new Material(vehicleTemplate); tmat.SetColor("_BaseColor", new Color(0.09f, 0.09f, 0.085f)); }   // an artist's turret carries its gun: its width is the ring; the plate is the dark of the fighting compartment
+                    if (artist) { ringW = tb0.size.x * 0.7f; tmat = new Material(vehicleTemplate); tmat.SetColor("_BaseColor", new Color(0.09f, 0.09f, 0.085f)); }   // an artist's turret carries its gun: its width is the ring; the plate is the dark of the fighting compartment
                     plate.transform.localPosition = new Vector3(spec.turretTexture != null || artist ? 0f : tb0.center.x, 0.03f, spec.turretTexture != null || artist ? 0f : tb0.center.z); plate.transform.localScale = new Vector3(ringW, 0.04f, ringW); plate.GetComponent<Renderer>().sharedMaterial = tmat; plate.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 }
                 foreach (var r in tm.GetComponentsInChildren<Renderer>()) { if (!artist) r.sharedMaterial = tmat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
@@ -237,6 +237,7 @@ namespace IronNight
                 var prefab = Resources.Load<GameObject>("Models/" + baseName + "_m" + i); if (prefab == null) continue;
                 var part = Instantiate(prefab, root.transform); part.name = "m" + i;
                 var m = MakeMaterial(Resources.Load<Texture2D>("Models/" + spec.texture + "_m" + i), Resources.Load<Texture2D>("Models/" + spec.texture + "_m" + i + "_n"));
+                m.SetFloat("_Smoothness", Wet ? 0.6f : 0.2f);   // painted steel: a little sheen, the artist's normal map shapes it
                 foreach (var r in part.GetComponentsInChildren<Renderer>()) r.sharedMaterial = m;
             }
             return root;

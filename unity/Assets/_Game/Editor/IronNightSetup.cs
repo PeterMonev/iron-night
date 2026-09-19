@@ -167,7 +167,7 @@ namespace IronNight.EditorTools
                 var path = AssetDatabase.GUIDToAssetPath(guid);
                 var imp = AssetImporter.GetAtPath(path) as ModelImporter; if (imp == null) continue;
                 imp.materialImportMode = ModelImporterMaterialImportMode.None;
-                imp.importNormals = ModelImporterNormals.Calculate; imp.normalSmoothingAngle = 60f;
+                imp.importNormals = System.Text.RegularExpressions.Regex.IsMatch(path, @"_m\d+\.obj$") ? ModelImporterNormals.Import : ModelImporterNormals.Calculate; imp.normalSmoothingAngle = 60f;   // an artist's model brings its own normals
                 imp.meshCompression = ModelImporterMeshCompression.Medium; imp.isReadable = path.Contains("_turret");   // the turrets are read at runtime for the roof height (the commander stands on it)
                 imp.SaveAndReimport();
             }

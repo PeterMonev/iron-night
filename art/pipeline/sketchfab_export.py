@@ -85,12 +85,14 @@ def write_part(mask, fname, mi):
     if len(idx) == 0: return None
     part = whole.submesh([idx], append=True); part.apply_translation(-ring_c); part.apply_scale(scale)
     pv, pf, uv = part.vertices.copy(), part.faces, part.visual.uv; pv[:, 0] *= -1; pf = pf[:, ::-1]
+    vn = part.vertex_normals.copy(); vn[:, 0] *= -1   # the artist's own normals (hard plate edges, smooth wheels), mirrored with the mesh
     with open(os.path.join(OUT, f'{fname}.obj'), 'w') as o:
         o.write(f'mtllib {fname}.mtl\no {fname}\n')
         for p in pv: o.write(f'v {p[0]:.5f} {p[1]:.5f} {p[2]:.5f}\n')
         for t in uv: o.write(f'vt {t[0]:.5f} {t[1]:.5f}\n')
-        o.write(f'usemtl {fname}\ns 1\n')
-        for a, b, c in pf + 1: o.write(f'f {a}/{a} {b}/{b} {c}/{c}\n')
+        for n in vn: o.write(f'vn {n[0]:.4f} {n[1]:.4f} {n[2]:.4f}\n')
+        o.write(f'usemtl {fname}\n')
+        for a, b, c in pf + 1: o.write(f'f {a}/{a}/{a} {b}/{b}/{b} {c}/{c}/{c}\n')
     with open(os.path.join(OUT, f'{fname}.mtl'), 'w') as o: o.write(f'newmtl {fname}\nKd 1 1 1\nmap_Kd {name}_m{mi}.png\n')
     return part
 hull_parts, tur_parts = [], []
