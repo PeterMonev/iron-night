@@ -19,7 +19,7 @@ namespace IronNight
         Transform turret; Renderer[] renderers; Color[] baseColors; Transform muzzle, hullT, barrelT; Vector3 barrelHome; float hullYaw, recoil;
         static Material starMaterial, crossMaterial, commanderMaterial; const float CommanderYaw = 0f;   // the figure's facing in its mesh, corrected here if it looks the wrong way
         public float smokeTimer;
-        static Material vehicleTemplate, barrelMaterial;
+        static Material vehicleTemplate, vehicleTemplateN, barrelMaterial;
 
         public Vector3 Forward => new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
         public Vector3 GunDirection => new Vector3(Mathf.Sin(turretYaw), 0f, Mathf.Cos(turretYaw));
@@ -40,8 +40,9 @@ namespace IronNight
         void Build()
         {
             if (vehicleTemplate == null) { vehicleTemplate = Resources.Load<Material>("VehicleLit"); barrelMaterial = Resources.Load<Material>("BarrelLit"); }
-            var tex = Resources.Load<Texture2D>("Models/" + spec.texture);
-            var mat = new Material(vehicleTemplate); mat.SetTexture("_BaseMap", tex); mat.SetColor("_BaseColor", friendly ? spec.tint * Depot.CamoTint : spec.tint);
+            var tex = Resources.Load<Texture2D>("Models/" + spec.texture); var nrm = Resources.Load<Texture2D>("Models/" + spec.texture + "_n");
+            if (vehicleTemplateN == null) vehicleTemplateN = Resources.Load<Material>("VehicleLitN");
+            var mat = new Material(nrm != null && vehicleTemplateN != null ? vehicleTemplateN : vehicleTemplate); mat.SetTexture("_BaseMap", tex); if (nrm != null) mat.SetTexture("_BumpMap", nrm); mat.SetColor("_BaseColor", friendly ? spec.tint * Depot.CamoTint : spec.tint);
 
             // hull: mesh origin is the turret ring, so it hangs ringHeight below the pivot and the tracks touch the ground
             var hull = Instantiate(Resources.Load<GameObject>("Models/" + spec.hullMesh), transform);
@@ -56,12 +57,12 @@ namespace IronNight
             {
                 var tm = Instantiate(Resources.Load<GameObject>("Models/" + spec.turretMesh), pivot);
                 tm.name = "TurretMesh"; tm.transform.localRotation = Quaternion.Euler(0f, spec.forward > 0f ? 0f : 180f, 0f); tm.transform.localPosition = new Vector3(spec.turretShift, 0f, 0f); turretMesh = tm.transform;   // the turret turns about its own centre
-                var tmat = mat; if (spec.turretTexture != null) { tmat = new Material(mat); tmat.SetTexture("_BaseMap", Resources.Load<Texture2D>("Models/" + spec.turretTexture)); }
+                var tmat = mat; if (spec.turretTexture != null) { tmat = new Material(mat); tmat.SetTexture("_BaseMap", Resources.Load<Texture2D>("Models/" + spec.turretTexture)); var tn = Resources.Load<Texture2D>("Models/" + spec.turretTexture + "_n"); if (tn != null) tmat.SetTexture("_BumpMap", tn); }
                 if (spec.turretTexture != null)
                 {
                     // a turret made on its own does not fill the hole the old one was cut from: a plate under it covers the ring
                     var plate = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(plate.GetComponent<Collider>()); plate.name = "RingPlate"; plate.transform.SetParent(pivot, false);
-                    plate.transform.localPosition = new Vector3(0f, 0.03f, 0f); plate.transform.localScale = new Vector3(2.9f, 0.04f, 2.9f); plate.GetComponent<Renderer>().sharedMaterial = mat; plate.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    plate.transform.localPosition = new Vector3(0f, 0.03f, 0f); plate.transform.localScale = new Vector3(2.25f, 0.04f, 2.25f); plate.GetComponent<Renderer>().sharedMaterial = mat; plate.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 }
                 foreach (var r in tm.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = tmat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
                 // the generated barrel was cut off (it comes out bent and short); this one has the real length

@@ -100,7 +100,11 @@ namespace IronNight.EditorTools
         static void CreateMaterials()
         {
             var vehicle = MakeMaterial("VehicleLit", "Universal Render Pipeline/Lit");
-            vehicle.SetFloat("_Smoothness", 0.28f); vehicle.SetFloat("_Metallic", 0.05f); vehicle.SetFloat("_Cull", (float)CullMode.Off); // generated meshes have holes: render the inside walls too
+            vehicle.SetFloat("_Smoothness", 0.1f); vehicle.SetFloat("_Metallic", 0f);   // matt paint: the moon put a flat blue sheen on every level deck at 0.28 vehicle.SetFloat("_Cull", (float)CullMode.Off); // generated meshes have holes: render the inside walls too
+            // the same with a detail normal map: the keyword lives on the asset so the variant is in the build
+            var vehicleN = MakeMaterial("VehicleLitN", "Universal Render Pipeline/Lit");
+            vehicleN.SetFloat("_Smoothness", 0.1f); vehicleN.SetFloat("_Metallic", 0f); vehicleN.SetFloat("_Cull", (float)CullMode.Off); vehicleN.EnableKeyword("_NORMALMAP"); vehicleN.SetFloat("_BumpScale", 0.8f);
+            vehicleN.SetTexture("_BumpMap", AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Game/Resources/Models/sherman_n.png"));
             var barrel = MakeMaterial("BarrelLit", "Universal Render Pipeline/Lit");
             barrel.SetColor("_BaseColor", new Color(0.3f, 0.31f, 0.26f)); barrel.SetFloat("_Smoothness", 0.45f); barrel.SetFloat("_Metallic", 0.4f);
             var ground = MakeMaterial("GroundLit", "Universal Render Pipeline/Lit");
@@ -119,7 +123,7 @@ namespace IronNight.EditorTools
             var field = MakeMaterial("Ground", "IronNight/Ground"); string[] set = { "plough", "pasture", "mown", "stubble" };
             for (int i = 0; i < 4; i++) { field.SetTexture("_Tex" + i, Tex("ground_" + set[i])); field.SetTexture("_Nrm" + i, Tex("ground_" + set[i] + "_n")); }
             field.SetTexture("_Variation", Tex("ground_variation")); field.SetFloat("_Tiling", 40f / 3f); field.SetFloat("_VariationTiling", 300f); field.SetFloat("_VariationStrength", 0.5f); field.SetFloat("_BumpScale", 1f); field.SetFloat("_Smoothness", 0.06f);
-            foreach (var m in new[] { vehicle, barrel, ground, additive, smoke, decal, foliage, field }) EditorUtility.SetDirty(m);
+            foreach (var m in new[] { vehicle, vehicleN, barrel, ground, additive, smoke, decal, foliage, field }) EditorUtility.SetDirty(m);
 
             const string profilePath = Res + "BattleProfile.asset";
             var old = AssetDatabase.LoadAssetAtPath<VolumeProfile>(profilePath); if (old != null) AssetDatabase.DeleteAsset(profilePath);

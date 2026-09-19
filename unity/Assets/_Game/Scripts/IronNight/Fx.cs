@@ -107,7 +107,7 @@ namespace IronNight
         public void MuzzleFlash(Vector3 pos, Vector3 dir)
         {
             Spawn(addGlow, pos + dir * 0.8f, 3f, new Color(1f, 0.95f, 0.8f, 1f), 0.06f, Vector3.zero, 0.3f);
-            var tongue = Sheet(Spawn(addMuzzle, pos + dir * 2.4f, 4.2f, new Color(1f, 0.95f, 0.85f, 1f), 0.11f, dir * 5f, 0.5f), 3, 1, 1, Random.Range(0, 3)); tongue.aligned = true; tongue.axis = dir; tongue.stretch = 1.5f;
+            var tongue = Sheet(Spawn(addMuzzle, pos + dir * 2f, 3.2f, new Color(1f, 0.95f, 0.85f, 0.9f), 0.09f, dir * 5f, 0.4f), 3, 1, 1, Random.Range(0, 3)); tongue.aligned = true; tongue.axis = dir; tongue.stretch = 1.5f;
             for (int i = 0; i < 3; i++) Spawn(smokeRagged, pos + dir * (1f + i * 1.1f) + Random.insideUnitSphere * 0.4f, 1.6f + Random.value, new Color(0.5f, 0.48f, 0.45f, 0.5f), 1.2f + Random.value * 0.6f, dir * (5f - i) + Vector3.up * 1.2f, 1.8f, true);
             for (int i = 0; i < 2; i++) Spawn(smokeSoft, new Vector3(pos.x, 0.3f, pos.z) + dir * 2f + Random.insideUnitSphere * 0.8f, 2.5f, new Color(0.38f, 0.33f, 0.26f, 0.5f), 1f, Vector3.up * 1.2f + dir * 2f, 1.5f, true);
             Flash(pos + dir * 1.2f + Vector3.up * 0.5f, new Color(1f, 0.8f, 0.5f), 45f, 16f, 0.1f);
@@ -205,8 +205,8 @@ namespace IronNight
         public Transform Tracer(Color core, Color tail)
         {
             var root = new GameObject("Shell").transform; root.SetParent(transform, false);
-            var c = Quad(); c.transform.SetParent(root, false); c.transform.localPosition = Vector3.zero; c.transform.localScale = new Vector3(0.5f, 2.6f, 1f); var cr = c.GetComponent<Renderer>(); cr.sharedMaterial = addSpark; mpb.SetVector(BaseMapST, WholeSheet); mpb.SetColor(BaseColor, core); cr.SetPropertyBlock(mpb);
-            var t = Quad(); t.transform.SetParent(root, false); t.transform.localPosition = new Vector3(0f, -2.2f, 0f); t.transform.localScale = new Vector3(1.4f, 5.6f, 1f); var tr = t.GetComponent<Renderer>(); tr.sharedMaterial = addTracer; mpb.SetVector(BaseMapST, WholeSheet); mpb.SetColor(BaseColor, new Color(tail.r, tail.g, tail.b, 1f)); tr.SetPropertyBlock(mpb);
+            var c = Quad(); c.transform.SetParent(root, false); c.transform.localPosition = Vector3.zero; c.transform.localScale = new Vector3(0.3f, 1.4f, 1f); var cr = c.GetComponent<Renderer>(); cr.sharedMaterial = addSpark; mpb.SetVector(BaseMapST, WholeSheet); mpb.SetColor(BaseColor, core); cr.SetPropertyBlock(mpb);
+            var t = Quad(); t.transform.SetParent(root, false); t.transform.localPosition = new Vector3(0f, -1.3f, 0f); t.transform.localScale = new Vector3(0.6f, 3.2f, 1f); var tr = t.GetComponent<Renderer>(); tr.sharedMaterial = addTracer; mpb.SetVector(BaseMapST, WholeSheet); mpb.SetColor(BaseColor, new Color(tail.r * 0.8f, tail.g * 0.8f, tail.b * 0.8f, 0.85f)); tr.SetPropertyBlock(mpb);
             return root;
         }
 

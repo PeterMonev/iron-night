@@ -24,13 +24,13 @@ namespace IronNight
         public static readonly VehicleSpec Sherman = new VehicleSpec
         {
             id = "sherman", name = "M4 Sherman", hullMesh = "sherman_hull", turretMesh = "sherman_turret2", texture = "sherman", turretTexture = "sherman_turret2", forward = 1f, ringHeight = 2.178f,
-            gunLength = 1.9f, gunRadius = 0.08f, gunHeight = 0.55f, mantlet = 0.9f, tint = new Color(0.86f, 0.9f, 0.68f),
+            gunLength = 1.9f, gunRadius = 0.08f, gunHeight = 0.5f, mantlet = 0.85f, tint = new Color(0.95f, 0.95f, 0.88f),
             speed = 9f, turnRate = 2.2f, turretRate = 3.2f, reload = 1.3f, damage = 1f, range = 26f, hp = 3f, radius = 2.4f
         };
         public static readonly VehicleSpec Firefly = new VehicleSpec
         {
             id = "firefly", name = "Sherman Firefly", hullMesh = "firefly_hull", turretMesh = "firefly_turret", texture = "firefly", forward = 1f, ringHeight = 1.98f,
-            gunLength = 3.6f, gunRadius = 0.075f, gunHeight = 0.45f, mantlet = 1.7f, turretShift = 0.06f, muzzleBrake = true, tint = new Color(0.8f, 0.85f, 0.64f),
+            gunLength = 3.6f, gunRadius = 0.075f, gunHeight = 0.45f, mantlet = 1.7f, turretShift = 0.06f, muzzleBrake = true, tint = new Color(0.95f, 0.95f, 0.88f),
             speed = 8.5f, turnRate = 2f, turretRate = 2.8f, reload = 1.6f, damage = 2f, range = 30f, hp = 3f, radius = 2.4f
         };
         public static readonly VehicleSpec PanzerIV = new VehicleSpec
@@ -87,56 +87,56 @@ namespace IronNight
         public static readonly VehicleSpec Easy8 = new VehicleSpec
         {
             id = "easy8", name = "M4A3E8 Easy Eight", hullMesh = "easy8_hull", turretMesh = "easy8_turret", texture = "easy8", forward = 1f, ringHeight = 2.19f,
-            gunLength = 3.9f, gunRadius = 0.075f, gunHeight = 0.5f, mantlet = 1.7f, turretShift = 0.09f, muzzleBrake = true, tint = new Color(0.86f, 0.9f, 0.68f),
+            gunLength = 3.9f, gunRadius = 0.075f, gunHeight = 0.5f, mantlet = 1.7f, turretShift = 0.09f, muzzleBrake = true, tint = new Color(0.95f, 0.95f, 0.88f),
             speed = 9.5f, turnRate = 2.2f, turretRate = 3f, reload = 1.2f, damage = 1.5f, range = 28f, hp = 4f, radius = 2.5f
         };
         public static readonly VehicleSpec Hellcat = new VehicleSpec
         {
             id = "hellcat", name = "M18 Hellcat", hullMesh = "hellcat_hull", turretMesh = "hellcat_turret", texture = "hellcat", forward = 1f, ringHeight = 1.71f,
-            gunLength = 3.9f, gunRadius = 0.075f, gunHeight = 0.5f, mantlet = 1.45f, turretShift = 0.23f, muzzleBrake = true, tint = new Color(0.86f, 0.9f, 0.68f),
+            gunLength = 3.9f, gunRadius = 0.075f, gunHeight = 0.5f, mantlet = 1.45f, turretShift = 0.23f, muzzleBrake = true, tint = new Color(0.95f, 0.95f, 0.88f),
             speed = 13f, turnRate = 2.8f, turretRate = 3.4f, reload = 1.4f, damage = 1.6f, range = 30f, hp = 2f, radius = 2.4f
         };
         public static readonly VehicleSpec Chaffee = new VehicleSpec
         {
             id = "chaffee", name = "M24 Chaffee", hullMesh = "chaffee_hull", turretMesh = "chaffee_turret", texture = "chaffee", forward = 1f, ringHeight = 1.71f,
-            gunLength = 2.2f, gunRadius = 0.07f, gunHeight = 0.5f, mantlet = 1.5f, turretShift = 0.13f, tint = new Color(0.86f, 0.9f, 0.68f),
+            gunLength = 2.2f, gunRadius = 0.07f, gunHeight = 0.5f, mantlet = 1.5f, turretShift = 0.13f, tint = new Color(0.95f, 0.95f, 0.88f),
             speed = 11.5f, turnRate = 2.9f, turretRate = 3.6f, reload = 1f, damage = 0.7f, range = 24f, hp = 2f, radius = 2.2f
         };
         public static readonly VehicleSpec Pershing = new VehicleSpec
         {
             id = "pershing", name = "M26 Pershing", hullMesh = "pershing_hull", turretMesh = "pershing_turret", texture = "pershing", forward = 1f, ringHeight = 2.07f,
-            gunLength = 4.5f, gunRadius = 0.085f, gunHeight = 0.5f, mantlet = 1.6f, turretShift = 0.03f, muzzleBrake = true, tint = new Color(0.86f, 0.9f, 0.68f),
+            gunLength = 4.5f, gunRadius = 0.085f, gunHeight = 0.5f, mantlet = 1.6f, turretShift = 0.03f, muzzleBrake = true, tint = new Color(0.95f, 0.95f, 0.88f),
             speed = 7.5f, turnRate = 1.7f, turretRate = 2.4f, reload = 1.9f, damage = 2.5f, range = 32f, hp = 6f, radius = 2.8f
         };
         public static readonly VehicleSpec M10 = new VehicleSpec
         {
             id = "m10", name = "M10 Wolverine", hullMesh = "m10_hull", turretMesh = "m10_turret", texture = "m10", forward = 1f, ringHeight = 1.14f,
-            gunLength = 3.6f, gunRadius = 0.075f, gunHeight = 0.6f, mantlet = 1.9f, turretShift = -0.06f, tint = new Color(0.86f, 0.9f, 0.68f),
+            gunLength = 3.6f, gunRadius = 0.075f, gunHeight = 0.6f, mantlet = 1.9f, turretShift = -0.06f, tint = new Color(0.95f, 0.95f, 0.88f),
             speed = 9f, turnRate = 2.1f, turretRate = 2.6f, reload = 1.5f, damage = 1.5f, range = 28f, hp = 2.5f, radius = 2.5f
         };
         // ---- the Soviet tree ----
         public static readonly VehicleSpec T34_85 = new VehicleSpec
         {
-            id = "t34_85", name = "T-34-85", hullMesh = "t34_85_hull", turretMesh = "t34_85_turret", texture = "t34_85", forward = 1f, ringHeight = 1.36f,
-            gunLength = 4.2f, gunRadius = 0.08f, gunHeight = 0.6f, mantlet = 1.3f, turretShift = -0.03f, tint = new Color(0.8f, 0.9f, 0.7f),
+            id = "t34_85", name = "T-34-85", hullMesh = "t34_85_hull", turretMesh = "t34_85_turret", texture = "t34_85", forward = 1f, ringHeight = 1.74f,
+            gunLength = 4.2f, gunRadius = 0.08f, gunHeight = 0.6f, mantlet = 1.2f, turretShift = 0f, tint = new Color(0.9f, 0.92f, 0.86f),
             speed = 10f, turnRate = 2.4f, turretRate = 3f, reload = 1.5f, damage = 1.5f, range = 27f, hp = 3.5f, radius = 2.5f
         };
         public static readonly VehicleSpec KV85 = new VehicleSpec
         {
-            id = "kv85", name = "KV-85", hullMesh = "kv85_hull", turretMesh = "kv85_turret", texture = "kv85", forward = 1f, ringHeight = 1.45f,
-            gunLength = 4.2f, gunRadius = 0.08f, gunHeight = 0.8f, mantlet = 2.1f, turretShift = 0.01f, tint = new Color(0.8f, 0.9f, 0.7f),
+            id = "kv85", name = "KV-85", hullMesh = "kv85_hull", turretMesh = "kv85_turret", texture = "kv85", forward = 1f, ringHeight = 2.09f,
+            gunLength = 4.2f, gunRadius = 0.08f, gunHeight = 0.65f, mantlet = 1.45f, turretShift = 0.04f, tint = new Color(0.9f, 0.92f, 0.86f),
             speed = 6.5f, turnRate = 1.5f, turretRate = 2.2f, reload = 1.8f, damage = 1.5f, range = 27f, hp = 6f, radius = 2.7f
         };
         public static readonly VehicleSpec SU100 = new VehicleSpec
         {
             id = "su100", name = "SU-100", hullMesh = "su100_hull", turretMesh = null, texture = "su100", forward = 1f, ringHeight = 0f,
-            gunLength = 0f, gunRadius = 0f, gunHeight = 0f, mantlet = 0f, tint = new Color(0.8f, 0.9f, 0.7f),
+            gunLength = 0f, gunRadius = 0f, gunHeight = 0f, mantlet = 0f, tint = new Color(0.9f, 0.92f, 0.86f),
             speed = 9f, turnRate = 2f, turretRate = 2f, reload = 1.8f, damage = 2.6f, range = 32f, hp = 3f, radius = 2.5f, casemate = true, scale = 0.85f, muzzle = new Vector3(0f, 2.2f, 4.7f)
         };
         public static readonly VehicleSpec IS2 = new VehicleSpec
         {
-            id = "is2", name = "IS-2", hullMesh = "is2_hull", turretMesh = "is2_turret", texture = "is2", forward = 1f, ringHeight = 1.56f,
-            gunLength = 5f, gunRadius = 0.095f, gunHeight = 0.6f, mantlet = 2.2f, turretShift = 0.03f, muzzleBrake = true, tint = new Color(0.8f, 0.9f, 0.7f),
+            id = "is2", name = "IS-2", hullMesh = "is2_hull", turretMesh = "is2_turret", texture = "is2", forward = 1f, ringHeight = 2.15f,
+            gunLength = 5f, gunRadius = 0.095f, gunHeight = 0.65f, mantlet = 1.8f, turretShift = 0.09f, muzzleBrake = true, tint = new Color(0.9f, 0.92f, 0.86f),
             speed = 6.5f, turnRate = 1.4f, turretRate = 2f, reload = 2.8f, damage = 3.5f, range = 32f, hp = 7f, radius = 2.9f
         };
         // ---- more Germans ----

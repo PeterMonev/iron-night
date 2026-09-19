@@ -1,7 +1,7 @@
 // Paints the reference's white stars out of a tank texture (the game draws its own, centred, crisp): every
 // bright low-saturation blob of a star's size is filled with the olive around it. node unstar.js [name ...] (default sherman)
 const { createCanvas, loadImage } = require('@napi-rs/canvas'); const fs = require('fs');
-const M = 'D:/Codes/Projects/lightswarm/unity/Assets/_Game/Resources/Models/', RAW = 'D:/Codes/Projects/lightswarm/art/models/raw-tex/';
+const M = 'D:/Codes/Projects/lightswarm/unity/Assets/_Game/Resources/Models/', RAW = 'D:/Codes/Projects/lightswarm/art/models/raw-tex/', UNSTARRED = 'D:/Codes/Projects/lightswarm/art/models/unstarred/';   // the star-free copy tankpaint.js starts from
 (async () => { for (const name of (process.argv.length > 2 ? process.argv.slice(2) : ['sherman'])) {
   if (!fs.existsSync(RAW + name + '.png')) fs.copyFileSync(M + name + '.png', RAW + name + '.png');
   const im = await loadImage(RAW + name + '.png'); const W = im.width, H = im.height; const c = createCanvas(W, H), g = c.getContext('2d'); g.drawImage(im, 0, 0);
@@ -24,5 +24,5 @@ const M = 'D:/Codes/Projects/lightswarm/unity/Assets/_Game/Resources/Models/', R
     for (const p of fill) { const x = p % W, y = (p - x) / W; const jitter = ((x * 7 + y * 13) % 9) - 4; d[p * 4] = mr + jitter; d[p * 4 + 1] = mg + jitter; d[p * 4 + 2] = mb + jitter; }
     painted++;
   }
-  g.putImageData(img, 0, 0); fs.writeFileSync(M + name + '.png', c.toBuffer('image/png')); console.log(name, 'blobs', blobs.length, 'painted out', painted);
+  g.putImageData(img, 0, 0); fs.writeFileSync(M + name + '.png', c.toBuffer('image/png')); fs.mkdirSync(UNSTARRED, { recursive: true }); fs.writeFileSync(UNSTARRED + name + '.png', c.toBuffer('image/png')); console.log(name, 'blobs', blobs.length, 'painted out', painted);
 } })();

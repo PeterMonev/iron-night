@@ -137,7 +137,7 @@ namespace IronNight
             TickArtillery(dt);
             var L = Leader;
             if (leaderShield > 0f) leaderShield -= dt;
-            if (rain != null) rain.transform.position = L.transform.position + Vector3.up * 30f;
+            if (rain != null) rain.transform.position = L.transform.position + L.Forward * 20f + Vector3.up * 30f;
 
             // the leader drives where the thumb points; the wingmen hold their slots
             if (stick.Active) L.Drive(stick.Direction, dt);
@@ -580,9 +580,9 @@ namespace IronNight
             var go = new GameObject("Rain"); rain = go.AddComponent<ParticleSystem>(); rain.Stop();
             var main = rain.main; main.startSpeed = winter ? 3f : 40f; main.startLifetime = winter ? 14f : 1.1f; main.startSize = winter ? 0.28f : 0.07f; main.maxParticles = 2000; main.simulationSpace = ParticleSystemSimulationSpace.World; main.gravityModifier = winter ? 0.08f : 1.5f;
             main.startColor = winter ? new Color(0.9f, 0.92f, 0.98f, 0.7f) : new Color(0.7f, 0.75f, 0.85f, 0.45f);
-            var em = rain.emission; em.rateOverTime = winter ? 140f : 1300f;
+            var em = rain.emission; em.rateOverTime = winter ? 400f : 3600f;
             if (winter) { var vel = rain.velocityOverLifetime; vel.enabled = true; vel.x = new ParticleSystem.MinMaxCurve(-1.2f, 1.2f); vel.z = new ParticleSystem.MinMaxCurve(-1.2f, 1.2f); }
-            var sh = rain.shape; sh.shapeType = ParticleSystemShapeType.Box; sh.scale = new Vector3(70f, 1f, 90f); sh.rotation = new Vector3(90f, 0f, 0f);
+            var sh = rain.shape; sh.shapeType = ParticleSystemShapeType.Box; sh.scale = new Vector3(130f, 1f, 170f); sh.rotation = new Vector3(90f, 0f, 0f);
             var r = go.GetComponent<ParticleSystemRenderer>(); if (winter) r.renderMode = ParticleSystemRenderMode.Billboard; else { r.renderMode = ParticleSystemRenderMode.Stretch; r.lengthScale = 22f; r.velocityScale = 0f; }
             var m = new Material(Resources.Load<Material>("Additive")); m.SetTexture("_BaseMap", glowTex); m.SetColor("_BaseColor", new Color(0.5f, 0.55f, 0.65f, 0.35f)); r.sharedMaterial = m;
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false;
@@ -849,7 +849,7 @@ namespace IronNight
 
         void RemoveDrop(Drop d) { Destroy(d.crate.gameObject); Destroy(d.chute.gameObject); Destroy(d.lines.gameObject); if (d.marker != null) Destroy(d.marker.gameObject); Destroy(d.canopy); }
 
-        static Color ChuteColour(int kind) { switch (kind) { case 0: return new Color(1.5f, 1.5f, 1.35f); case 1: return new Color(1.9f, 0.6f, 0.5f); case 2: return new Color(1.8f, 1.5f, 0.45f); default: return new Color(0.55f, 0.95f, 1.8f); } }   // repair white, ammunition red, smoke yellow, radio blue: the air force colour code
+        static Color ChuteColour(int kind) { return new Color(1.7f, 1.7f, 1.6f); }   // white silk; the crate says what it carries   // repair white, ammunition red, smoke yellow, radio blue: the air force colour code
 
         /// <summary>A parachute canopy: a dome of gores that bulge between their seams, the apex at the top, the skirt
         /// at y = 0. Rendered from both sides. The rest positions come back for the ripple and the collapse.</summary>

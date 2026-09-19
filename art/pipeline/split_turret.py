@@ -11,7 +11,8 @@ import numpy as np
 import trimesh
 
 src, out_dir, name, hull_len = sys.argv[1], sys.argv[2], sys.argv[3], float(sys.argv[4])
-ring_frac = float(sys.argv[5]) if len(sys.argv) > 5 else None
+ring_frac = float(sys.argv[5]) if len(sys.argv) > 5 and sys.argv[5] not in ("", "auto") else None
+force_forward = float(sys.argv[6]) if len(sys.argv) > 6 else None   # +1/-1: which end the model's barrel is at, when the glacis rule gets it wrong
 
 scene = trimesh.load(src)
 mesh = list(scene.geometry.values())[0] if isinstance(scene, trimesh.Scene) else scene
@@ -21,6 +22,13 @@ lo, hi = mesh.bounds
 size = hi - lo
 axis = int(np.argmax([size[0], size[2]])) * 2  # 0 = X, 2 = Z
 height = size[1]
+# the hull's own length, without the barrel: bins along the long axis where the model is wider than a third of its widest
+lat0 = 2 if axis == 0 else 0; nb = 60; edges = np.linspace(lo[axis], hi[axis], nb + 1); widths = np.zeros(nb)
+for i in range(nb):
+    sel = (v[:, axis] >= edges[i]) & (v[:, axis] < edges[i + 1]); widths[i] = (v[sel, lat0].max() - v[sel, lat0].min()) if sel.sum() > 3 else 0
+wide = np.where(widths > 0.33 * widths.max())[0]; hull_z0, hull_z1 = edges[wide.min()], edges[wide.max() + 1]
+hull_span = hull_z1 - hull_z0; print(f'hull without the barrel: {hull_span / size[axis]:.2f} of the model length')
+size[axis] = hull_span   # every fraction below is of the hull, not of the gun
 
 # the turret ring sits on the hull deck: the deck is the height band with the most upward-facing area between 40% and 80%
 # of the model height (roof of the hull, sponsons); the turret walls rise from there
@@ -40,7 +48,8 @@ print(f"{name}: height {height:.3f}, deck band {best}, ring height {ring_y:.3f} 
 cent = v[f].mean(axis=1)
 lat_v = np.abs(v[f][:, :, lat] - xc)            # lateral offset of each face's three vertices
 above = cent[:, 1] > ring_y + 0.005
-tur_c = cent[above]
+high = cent[:, 1] > ring_y + 0.12 * height   # the turret proper, clear of hatches and stowage on the deck
+tur_c = cent[high] if high.sum() > 50 else cent[above]
 ring_center = np.array([np.median(tur_c[:, 0]), ring_y, np.median(tur_c[:, 2])]) if above.any() else (lo + hi) / 2
 along = cent[:, axis] - ring_center[axis]
 lateral = np.abs(cent[:, lat] - ring_center[lat])
@@ -53,9 +62,9 @@ narrow = (lat_v.max(axis=1) - lat_v.min(axis=1)) < 0.05          # faces of some
 # forward: the glacis - the big plate sloping up toward the turret - is at the front of every tank; the rear is vertical
 # doors and a flat engine deck. (A roof machine gun pointing backwards fooled the "where is the thin tube" rule.)
 sloped = (fn[:, 1] > 0.35) & (fn[:, 1] < 0.9) & (np.abs(fn[:, axis]) > 0.4)
-mid = (lo[axis] + hi[axis]) / 2
+mid = (hull_z0 + hull_z1) / 2
 area_plus = fa[sloped & (cent[:, axis] > mid + 0.25 * size[axis])].sum(); area_minus = fa[sloped & (cent[:, axis] < mid - 0.25 * size[axis])].sum()
-forward = 1.0 if area_plus >= area_minus else -1.0
+forward = force_forward if force_forward is not None else (1.0 if area_plus >= area_minus else -1.0)
 thin_ahead = above & narrow & (along * forward > 0.2 * size[axis]) & (np.abs(cent[:, lat] - xc) < 0.08 * size[lat])
 n_thin = int(thin_ahead.sum())
 print(f"glacis area +{area_plus:.3f} / -{area_minus:.3f} -> front is {'+' if forward > 0 else '-'}{'x' if axis == 0 else 'z'}; {n_thin} narrow faces ahead")
@@ -95,7 +104,7 @@ print(f"roof at {(roof - lo[1]) / height:.2f} of height, {ncomp} pieces above it
 hull = ~turret & ~barrel & ~clutter
 
 os.makedirs(out_dir, exist_ok=True)
-scale = hull_len / size[axis]
+scale = hull_len / hull_span
 def export(mask, fname):
     part = mesh.submesh([np.where(mask)[0]], append=True)
     try:

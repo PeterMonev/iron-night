@@ -30,6 +30,8 @@ namespace IronNight
         public static void Load()
         {
             if (loaded) return; loaded = true;
+            // once: the test runs of the third batch left the nation and paint changed on this machine; back to olive Americans
+            if (PlayerPrefs.GetInt("depot.version", 0) < 2) { PlayerPrefs.SetString("depot.nation", "us"); PlayerPrefs.SetString("depot.camo", "olive"); PlayerPrefs.SetInt("depot.version", 2); PlayerPrefs.Save(); }
             Points = PlayerPrefs.GetInt("depot.points", 0);
             NightsFought = PlayerPrefs.GetInt("depot.nights", 0);
             BestKills = PlayerPrefs.GetInt("depot.bestKills", 0);
@@ -74,7 +76,7 @@ namespace IronNight
         public static readonly Camo[] Camos =
         {
             new Camo { id = "olive", name = "Olive drab", tint = Color.white, cost = 0 },
-            new Camo { id = "winter", name = "Winter", tint = new Color(1.7f, 1.7f, 1.95f), cost = 800 },
+            new Camo { id = "winter", name = "Winter", tint = new Color(1.3f, 1.32f, 1.42f), cost = 800 },
             new Camo { id = "desert", name = "Desert", tint = new Color(1.25f, 1.15f, 0.88f), cost = 800 },
             new Camo { id = "night", name = "Night", tint = new Color(0.62f, 0.68f, 0.85f), cost = 1500 },
         };
