@@ -33,6 +33,7 @@ namespace IronNight
             // once: the test runs of the third batch left the nation and paint changed on this machine; back to olive Americans
             if (PlayerPrefs.GetInt("depot.version", 0) < 2) { PlayerPrefs.SetString("depot.nation", "us"); PlayerPrefs.SetString("depot.camo", "olive"); PlayerPrefs.SetInt("depot.version", 2); PlayerPrefs.Save(); }
             if (PlayerPrefs.GetInt("depot.version", 0) < 3) { foreach (var k in new[] { "camp.night", "camp.kills", "camp.score", "camp.won", "camp.best" }) PlayerPrefs.DeleteKey(k); PlayerPrefs.DeleteKey("camp.platoon"); PlayerPrefs.DeleteKey("camp.leaderHp"); PlayerPrefs.SetInt("depot.version", 3); PlayerPrefs.Save(); }   // the campaign test runs wiped
+            if (PlayerPrefs.GetInt("depot.version", 0) < 4) { foreach (var k in new[] { "camp.night", "camp.kills", "camp.score", "camp.platoon", "camp.leaderHp", "depot.leader.us", "depot.leader.su", "depot.commander.us", "depot.commander.su" }) PlayerPrefs.DeleteKey(k); PlayerPrefs.SetInt("depot.version", 4); PlayerPrefs.Save(); }   // the garage test runs wiped: back to the Sherman, no commander
             Points = PlayerPrefs.GetInt("depot.points", 0);
             NightsFought = PlayerPrefs.GetInt("depot.nights", 0);
             BestKills = PlayerPrefs.GetInt("depot.bestKills", 0);

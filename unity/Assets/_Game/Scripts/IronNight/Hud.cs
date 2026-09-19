@@ -8,6 +8,14 @@ namespace IronNight
     /// The overlay: night clock, platoon count, level bar, formation buttons, pause button, toast line, the three-card
     /// level-up sheet, the pause sheet and the end-of-assault sheet with the (mock) rewarded-ad button. Built in code with the legacy UI, English only.
     /// </summary>
+    /// <summary>A drag across the showroom picture turns the turntable.</summary>
+    public class GarageDrag : MonoBehaviour, UnityEngine.EventSystems.IDragHandler, UnityEngine.EventSystems.IPointerDownHandler
+    {
+        public Garage garage;
+        public void OnDrag(UnityEngine.EventSystems.PointerEventData e) { if (garage != null) garage.Drag(-e.delta.x); }
+        public void OnPointerDown(UnityEngine.EventSystems.PointerEventData e) { if (garage != null) garage.Drag(0f); }
+    }
+
     public class Hud : MonoBehaviour
     {
         public class Card { public string id, title, desc; public bool rare; }
@@ -19,7 +27,7 @@ namespace IronNight
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
         class Rising { public Text t; public float life; public Vector3 world; }
         readonly List<Rising> popups = new List<Rising>(); readonly Stack<Text> popupPool = new Stack<Text>(); RectTransform canvasRect;
-        Image radar, objectiveArrow; Text objectiveLabel; readonly List<Image> radarDots = new List<Image>(); readonly List<Image> hpBars = new List<Image>(); readonly List<Image> hpFills = new List<Image>(); Transform cardRoot, depotRows; Image rankBadge; GameObject campaignBtn, againBtn; int depotTab; readonly Button[] depotTabs = new Button[2]; ScrollRect depotScroll; Canvas canvas; Text depotPoints, titleStats, endPoints, reserveNote, bossName; Image bossFill; GameObject bossBar;
+        Image radar, objectiveArrow; Text objectiveLabel; readonly List<Image> radarDots = new List<Image>(); readonly List<Image> hpBars = new List<Image>(); readonly List<Image> hpFills = new List<Image>(); Transform cardRoot, depotRows; Image rankBadge; GameObject campaignBtn, againBtn; public Garage garage; int depotTab; readonly Button[] depotTabs = new Button[2]; ScrollRect depotScroll; Canvas canvas; Text depotPoints, titleStats, endPoints, reserveNote, bossName; Image bossFill; GameObject bossBar;
         readonly Button[] formButtons = new Button[4];
         readonly List<Image> arrows = new List<Image>(); Sprite arrowSprite;
         float fpsAccum, fpsTimer, toastLeft; int fpsFrames;
@@ -198,6 +206,7 @@ namespace IronNight
 
         public void ShowTitle(bool reserveGranted)
         {
+            if (garage != null) garage.SetActive(false);
             Depot.Load(); Medals.Check(); hudGroup.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(false); dailyBtn.SetActive(Depot.DailyReady);
             int m = Mathf.FloorToInt(Depot.BestTime / 60f), s = Mathf.FloorToInt(Depot.BestTime % 60f);
             { var sheet = Resources.Load<Texture2D>("UI/rank_insignia"); if (sheet != null && rankBadge != null) { int cell = Depot.RankIndex; rankBadge.sprite = UiSprite("rank_insignia", new Rect(cell * sheet.width / 6f, 0f, sheet.width / 6f, sheet.height)); rankBadge.enabled = Depot.NightsFought > 0; } }
@@ -215,7 +224,7 @@ namespace IronNight
             }
             titleSheet.SetActive(true);
         }
-        public void HideTitle() { titleSheet.SetActive(false); hudGroup.SetActive(true); }
+        public void HideTitle() { titleSheet.SetActive(false); hudGroup.SetActive(true); if (garage != null) garage.SetActive(false); }
 
         public void ShowDepot()
         {
@@ -227,6 +236,7 @@ namespace IronNight
             depotPoints.text = $"{Depot.Points} points";
             foreach (Transform c in depotRows) Destroy(c.gameObject);
             for (int k = 0; k < 2; k++) { bool on = depotTab == k; depotTabs[k].GetComponent<Image>().color = on ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : new Color(0.2f, 0.22f, 0.24f, 0.95f); depotTabs[k].transform.Find("Label").GetComponent<Text>().color = on ? new Color(0.1f, 0.08f, 0.05f) : new Color(0.93f, 0.91f, 0.86f); }
+            if (garage != null) garage.SetActive(false);
             if (depotTab == 1) { RefreshGarage(); FitDepotRows(); return; }
             for (int i = 0; i < Depot.Upgrades.Count; i++)
             {
@@ -293,6 +303,16 @@ namespace IronNight
         void RefreshGarage()
         {
             var ink = new Color(0.93f, 0.91f, 0.86f); var dim = new Color(0.66f, 0.64f, 0.59f); var amber = new Color(0.95f, 0.66f, 0.23f); string nation = Depot.Nation; float y = 0f;
+            if (garage != null)
+            {
+                // the showroom: the leader's tank on the turntable, a drag turns it
+                var frame = MakeImage(depotRows, "Showroom", new Vector2(0.5f, 1f), new Vector2(0, 0), new Vector2(940, 705), new Color(0.05f, 0.05f, 0.06f, 1f)); frame.rectTransform.pivot = new Vector2(0.5f, 1f);
+                var view = new GameObject("View", typeof(RectTransform), typeof(RawImage), typeof(GarageDrag)); view.transform.SetParent(frame.transform, false);
+                var vrt = view.GetComponent<RectTransform>(); vrt.anchorMin = Vector2.zero; vrt.anchorMax = Vector2.one; vrt.offsetMin = vrt.offsetMax = Vector2.zero;
+                view.GetComponent<RawImage>().texture = garage.Texture; view.GetComponent<GarageDrag>().garage = garage;
+                var cap = MakeText(frame.transform, "Caption", new Vector2(0.5f, 0f), new Vector2(0, 18), TextAnchor.LowerCenter, 24, dim); cap.text = "drag to turn · tap a tank below to see it"; cap.rectTransform.sizeDelta = new Vector2(900, 34);
+                garage.Show(VehicleSpec.ById(Depot.LeaderId)); garage.SetActive(true); y -= 725f;
+            }
             // the nation: two flags
             {
                 var row = MakeImage(depotRows, "Row nation", new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 210), new Color(0.08f, 0.09f, 0.1f, 0.96f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);
@@ -317,6 +337,7 @@ namespace IronNight
                 var name = MakeText(row.transform, "Name", new Vector2(0f, 1f), new Vector2(30, -14), TextAnchor.UpperLeft, 38, here ? ink : dim); name.text = c.name + (here ? "" : "  · coming"); name.rectTransform.sizeDelta = new Vector2(560, 46);
                 var stats = MakeText(row.transform, "Stats", new Vector2(0f, 1f), new Vector2(30, -58), TextAnchor.UpperLeft, 24, amber); stats.text = $"speed {spec.speed:0}  ·  gun {spec.damage:0.#}  ·  reload {spec.reload:0.#} s  ·  range {spec.range:0} m  ·  hits {spec.hp:0.#}"; stats.rectTransform.sizeDelta = new Vector2(600, 34);
                 var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(30, -92), TextAnchor.UpperLeft, 24, dim); desc.text = c.desc; desc.rectTransform.sizeDelta = new Vector2(600, 56);
+                if (garage != null && here) { var look = MakeButton(row.transform, "", new Vector2(0f, 0.5f), new Vector2(320, 0), new Vector2(640, 150), 10, () => garage.Show(spec)); look.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.01f); look.transform.SetAsFirstSibling(); }
                 var b = MakeButton(row.transform, chosen ? "Leading" : owned ? "Lead" : $"{c.cost} pts", new Vector2(1f, 0.5f), new Vector2(-150, 0), new Vector2(260, 80), 28, () => { if (Depot.PickLeader(c)) RefreshDepot(); });
                 b.GetComponent<Image>().color = chosen ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : can ? new Color(0.2f, 0.22f, 0.24f, 0.95f) : new Color(0.12f, 0.12f, 0.13f, 0.9f);
                 b.transform.Find("Label").GetComponent<Text>().color = chosen ? new Color(0.1f, 0.08f, 0.05f) : can ? ink : new Color(0.5f, 0.48f, 0.45f);

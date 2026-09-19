@@ -98,6 +98,7 @@ namespace IronNight
             hud.OnFormation = f => formation = f;
             hud.OnAd = OnAd; hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             hud.OnStart = () => { hud.HideTitle(); phase = Phase.Play; stick.Blocked = false; };
+            hud.garage = Garage.Build(); hud.garage.SetActive(false);
             hud.OnCampaign = () => { if (Depot.CampaignNight == 0) Depot.CampaignStart(); PlayerPrefs.SetInt("camp.launch", Depot.CampaignNight); PlayerPrefs.Save(); SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); };
             hud.OnDepot = () => { stick.Blocked = true; hud.ShowDepot(); };
             hud.OnBack = () => { if (phase == Phase.End) SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); else hud.ShowTitle(reserveGranted); };
