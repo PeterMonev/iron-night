@@ -13,7 +13,7 @@ namespace IronNight
         public class Card { public string id, title, desc; public bool rare; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain, OnStart, OnCampaign, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality;
+        public System.Action OnAd, OnAgain, OnStart, OnCampaign, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality;
 
         Text clock, count, fps, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel; GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
@@ -110,7 +110,8 @@ namespace IronNight
             var snd = MakeButton(pauseSheet.transform, "Sound: on", new Vector2(0.5f, 0.5f), new Vector2(0, -20), new Vector2(880, 130), 40, () => OnSound?.Invoke()); soundLabel = snd.transform.Find("Label").GetComponent<Text>();
             var qb = MakeButton(pauseSheet.transform, "Quality: high", new Vector2(0.5f, 0.5f), new Vector2(0, -180), new Vector2(880, 130), 40, () => OnQuality?.Invoke()); qualityLabel = qb.transform.Find("Label").GetComponent<Text>();
             MakeText(pauseSheet.transform, "QualityNote", new Vector2(0.5f, 0.5f), new Vector2(0, -270), TextAnchor.MiddleCenter, 26, dim).text = "Low: no shadows, no glow, no rain. For phones that stutter.";
-            MakeButton(pauseSheet.transform, "Abandon the assault", new Vector2(0.5f, 0.5f), new Vector2(0, -400), new Vector2(880, 130), 40, () => OnQuit?.Invoke());
+            MakeButton(pauseSheet.transform, "Restart the night", new Vector2(0.5f, 0.5f), new Vector2(0, -400), new Vector2(880, 110), 38, () => OnRestart?.Invoke());
+            MakeButton(pauseSheet.transform, "Abandon the assault", new Vector2(0.5f, 0.5f), new Vector2(0, -530), new Vector2(880, 110), 38, () => OnQuit?.Invoke());
             pauseSheet.SetActive(false);
 
             // title sheet

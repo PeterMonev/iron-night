@@ -41,6 +41,7 @@ namespace IronNight
         Material shellTemplate; Texture2D glowTex;
         Formation formation = Formation.Wedge; Phase phase = Phase.Title; bool reserveGranted;
         int campaignNight;   // 0: a single night; 1..3: the campaign
+        Vehicle focus; float focusLeft; Transform focusRing;   // the enemy the platoon was told to hit
         float t, spawnTimer = 6f, leaderShield; int level = 1, xp, xpNeed = 6, score, kills, maxPlatoon = 4, reinforcements;
         bool wave2, wave3, wave4, revived, doubled, bossSpawned; Vehicle boss;
         static readonly bool debugBoss = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--boss") >= 0;   // test switch: the boss comes at 0:06
@@ -102,6 +103,7 @@ namespace IronNight
             hud.OnReserveAd = () => { reserveGranted = true; maxPlatoon = 4; hud.ShowTitle(true); };   // the ad is a mock: granted at once
             hud.OnPause = Pause; hud.OnResume = Resume; hud.OnSound = () => { Sfx.Muted = !Sfx.Muted; hud.ShowPause(!Sfx.Muted, !LowQuality); };
             hud.OnQuit = () => { Resume(); revived = true; End(false); };   // no rewarded repair after walking away
+            hud.OnRestart = () => { Time.timeScale = 1f; if (campaignNight > 0) { PlayerPrefs.SetInt("camp.launch", campaignNight); PlayerPrefs.Save(); } SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); };
             if (debugDawn) t = 250f; if (debugMid) { t = 100f; mortarTimer = 6f; starTimer = 9f; }
             hud.Set(t, platoon.Count); hud.SetLevel(level, 0f);
             PlaceCamera(true);
@@ -164,12 +166,20 @@ namespace IronNight
             }
             foreach (var v in platoon) { if (v.trackOut > 0f) v.trackOut -= dt; v.speedMul = speedMul; v.damageMul = damageMul; v.rangeMul = rangeMul; v.reloadMul = reloadMul; v.turretMul = turretMul; }
 
+            // a tap on an enemy: every gun onto it for eight seconds
+            if (stick.ConsumeTap() && phase == Phase.Play)
+            {
+                var ray = cam.ScreenPointToRay(stick.TapAt); if (ray.direction.y < -0.01f) { var g = ray.origin + ray.direction * (-ray.origin.y / ray.direction.y); var pick = Nearest(foes, g, 9f);
+                    if (pick != null) { focus = pick; focusLeft = 8f; if (focusRing == null) focusRing = fx.Marker(pick.transform.position, new Color(1f, 0.55f, 0.3f), 7f); focusRing.gameObject.SetActive(true); hud.Toast("Focus fire · " + pick.spec.name, 1.6f); Sfx.Click(); } }
+            }
+            if (focus != null) { focusLeft -= dt; if (focus.dead || focusLeft <= 0f) { focus = null; if (focusRing != null) focusRing.gameObject.SetActive(false); } else focusRing.position = focus.transform.position; }
             // turrets: nearest foe in range, else drift home
             float leaderTurret = L.turretYaw;
             foreach (var v in platoon)
             {
                 v.reloadLeft -= dt;
                 var target = Nearest(foes, v.transform.position, v.Range * 1.15f);
+                if (focus != null && Dist(v, focus) <= v.Range * 1.15f) target = focus;
                 if (target != null)
                 {
                     bool on = v.Aim(target.transform.position, dt);
@@ -236,6 +246,7 @@ namespace IronNight
             hud.HpBars(foes, cam, boss);
             if (objective != null) { var od = objective.pos - L.transform.position; od.y = 0f; hud.Objective(objective.pos, od.magnitude, cam, true); }
             TickObjectiveLabel();
+            if (firstNight) Tutorial(dt);
             if (t >= NightLength) { Radio("dawn"); End(true); }
         }
 
@@ -1140,6 +1151,20 @@ namespace IronNight
             }
         }
         bool campaignTallied; Depot.Commander commander; float radioCool;
+        int tutorialStep; float tutorialAt;
+        /// <summary>Five hints on the first night, each when its moment comes: driving, the turrets, the objective, the cards, the hedges.</summary>
+        void Tutorial(float dt)
+        {
+            tutorialAt += dt;
+            switch (tutorialStep)
+            {
+                case 0: if (tutorialAt > 1.5f) { hud.Toast("Drag anywhere to drive the leader", 4f); tutorialStep++; tutorialAt = 0f; } break;
+                case 1: if (foes.Count > 0 && tutorialAt > 2f) { hud.Toast("The turrets aim and fire on their own · tap an enemy to focus fire", 4.5f); tutorialStep++; tutorialAt = 0f; } break;
+                case 2: if (tutorialAt > 12f) { hud.Toast("The green arrow points to the objective · reach it for points", 4f); tutorialStep++; tutorialAt = 0f; } break;
+                case 3: if (level >= 2 && tutorialAt > 4f) { hud.Toast("Hug a hedge: a third of the shells stop in the bank", 4f); tutorialStep++; tutorialAt = 0f; } break;
+                case 4: if (platoon.Count >= 2 && tutorialAt > 3f) { hud.Toast("Wingmen hold formation · the buttons below change it", 4f); tutorialStep++; } break;
+            }
+        }
         /// <summary>A line over the radio from the commander in the hatch, in his own words; never two within eight seconds.</summary>
         void Radio(string when)
         {

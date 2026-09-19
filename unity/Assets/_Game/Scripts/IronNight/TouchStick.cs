@@ -15,6 +15,9 @@ namespace IronNight
         public Vector2 Direction { get; private set; }
         public bool Active { get; private set; }
         public bool Blocked;   // true while a sheet is open
+        public Vector2 TapAt { get; private set; } public bool Tapped { get; private set; }   // a press released within 0.25 s and 18 px: a tap, held until ConsumeTap
+        public bool ConsumeTap() { bool t = Tapped; Tapped = false; return t; }
+        float pressTime; Vector2 pressAt; bool moved;
 
         Image ring, knob; RectTransform canvasRect; Vector2 origin; bool keyboard;
 
@@ -56,8 +59,9 @@ namespace IronNight
                 if (keyboard) { keyboard = false; Active = false; Direction = Vector2.zero; }
             }
 
-            if (pressed && !Active) { Active = true; origin = pos; Direction = Vector2.zero; SetVisible(true); }
-            else if (!pressed && Active) { Active = false; Direction = Vector2.zero; SetVisible(false); return; }
+            if (pressed && !Active) { Active = true; origin = pos; Direction = Vector2.zero; SetVisible(true); pressTime = Time.unscaledTime; pressAt = pos; moved = false; }
+            else if (!pressed && Active) { Active = false; Direction = Vector2.zero; SetVisible(false); if (!moved && Time.unscaledTime - pressTime < 0.25f) { Tapped = true; TapAt = pressAt; } return; }
+            if (Active && (pos - pressAt).magnitude > 18f) moved = true;
             if (!Active) return;
 
             Direction = Vector2.ClampMagnitude((pos - origin) / radiusPixels, 1f);
