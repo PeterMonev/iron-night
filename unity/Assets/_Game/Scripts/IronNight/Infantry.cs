@@ -15,6 +15,22 @@ namespace IronNight
         public class Squad { public readonly List<Soldier> men = new List<Soldier>(); }
 
         public readonly List<Squad> squads = new List<Squad>();
+        class Runner { public Transform t; public Vector3 dir; public float age; }
+        readonly List<Runner> runners = new List<Runner>();
+
+        /// <summary>Two crewmen out of a knocked-out platoon tank, running for the rear; gone after eight seconds.</summary>
+        public void BailOut(Vector3 at, Vector3 rear)
+        {
+            if (figure == null) return;
+            for (int i = 0; i < 2; i++)
+            {
+                var go = new GameObject("Crewman"); var dir = (rear + new Vector3(Random.Range(-0.5f, 0.5f), 0f, Random.Range(-0.5f, 0.5f))).normalized;
+                go.transform.position = at + dir * 2.5f + new Vector3(Random.Range(-1.5f, 1.5f), 0f, 0f); go.transform.rotation = Quaternion.LookRotation(dir);
+                var fg = Instantiate(figure, go.transform); fg.transform.localRotation = Quaternion.Euler(0f, SoldierYaw, 0f); fg.transform.localScale = Vector3.one * 0.95f;
+                foreach (var rr in fg.GetComponentsInChildren<Renderer>()) { rr.sharedMaterial = skin; rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+                runners.Add(new Runner { t = go.transform, dir = dir });
+            }
+        }
         const float SoldierYaw = -90f, SoldierBYaw = 0f; GameObject figureB; Material skinB;   // the figure's facing in its own mesh, corrected here if the export looks the wrong way
         readonly List<Soldier> fallen = new List<Soldier>();
         Material uniform, helmet, skin; GameObject figure;
@@ -60,6 +76,7 @@ namespace IronNight
         public void Tick(float dt, List<Vehicle> platoon, Props props, System.Action<Soldier, Vehicle> fire)
         {
             float time = Time.time;
+            for (int i = runners.Count - 1; i >= 0; i--) { var r = runners[i]; r.age += dt; r.t.position += r.dir * (3.2f * dt); r.t.position = new Vector3(r.t.position.x, Mathf.Abs(Mathf.Sin(r.age * 9f)) * 0.08f, r.t.position.z); if (r.age > 8f) { Destroy(r.t.gameObject); runners.RemoveAt(i); } }
             for (int q = squads.Count - 1; q >= 0; q--)
             {
                 var sq = squads[q]; bool any = false;

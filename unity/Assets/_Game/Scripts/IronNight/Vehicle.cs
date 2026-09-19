@@ -11,7 +11,7 @@ namespace IronNight
     {
         public VehicleSpec spec;
         public bool friendly;
-        public float hp, yaw, turretYaw, reloadLeft, hitFlash, lastHit = -100f, mgTimer, mgSound, trackOut; public int flank; public bool unloaded, leaving;   // trackOut: seconds left with a track knocked off
+        public float hp, yaw, turretYaw, reloadLeft, hitFlash, lastHit = -100f, mgTimer, mgSound, trackOut, fallBack; public int flank, fallenBack; public bool unloaded, leaving;   // trackOut: seconds left with a track knocked off
         public float speedMul = 1f, damageMul = 1f, rangeMul = 1f, reloadMul = 1f, turretMul = 1f;
         public bool dead;
         public Vehicle target;

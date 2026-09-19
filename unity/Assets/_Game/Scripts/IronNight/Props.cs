@@ -608,6 +608,17 @@ namespace IronNight
         }
 
         /// <summary>True when a shell at this point is inside something solid that is taller than the shell's flight.</summary>
+        /// <summary>Within a metre of a hedge bank: cover from shells coming across it.</summary>
+        public bool InCover(Vector3 pos)
+        {
+            foreach (var p in active)
+            {
+                if (p.what != What.Hedge || p.radii.Length == 0) continue; float reach = p.bound + 4f; if ((p.pos - pos).sqrMagnitude > reach * reach) continue;
+                for (int c = 0; c < p.radii.Length; c++) { float r = p.radii[c] + 1.2f; if ((new Vector2(pos.x, pos.z) - p.circleCenters[c]).sqrMagnitude < r * r) return true; }
+            }
+            return false;
+        }
+
         public bool Blocks(Vector3 pos)
         {
             foreach (var p in active)

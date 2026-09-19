@@ -198,7 +198,13 @@ namespace IronNight
                 var target = Nearest(platoon, e.transform.position, 1000f); if (target == null) continue; e.rangeMul = enemyRangeMul * (lit ? 1.2f : 1f);
                 float dist = Dist(e, target);
                 if (e.spec.transport) { TickTransport(e, target, dist, dt); continue; }
-                if (!e.spec.isGun && dist > e.Range * 0.8f)
+                if (!e.spec.isGun && !e.spec.casemate && e.hp <= 1f && e.spec.hp >= 3f && e.fallBack <= 0f && e.fallenBack < 1 && dist < e.Range * 0.8f) { e.fallBack = 6f; e.fallenBack++; hud.Toast(e.spec.name + " falling back", 2f); }
+                if (e.fallBack > 0f)
+                {
+                    // reversing out of range, gun still on us
+                    e.fallBack -= dt; var away = e.transform.position - target.transform.position; away.y = 0f; e.Drive(Steer(e, new Vector2(away.x, away.z)), dt);
+                }
+                else if (!e.spec.isGun && dist > e.Range * 0.8f)
                 {
                     var goal = target.transform.position;
                     if (e.flank != 0 && dist > 20f) { var toT = goal - e.transform.position; toT.y = 0f; toT.Normalize(); goal += new Vector3(toT.z, 0f, -toT.x) * (e.flank * 18f); }   // a Panzer IV works round the side
@@ -278,6 +284,9 @@ namespace IronNight
                 s.vis.position = s.pos; s.vis.rotation = Quaternion.LookRotation(cam.transform.forward, s.vel);
                 var hitList = s.friendly ? foes : platoon; Vehicle hit = null;
                 if (!s.bounced) foreach (var v in hitList) { if (v.dead) continue; var d = v.transform.position - s.pos; d.y = 0f; if (d.sqrMagnitude < v.spec.radius * v.spec.radius) { hit = v; break; } }
+                // a wreck in the way stops the shell; a target in a hedge bank is missed one time in three
+                if (hit == null && !s.bounced) foreach (var w in wrecks) { if ((w.v.transform.position - s.pos).sqrMagnitude < w.v.spec.radius * w.v.spec.radius * 0.6f && s.pos.y < 2.2f) { fx.Spark(s.pos + Vector3.up * 0.5f, -s.vel.normalized); Sfx.Ricochet(s.pos); s.life = 0f; break; } }
+                if (hit != null && !s.bounced && props.InCover(hit.transform.position) && Random.value < 0.33f) { fx.Hit(new Vector3(s.pos.x, 0.8f, s.pos.z), 0.5f); if (hit.friendly) hud.Popup(hit.transform.position, "Hedge", new Color(0.55f, 0.8f, 0.5f)); s.life = 0f; hit = null; }
                 if (hit != null && Ricochets(s, hit))
                 {
                     // glances off: sparks, a whine, and the shell tumbles away over the hull
@@ -323,6 +332,7 @@ namespace IronNight
             var fire = new GameObject("WreckFire").AddComponent<Light>(); fire.type = LightType.Point; fire.color = new Color(1f, 0.5f, 0.2f); fire.range = 16f; fire.intensity = 6f; fire.shadows = LightShadows.None;
             fire.transform.position = v.transform.position + Vector3.up * 2.5f;
             wrecks.Add(new Wreck { v = v, fire = fire });
+            if (v.friendly) infantry.BailOut(v.transform.position, -v.Forward);
             if (v.friendly)
             {
                 bool wasLeader = v == Leader; platoon.Remove(v);
