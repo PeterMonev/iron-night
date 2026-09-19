@@ -145,7 +145,7 @@ namespace IronNight
             var ort = orders.GetComponent<RectTransform>(); ort.anchorMin = ort.anchorMax = new Vector2(0.5f, 0.5f); ort.anchoredPosition = new Vector2(0, -370); ort.sizeDelta = Vector2.zero; missionRoot = orders.transform;
             rankBadge = MakeImage(titleSheet.transform, "Rank", new Vector2(0.5f, 0.5f), new Vector2(0, -625), new Vector2(90, 90), Color.white); rankBadge.preserveAspect = true;
             titleStats = MakeText(titleSheet.transform, "Stats", new Vector2(0.5f, 0.5f), new Vector2(0, -700), TextAnchor.MiddleCenter, 32, dim); titleStats.rectTransform.sizeDelta = new Vector2(900, 200);
-            MakeText(titleSheet.transform, "Credits", new Vector2(0.5f, 0f), new Vector2(0, 70), TextAnchor.MiddleCenter, 24, new Color(0.45f, 0.44f, 0.4f)).text = "Built with DINOv3 · TRELLIS 2 · Unity";
+            MakeText(titleSheet.transform, "Credits", new Vector2(0.5f, 0f), new Vector2(0, 70), TextAnchor.MiddleCenter, 24, new Color(0.45f, 0.44f, 0.4f)).text = "Tank models by mamont nikita, buffinbag, Hxhdjdjdk, Julian, Artem Goyko, XxRxX, Mr_Chiko, Joanthan To · Sketchfab, CC BY 4.0\nBuilt with DINOv3 · TRELLIS 2 · Unity";
             MakeButton(titleSheet.transform, "How to play", new Vector2(0.5f, 0f), new Vector2(-310, 215), new Vector2(290, 70), 28, () => { helpSheet.SetActive(true); });
             MakeButton(titleSheet.transform, "Medals", new Vector2(0.5f, 0f), new Vector2(0, 215), new Vector2(290, 70), 28, () => { ShowMedals(); });
             MakeButton(titleSheet.transform, "Records", new Vector2(0.5f, 0f), new Vector2(310, 215), new Vector2(290, 70), 28, () => { ShowRecords(); });

@@ -42,29 +42,33 @@ namespace IronNight
             if (vehicleTemplate == null) { vehicleTemplate = Resources.Load<Material>("VehicleLit"); barrelMaterial = Resources.Load<Material>("BarrelLit"); }
             var tex = Resources.Load<Texture2D>("Models/" + spec.texture); var nrm = Resources.Load<Texture2D>("Models/" + spec.texture + "_n");
             if (vehicleTemplateN == null) vehicleTemplateN = Resources.Load<Material>("VehicleLitN");
-            var mat = new Material(nrm != null && vehicleTemplateN != null ? vehicleTemplateN : vehicleTemplate); mat.SetTexture("_BaseMap", tex); if (nrm != null) mat.SetTexture("_BumpMap", nrm); mat.SetColor("_BaseColor", friendly ? spec.tint * Depot.CamoTint : spec.tint); if (Wet) mat.SetFloat("_Smoothness", 0.55f);
+            var mat = MakeMaterial(tex, nrm);
+            bool artist = HasParts(spec.hullMesh);   // an artist's model: one part per material
 
             // hull: mesh origin is the turret ring, so it hangs ringHeight below the pivot and the tracks touch the ground
-            var hull = Instantiate(Resources.Load<GameObject>("Models/" + spec.hullMesh), transform);
+            var hull = artist ? Assemble(spec.hullMesh, transform) : Instantiate(Resources.Load<GameObject>("Models/" + spec.hullMesh), transform);
             hull.name = "Hull"; hull.transform.localPosition = new Vector3(0f, spec.ringHeight, 0f); hull.transform.localRotation = Quaternion.Euler(0f, (spec.forward > 0f ? 0f : 180f) + spec.meshYaw, 0f);
             hullT = hull.transform; hullYaw = spec.forward > 0f ? 0f : 180f;
-            foreach (var r in hull.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+            foreach (var r in hull.GetComponentsInChildren<Renderer>()) { if (!artist) r.sharedMaterial = mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
             Transform turretMesh = null;
 
             var pivot = new GameObject("Turret").transform; pivot.SetParent(transform, false); pivot.localPosition = new Vector3(0f, spec.ringHeight, 0f);
             turret = pivot;
             if (spec.turretMesh != null)
             {
-                var tm = Instantiate(Resources.Load<GameObject>("Models/" + spec.turretMesh), pivot);
+                var tm = artist ? Assemble(spec.turretMesh, pivot) : Instantiate(Resources.Load<GameObject>("Models/" + spec.turretMesh), pivot);
                 tm.name = "TurretMesh"; tm.transform.localRotation = Quaternion.Euler(0f, spec.forward > 0f ? 0f : 180f, 0f); tm.transform.localPosition = new Vector3(spec.turretShift, 0f, 0f); turretMesh = tm.transform;   // the turret turns about its own centre
                 var tmat = mat; if (spec.turretTexture != null) { tmat = new Material(mat); tmat.SetTexture("_BaseMap", Resources.Load<Texture2D>("Models/" + spec.turretTexture)); var tn = Resources.Load<Texture2D>("Models/" + spec.turretTexture + "_n"); if (tn != null) tmat.SetTexture("_BumpMap", tn); }
+                if (!artist)
                 {
                     // the cut turret is open underneath and the hull open above: a plate at the ring, as wide as the turret, covers both
                     var tb0 = LocalBounds(turretMesh, pivot); float ringW = spec.turretTexture != null ? 2.25f : Mathf.Min(tb0.size.x, tb0.size.z) * 0.95f;
                     var plate = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(plate.GetComponent<Collider>()); plate.name = "RingPlate"; plate.transform.SetParent(pivot, false);
                     plate.transform.localPosition = new Vector3(spec.turretTexture != null ? 0f : tb0.center.x, 0.03f, spec.turretTexture != null ? 0f : tb0.center.z); plate.transform.localScale = new Vector3(ringW, 0.04f, ringW); plate.GetComponent<Renderer>().sharedMaterial = tmat; plate.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 }
-                foreach (var r in tm.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = tmat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+                foreach (var r in tm.GetComponentsInChildren<Renderer>()) { if (!artist) r.sharedMaterial = tmat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+                if (spec.gunLength <= 0f) { muzzle = new GameObject("Muzzle").transform; muzzle.SetParent(pivot, false); muzzle.localPosition = spec.muzzle; }   // the model keeps its own gun
+                else {
                 // the generated barrel was cut off (it comes out bent and short); this one has the real length
                 var barrel = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(barrel.GetComponent<Collider>());
                 barrel.name = "Barrel"; barrel.transform.SetParent(pivot, false);
@@ -89,6 +93,7 @@ namespace IronNight
                     brake.GetComponent<Renderer>().sharedMaterial = barrelMaterial;
                 }
                 muzzle = new GameObject("Muzzle").transform; muzzle.SetParent(pivot, false); muzzle.localPosition = new Vector3(spec.gunX, spec.gunHeight, spec.mantlet + spec.gunLength);
+                }
             }
             else
             {
@@ -104,7 +109,7 @@ namespace IronNight
                 if (cmd != null)
                 {
                     var tb = LocalBounds(turretMesh, pivot); var c = Instantiate(cmd, pivot); c.name = "Commander";
-                    c.transform.localScale = Vector3.one * 0.55f; c.transform.localPosition = new Vector3(tb.center.x + tb.extents.x * 0.3f, RoofHeight(turretMesh, pivot) - 0.05f, tb.center.z - tb.extents.z * 0.2f); c.transform.localRotation = Quaternion.Euler(0f, CommanderYaw, 0f);
+                    c.transform.localScale = Vector3.one * 0.55f; c.transform.localPosition = new Vector3(artist ? 0.3f : tb.center.x + tb.extents.x * 0.3f, RoofHeight(turretMesh, pivot) - 0.05f, artist ? -0.2f : tb.center.z - tb.extents.z * 0.2f);   // an artist's turret carries its gun, so its bounds say nothing about the hatch: just behind the ring axis, to one side c.transform.localRotation = Quaternion.Euler(0f, CommanderYaw, 0f);
                     if (commanderMaterial == null) { commanderMaterial = new Material(Resources.Load<Material>("VehicleLit")); commanderMaterial.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/commander_tex")); commanderMaterial.SetFloat("_Cull", 0f); }
                     foreach (var r in c.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = commanderMaterial; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
                 }
@@ -212,12 +217,38 @@ namespace IronNight
         }
 
         /// <summary>The box round every mesh under a part, measured in the given frame.</summary>
-        /// <summary>The turret roof: the height under the top 3% of the mesh's vertices, so an aerial or a roof gun does not count.</summary>
+        Material MakeMaterial(Texture2D tex, Texture2D nrm)
+        {
+            var mat = new Material(nrm != null && vehicleTemplateN != null ? vehicleTemplateN : vehicleTemplate); mat.SetTexture("_BaseMap", tex); if (nrm != null) mat.SetTexture("_BumpMap", nrm);
+            mat.SetColor("_BaseColor", friendly ? spec.tint * Depot.CamoTint : spec.tint); if (Wet) mat.SetFloat("_Smoothness", 0.55f); return mat;
+        }
+
+        /// <summary>An artist's model comes as one OBJ per material (<name>_m0, _m1, ...) with textures <texture>_m<i>: all of them under one node.</summary>
+        static bool HasParts(string baseName) { for (int i = 0; i < 24; i++) if (Resources.Load<GameObject>("Models/" + baseName + "_m" + i) != null) return true; return false; }
+
+        GameObject Assemble(string baseName, Transform parent)
+        {
+            var root = new GameObject(baseName); root.transform.SetParent(parent, false);
+            for (int i = 0; i < 24; i++)
+            {
+                var prefab = Resources.Load<GameObject>("Models/" + baseName + "_m" + i); if (prefab == null) continue;
+                var part = Instantiate(prefab, root.transform); part.name = "m" + i;
+                var m = MakeMaterial(Resources.Load<Texture2D>("Models/" + spec.texture + "_m" + i), Resources.Load<Texture2D>("Models/" + spec.texture + "_m" + i + "_n"));
+                foreach (var r in part.GetComponentsInChildren<Renderer>()) r.sharedMaterial = m;
+            }
+            return root;
+        }
+
+        /// <summary>The turret roof: the highest dense band of vertices within 0.6 m of the turret axis, so the gun, an aerial or a roof MG do not count.</summary>
         static float RoofHeight(Transform part, Transform frame)
         {
             var ys = new System.Collections.Generic.List<float>();
-            foreach (var mf in part.GetComponentsInChildren<MeshFilter>()) { if (mf.sharedMesh == null) continue; foreach (var v in mf.sharedMesh.vertices) ys.Add(frame.InverseTransformPoint(mf.transform.TransformPoint(v)).y); }
-            if (ys.Count == 0) return 0f; ys.Sort(); return ys[Mathf.Clamp(Mathf.FloorToInt(ys.Count * 0.97f), 0, ys.Count - 1)];
+            foreach (var mf in part.GetComponentsInChildren<MeshFilter>()) { if (mf.sharedMesh == null || !mf.sharedMesh.isReadable) continue; foreach (var v in mf.sharedMesh.vertices) { var p = frame.InverseTransformPoint(mf.transform.TransformPoint(v)); if (p.x * p.x + p.z * p.z < 0.36f) ys.Add(p.y); } }   // the central column only: not the gun, not the bustle
+            if (ys.Count < 20) return LocalBounds(part, frame).max.y - 0.35f; ys.Sort();
+            // the roof is the highest 10 cm band that still holds a good share of the column's vertices; a machine gun or a hatch handle above it is sparse
+            float top = ys[ys.Count - 1]; int need = Mathf.Max(8, ys.Count / 25);
+            for (float y = top; y > ys[0]; y -= 0.1f) { int n = 0; foreach (var v in ys) if (v > y - 0.1f && v <= y) n++; if (n >= need) return y; }
+            return ys[Mathf.Clamp(Mathf.FloorToInt(ys.Count * 0.9f), 0, ys.Count - 1)];
         }
 
         static Bounds LocalBounds(Transform part, Transform frame)

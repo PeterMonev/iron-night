@@ -1,0 +1,11 @@
+Model Information:
+* title:	Kv-1 (КВ-1)
+* source:	https://sketchfab.com/3d-models/kv-1-1-f23cf9b8822a4ad48f068a2c51c44848
+* author:	Artem Goyko (https://sketchfab.com/Artem.Goyko)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Kv-1 (КВ-1)" (https://sketchfab.com/3d-models/kv-1-1-f23cf9b8822a4ad48f068a2c51c44848) by Artem Goyko (https://sketchfab.com/Artem.Goyko) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

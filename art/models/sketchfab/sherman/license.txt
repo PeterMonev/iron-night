@@ -1,0 +1,11 @@
+Model Information:
+* title:	Sherman M4A3 Green Set E
+* source:	https://sketchfab.com/3d-models/sherman-m4a3-green-set-e-da4aa5094c4a474b896d055ab27f10f5
+* author:	mamont nikita (https://sketchfab.com/mamontnikita62)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Sherman M4A3 Green Set E" (https://sketchfab.com/3d-models/sherman-m4a3-green-set-e-da4aa5094c4a474b896d055ab27f10f5) by mamont nikita (https://sketchfab.com/mamontnikita62) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

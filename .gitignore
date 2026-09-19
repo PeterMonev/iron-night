@@ -21,3 +21,7 @@ node_modules/
 Thumbs.db
 unity/.utmp/
 unity/.gradle/
+
+# Sketchfab sources: only the licence files are kept; the models are re-downloaded from the links in THIRD_PARTY.md
+art/models/sketchfab/*/scene.*
+art/models/sketchfab/*/textures/

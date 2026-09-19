@@ -47,3 +47,13 @@ the turret dropped) -> `vehicle_export.py parts <name> <xscale> --raw` (raw-tex 
 (US olive drab 84 88 64 k 0.9, Soviet 4BO 66 75 46 k 0.9, sherman_turret2 like the hull). The painted stars stay
 (`VehicleSpec.painted`). `bake_markings.py` paints a star/cross into the texture on the surface, for a model whose
 reference had none.
+
+## Artist models from Sketchfab (2026-09-19, evening)
+Generated tanks never look like the real thing up close; artist models do. Free ones with CC BY 4.0 (credit in
+THIRD_PARTY.md and on the title screen; never a model ripped from World of Tanks / War Thunder / Call of Duty, whatever
+licence the uploader picked). Download the glTF into `art/models/sketchfab/<name>/`, then
+`sketchfab_export.py <folder> <name> <hull_length_m> [ring=<frac>] [reach=0.25] [forward=+|-] [casemate]`: one OBJ per
+material (`<name>_hull_m<i>`, `<name>_turret_m<i>`, textures `<name>_m<i>.png` + `_n`), the ring at the origin, X
+mirrored for Unity, the model's own gun kept (spec gunLength 0, muzzle from the printout). `Vehicle.Assemble` builds
+the parts; `VehicleSpec.painted`. Ring fractions used: KV-1 0.68, Panzer IV 0.70, Chaffee 0.47, the rest auto.
+Check a split with `viewer10.html?n=<name>` after `obj2view_sf.py <name>` (scratchpad).

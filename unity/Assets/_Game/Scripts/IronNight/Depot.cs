@@ -100,7 +100,7 @@ namespace IronNight
             new LeaderChoice { id = "firefly", name = "Sherman Firefly", nation = "us", cost = 2000, desc = "The 17-pounder hits twice as hard and reaches farther; the turret is slower." },
             new LeaderChoice { id = "pershing", name = "M26 Pershing", nation = "us", cost = 3500, desc = "A heavy: the 90 mm gun and thick armour, slow to load and to turn." },
             new LeaderChoice { id = "t34_85", name = "T-34-85", nation = "su", cost = 0, desc = "Fast, sloped, an 85 mm gun: the best all-rounder of the war." },
-            new LeaderChoice { id = "kv85", name = "KV-85", nation = "su", cost = 2000, desc = "A heavy hull under the 85: slow, and it takes a beating." },
+            new LeaderChoice { id = "kv85", name = "KV-1", nation = "su", cost = 2000, desc = "The heavy of 1941: slow, thick, and it takes a beating." },
             new LeaderChoice { id = "su100", name = "SU-100", nation = "su", cost = 2200, desc = "No turret: the 100 mm gun aims with the hull. Point the tank, kill anything." },
             new LeaderChoice { id = "is2", name = "IS-2", nation = "su", cost = 4000, desc = "The 122 mm gun: one shot, one wreck. Slow to load, slow to turn, hard to kill." },
         };

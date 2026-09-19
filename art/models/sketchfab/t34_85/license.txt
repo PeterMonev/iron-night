@@ -1,0 +1,11 @@
+Model Information:
+* title:	T-34 85 Tank
+* source:	https://sketchfab.com/3d-models/t-34-85-tank-ca24cc254922473a91ec213aebd83292
+* author:	Julian (https://sketchfab.com/julianrijken)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "T-34 85 Tank" (https://sketchfab.com/3d-models/t-34-85-tank-ca24cc254922473a91ec213aebd83292) by Julian (https://sketchfab.com/julianrijken) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
