@@ -11,7 +11,7 @@ namespace IronNight
     public static class Missions
     {
         public class Mission { public int index; public string stat, text; public int goal, reward, progress, start; public bool perNight; public string Title => string.Format(text, goal); public string Key => stat + goal; }
-        public class Night { public int kills, tigers, paks, flares, level, objectives, infantry, tracked, focus, campaign; public float time; public bool boss; }
+        public class Night { public int kills, tigers, paks, flares, level, objectives, infantry, tracked, focus, campaign, lamps; public float time; public bool boss; }
 
         static readonly Mission[] Pool =
         {
@@ -26,6 +26,7 @@ namespace IronNight
             new Mission { stat = "level", goal = 5, reward = 300, text = "Reach level {0} in one night", perNight = true },
             new Mission { stat = "tracked", goal = 5, reward = 300, text = "Throw {0} enemy tracks" },
             new Mission { stat = "focus", goal = 8, reward = 350, text = "Destroy {0} focus-fire targets" },
+            new Mission { stat = "lamps", goal = 3, reward = 400, text = "Shoot out {0} searchlights" },
             new Mission { stat = "nightkills", goal = 15, reward = 300, text = "Destroy {0} enemies in one night", perNight = true },
             new Mission { stat = "time", goal = 210, reward = 600, text = "Hold until 3:30 in one night", perNight = true },
             new Mission { stat = "tigers", goal = 4, reward = 600, text = "Destroy {0} Tigers" },
@@ -78,7 +79,7 @@ namespace IronNight
             {
                 case "kills": case "nightkills": return n.kills; case "tigers": return n.tigers; case "paks": return n.paks; case "flares": return n.flares;
                 case "level": return n.level; case "time": return Mathf.FloorToInt(n.time); case "boss": return n.boss ? 1 : 0; case "objectives": return n.objectives; case "infantry": return n.infantry;
-                case "tracked": return n.tracked; case "focus": return n.focus; case "campaign": return n.campaign; default: return 0;
+                case "tracked": return n.tracked; case "lamps": return n.lamps; case "focus": return n.focus; case "campaign": return n.campaign; default: return 0;
             }
         }
 

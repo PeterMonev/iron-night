@@ -41,7 +41,7 @@ namespace IronNight
         Material shellTemplate; Texture2D glowTex;
         Formation formation = Formation.Wedge; Phase phase = Phase.Title; bool reserveGranted;
         int campaignNight;   // 0: a single night; 1..3: the campaign
-        int nightTracked, nightFocus, talliedTracked;
+        int nightTracked, nightFocus, talliedTracked, nightLamps, talliedLamps; bool litBySearchlight;
         Vehicle focus; float focusLeft; Transform focusRing;   // the enemy the platoon was told to hit
         float t, spawnTimer = 6f, leaderShield; int level = 1, xp, xpNeed = 6, score, kills, maxPlatoon = 4, reinforcements;
         bool wave2, wave3, wave4, revived, doubled, bossSpawned; Vehicle boss;
@@ -235,7 +235,7 @@ namespace IronNight
             foreach (var e in foes) if (!e.spec.isGun) e.transform.position = props.PushOut(e.transform.position, e.spec.radius * 0.7f);
             foreach (var v in platoon) tracks.Mark(v); foreach (var e in foes) if (!e.spec.isGun) tracks.Mark(e);
             foreach (var v in platoon) Smoulder(v, dt); foreach (var e in foes) Smoulder(e, dt);
-            props.Tick();
+            props.platoon = L.transform.position; props.alert = t > 60f || System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--lamps") >= 0; props.Tick();
             flareLight.range = 34f + platoon.Count * 3f;
             Sfx.Engine(stick.Active ? stick.Direction.magnitude : 0f);
             PlaceCamera(false);
@@ -317,6 +317,7 @@ namespace IronNight
                     fx.Hit(new Vector3(s.pos.x, 1.6f, s.pos.z), s.he ? 1.5f : 1f);
                 }
                 if (s.bounced) s.vel += Vector3.down * (30f * dt);
+                if (hit == null && !s.bounced && s.friendly && props.HitLamp(s.pos)) { fx.Explosion(s.pos); Sfx.Explosion(s.pos); score += 150; hud.Popup(s.pos, "Searchlight out · +150", new Color(1f, 0.9f, 0.6f)); nightLamps++; s.life = 0f; }
                 if (hit == null && !s.bounced && props.Blocks(s.pos)) { fx.Hit(s.pos, 0.6f); Sfx.Hit(s.pos); s.life = 0f; }
                 else if (hit == null && s.life <= 0f) { var g = new Vector3(s.pos.x, 0f, s.pos.z); fx.Dust(g); props.Crater(g, 2.2f); }   // spent: into the dirt
                 if (hit != null || s.life <= 0f) { fx.Release(s.vis); shells.RemoveAt(i); }
@@ -896,12 +897,14 @@ namespace IronNight
                 star.light = new GameObject("StarLight").AddComponent<Light>(); star.light.type = LightType.Point; star.light.color = new Color(1f, 0.96f, 0.86f); star.light.range = 80f; star.light.intensity = 70f; star.light.shadows = LightShadows.None;
                 Sfx.Flak(star.pos + Vector3.up * 30f); hud.Toast("Star shell! You are lit up · move", 3f);
             } }
-            if (star == null) { lit = false; return; }
+            if (props.Lit && !litBySearchlight) { litBySearchlight = true; hud.Toast("Caught in the searchlight · drive out or shoot the lamp", 3f); }
+            if (!props.Lit) litBySearchlight = false;
+            if (star == null) { lit = props.Lit; return; }
             star.life -= dt; star.height = Mathf.Max(6f, star.height - 1.7f * dt); star.pos += new Vector3(0.5f, 0f, 0.3f) * dt;
             var at = star.pos + Vector3.up * star.height; star.flare.position = at; star.flare.GetChild(0).rotation = cam.transform.rotation; star.chute.position = at + Vector3.up * 3f; star.light.transform.position = at;
             float burn = Mathf.Clamp01(star.life / 3f) * (0.85f + 0.15f * Mathf.PerlinNoise(Time.time * 9f, 0.5f)); star.light.intensity = 70f * burn; star.flare.GetChild(0).localScale = Vector3.one * (7f * (0.5f + 0.5f * burn));
             star.puff -= dt; if (star.puff <= 0f) { star.puff = 0.25f; fx.Signal(at, new Color(0.8f, 0.8f, 0.8f, 0.5f)); }
-            var d = L.transform.position - star.pos; d.y = 0f; lit = star.life > 0f && d.magnitude < 40f;
+            var d = L.transform.position - star.pos; d.y = 0f; lit = (star.life > 0f && d.magnitude < 40f) || props.Lit;
             if (star.life <= 0f) { fx.Release(star.flare); Destroy(star.chute.gameObject); Destroy(star.light.gameObject); star = null; lit = false; }
         }
 
@@ -1104,12 +1107,12 @@ namespace IronNight
             int earned = Mathf.RoundToInt(score * (veteran ? 1.5f : 1f)) * (doubled ? 2 : 1) + (dawn ? 500 : 0);
             Depot.AddPoints(earned - banked); banked = earned;                       // a revived night banks only what is new
             if (!nightRecorded) { Depot.RecordNight(kills, t); nightRecorded = true; }
-            var done = Missions.Report(new Missions.Night { kills = kills, tigers = nightTigers, paks = nightPaks, flares = nightFlares, level = level, time = t, boss = bossKilled, objectives = objectivesReached, infantry = nightInfantry, tracked = nightTracked, focus = nightFocus, campaign = campaignNight == 3 && dawn ? 1 : 0 });
+            var done = Missions.Report(new Missions.Night { kills = kills, tigers = nightTigers, paks = nightPaks, flares = nightFlares, level = level, time = t, boss = bossKilled, objectives = objectivesReached, infantry = nightInfantry, tracked = nightTracked, focus = nightFocus, lamps = nightLamps, campaign = campaignNight == 3 && dawn ? 1 : 0 });
             Depot.Tally("kills", kills - talliedKills); talliedKills = kills; Depot.Tally("tigers", nightTigers - talliedTigers); talliedTigers = nightTigers;
             Depot.Tally("guns", nightPaks - talliedGuns); talliedGuns = nightPaks; Depot.Tally("infantry", nightInfantry - talliedInfantry); talliedInfantry = nightInfantry;
             Depot.Tally("objectives", objectivesReached - talliedObjectives); talliedObjectives = objectivesReached;
             if (bossKilled && !talliedAce) { talliedAce = true; Depot.Tally("aces", 1); }
-            if (dawn) { Depot.Tally("dawns", 1); if (veteran) Depot.Tally("veteranDawns", 1); } Depot.Tally("tracked", nightTracked - talliedTracked); talliedTracked = nightTracked;
+            if (dawn) { Depot.Tally("dawns", 1); if (veteran) Depot.Tally("veteranDawns", 1); } Depot.Tally("tracked", nightTracked - talliedTracked); talliedTracked = nightTracked; Depot.Tally("lamps", nightLamps - talliedLamps); talliedLamps = nightLamps;
             if (kills >= 15 && shotsFired > 0 && shotsHit * 2 >= shotsFired) Depot.Tally("sharp", 1);
             if (!logged) { logged = true; Depot.LogNight(winter ? "Ardennes" : "Normandy", kills, t, score, dawn); }
             var medals = Medals.Check();

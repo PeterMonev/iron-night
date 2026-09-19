@@ -19,7 +19,7 @@ namespace IronNight
             public What what; public Kind kind; public Vector3 pos; public float yaw, size, bound = 8f, height = -1f; public int seed;
             public Vector2[] circleCenters = new Vector2[0]; public float[] radii = new float[0];
             public Vector3 a, b; public float[] gaps; public float clearA, clearB;              // hedges: the line and its openings
-            public GameObject go; public Mesh mesh, leaves; public LightShaft shaft; public Transform yoke, drum, lamp; public float flakTimer = 4f; public int burst;
+            public GameObject go; public Mesh mesh, leaves; public float az, el = 42f, track; public LightShaft shaft; public Transform yoke, drum, lamp; public float flakTimer = 4f; public int burst;
         }
 
         // circles: triples (offsetAlong, offsetSide, radius) in metres, along the prop's own forward axis
@@ -65,6 +65,9 @@ namespace IronNight
 
         public bool winter;   // the Ardennes: snow on the fields, bare trees
         public bool wet;      // a rainy night: puddles in the fields
+        public Vector3 platoon; public bool alert;          // where the leader is, and whether the posts have been told to look for him
+        public bool Lit { get; private set; } public Vector3 LitBy { get; private set; }   // a beam is on the platoon
+        readonly HashSet<int> deadLamps = new HashSet<int>();   // posts shot out tonight, by seed
         Material puddleMaterial;
 
         public void Build(Camera camera)
@@ -274,6 +277,19 @@ namespace IronNight
             var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = groundMat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; ground = go.transform;
         }
 
+        /// <summary>A shell near a searchlight's drum puts the light out for the night.</summary>
+        public bool HitLamp(Vector3 at)
+        {
+            foreach (var p in active)
+            {
+                if (p.what != What.Searchlight || deadLamps.Contains(p.seed) || p.drum == null) continue;
+                if ((p.drum.position - at).sqrMagnitude > 2.4f * 2.4f) continue;
+                deadLamps.Add(p.seed); KillLamp(p); return true;
+            }
+            return false;
+        }
+        void KillLamp(Prop p) { if (p.shaft != null) p.shaft.gameObject.SetActive(false); if (p.lamp != null) p.lamp.gameObject.SetActive(false); }
+
         /// <summary>Moves the grid to the cell under the camera and recolours it: a corner deep inside a field is that
         /// field, a corner near a boundary is a mix of the two, so the textures cross-fade over five metres or so.</summary>
         void Recentre(int cx, int cz)
@@ -311,19 +327,26 @@ namespace IronNight
             for (int ix = cx - 2; ix <= cx + 2; ix++) for (int iz = cz - 2; iz <= cz + 2; iz++) foreach (var p in CellProps(ix, iz)) wanted.Add(p);
             for (int i = active.Count - 1; i >= 0; i--) if (!wanted.Contains(active[i])) { Unload(active[i]); active.RemoveAt(i); }
             foreach (var p in wanted) if (p.go == null) { Spawn(p); active.Add(p); }
-            float time = Time.time;
+            float time = Time.time; bool litNow = false; Vector3 litBy = Vector3.zero;
             foreach (var p in active)
             {
-                if (p.what != What.Searchlight) continue;
-                // the beam wanders round the sky between 22 and 62 degrees up; the lamp glow faces the camera
+                if (p.what != What.Searchlight || deadLamps.Contains(p.seed)) continue;
+                // the beam wanders round the sky between 22 and 62 degrees up; the lamp glow faces the camera. Once the posts are
+                // alerted, one within 75 m swings down and follows the leader; the sweep is picked up again when he is gone
                 float ph = p.seed * 0.37f, az = time * 7f * (p.seed % 2 == 0 ? 1f : -1f) + ph * 57f, el = 42f + Mathf.Sin(time * 0.17f + ph) * 20f;
-                p.yoke.localRotation = Quaternion.Euler(0f, az, 0f); p.drum.localRotation = Quaternion.Euler(-el, 0f, 0f);
+                var toL = platoon - p.pos; float distL = new Vector2(toL.x, toL.z).magnitude; bool tracking = alert && distL < 75f && distL > 6f;
+                if (tracking) { az = Mathf.Atan2(toL.x, toL.z) * Mathf.Rad2Deg - p.yaw * Mathf.Rad2Deg; el = Mathf.Max(3f, Mathf.Atan2(2.4f, distL) * Mathf.Rad2Deg); p.track = Mathf.Min(1f, p.track + Time.deltaTime * 0.5f); }
+                else p.track = Mathf.Max(0f, p.track - Time.deltaTime * 0.5f);
+                p.az = Mathf.MoveTowardsAngle(p.az, az, (tracking ? 30f : 90f) * Time.deltaTime); p.el = Mathf.MoveTowards(p.el, el, 25f * Time.deltaTime);
+                p.yoke.localRotation = Quaternion.Euler(0f, p.az, 0f); p.drum.localRotation = Quaternion.Euler(-p.el, 0f, 0f);
+                if (tracking && p.track >= 1f && Vector3.Angle(p.drum.forward, (platoon + Vector3.up - p.drum.position).normalized) < 5f) { litNow = true; litBy = p.pos; }
                 p.lamp.rotation = cam.rotation;
                 p.shaft.Set(p.drum.position + p.drum.forward * 0.6f, p.drum.forward);
                 // the post's gun fires a burst at the sky now and then: five tracers climbing along the beam
                 p.flakTimer -= Time.deltaTime;
                 if (p.flakTimer <= 0f) { if (p.burst == 0) p.burst = 5; p.flakTimer = p.burst > 1 ? 0.13f : 7f + Rnd(p.seed, (int)(time * 10f), 3) * 12f; p.burst--; if (fx != null) { var from = p.pos + Quaternion.Euler(0f, p.yaw * Mathf.Rad2Deg, 0f) * new Vector3(5f, 1.2f, 1f); fx.Flak(from, (p.drum.forward + Random.insideUnitSphere * 0.06f).normalized); if (p.burst == 4) Sfx.Flak(from); } }
             }
+            Lit = litNow; LitBy = litBy;
         }
 
         void Unload(Prop p)
@@ -429,7 +452,7 @@ namespace IronNight
             go.transform.position = p.pos; go.transform.rotation = Quaternion.Euler(0f, p.yaw * Mathf.Rad2Deg, 0f);
             p.yoke = go.transform.Find("Yoke"); p.drum = p.yoke.Find("Drum"); p.lamp = p.drum.Find("Lamp");
             var shaft = new GameObject("Beam"); shaft.transform.SetParent(transform, false); p.shaft = shaft.AddComponent<LightShaft>();
-            p.go = go;
+            p.go = go; if (deadLamps.Contains(p.seed)) KillLamp(p);
         }
 
         /// <summary>The searchlight itself: a drum on a yoke on a pedestal on a four-wheel trailer, its face glowing.</summary>
