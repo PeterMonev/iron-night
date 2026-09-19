@@ -97,7 +97,7 @@ namespace IronNight
         void BuildWorld()
         {
             // the ground, the fields, lanes, hedges, farms and searchlight posts are Props, built cell by cell around the camera
-            props = new GameObject("Props").AddComponent<Props>(); props.winter = winter; props.Build(cam); props.fx = fx;
+            props = new GameObject("Props").AddComponent<Props>(); props.winter = winter; props.wet = weather == Weather.Rain && !winter; Vehicle.Wet = props.wet; props.Build(cam); props.fx = fx;
             tracks = new GameObject("Tracks").AddComponent<Tracks>(); tracks.Build();
             infantry = new GameObject("Infantry").AddComponent<Infantry>(); infantry.Build(); veteran = Depot.Veteran;
 
@@ -137,7 +137,7 @@ namespace IronNight
             TickArtillery(dt);
             var L = Leader;
             if (leaderShield > 0f) leaderShield -= dt;
-            if (rain != null) rain.transform.position = L.transform.position + L.Forward * 20f + Vector3.up * 30f;
+            if (rain != null) rain.transform.position = L.transform.position + L.Forward * 20f + Vector3.up * 30f; if (splashes != null) splashes.transform.position = L.transform.position + L.Forward * 10f + Vector3.up * 0.06f;
 
             // the leader drives where the thumb points; the wingmen hold their slots
             if (stick.Active) L.Drive(stick.Direction, dt);
@@ -292,7 +292,7 @@ namespace IronNight
             if (v.friendly && v == Leader) { hud.Flash(); shake = Mathf.Max(shake, 0.8f); Buzz(); }
             if (v.hp > 0f) { if (v == Leader) { hud.Toast("Leader hit"); if (hasSmoke && smokeCooldown <= 0f) PopSmoke(); } return; }
             tracks.Forget(v);
-            v.Wreck(); fx.Explosion(v.transform.position); Sfx.Explosion(v.transform.position); InfantryKilled(infantry.Blast(v.transform.position, 6f), v.transform.position);
+            v.Wreck(); fx.Explosion(v.transform.position); Sfx.Explosion(v.transform.position); props.Scorch(v.transform, 6f + v.spec.radius * 1.5f); InfantryKilled(infantry.Blast(v.transform.position, 6f), v.transform.position);
             var fire = new GameObject("WreckFire").AddComponent<Light>(); fire.type = LightType.Point; fire.color = new Color(1f, 0.5f, 0.2f); fire.range = 16f; fire.intensity = 6f; fire.shadows = LightShadows.None;
             fire.transform.position = v.transform.position + Vector3.up * 2.5f;
             wrecks.Add(new Wreck { v = v, fire = fire });
@@ -556,7 +556,7 @@ namespace IronNight
             bool low = LowQuality;
             moon.shadows = low ? LightShadows.None : LightShadows.Soft;
             var volume = FindAnyObjectByType<UnityEngine.Rendering.Volume>(); if (volume != null) volume.weight = low ? 0f : 1f;
-            if (rain != null) { if (low) rain.Stop(); else if (!rain.isPlaying) rain.Play(); }
+            if (rain != null) { if (low) rain.Stop(); else if (!rain.isPlaying) rain.Play(); } if (splashes != null) { if (low) splashes.Stop(); else if (!splashes.isPlaying) splashes.Play(); }
         }
 
         /// <summary>The night's light every frame: the sky of the weather, then the last 45 seconds turning to dawn
@@ -581,12 +581,35 @@ namespace IronNight
             var main = rain.main; main.startSpeed = winter ? 3f : 40f; main.startLifetime = winter ? 14f : 1.1f; main.startSize = winter ? 0.28f : 0.07f; main.maxParticles = 2000; main.simulationSpace = ParticleSystemSimulationSpace.World; main.gravityModifier = winter ? 0.08f : 1.5f;
             main.startColor = winter ? new Color(0.9f, 0.92f, 0.98f, 0.7f) : new Color(0.7f, 0.75f, 0.85f, 0.45f);
             var em = rain.emission; em.rateOverTime = winter ? 400f : 3600f;
-            if (winter) { var vel = rain.velocityOverLifetime; vel.enabled = true; vel.x = new ParticleSystem.MinMaxCurve(-1.2f, 1.2f); vel.z = new ParticleSystem.MinMaxCurve(-1.2f, 1.2f); }
+            { var vel = rain.velocityOverLifetime; vel.enabled = true; vel.x = winter ? new ParticleSystem.MinMaxCurve(0.4f, 2.2f) : new ParticleSystem.MinMaxCurve(5f, 7f); vel.z = new ParticleSystem.MinMaxCurve(-1.2f, 1.2f); }   // a wind from the west
             var sh = rain.shape; sh.shapeType = ParticleSystemShapeType.Box; sh.scale = new Vector3(130f, 1f, 170f); sh.rotation = new Vector3(90f, 0f, 0f);
             var r = go.GetComponent<ParticleSystemRenderer>(); if (winter) r.renderMode = ParticleSystemRenderMode.Billboard; else { r.renderMode = ParticleSystemRenderMode.Stretch; r.lengthScale = 22f; r.velocityScale = 0f; }
             var m = new Material(Resources.Load<Material>("Additive")); m.SetTexture("_BaseMap", glowTex); m.SetColor("_BaseColor", new Color(0.5f, 0.55f, 0.65f, 0.35f)); r.sharedMaterial = m;
+            if (winter)
+            {
+                // real flakes: the sheet of twelve clusters, one picked per flake, tumbling slowly
+                var flakes = Resources.Load<Texture2D>("Fx/fx_snowflakes"); if (flakes != null) { m.SetTexture("_BaseMap", flakes); m.SetColor("_BaseColor", new Color(0.9f, 0.92f, 1f, 0.8f)); }
+                var ts = rain.textureSheetAnimation; ts.enabled = true; ts.numTilesX = 4; ts.numTilesY = 3; ts.startFrame = new ParticleSystem.MinMaxCurve(0f, 11.99f); ts.frameOverTime = new ParticleSystem.MinMaxCurve(0f); ts.cycleCount = 1;
+                var rot = rain.rotationOverLifetime; rot.enabled = true; rot.z = new ParticleSystem.MinMaxCurve(-0.6f, 0.6f); main.startSize = new ParticleSystem.MinMaxCurve(0.5f, 1.1f);
+            }
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false;
             go.transform.position = Vector3.up * 30f; rain.Play();
+            if (!winter) BuildSplashes();
+        }
+
+        ParticleSystem splashes;
+        /// <summary>Rain hitting the ground round the platoon: little crowns from the photographed sheet, flat on the ground.</summary>
+        void BuildSplashes()
+        {
+            var tex = Resources.Load<Texture2D>("Fx/fx_splash"); if (tex == null) return;
+            var go = new GameObject("Splashes"); splashes = go.AddComponent<ParticleSystem>(); splashes.Stop();
+            var main = splashes.main; main.startSpeed = 0f; main.startLifetime = 0.35f; main.startSize = new ParticleSystem.MinMaxCurve(0.5f, 0.9f); main.maxParticles = 600; main.simulationSpace = ParticleSystemSimulationSpace.World; main.startColor = new Color(0.8f, 0.85f, 0.95f, 0.5f); main.startRotation = new ParticleSystem.MinMaxCurve(0f, 6.28f);
+            var em = splashes.emission; em.rateOverTime = 900f;
+            var sh = splashes.shape; sh.shapeType = ParticleSystemShapeType.Box; sh.scale = new Vector3(60f, 0.1f, 80f);
+            var ts = splashes.textureSheetAnimation; ts.enabled = true; ts.numTilesX = 8; ts.numTilesY = 1; ts.frameOverTime = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0f, 1f, 1f)); ts.cycleCount = 1;
+            var r = go.GetComponent<ParticleSystemRenderer>(); r.renderMode = ParticleSystemRenderMode.HorizontalBillboard; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false;
+            var m = new Material(Resources.Load<Material>("Additive")); m.SetTexture("_BaseMap", tex); m.SetColor("_BaseColor", new Color(0.6f, 0.65f, 0.75f, 0.6f)); r.sharedMaterial = m;
+            go.transform.position = Vector3.up * 0.06f; splashes.Play();
         }
 
         /// <summary>Armour is sloped and shells glance: most likely off a front plate, rarely off a side, never from

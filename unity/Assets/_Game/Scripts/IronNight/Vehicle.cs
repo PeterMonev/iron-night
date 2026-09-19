@@ -19,7 +19,7 @@ namespace IronNight
         Transform turret; Renderer[] renderers; Color[] baseColors; Transform muzzle, hullT, barrelT; Vector3 barrelHome; float hullYaw, recoil;
         static Material starMaterial, crossMaterial, commanderMaterial; const float CommanderYaw = 0f;   // the figure's facing in its mesh, corrected here if it looks the wrong way
         public float smokeTimer;
-        static Material vehicleTemplate, vehicleTemplateN, barrelMaterial;
+        static Material vehicleTemplate, vehicleTemplateN, barrelMaterial; public static bool Wet;   // a rainy night: the armour shines
 
         public Vector3 Forward => new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
         public Vector3 GunDirection => new Vector3(Mathf.Sin(turretYaw), 0f, Mathf.Cos(turretYaw));
@@ -42,7 +42,7 @@ namespace IronNight
             if (vehicleTemplate == null) { vehicleTemplate = Resources.Load<Material>("VehicleLit"); barrelMaterial = Resources.Load<Material>("BarrelLit"); }
             var tex = Resources.Load<Texture2D>("Models/" + spec.texture); var nrm = Resources.Load<Texture2D>("Models/" + spec.texture + "_n");
             if (vehicleTemplateN == null) vehicleTemplateN = Resources.Load<Material>("VehicleLitN");
-            var mat = new Material(nrm != null && vehicleTemplateN != null ? vehicleTemplateN : vehicleTemplate); mat.SetTexture("_BaseMap", tex); if (nrm != null) mat.SetTexture("_BumpMap", nrm); mat.SetColor("_BaseColor", friendly ? spec.tint * Depot.CamoTint : spec.tint);
+            var mat = new Material(nrm != null && vehicleTemplateN != null ? vehicleTemplateN : vehicleTemplate); mat.SetTexture("_BaseMap", tex); if (nrm != null) mat.SetTexture("_BumpMap", nrm); mat.SetColor("_BaseColor", friendly ? spec.tint * Depot.CamoTint : spec.tint); if (Wet) mat.SetFloat("_Smoothness", 0.55f);
 
             // hull: mesh origin is the turret ring, so it hangs ringHeight below the pivot and the tracks touch the ground
             var hull = Instantiate(Resources.Load<GameObject>("Models/" + spec.hullMesh), transform);

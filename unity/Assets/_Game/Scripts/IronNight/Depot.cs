@@ -150,6 +150,7 @@ namespace IronNight
         public static List<string[]> NightLog() { var list = new List<string[]>(); for (int i = 0; i < 10; i++) { var s = PlayerPrefs.GetString("log." + i, ""); if (s != "") list.Add(s.Split('|')); } return list; }
 
         /// <summary>A rank for the title screen, by nights fought.</summary>
+        public static int RankIndex { get { Load(); int n = NightsFought; return n < 1 ? 0 : n < 5 ? 0 : n < 10 ? 1 : n < 20 ? 2 : n < 40 ? 3 : n < 80 ? 4 : 5; } }   // the cell of the insignia sheet: private .. captain
         public static string Rank { get { Load(); int n = NightsFought; return n < 1 ? "Recruit" : n < 5 ? "Trooper" : n < 10 ? "Corporal" : n < 20 ? "Sergeant" : n < 40 ? "Lieutenant" : n < 80 ? "Captain" : "Major"; } }
         public static Color CamoTint { get { foreach (var c in Camos) if (c.id == CamoId) return c.tint; return Color.white; } }
         public static bool OwnsCamo(Camo c) => c.cost == 0 || PlayerPrefs.GetInt("depot.camo." + c.id, 0) == 1;

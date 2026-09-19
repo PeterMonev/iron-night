@@ -64,6 +64,8 @@ namespace IronNight
         public Fx fx;
 
         public bool winter;   // the Ardennes: snow on the fields, bare trees
+        public bool wet;      // a rainy night: puddles in the fields
+        Material puddleMaterial;
 
         public void Build(Camera camera)
         {
@@ -78,6 +80,8 @@ namespace IronNight
             }
             BuildGround();
             Material Decal(string tex, int queue) { var m = new Material(decal); m.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/" + tex)); m.SetTexture("_BumpMap", Resources.Load<Texture2D>("Textures/" + tex + "_n")); m.SetColor("_BaseColor", new Color(0.95f, 0.95f, 0.95f)); m.renderQueue = queue; return m; }
+            scorchMaterial = Decal("scorch", 2449); scorchMaterial.SetTexture("_BumpMap", null);
+            puddleMaterial = Decal("puddle", 2447); puddleMaterial.SetTexture("_BumpMap", null); puddleMaterial.SetFloat("_Smoothness", 0.92f);   // still water: the moon on it
             yardMaterial = Decal("yard" + sn, 2440); laneMaterial = Decal("lane" + sn, 2442); laneMaterial.SetTextureScale("_BaseMap", new Vector2(1f, 2f)); craterMaterial = Decal("crater", 2446);
             patchMaterial = new Material(Resources.Load<Material>("Smoke")); patchMaterial.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.GroundShadow(128).texture); patchMaterial.SetColor("_BaseColor", new Color(0.05f, 0.04f, 0.03f, 0.3f)); patchMaterial.renderQueue = 2450;
             hedgeMaterial = new Material(Resources.Load<Material>("FoliageLit")); hedgeMaterial.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/hedge")); hedgeMaterial.SetTexture("_BumpMap", Resources.Load<Texture2D>("Textures/hedge_n")); hedgeMaterial.SetColor("_BaseColor", winter ? new Color(0.72f, 0.78f, 0.82f) : new Color(0.9f, 0.95f, 0.85f)); hedgeMaterial.SetFloat("_Smoothness", 0.08f); hedgeMaterial.SetFloat("_Cull", 0f);
@@ -222,6 +226,7 @@ namespace IronNight
             if (Rnd(ix, iz, 1040) < 0.1f) Place(list, "truck", c + In(ix, iz, 1041, 12f), Rnd(ix, iz, 1043) * 6.28f);
             if (Rnd(ix, iz, 1044) < 0.1f) Place(list, "deadtree", c + In(ix, iz, 1045, 14f), Rnd(ix, iz, 1047) * 6.28f);
             if (Rnd(ix, iz, 1048) < 0.08f) Tree(list, c + In(ix, iz, 1049, 12f), (int)(Hash(ix, iz, 1051) & 0xffff));
+            if (wet) { int puddles = (type == 0 ? 3 : 1) + (int)(Rnd(ix, iz, 1080) * 3f); for (int k = 0; k < puddles; k++) list.Add(new Prop { what = What.Decal, seed = 2, pos = c + In(ix, iz, 1081 + k * 2, 17f), yaw = Rnd(ix, iz, 1090 + k) * 6.28f, size = 3f + Rnd(ix, iz, 1096 + k) * 4f }); }
             int craters = Rnd(ix, iz, 1052) < 0.35f ? 1 + (int)(Rnd(ix, iz, 1053) * 2f) : 0;
             for (int k = 0; k < craters; k++) list.Add(new Prop { what = What.Decal, seed = 1, pos = c + In(ix, iz, 1054 + k * 2, 16f), yaw = Rnd(ix, iz, 1060 + k) * 6.28f, size = 4f + Rnd(ix, iz, 1064 + k) * 3f });
             if (Rnd(ix, iz, 1070) < 0.05f) Place(list, "sandbags", c + In(ix, iz, 1071, 12f), Rnd(ix, iz, 1073) * 6.28f);
@@ -341,7 +346,7 @@ namespace IronNight
             switch (p.what)
             {
                 case What.Lane: p.go = Quad(transform, p.pos, yawDeg, 6f, Cell, laneMaterial, 0.02f); p.go.name = "Lane"; break;
-                case What.Decal: p.go = Quad(transform, p.pos, yawDeg, p.size, p.size, p.seed == 0 ? yardMaterial : craterMaterial, p.seed == 0 ? 0.03f : 0.05f); p.go.name = p.seed == 0 ? "Yard" : "Crater"; break;
+                case What.Decal: p.go = Quad(transform, p.pos, yawDeg, p.size, p.size, p.seed == 0 ? yardMaterial : p.seed == 2 ? puddleMaterial : craterMaterial, p.seed == 0 ? 0.03f : p.seed == 2 ? 0.04f : 0.05f); p.go.name = p.seed == 0 ? "Yard" : p.seed == 2 ? "Puddle" : "Crater"; break;
                 case What.Hedge: SpawnHedge(p); break;
                 case What.Tree: SpawnTree(p); break;
                 case What.Searchlight: SpawnSearchlight(p); break;
@@ -588,6 +593,13 @@ namespace IronNight
         }
 
         /// <summary>A fresh shell crater on the ground; the field keeps the last forty.</summary>
+        /// <summary>Burnt ground under a wreck, tied to it so it goes when the wreck does.</summary>
+        public void Scorch(Transform wreck, float size)
+        {
+            var q = Quad(transform, wreck.position, Random.value * 360f, size, size, scorchMaterial, 0.075f); q.name = "Scorch"; q.transform.SetParent(wreck, true);
+        }
+        Material scorchMaterial;
+
         public void Crater(Vector3 pos, float size)
         {
             GameObject q;

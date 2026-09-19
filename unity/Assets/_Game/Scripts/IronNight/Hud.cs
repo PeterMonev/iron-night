@@ -19,7 +19,7 @@ namespace IronNight
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
         class Rising { public Text t; public float life; public Vector3 world; }
         readonly List<Rising> popups = new List<Rising>(); readonly Stack<Text> popupPool = new Stack<Text>(); RectTransform canvasRect;
-        Image radar, objectiveArrow; Text objectiveLabel; readonly List<Image> radarDots = new List<Image>(); readonly List<Image> hpBars = new List<Image>(); readonly List<Image> hpFills = new List<Image>(); Transform cardRoot, depotRows; int depotTab; readonly Button[] depotTabs = new Button[2]; ScrollRect depotScroll; Canvas canvas; Text depotPoints, titleStats, endPoints, reserveNote, bossName; Image bossFill; GameObject bossBar;
+        Image radar, objectiveArrow; Text objectiveLabel; readonly List<Image> radarDots = new List<Image>(); readonly List<Image> hpBars = new List<Image>(); readonly List<Image> hpFills = new List<Image>(); Transform cardRoot, depotRows; Image rankBadge; int depotTab; readonly Button[] depotTabs = new Button[2]; ScrollRect depotScroll; Canvas canvas; Text depotPoints, titleStats, endPoints, reserveNote, bossName; Image bossFill; GameObject bossBar;
         readonly Button[] formButtons = new Button[4];
         readonly List<Image> arrows = new List<Image>(); Sprite arrowSprite;
         float fpsAccum, fpsTimer, toastLeft; int fpsFrames;
@@ -131,6 +131,7 @@ namespace IronNight
             MakeText(titleSheet.transform, "OrdersLabel", new Vector2(0.5f, 0.5f), new Vector2(0, -320), TextAnchor.MiddleCenter, 28, dim).text = "STANDING ORDERS";
             var orders = new GameObject("Orders", typeof(RectTransform)); orders.transform.SetParent(titleSheet.transform, false);
             var ort = orders.GetComponent<RectTransform>(); ort.anchorMin = ort.anchorMax = new Vector2(0.5f, 0.5f); ort.anchoredPosition = new Vector2(0, -370); ort.sizeDelta = Vector2.zero; missionRoot = orders.transform;
+            rankBadge = MakeImage(titleSheet.transform, "Rank", new Vector2(0.5f, 0.5f), new Vector2(0, -625), new Vector2(90, 90), Color.white); rankBadge.preserveAspect = true;
             titleStats = MakeText(titleSheet.transform, "Stats", new Vector2(0.5f, 0.5f), new Vector2(0, -700), TextAnchor.MiddleCenter, 32, dim); titleStats.rectTransform.sizeDelta = new Vector2(900, 200);
             MakeText(titleSheet.transform, "Credits", new Vector2(0.5f, 0f), new Vector2(0, 70), TextAnchor.MiddleCenter, 24, new Color(0.45f, 0.44f, 0.4f)).text = "Built with DINOv3 · TRELLIS 2 · Unity";
             MakeButton(titleSheet.transform, "How to play", new Vector2(0.5f, 0f), new Vector2(-310, 215), new Vector2(290, 70), 28, () => { helpSheet.SetActive(true); });
@@ -195,6 +196,7 @@ namespace IronNight
         {
             Depot.Load(); Medals.Check(); hudGroup.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(false); dailyBtn.SetActive(Depot.DailyReady);
             int m = Mathf.FloorToInt(Depot.BestTime / 60f), s = Mathf.FloorToInt(Depot.BestTime % 60f);
+            { var sheet = Resources.Load<Texture2D>("UI/rank_insignia"); if (sheet != null && rankBadge != null) { int cell = Depot.RankIndex; rankBadge.sprite = UiSprite("rank_insignia", new Rect(cell * sheet.width / 6f, 0f, sheet.width / 6f, sheet.height)); rankBadge.enabled = Depot.NightsFought > 0; } }
             titleStats.text = Depot.NightsFought == 0 ? "First night. Drag anywhere to drive; the turrets fire on their own." : $"{Depot.Rank} · {Depot.NightsFought} nights fought · best {Depot.BestKills} kills · longest {m}:{s:00}\n{Depot.Points} depot points";
             reserveBtn.SetActive(!reserveGranted); reserveNote.text = reserveGranted ? "Reserve tank granted: the platoon can grow to 4 tonight." : "The platoon holds 3 tanks. A rewarded video opens a 4th slot for this night (mock).";
             Missions.Load(); foreach (Transform c in missionRoot) Destroy(c.gameObject);
