@@ -21,7 +21,7 @@ namespace IronNight
         public class Card { public string id, title, desc; public bool rare; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain, OnStart, OnCampaign, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality;
+        public System.Action OnAd, OnAgain, OnStart, OnCampaign, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold; GameObject holdBtn;
 
         Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel; GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
@@ -109,6 +109,7 @@ namespace IronNight
             var root = canvasGo.transform;
             endPoints = MakeText(endSheet.transform, "Points", new Vector2(0.5f, 0.5f), new Vector2(0, 120), TextAnchor.MiddleCenter, 44, amber);
             MakeButton(endSheet.transform, "Depot", new Vector2(0.5f, 0.5f), new Vector2(0, -400), new Vector2(880, 130), 40, () => OnDepot?.Invoke());
+            holdBtn = MakeButton(endSheet.transform, "Hold till morning · points ×1.5", new Vector2(0.5f, 0.5f), new Vector2(0, -540), new Vector2(880, 130), 40, () => OnHold?.Invoke()); holdBtn.GetComponent<Image>().color = new Color(0.55f, 0.36f, 0.14f, 0.95f); holdBtn.SetActive(false);
 
             // pause sheet
             pauseSheet = new GameObject("Pause", typeof(RectTransform), typeof(Image)); pauseSheet.transform.SetParent(root, false);
@@ -519,6 +520,7 @@ namespace IronNight
             endSheet.SetActive(true);
         }
         public void HideEnd() { endSheet.SetActive(false); }
+        public void ShowHold(bool on) { if (holdBtn != null) holdBtn.SetActive(on); }
 
         void ShowMedals()
         {
