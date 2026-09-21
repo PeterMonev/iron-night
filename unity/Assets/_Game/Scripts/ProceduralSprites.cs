@@ -125,6 +125,50 @@ namespace Lightswarm
             return Finish(tex);
         }
 
+        /// <summary>A rounded rectangle for the UI, 9-sliced at the corner radius: a panel or a button, tinted by the Image.</summary>
+        public static Sprite RoundedRect(int radius = 24, int size = 96)
+        {
+            var tex = NewTexture(size, size);
+            for (int y = 0; y < size; y++) for (int x = 0; x < size; x++)
+            {
+                float dx = Mathf.Max(0f, Mathf.Abs(x + 0.5f - size * 0.5f) - (size * 0.5f - radius)), dy = Mathf.Max(0f, Mathf.Abs(y + 0.5f - size * 0.5f) - (size * 0.5f - radius));
+                float d = Mathf.Sqrt(dx * dx + dy * dy); tex.SetPixel(x, y, new Color(1f, 1f, 1f, Mathf.Clamp01(radius - d + 0.5f)));
+            }
+            tex.Apply(); return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(radius + 2, radius + 2, radius + 2, radius + 2));
+        }
+
+        /// <summary>The same shape with only its edge: a 2 px outline for ghost buttons and cards.</summary>
+        public static Sprite RoundedOutline(int radius = 24, int size = 96, float width = 2f)
+        {
+            var tex = NewTexture(size, size);
+            for (int y = 0; y < size; y++) for (int x = 0; x < size; x++)
+            {
+                float dx = Mathf.Max(0f, Mathf.Abs(x + 0.5f - size * 0.5f) - (size * 0.5f - radius)), dy = Mathf.Max(0f, Mathf.Abs(y + 0.5f - size * 0.5f) - (size * 0.5f - radius));
+                float d = Mathf.Sqrt(dx * dx + dy * dy); float a = Mathf.Clamp01(radius - d + 0.5f) - Mathf.Clamp01(radius - width - d + 0.5f); tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+            }
+            tex.Apply(); return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(radius + 2, radius + 2, radius + 2, radius + 2));
+        }
+
+        /// <summary>A soft shadow to sit under a rounded button: the rectangle blurred outward; 9-sliced at the blur width.</summary>
+        public static Sprite SoftShadow(int radius = 24, int blur = 28, int size = 160)
+        {
+            var tex = NewTexture(size, size); float half = size * 0.5f - blur;
+            for (int y = 0; y < size; y++) for (int x = 0; x < size; x++)
+            {
+                float dx = Mathf.Max(0f, Mathf.Abs(x + 0.5f - size * 0.5f) - (half - radius)), dy = Mathf.Max(0f, Mathf.Abs(y + 0.5f - size * 0.5f) - (half - radius));
+                float d = Mathf.Sqrt(dx * dx + dy * dy) - radius; float a = d <= 0f ? 1f : Mathf.Clamp01(1f - d / blur); tex.SetPixel(x, y, new Color(0f, 0f, 0f, a * a));
+            }
+            tex.Apply(); int b = blur + radius + 2; return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(b, b, b, b));
+        }
+
+        /// <summary>A vertical gradient, clear at the top to solid at the bottom (the scrim over the key art).</summary>
+        public static Sprite GradientDown(int height = 128, float power = 1.6f)
+        {
+            var tex = NewTexture(4, height);
+            for (int y = 0; y < height; y++) { float a = Mathf.Pow(1f - (y + 0.5f) / height, power); for (int x = 0; x < 4; x++) tex.SetPixel(x, y, new Color(1f, 1f, 1f, a)); }
+            tex.Apply(); return Sprite.Create(tex, new Rect(0, 0, 4, height), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
+        }
+
         static Texture2D NewTexture(int w, int h)
         {
             var tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };

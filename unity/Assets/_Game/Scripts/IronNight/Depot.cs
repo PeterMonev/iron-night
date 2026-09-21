@@ -176,8 +176,13 @@ namespace IronNight
         }
 
         // what the upgrades mean in the fight
-        public static float LeaderHp => 8f + Level("armor");
-        public static float ReloadMul => 1f - 0.06f * Level("loaders");
+        public static float LeaderHp => 8f + Level("armor") + (CrewLevel >= 2 ? 1f : 0f);
+        // the leader's crew: nights survived together, per nation; lost with the leader unless the field repair pulls them out
+        public static int CrewNights { get { Load(); return PlayerPrefs.GetInt("crew.nights." + Nation, 0); } set { PlayerPrefs.SetInt("crew.nights." + Nation, Mathf.Max(0, value)); Save(); } }
+        public static int CrewLevel => CrewNights >= 10 ? 3 : CrewNights >= 5 ? 2 : CrewNights >= 2 ? 1 : 0;
+        public static string CrewName => CrewLevel == 3 ? "Old hands" : CrewLevel == 2 ? "Veteran crew" : CrewLevel == 1 ? "Blooded crew" : "Green crew";
+        public static string CrewBonusText => CrewLevel == 3 ? "reloads 10% faster, one hit more, sees 5% farther" : CrewLevel == 2 ? "reloads 5% faster, one hit more" : CrewLevel == 1 ? "reloads 5% faster" : "no bonus yet · survive two nights";
+        public static float ReloadMul => (1f - 0.06f * Level("loaders")) * (CrewLevel >= 3 ? 0.9f : CrewLevel >= 1 ? 0.95f : 1f);
         public static float RangeMul => 1f + 0.05f * Level("optics");
         public static float SpeedMul => 1f + 0.05f * Level("engines");
         public static float WingmanHpBonus => Level("reserve");

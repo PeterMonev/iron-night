@@ -31,6 +31,8 @@ namespace IronNight
             new Medal { id = "wrecker", name = "Track Wrecker", desc = "Throw twenty enemy tracks.", test = () => Depot.Total("tracked") >= 20 },
             new Medal { id = "daybreak", name = "Daybreak", desc = "Hold two minutes into daylight.", test = () => Depot.Total("daybreak") >= 1 },
             new Medal { id = "spotter", name = "Spotter Hunter", desc = "Silence five forward observers.", test = () => Depot.Total("observers") >= 5 },
+            new Medal { id = "samaritan", name = "Good Samaritan", desc = "Pick up five stranded crews.", test = () => Depot.Total("rescued") >= 5 },
+            new Medal { id = "oldhands", name = "Old Hands", desc = "Keep one crew alive for ten nights.", test = () => Depot.CrewNights >= 10 },
         };
 
         public static bool Earned(Medal m) => PlayerPrefs.GetInt("medal." + m.id, 0) == 1;

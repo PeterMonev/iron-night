@@ -35,3 +35,11 @@ All modified for the game: split into hull and turret, rescaled, textures resize
 | Panzer IV | Panzer IV Medium Tank - Toshueyi | Joanthan To | https://sketchfab.com/3d-models/panzer-iv-medium-tank-toshueyi-14c74d148326448c8edb5fee81be3894 |
 
 Licence: https://creativecommons.org/licenses/by/4.0/
+
+## Fonts (SIL Open Font License 1.1)
+| Font | Author | Use |
+|---|---|---|
+| Bebas Neue | Ryoichi Tsunekawa (Dharma Type) | the game's name and headings |
+| Barlow | Jeremy Tribby | all other text |
+
+The licence texts are in `unity/Assets/_Game/Resources/Fonts/OFL-*.txt`. The fonts are used unmodified.

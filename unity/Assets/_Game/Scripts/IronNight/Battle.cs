@@ -19,7 +19,7 @@ namespace IronNight
         class Flare { public Vector3 pos; public float age; public Transform vis; public Light light; public Material mat; }
         class Wreck { public Vehicle v; public float age, burnTimer; public Light fire; }
         class ArtyShell { public Vector3 at; public float timer; }
-        class Objective { public Vector3 pos; public Transform marker; public GameObject grenade; public float smokeTimer, held, salvo, clock; public int n, hits; public bool hold; public string kind = "reach"; public List<Vehicle> targets = new List<Vehicle>(); public List<GameObject> props = new List<GameObject>(); }
+        class Objective { public Vector3 pos; public Transform marker; public GameObject grenade; public float smokeTimer, held, salvo, clock; public int n, hits; public bool hold; public string kind = "reach"; public List<Vehicle> targets = new List<Vehicle>(); public List<GameObject> props = new List<GameObject>(); public List<Transform> figures = new List<Transform>(); }
         class Mine { public Vector3 pos; public Transform vis; }
         class Drop { public Vector3 pos; public float height, age, lift, top; public int kind; public Transform crate, chute, marker; public LineRenderer lines; public Mesh canopy; public Vector3[] rest; }   // lift: the crate origin above its base; top: where the shrouds tie
         class Mortar { public Vector3 at; public float timer; public Transform ring; }
@@ -43,6 +43,7 @@ namespace IronNight
         Formation formation = Formation.Wedge; Phase phase = Phase.Title; bool reserveGranted;
         int campaignNight;   // 0: a single night; 1..3: the campaign
         int nightTracked, nightFocus, talliedTracked, nightLamps, talliedLamps; bool litBySearchlight;
+        bool crewCounted, crewLostTonight; int crewBefore;   // the crew's nights: counted at dawn, lost with the leader unless he is pulled back
         Vehicle focus; float focusLeft; Transform focusRing;   // the enemy the platoon was told to hit
         float pointLeft; Vector3 point;                      // a spot the platoon was told to shell (the fuel dump)
         readonly List<Mine> mines = new List<Mine>(); float mineTimer = 130f; static Material mineMaterial;
@@ -52,6 +53,7 @@ namespace IronNight
         bool wave2, wave3, wave4, revived, doubled, bossSpawned; Vehicle boss;
         static readonly bool debugBoss = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--boss") >= 0;   // test switch: the boss comes at 0:06
         static readonly bool debugDawn = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--dawn") >= 0;   // test switch: the night starts at 4:10
+        static readonly bool debugCrew = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--crew") >= 0;
         static readonly bool debugDump = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--dump") >= 0;   // test switch: every objective is a fuel dump
         static readonly bool debugMid = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--mid") >= 0;   // test switch: 1:40, mortars and a star shell at once
         static readonly bool debugZoo = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--zoo") >= 0;   // test switch: one of each new enemy at 0:04
@@ -77,7 +79,7 @@ namespace IronNight
             // the night always starts with the leader alone; the platoon grows from flares to 3, a rewarded ad opens a 4th slot.
             // The depot's permanent upgrades set the starting numbers
             Depot.Load(); firstNight = Depot.NightsFought == 0;
-            reloadMul = Depot.ReloadMul; rangeMul = Depot.RangeMul; speedMul = Depot.SpeedMul; maxPlatoon = 3;
+            reloadMul = Depot.ReloadMul; rangeMul = Depot.RangeMul * (Depot.CrewLevel >= 3 ? 1.05f : 1f); speedMul = Depot.SpeedMul; maxPlatoon = 3;
             if (weather == Weather.Fog) { rangeMul *= 0.8f; enemyRangeMul = 0.8f; } else if (weather == Weather.Overcast) enemyRangeMul = 0.9f; else if (weather == Weather.Rain) { speedMul *= 0.92f; enemyRangeMul = 0.95f; }
             hud.SetConditions(winter ? "Ardennes" : "Normandy", winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Overcast ? "a dark night, the enemy sees 10% less" : weather == Weather.Rain ? (winter ? "the platoon slows in the drifts, the enemy sees 5% less" : "mud slows the platoon, the enemy sees 5% less") : "");
             hud.OnQuality = () => { LowQuality = !LowQuality; ApplyQuality(); hud.SetQualityLabel(!LowQuality); };
@@ -822,15 +824,17 @@ namespace IronNight
         /// smoke and a light. Reaching it is worth 300 and the next one is set.</summary>
         void NextObjective()
         {
-            var L = Leader; float ang = (Random.value - 0.5f) * 80f * Mathf.Deg2Rad, dist = debugDump ? 19f : 110f + Random.value * 60f;
+            var L = Leader; float ang = (Random.value - 0.5f) * 80f * Mathf.Deg2Rad, dist = debugDump ? 19f : debugCrew ? 16f : 110f + Random.value * 60f;
             var pos = L.transform.position + new Vector3(Mathf.Sin(ang), 0f, Mathf.Cos(ang)) * dist;
             bool hold = objectivesReached > 0 && Random.value < 0.5f;
             // from the second objective on, one in three is a battery to destroy or a staff car to stop
             string kind = "reach"; float roll = Random.value;
             if (objectivesReached > 0 && roll < 0.2f && VehicleSpec.Available(VehicleSpec.Nebelwerfer)) kind = "battery";
             else if (objectivesReached > 0 && roll < 0.35f && VehicleSpec.Available(VehicleSpec.Kubelwagen)) kind = "car";
-            else if (objectivesReached > 0 && roll < 0.55f) kind = "dump";
+            else if (objectivesReached > 0 && roll < 0.5f) kind = "crew";
+            else if (objectivesReached > 0 && roll < 0.65f) kind = "dump";
             if (debugDump) kind = "dump";   // test switch: every objective a fuel dump
+            if (debugCrew) kind = "crew";   // test switch: every objective a stranded crew
             if (kind != "reach") hold = false;
             objective = new Objective { pos = pos, n = objectivesReached + 1, hold = hold, kind = kind, marker = fx.Marker(pos, kind == "reach" ? new Color(0.35f, 0.95f, 0.45f) : new Color(1f, 0.45f, 0.3f), hold ? 15f : 9f, true) };
             if (kind == "reach") objective.grenade = props.Spawn("marker_smoke", pos, Random.value * 360f);   // the coloured smoke grenade marking the spot
@@ -839,6 +843,14 @@ namespace IronNight
                 // two launchers dug in at the spot, facing us; the objective is done when both are wrecks
                 var toL = L.transform.position - pos; toL.y = 0f; float gy = Mathf.Atan2(toL.x, toL.z); var side = new Vector3(toL.z, 0f, -toL.x).normalized;
                 foreach (float s in new[] { -1f, 1f }) objective.targets.Add(Foe(VehicleSpec.Nebelwerfer, props.PushOut(pos + side * s * 5f, 2f), gy));
+            }
+            if (kind == "crew")
+            {
+                // one of ours knocked out, two of the crew waiting by the wreck for a lift
+                objective.pos = props.PushOut(pos, 5f); pos = objective.pos; objective.marker.position = pos;
+                var w = props.Spawn("wreck", pos, Random.value * 360f); if (w != null) objective.props.Add(w);
+                var toL = L.transform.position - pos; toL.y = 0f; toL.Normalize(); var side = new Vector3(toL.z, 0f, -toL.x);
+                objective.figures.Add(infantry.Figure(pos + toL * 4f + side * 1.2f, toL)); objective.figures.Add(infantry.Figure(pos + toL * 4.5f - side * 1.4f, toL));
             }
             if (kind == "dump")
             {
@@ -852,7 +864,7 @@ namespace IronNight
                 // the staff car starts 45 m ahead and drives off away from us for forty seconds
                 var car = Foe(VehicleSpec.Kubelwagen, props.PushOut(L.transform.position + L.Forward * 45f, 2f), L.yaw); car.unloaded = true; car.leaving = true; objective.targets.Add(car); objective.clock = 40f;
             }
-            if (phase == Phase.Play) hud.Toast("Objective " + objective.n + " · " + (kind == "battery" ? "destroy the rocket battery, " : kind == "dump" ? "fuel dump · tap it to shell it, " : kind == "car" ? "staff car making a run for it · stop it" : (hold ? "hold the crossing, " : "")) + (kind == "car" ? "" : Mathf.RoundToInt(dist) + " m ahead"), 3f);
+            if (phase == Phase.Play) hud.Toast("Objective " + objective.n + " · " + (kind == "battery" ? "destroy the rocket battery, " : kind == "dump" ? "fuel dump · tap it to shell it, " : kind == "crew" ? "crew of a knocked-out tank · pick them up, " : kind == "car" ? "staff car making a run for it · stop it" : (hold ? "hold the crossing, " : "")) + (kind == "car" ? "" : Mathf.RoundToInt(dist) + " m ahead"), 3f);
         }
 
         void TickObjective(float dt)
@@ -876,6 +888,20 @@ namespace IronNight
                     foreach (var w in objective.targets) for (int i = 0; i < 3; i++) fx.Flak(w.transform.position + Vector3.up * 1.4f, (Vector3.up * 1.2f + (centre - w.transform.position).normalized * 0.4f + Random.insideUnitSphere * 0.08f).normalized);
                 }
                 objective.marker.position = objective.pos; hud.Objective(objective.pos, od.magnitude, cam, true, "Battery " + objective.targets.Count + "/2");
+                return;
+            }
+            if (objective.kind == "crew")
+            {
+                objective.smokeTimer -= dt; if (objective.smokeTimer <= 0f) { objective.smokeTimer = 0.5f; fx.Signal(objective.pos + Vector3.up * 0.6f, new Color(1f, 0.35f, 0.3f, 0.7f)); }
+                if (od.magnitude < 11f)
+                {
+                    // they run to the leader, patch him up and ride along
+                    score += 400; objectivesReached++; Sfx.Pickup(); L.hp = Mathf.Min(Depot.LeaderHp + 1f, L.hp + 2f); Depot.Tally("rescued", 1);
+                    foreach (var f in objective.figures) { if (f == null) continue; var to = L.transform.position - f.position; to.y = 0f; infantry.BailOut(f.position, to.normalized); Destroy(f.gameObject); }
+                    hud.Popup(objective.pos, "+400", new Color(0.4f, 0.9f, 0.6f)); hud.Toast("Crew picked up · the leader is patched up · +400", 2.8f); if (Random.value < 0.6f) Radio("kill");
+                    Destroy(objective.marker.gameObject); objective = null; NextObjective(); return;
+                }
+                hud.Objective(objective.pos, od.magnitude, cam, true, "Crew");
                 return;
             }
             if (objective.kind == "dump")
@@ -1262,6 +1288,8 @@ namespace IronNight
             Depot.Tally("guns", nightPaks - talliedGuns); talliedGuns = nightPaks; Depot.Tally("infantry", nightInfantry - talliedInfantry); talliedInfantry = nightInfantry;
             Depot.Tally("objectives", objectivesReached - talliedObjectives); talliedObjectives = objectivesReached;
             if (bossKilled && !talliedAce) { talliedAce = true; Depot.Tally("aces", 1); }
+            if (dawn && !crewCounted) { crewCounted = true; Depot.CrewNights = Depot.CrewNights + 1; Depot.Tally("crewNights", 1); }
+            if (!dawn && !revived && !crewLostTonight) { crewLostTonight = true; crewBefore = Depot.CrewNights; Depot.CrewNights = 0; }
             if (dawn) { Depot.Tally("dawns", 1); if (veteran) Depot.Tally("veteranDawns", 1); } Depot.Tally("tracked", nightTracked - talliedTracked); talliedTracked = nightTracked; Depot.Tally("lamps", nightLamps - talliedLamps); talliedLamps = nightLamps;
             if (kills >= 15 && shotsFired > 0 && shotsHit * 2 >= shotsFired) Depot.Tally("sharp", 1);
             if (!logged) { logged = true; Depot.LogNight(winter ? "Ardennes" : "Normandy", kills, t, score, dawn); }
@@ -1271,7 +1299,8 @@ namespace IronNight
             hud.SetEndPoints(earned + bonus);
             int m = Mathf.FloorToInt(t / 60f), s = Mathf.FloorToInt(t % 60f);
             int acc = shotsFired > 0 ? Mathf.RoundToInt(100f * shotsHit / shotsFired) : 0;
-            string statLine = $"{kills} enemy vehicles destroyed · {nightInfantry} infantry\n{m}:{s:00} held · level {level} · {objectivesReached} objectives\nGunnery {acc}% · Score {score * (doubled ? 2 : 1)}" + lines;
+            string crewLine = dawn ? $"\nThe crew's {Depot.CrewNights}{(Depot.CrewNights == 1 ? "st" : Depot.CrewNights == 2 ? "nd" : Depot.CrewNights == 3 ? "rd" : "th")} night together · {Depot.CrewName}" : crewLostTonight && crewBefore > 0 ? $"\nThe crew is lost with the tank · {crewBefore} nights together" : "";
+            string statLine = $"{kills} enemy vehicles destroyed · {nightInfantry} infantry\n{m}:{s:00} held · level {level} · {objectivesReached} objectives\nGunnery {acc}% · Score {score * (doubled ? 2 : 1)}" + crewLine + lines;
             if (campaignNight > 0) { CampaignEnd(dawn, statLine, dawn ? !doubled : !revived); return; }
             hud.ShowEnd(dawn, statLine + (endless ? "\nHeld into daylight · points ×1.5" : ""), dawn ? !doubled : !revived, endless && !dawn ? "DAYLIGHT · LEADER KNOCKED OUT" : null, endless && !dawn ? "The long night is over" : null);
             hud.ShowHold(dawn && !endless);
@@ -1345,6 +1374,7 @@ namespace IronNight
             if (t >= NightLength) { doubled = true; Depot.AddPoints(score); banked += score; hud.SetEndPoints(banked); hud.ShowEnd(true, $"{kills} enemy vehicles destroyed\nScore {score * 2} (doubled)", false); return; }
             revived = true;
             var L = Vehicle.Create(Wingman, true, platoon.Count > 0 ? platoon[0].transform.position - platoon[0].Forward * 8f : Vector3.zero, platoon.Count > 0 ? platoon[0].yaw : 0f);
+            if (crewLostTonight) { Depot.CrewNights = crewBefore; crewLostTonight = false; }   // pulled out alive: the crew keeps its nights
             L.hp = Depot.LeaderHp; platoon.Insert(0, L); leaderShield = 4f;
             hud.HideEnd(); phase = Phase.Play; stick.Blocked = false; hud.Toast("Field repair · back in the fight");
         }

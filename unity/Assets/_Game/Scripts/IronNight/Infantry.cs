@@ -101,6 +101,14 @@ namespace IronNight
             for (int i = fallen.Count - 1; i >= 0; i--) { var m = fallen[i]; m.deadAge += dt; if (m.deadAge > 25f) { Destroy(m.t.gameObject); fallen.RemoveAt(i); } }
         }
 
+        /// <summary>A man of ours standing where he is put (the crew waiting by their wreck); not a target, not a shooter.</summary>
+        public Transform Figure(Vector3 at, Vector3 facing)
+        {
+            var go = new GameObject("Crewman"); go.transform.SetParent(transform, false); go.transform.position = at; go.transform.rotation = Quaternion.LookRotation(facing, Vector3.up);
+            if (figure != null) { var fg = Instantiate(figure, go.transform); fg.transform.localRotation = Quaternion.Euler(0f, SoldierYaw, 0f); fg.transform.localScale = Vector3.one * 0.95f; foreach (var rr in fg.GetComponentsInChildren<Renderer>()) { rr.sharedMaterial = skin; rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; } }
+            return go.transform;
+        }
+
         /// <summary>One kneeling man who stays put: the forward observer with his radio.</summary>
         public Soldier SpawnObserver(Vector3 at, Vector3 facing)
         {
