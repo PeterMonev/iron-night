@@ -10,6 +10,8 @@ namespace IronNight
     public class Garage : MonoBehaviour
     {
         public RenderTexture Texture { get; private set; }
+        public RenderTexture TitleTexture { get; private set; }   // the whole screen behind the menu
+        Camera titleCam; bool titleOn;
         Camera cam; Transform stage; Vehicle shown; string shownId; float spin = 35f, spinVel; Light lamp, fill;
         static readonly Vector3 Home = new Vector3(0f, -600f, 0f);
 
@@ -32,6 +34,16 @@ namespace IronNight
             g.fill = fillGo.AddComponent<Light>(); g.fill.type = LightType.Point; g.fill.range = 30f; g.fill.intensity = 16f; g.fill.color = new Color(0.8f, 0.85f, 1f); g.fill.shadows = LightShadows.None;
             var backGo = new GameObject("Back"); backGo.transform.SetParent(go.transform, false); backGo.transform.localPosition = new Vector3(-6f, 5f, 9f);
             var back = backGo.AddComponent<Light>(); back.type = LightType.Point; back.range = 25f; back.intensity = 10f; back.color = new Color(1f, 0.95f, 0.85f); back.shadows = LightShadows.None;
+            // the menu's camera: low, from the front-left, the tank filling the middle of a portrait screen; light shafts from the roof for it
+            g.TitleTexture = new RenderTexture(Mathf.Max(480, Screen.width * 2 / 3), Mathf.Max(800, Screen.height * 2 / 3), 24) { antiAliasing = 2 };
+            var tcGo = new GameObject("TitleCamera"); tcGo.transform.SetParent(go.transform, false); tcGo.transform.localPosition = new Vector3(-9.6f, 3.4f, -15.2f); tcGo.transform.LookAt(go.transform.position + new Vector3(0.2f, 1.05f, 0.3f));
+            g.titleCam = tcGo.AddComponent<Camera>(); g.titleCam.targetTexture = g.TitleTexture; g.titleCam.fieldOfView = 40f; g.titleCam.nearClipPlane = 0.3f; g.titleCam.farClipPlane = 60f; g.titleCam.clearFlags = CameraClearFlags.SolidColor; g.titleCam.backgroundColor = new Color(0.03f, 0.03f, 0.04f); g.titleCam.enabled = false;
+            var tdata = tcGo.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>(); tdata.renderShadows = true; tdata.renderPostProcessing = false;
+            for (int i = 0; i < 3; i++)
+            {
+                var shaft = new GameObject("Shaft").AddComponent<LightShaft>(); shaft.transform.SetParent(go.transform, false); shaft.facing = g.titleCam; shaft.length = 15f; shaft.width0 = 1.2f; shaft.width1 = 6.5f;
+                shaft.Set(go.transform.position + new Vector3(-3f + i * 3.2f, 10.5f, 4f + i * 0.5f), new Vector3(0.28f, -1f, -0.35f));
+            }
             var camGo = new GameObject("GarageCamera"); camGo.transform.SetParent(go.transform, false); camGo.transform.localPosition = new Vector3(0f, 3.6f, -9f); camGo.transform.LookAt(go.transform.position + new Vector3(0f, 1.2f, 0f));
             g.cam = camGo.AddComponent<Camera>(); g.cam.targetTexture = g.Texture; g.cam.fieldOfView = 34f; g.cam.nearClipPlane = 0.3f; g.cam.farClipPlane = 60f; g.cam.clearFlags = CameraClearFlags.SolidColor; g.cam.backgroundColor = new Color(0.05f, 0.05f, 0.06f); g.cam.enabled = false;
             var data = camGo.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>(); data.renderShadows = true; data.renderPostProcessing = false;
@@ -47,13 +59,15 @@ namespace IronNight
             shown.turretYaw = 0.35f; shown.Apply(); shown.enabled = false;
         }
 
-        public void SetActive(bool on) { cam.enabled = on; gameObject.SetActive(on); }
+        public void SetActive(bool on) { cam.enabled = on; gameObject.SetActive(on || titleOn); }
+        /// <summary>The menu backdrop: the tank turning slowly under the roof lights.</summary>
+        public void SetTitle(bool on) { titleOn = on; titleCam.enabled = on; if (on) gameObject.SetActive(true); else if (!cam.enabled) gameObject.SetActive(false); }
         public void Drag(float dx) { spinVel = dx * 0.35f; }
 
         void Update()
         {
-            if (!cam.enabled) return;
-            spinVel = Mathf.MoveTowards(spinVel, 12f, Time.unscaledDeltaTime * 30f); spin += spinVel * Time.unscaledDeltaTime;
+            if (!cam.enabled && !titleOn) return;
+            spinVel = Mathf.MoveTowards(spinVel, titleOn && !cam.enabled ? 5f : 12f, Time.unscaledDeltaTime * 30f); spin += spinVel * Time.unscaledDeltaTime;
             stage.localRotation = Quaternion.Euler(0f, spin, 0f);
             lamp.intensity = 34f + Mathf.Sin(Time.unscaledTime * 9f) * 0.8f;   // the hangar lamp hums
         }

@@ -10,6 +10,7 @@ namespace IronNight
     public class LightShaft : MonoBehaviour
     {
         public static Camera cam; public static float boost = 1f;   // fog nights make the beams stand out
+        public Camera facing;   // a shaft in the garage faces the garage camera, not the field's
         static Texture2D tex;
         const int N = 14;
         public float length = 380f, width0 = 2.2f, width1 = 16f;
@@ -45,12 +46,12 @@ namespace IronNight
 
         void LateUpdate()
         {
-            if (cam == null) return;
-            var cp = cam.transform.position;
+            var c = facing != null ? facing : cam; if (c == null) return;
+            var cp = c.transform.position;
             for (int i = 0; i <= N; i++)
             {
                 float t = i / (float)N; var p = origin + dir * (t * length);
-                var side = Vector3.Cross(dir, cp - p); if (side.sqrMagnitude < 1e-4f) side = cam.transform.right; side.Normalize();
+                var side = Vector3.Cross(dir, cp - p); if (side.sqrMagnitude < 1e-4f) side = c.transform.right; side.Normalize();
                 float w = Mathf.Lerp(width0, width1, t) * 0.5f;
                 verts[i * 2] = p - side * w; verts[i * 2 + 1] = p + side * w;
             }
