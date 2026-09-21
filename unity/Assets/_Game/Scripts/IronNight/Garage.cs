@@ -15,25 +15,72 @@ namespace IronNight
         Camera cam; Transform stage; Vehicle shown; string shownId; float spin = 35f, spinVel; Light lamp, fill;
         static readonly Vector3 Home = new Vector3(0f, -600f, 0f);
 
+        Transform parked; Vehicle parkedTank;
+        static Material Surface(string tex, Vector2 tiling, Color tint, float smooth)
+        {
+            var m = new Material(Resources.Load<Material>("VehicleLitN")); m.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/" + tex)); m.SetTexture("_BumpMap", Resources.Load<Texture2D>("Textures/" + tex + "_n"));
+            m.SetTextureScale("_BaseMap", tiling); m.SetColor("_BaseColor", tint); m.SetFloat("_Smoothness", smooth); m.SetFloat("_Cull", 2f); return m;
+        }
+        static void Wall(Transform parent, Vector3 pos, Quaternion rot, Vector3 scale, Material m)
+        {
+            var q = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(q.GetComponent<Collider>()); q.transform.SetParent(parent, false); q.transform.localPosition = pos; q.transform.localRotation = rot; q.transform.localScale = scale; q.GetComponent<Renderer>().sharedMaterial = m;
+        }
+        static void Prop(Transform parent, string mesh, Vector3 pos, float yaw)
+        {
+            var pf = Resources.Load<GameObject>("Props/" + mesh); if (pf == null) return;
+            var p = Instantiate(pf, parent); p.transform.localPosition = pos; p.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
+            var m = new Material(Resources.Load<Material>("VehicleLit")); m.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + mesh + "_tex")); m.SetFloat("_Smoothness", 0.15f); m.SetFloat("_Cull", 0f);
+            foreach (var r in p.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+        }
+
         public static Garage Build()
         {
             var go = new GameObject("Garage"); go.transform.position = Home; var g = go.AddComponent<Garage>();
             g.Texture = new RenderTexture(1024, 768, 24) { antiAliasing = 2 };
-            // the hangar: a concrete floor, a back wall, one warm lamp from above and a cold fill from the door
-            var floor = GameObject.CreatePrimitive(PrimitiveType.Plane); Destroy(floor.GetComponent<Collider>()); floor.transform.SetParent(go.transform, false); floor.transform.localScale = new Vector3(4f, 1f, 4f);
-            var fm = new Material(Resources.Load<Material>("GroundLit")); fm.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/yard")); fm.SetTextureScale("_BaseMap", new Vector2(3f, 3f)); fm.SetColor("_BaseColor", new Color(0.55f, 0.55f, 0.58f)); fm.SetFloat("_Smoothness", 0.35f);
-            floor.GetComponent<Renderer>().sharedMaterial = fm;
-            var wall = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(wall.GetComponent<Collider>()); wall.transform.SetParent(go.transform, false); wall.transform.localPosition = new Vector3(0f, 6f, 14f); wall.transform.localScale = new Vector3(60f, 14f, 1f);
-            var wm = new Material(Resources.Load<Material>("GroundLit")); wm.SetColor("_BaseColor", new Color(0.16f, 0.17f, 0.19f)); wm.SetFloat("_Smoothness", 0.1f); wall.GetComponent<Renderer>().sharedMaterial = wm;
+            // the hangar: concrete underfoot, brick at the back, corrugated steel at the sides, steel beams and lamps overhead, the door open on the night
+            var floor = GameObject.CreatePrimitive(PrimitiveType.Plane); Destroy(floor.GetComponent<Collider>()); floor.transform.SetParent(go.transform, false); floor.transform.localScale = new Vector3(4.4f, 1f, 4.4f);
+            floor.GetComponent<Renderer>().sharedMaterial = Surface("hangar_floor", new Vector2(9f, 9f), new Color(0.62f, 0.62f, 0.64f), 0.42f);
+            Wall(go.transform, new Vector3(0f, 6f, 20f), Quaternion.identity, new Vector3(46f, 12f, 1f), Surface("hangar_brick", new Vector2(9f, 2.4f), new Color(0.62f, 0.6f, 0.58f), 0.12f));
+            Wall(go.transform, new Vector3(-22f, 6f, 0f), Quaternion.Euler(0f, -90f, 0f), new Vector3(44f, 12f, 1f), Surface("hangar_metal", new Vector2(8f, 2.2f), new Color(0.6f, 0.62f, 0.66f), 0.3f));
+            Wall(go.transform, new Vector3(22f, 6f, 0f), Quaternion.Euler(0f, 90f, 0f), new Vector3(44f, 12f, 1f), Surface("hangar_metal", new Vector2(8f, 2.2f), new Color(0.6f, 0.62f, 0.66f), 0.3f));
+            var roof = GameObject.CreatePrimitive(PrimitiveType.Plane); Destroy(roof.GetComponent<Collider>()); roof.transform.SetParent(go.transform, false); roof.transform.localPosition = new Vector3(0f, 12f, 0f); roof.transform.localRotation = Quaternion.Euler(180f, 0f, 0f); roof.transform.localScale = new Vector3(4.4f, 1f, 4.4f);
+            roof.GetComponent<Renderer>().sharedMaterial = Surface("hangar_metal", new Vector2(10f, 10f), new Color(0.22f, 0.23f, 0.25f), 0.1f);
+            var steel = new Material(Resources.Load<Material>("BarrelLit")); steel.SetColor("_BaseColor", new Color(0.2f, 0.2f, 0.21f)); steel.SetFloat("_Metallic", 0.5f); steel.SetFloat("_Smoothness", 0.35f);
+            for (int i = -2; i <= 2; i++) { var beam = GameObject.CreatePrimitive(PrimitiveType.Cube); Destroy(beam.GetComponent<Collider>()); beam.transform.SetParent(go.transform, false); beam.transform.localPosition = new Vector3(0f, 11.4f, i * 8f); beam.transform.localScale = new Vector3(44f, 0.7f, 0.35f); beam.GetComponent<Renderer>().sharedMaterial = steel; }
+            for (int i = -1; i <= 1; i++) { var post = GameObject.CreatePrimitive(PrimitiveType.Cube); Destroy(post.GetComponent<Collider>()); post.transform.SetParent(go.transform, false); post.transform.localPosition = new Vector3(-21.6f, 6f, i * 12f); post.transform.localScale = new Vector3(0.5f, 12f, 0.5f); post.GetComponent<Renderer>().sharedMaterial = steel; }
+            // the door: a bright opening in the back wall to the right, the night coming in cold
+            var doorMat = new Material(Resources.Load<Material>("VehicleLit")); doorMat.SetColor("_BaseColor", new Color(0.05f, 0.07f, 0.14f)); doorMat.SetFloat("_Smoothness", 0f);   // the night outside: a dark plate in the opening
+            var door = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(door.GetComponent<Collider>()); door.transform.SetParent(go.transform, false); door.transform.localPosition = new Vector3(18.5f, 4.2f, 19.7f); door.transform.localScale = new Vector3(6f, 8.4f, 1f); door.GetComponent<Renderer>().sharedMaterial = doorMat;
+            var hazeMat = new Material(Resources.Load<Material>("Additive")); hazeMat.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.Glow(64, 0.2f).texture); hazeMat.SetColor("_BaseColor", new Color(0.3f, 0.4f, 0.7f, 1f));
+            var haze = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(haze.GetComponent<Collider>()); haze.transform.SetParent(go.transform, false); haze.transform.localPosition = new Vector3(18.5f, 4.5f, 19.5f); haze.transform.localScale = new Vector3(9f, 11f, 1f); haze.GetComponent<Renderer>().sharedMaterial = hazeMat;   // moonlight spilling in
+            var doorLight = new GameObject("DoorLight").AddComponent<Light>(); doorLight.transform.SetParent(go.transform, false); doorLight.transform.localPosition = new Vector3(17f, 5f, 15f); doorLight.type = LightType.Point; doorLight.range = 24f; doorLight.intensity = 8f; doorLight.color = new Color(0.55f, 0.66f, 1f); doorLight.shadows = LightShadows.None;
+            // a wide soft light in the middle so the walls and the roof read as walls, not as a void
+            var amb = new GameObject("HangarAmbient").AddComponent<Light>(); amb.transform.SetParent(go.transform, false); amb.transform.localPosition = new Vector3(0f, 7f, 4f); amb.type = LightType.Point; amb.range = 52f; amb.intensity = 30f; amb.color = new Color(0.9f, 0.85f, 0.75f); amb.shadows = LightShadows.None;
+            // wall washers: a light falls off with the square of the distance, so the walls need lamps of their own close by
+            foreach (var w in new[] { new Vector3(-9f, 9.5f, 15.5f), new Vector3(7f, 9.5f, 15.5f) }) { var ws = new GameObject("Washer").AddComponent<Light>(); ws.transform.SetParent(go.transform, false); ws.transform.localPosition = w; ws.transform.rotation = Quaternion.Euler(62f, 0f, 0f); ws.type = LightType.Spot; ws.spotAngle = 110f; ws.range = 20f; ws.intensity = 34f; ws.color = new Color(1f, 0.88f, 0.7f); ws.shadows = LightShadows.None; }
+            foreach (var sx in new[] { -1f, 1f }) { var ws = new GameObject("SideWasher").AddComponent<Light>(); ws.transform.SetParent(go.transform, false); ws.transform.localPosition = new Vector3(sx * 17.5f, 9.5f, 2f); ws.transform.rotation = Quaternion.Euler(60f, sx > 0 ? 90f : -90f, 0f); ws.type = LightType.Spot; ws.spotAngle = 120f; ws.range = 22f; ws.intensity = 26f; ws.color = new Color(0.95f, 0.9f, 0.8f); ws.shadows = LightShadows.None; }
+            // three lamps hanging from the beams, with a glow in each shade and warm light under it
+            var shadeMat = new Material(Resources.Load<Material>("BarrelLit")); shadeMat.SetColor("_BaseColor", new Color(0.12f, 0.12f, 0.12f)); shadeMat.SetFloat("_Metallic", 0.3f); shadeMat.SetFloat("_Smoothness", 0.5f); shadeMat.SetFloat("_Cull", 0f);
+            var glowMat = new Material(Resources.Load<Material>("Additive")); glowMat.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.Glow(64, 0.35f).texture); glowMat.SetColor("_BaseColor", new Color(1f, 0.85f, 0.6f, 1f));
+            for (int i = 0; i < 3; i++)
+            {
+                var at = new Vector3(-3f + i * 3.2f, 10.5f, 4f + i * 0.5f);
+                var cord = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(cord.GetComponent<Collider>()); cord.transform.SetParent(go.transform, false); cord.transform.localPosition = at + new Vector3(0f, 0.6f, 0f); cord.transform.localScale = new Vector3(0.04f, 0.6f, 0.04f); cord.GetComponent<Renderer>().sharedMaterial = steel;
+                var shade = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(shade.GetComponent<Collider>()); shade.transform.SetParent(go.transform, false); shade.transform.localPosition = at; shade.transform.localScale = new Vector3(1.3f, 0.18f, 1.3f); shade.GetComponent<Renderer>().sharedMaterial = shadeMat;
+                var glow = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(glow.GetComponent<Collider>()); glow.transform.SetParent(go.transform, false); glow.transform.localPosition = at + new Vector3(0f, -0.25f, 0f); glow.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); glow.transform.localScale = new Vector3(1.6f, 1.6f, 1f); glow.GetComponent<Renderer>().sharedMaterial = glowMat;
+            }
+            // what stands about in a workshop: drums, crates, sandbags, a truck and a second tank in the shadows at the back
+            Prop(go.transform, "barrels", new Vector3(-13f, 0f, 9f), 20f); Prop(go.transform, "barrels", new Vector3(-15.5f, 0f, 6f), 110f); Prop(go.transform, "crate", new Vector3(-12f, 0f, 3f), 15f); Prop(go.transform, "crate", new Vector3(-12.8f, 0f, 4.6f), 40f);
+            Prop(go.transform, "sandbags", new Vector3(14f, 0f, 2f), -30f); Prop(go.transform, "crate", new Vector3(15f, 0f, 8f), 70f); Prop(go.transform, "barrels", new Vector3(17f, 0f, 12f), 0f);
+            Prop(go.transform, "truck", new Vector3(-13f, 0f, 15f), 160f);
+            g.parked = new GameObject("Parked").transform; g.parked.SetParent(go.transform, false); g.parked.localPosition = new Vector3(13.5f, 0f, 14f); g.parked.localRotation = Quaternion.Euler(0f, 205f, 0f);
             g.stage = new GameObject("Turntable").transform; g.stage.SetParent(go.transform, false);
-            var disc = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(disc.GetComponent<Collider>()); disc.transform.SetParent(go.transform, false); disc.transform.localPosition = new Vector3(0f, 0.03f, 0f); disc.transform.localScale = new Vector3(9f, 0.03f, 9f);
-            var dm = new Material(Resources.Load<Material>("BarrelLit")); dm.SetColor("_BaseColor", new Color(0.22f, 0.22f, 0.24f)); dm.SetFloat("_Smoothness", 0.5f); dm.SetFloat("_Metallic", 0.6f); disc.GetComponent<Renderer>().sharedMaterial = dm;
+            var disc = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(disc.GetComponent<Collider>()); disc.transform.SetParent(go.transform, false); disc.transform.localPosition = new Vector3(0f, 0.02f, 0f); disc.transform.localScale = new Vector3(9f, 0.02f, 9f);
+            disc.GetComponent<Renderer>().sharedMaterial = Surface("hangar_floor", new Vector2(2f, 2f), new Color(0.3f, 0.3f, 0.31f), 0.5f);   // the painted circle of the turntable
             var lampGo = new GameObject("Lamp"); lampGo.transform.SetParent(go.transform, false); lampGo.transform.localPosition = new Vector3(6f, 6f, -7f); lampGo.transform.LookAt(go.transform.position + new Vector3(0f, 1.2f, 0f));
             g.lamp = lampGo.AddComponent<Light>(); g.lamp.type = LightType.Spot; g.lamp.spotAngle = 60f; g.lamp.range = 30f; g.lamp.intensity = 34f; g.lamp.color = new Color(1f, 0.96f, 0.9f); g.lamp.shadows = LightShadows.Soft;
             var fillGo = new GameObject("Fill"); fillGo.transform.SetParent(go.transform, false); fillGo.transform.localPosition = new Vector3(-8f, 4f, -8f);
             g.fill = fillGo.AddComponent<Light>(); g.fill.type = LightType.Point; g.fill.range = 30f; g.fill.intensity = 16f; g.fill.color = new Color(0.8f, 0.85f, 1f); g.fill.shadows = LightShadows.None;
-            var backGo = new GameObject("Back"); backGo.transform.SetParent(go.transform, false); backGo.transform.localPosition = new Vector3(-6f, 5f, 9f);
-            var back = backGo.AddComponent<Light>(); back.type = LightType.Point; back.range = 25f; back.intensity = 10f; back.color = new Color(1f, 0.95f, 0.85f); back.shadows = LightShadows.None;
             // the menu's camera: low, from the front-left, the tank filling the middle of a portrait screen; light shafts from the roof for it
             g.TitleTexture = new RenderTexture(Mathf.Max(480, Screen.width * 2 / 3), Mathf.Max(800, Screen.height * 2 / 3), 24) { antiAliasing = 2 };
             var tcGo = new GameObject("TitleCamera"); tcGo.transform.SetParent(go.transform, false); tcGo.transform.localPosition = new Vector3(-9.6f, 3.4f, -15.2f); tcGo.transform.LookAt(go.transform.position + new Vector3(0.2f, 1.05f, 0.3f));
@@ -57,6 +104,11 @@ namespace IronNight
             if (shown != null) Destroy(shown.gameObject);
             shown = Vehicle.Create(spec, true, Home, 0f); shown.transform.SetParent(stage, true); shownId = spec.id;
             shown.turretYaw = 0.35f; shown.Apply(); shown.enabled = false;
+            if (parkedTank == null && parked != null)
+            {
+                // one of the wingmen parked at the back, in the shadows
+                var wing = VehicleSpec.ById(Depot.WingmanId); if (wing != null && VehicleSpec.Available(wing)) { parkedTank = Vehicle.Create(wing, false, parked.position, parked.eulerAngles.y * Mathf.Deg2Rad); parkedTank.transform.SetParent(parked, true); parkedTank.turretYaw = parkedTank.yaw + 0.5f; parkedTank.Apply(); parkedTank.enabled = false; }
+            }
         }
 
         public void SetActive(bool on) { cam.enabled = on; gameObject.SetActive(on || titleOn); }

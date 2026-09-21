@@ -23,7 +23,7 @@ namespace IronNight
         public System.Action<Formation> OnFormation;
         public System.Action OnAd, OnAgain, OnStart, OnCampaign, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold; GameObject holdBtn;
 
-        Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel, setSound, setQuality, setVibe, rankLine, pointsLine, ordersCount; GameObject settingsSheet, ordersSheet; RawImage titleBackdrop; readonly List<RectTransform> embers = new List<RectTransform>(); readonly List<float> emberPhase = new List<float>(); GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
+        Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel, setSound, setQuality, setVibe, rankLine, pointsLine, ordersCount; GameObject settingsSheet, ordersSheet; RawImage titleBackdrop, depotBackdrop; GarageDrag depotDrag; readonly List<RectTransform> embers = new List<RectTransform>(); readonly List<float> emberPhase = new List<float>(); GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
         class Rising { public Text t; public float life; public Vector3 world; }
         readonly List<Rising> popups = new List<Rising>(); readonly Stack<Text> popupPool = new Stack<Text>(); RectTransform canvasRect;
@@ -239,21 +239,29 @@ namespace IronNight
 
             // depot sheet
             depotSheet = new GameObject("Depot", typeof(RectTransform), typeof(Image)); depotSheet.transform.SetParent(root, false);
-            Stretch(depotSheet); depotSheet.GetComponent<Image>().color = new Color(0.02f, 0.03f, 0.04f, 0.9f);
-            MakeText(depotSheet.transform, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -90), TextAnchor.MiddleCenter, 30, dim).text = "THE DEPOT";
-            MakeText(depotSheet.transform, "Title", new Vector2(0.5f, 1f), new Vector2(0, -170), TextAnchor.MiddleCenter, 96, ink).text = "Upgrades";
-            depotPoints = MakeText(depotSheet.transform, "Points", new Vector2(0.5f, 1f), new Vector2(0, -270), TextAnchor.MiddleCenter, 40, amber);
-            depotTabs[0] = MakeButton(depotSheet.transform, "Upgrades", new Vector2(0.5f, 1f), new Vector2(-240, -400), new Vector2(440, 80), 32, () => { depotTab = 0; RefreshDepot(); }).GetComponent<Button>();
-            depotTabs[1] = MakeButton(depotSheet.transform, "Garage", new Vector2(0.5f, 1f), new Vector2(240, -400), new Vector2(440, 80), 32, () => { depotTab = 1; RefreshDepot(); }).GetComponent<Button>();
-            // the rows scroll in a masked window between the tabs and the Back button
-            var viewport = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D), typeof(ScrollRect)); viewport.transform.SetParent(depotSheet.transform, false);
-            var vrt = viewport.GetComponent<RectTransform>(); vrt.anchorMin = new Vector2(0f, 0f); vrt.anchorMax = new Vector2(1f, 1f); vrt.offsetMin = new Vector2(0f, 300f); vrt.offsetMax = new Vector2(0f, -500f);
+            Stretch(depotSheet); depotSheet.GetComponent<Image>().color = new Color(0.02f, 0.02f, 0.03f, 1f);
+            { var bd = new GameObject("Backdrop", typeof(RectTransform), typeof(RawImage), typeof(GarageDrag)); bd.transform.SetParent(depotSheet.transform, false); Stretch(bd); depotBackdrop = bd.GetComponent<RawImage>(); depotBackdrop.color = Color.white; depotDrag = bd.GetComponent<GarageDrag>();
+              var top = MakeImage(depotSheet.transform, "TopShade", new Vector2(0.5f, 1f), Vector2.zero, new Vector2(1400f, 700f), new Color(0.02f, 0.02f, 0.03f, 0.85f)); top.sprite = Lightswarm.ProceduralSprites.GradientDown(128, 1.6f); top.rectTransform.localScale = new Vector3(1f, -1f, 1f);
+              var low = MakeImage(depotSheet.transform, "LowShade", new Vector2(0.5f, 0f), Vector2.zero, new Vector2(1400f, 1500f), new Color(0.02f, 0.02f, 0.03f, 0.97f)); low.sprite = Lightswarm.ProceduralSprites.GradientDown(128, 2.2f); }
+            { var back = MakeGhost(depotSheet.transform, "Back", new Vector2(0f, 1f), new Vector2(120, -105), new Vector2(180, 70), 26, () => OnBack?.Invoke(), 0.25f); back.transform.Find("Label").GetComponent<Text>().text = Spaced("BACK"); }
+            { var dt = MakeText(depotSheet.transform, "Title", new Vector2(0.5f, 1f), new Vector2(0, -110), TextAnchor.MiddleCenter, 84, ink); dt.text = "DEPOT"; dt.font = DisplayFont(); dt.verticalOverflow = VerticalWrapMode.Overflow; var dsh = dt.gameObject.AddComponent<UnityEngine.UI.Shadow>(); dsh.effectColor = new Color(0f, 0f, 0f, 0.8f); dsh.effectDistance = new Vector2(0f, -5f); }
+            { var pts = MakeCard(depotSheet.transform, "Points", new Vector2(1f, 1f), new Vector2(-50, -70), new Vector2(300, 72), new Color(0.06f, 0.07f, 0.09f, 0.75f), 0.2f); pts.rectTransform.pivot = new Vector2(1f, 1f);
+              var coin = MakeImage(pts.transform, "Coin", new Vector2(0f, 0.5f), new Vector2(18, 0), new Vector2(30, 30), new Color(0.96f, 0.68f, 0.24f)); coin.sprite = Lightswarm.ProceduralSprites.Ring(64, 0.16f); coin.rectTransform.pivot = new Vector2(0f, 0.5f);
+              depotPoints = MakeText(pts.transform, "Text", new Vector2(0f, 0.5f), new Vector2(64, 0), TextAnchor.MiddleLeft, 30, new Color(0.96f, 0.68f, 0.24f)); depotPoints.rectTransform.pivot = new Vector2(0f, 0.5f); depotPoints.rectTransform.sizeDelta = new Vector2(230, 72); depotPoints.font = BoldFont(); }
+            MakeText(depotSheet.transform, "Hint", new Vector2(0.5f, 1f), new Vector2(0, -1010), TextAnchor.MiddleCenter, 22, dim).text = "drag the tank to turn it · tap a tank in the list to see it";
+            var panel = MakeCard(depotSheet.transform, "Panel", new Vector2(0.5f, 0f), new Vector2(0, 40), new Vector2(1000, 1230), new Color(0.04f, 0.05f, 0.07f, 0.82f), 0.14f); panel.rectTransform.pivot = new Vector2(0.5f, 0f);
+            { var seg = MakeCard(panel.transform, "Tabs", new Vector2(0.5f, 1f), new Vector2(0, -22), new Vector2(920, 84), new Color(0.03f, 0.04f, 0.05f, 0.9f), 0.1f); seg.rectTransform.pivot = new Vector2(0.5f, 1f);
+              depotTabs[0] = MakeButton(seg.transform, "Upgrades", new Vector2(0.5f, 0.5f), new Vector2(-228, 0), new Vector2(446, 70), 28, () => { depotTab = 0; RefreshDepot(); }).GetComponent<Button>();
+              depotTabs[1] = MakeButton(seg.transform, "Garage", new Vector2(0.5f, 0.5f), new Vector2(228, 0), new Vector2(446, 70), 28, () => { depotTab = 1; RefreshDepot(); }).GetComponent<Button>();
+              foreach (var tb in depotTabs) { var lt = tb.transform.Find("Label").GetComponent<Text>(); lt.text = Spaced(lt.text.ToUpperInvariant()); } }
+            // the rows scroll in a masked window inside the panel, under the tabs
+            var viewport = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D), typeof(ScrollRect)); viewport.transform.SetParent(panel.transform, false);
+            var vrt = viewport.GetComponent<RectTransform>(); vrt.anchorMin = new Vector2(0f, 0f); vrt.anchorMax = new Vector2(1f, 1f); vrt.offsetMin = new Vector2(20f, 24f); vrt.offsetMax = new Vector2(-20f, -125f);
             viewport.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.01f);   // something to drag on
             var rows = new GameObject("Rows", typeof(RectTransform)); rows.transform.SetParent(viewport.transform, false);
             var rrt = rows.GetComponent<RectTransform>(); rrt.anchorMin = rrt.anchorMax = new Vector2(0.5f, 1f); rrt.pivot = new Vector2(0.5f, 1f); rrt.anchoredPosition = Vector2.zero; rrt.sizeDelta = new Vector2(940f, 2000f);
             depotRows = rows.transform; depotScroll = viewport.GetComponent<ScrollRect>(); depotScroll.content = rrt; depotScroll.viewport = vrt; depotScroll.horizontal = false; depotScroll.vertical = true;
             depotScroll.movementType = ScrollRect.MovementType.Clamped; depotScroll.scrollSensitivity = 40f; depotScroll.inertia = true; depotScroll.decelerationRate = 0.12f;
-            MakeButton(depotSheet.transform, "Back", new Vector2(0.5f, 0f), new Vector2(0, 150), new Vector2(880, 130), 40, () => OnBack?.Invoke());
             depotSheet.SetActive(false);
         }
 
@@ -279,7 +287,7 @@ namespace IronNight
             }
             titleSheet.SetActive(true);
         }
-        public void HideTitle() { titleSheet.SetActive(false); hudGroup.SetActive(true); if (garage != null) { garage.SetTitle(false); garage.SetActive(false); } }
+        public void HideTitle() { titleSheet.SetActive(false); depotSheet.SetActive(false); hudGroup.SetActive(true); if (garage != null) { garage.SetTitle(false); garage.SetActive(false); } }
         void ShowOrders() { ordersSheet.SetActive(true); }
 
         /// <summary>Test switch --garage=id: straight into the garage tab with that tank on the turntable.</summary>
@@ -287,15 +295,16 @@ namespace IronNight
 
         public void ShowDepot()
         {
-            Depot.Load(); titleSheet.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(true); if (garage != null) garage.SetTitle(false); RefreshDepot(); if (depotScroll != null) depotScroll.verticalNormalizedPosition = 1f;
+            Depot.Load(); titleSheet.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(true);
+            if (garage != null) { garage.Show(VehicleSpec.ById(Depot.LeaderId)); garage.SetTitle(true); depotBackdrop.texture = garage.TitleTexture; depotDrag.garage = garage; }
+            RefreshDepot(); if (depotScroll != null) depotScroll.verticalNormalizedPosition = 1f;
         }
 
         void RefreshDepot()
         {
-            depotPoints.text = $"{Depot.Points} points";
+            depotPoints.text = Depot.Points.ToString("N0");
             foreach (Transform c in depotRows) Destroy(c.gameObject);
-            for (int k = 0; k < 2; k++) { bool on = depotTab == k; depotTabs[k].GetComponent<Image>().color = on ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : new Color(0.2f, 0.22f, 0.24f, 0.95f); depotTabs[k].transform.Find("Label").GetComponent<Text>().color = on ? new Color(0.1f, 0.08f, 0.05f) : new Color(0.93f, 0.91f, 0.86f); }
-            if (garage != null) garage.SetActive(false);
+            for (int k = 0; k < 2; k++) { bool on = depotTab == k; depotTabs[k].GetComponent<Image>().color = on ? new Color(0.96f, 0.68f, 0.24f, 1f) : new Color(0f, 0f, 0f, 0f); depotTabs[k].transform.Find("Label").GetComponent<Text>().color = on ? new Color(0.12f, 0.09f, 0.04f) : new Color(0.82f, 0.8f, 0.76f); }
             if (depotTab == 1) { RefreshGarage(); FitDepotRows(); return; }
             for (int i = 0; i < Depot.Upgrades.Count; i++)
             {
@@ -362,16 +371,6 @@ namespace IronNight
         void RefreshGarage()
         {
             var ink = new Color(0.93f, 0.91f, 0.86f); var dim = new Color(0.66f, 0.64f, 0.59f); var amber = new Color(0.95f, 0.66f, 0.23f); string nation = Depot.Nation; float y = 0f;
-            if (garage != null)
-            {
-                // the showroom: the leader's tank on the turntable, a drag turns it
-                var frame = MakeImage(depotRows, "Showroom", new Vector2(0.5f, 1f), new Vector2(0, 0), new Vector2(940, 705), new Color(0.05f, 0.05f, 0.06f, 1f)); frame.rectTransform.pivot = new Vector2(0.5f, 1f);
-                var view = new GameObject("View", typeof(RectTransform), typeof(RawImage), typeof(GarageDrag)); view.transform.SetParent(frame.transform, false);
-                var vrt = view.GetComponent<RectTransform>(); vrt.anchorMin = Vector2.zero; vrt.anchorMax = Vector2.one; vrt.offsetMin = vrt.offsetMax = Vector2.zero;
-                view.GetComponent<RawImage>().texture = garage.Texture; view.GetComponent<GarageDrag>().garage = garage;
-                var cap = MakeText(frame.transform, "Caption", new Vector2(0.5f, 0f), new Vector2(0, 18), TextAnchor.LowerCenter, 24, dim); cap.text = "drag to turn · tap a tank below to see it"; cap.rectTransform.sizeDelta = new Vector2(900, 34);
-                garage.Show(VehicleSpec.ById(Depot.LeaderId)); garage.SetActive(true); y -= 725f;
-            }
             // the nation: two flags
             {
                 var row = MakeImage(depotRows, "Row nation", new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 210), new Color(0.08f, 0.09f, 0.1f, 0.96f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);

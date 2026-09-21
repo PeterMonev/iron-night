@@ -57,3 +57,10 @@ material (`<name>_hull_m<i>`, `<name>_turret_m<i>`, textures `<name>_m<i>.png` +
 mirrored for Unity, the model's own gun kept (spec gunLength 0, muzzle from the printout). `Vehicle.Assemble` builds
 the parts; `VehicleSpec.painted`. Ring fractions used: KV-1 0.68, Panzer IV 0.70, Chaffee 0.47, the rest auto.
 Check a split with `viewer10.html?n=<name>` after `obj2view_sf.py <name>` (scratchpad).
+
+## The hangar (2026-09-22)
+`gen-hangar.js 8189 concrete brick metal` (SDXL on the TRELLIS ComfyUI) -> `bake-hangar.js` (seamless, toned, normal
+maps) -> `Resources/Textures/hangar_*.png`. Run IronNightSetup.Setup after adding textures: `*_n.png` must import as
+normal maps or the surface goes black. Unity's Quad faces -Z: a wall at +z keeps identity, the left wall (x<0, facing +x)
+turns -90 about Y, the right +90. Lights fall off with the square of the distance: walls need washers of their own within
+a few metres; the URP asset's per-object light limit is 8 now.

@@ -70,6 +70,7 @@ namespace IronNight.EditorTools
             var so = new SerializedObject(asset);
             void Set(string field, System.Action<SerializedProperty> apply) { var p = so.FindProperty(field); if (p != null) apply(p); else Debug.LogWarning("URP asset: no field " + field); }
             Set("m_MainLightShadowsSupported", p => p.boolValue = true);
+            Set("m_AdditionalLightsPerObjectLimit", p => p.intValue = 8);   // the hangar has a lamp per beam: the walls must see them all
             Set("m_MainLightShadowmapResolution", p => p.intValue = 2048);
             Set("m_ShadowDistance", p => p.floatValue = 115f);
             Set("m_ShadowCascadeCount", p => p.intValue = 2);
