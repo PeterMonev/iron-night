@@ -30,6 +30,7 @@ namespace IronNight
             new Medal { id = "campaigner", name = "Campaigner", desc = "Win a three-night campaign.", test = () => Depot.CampaignsWon >= 1 },
             new Medal { id = "wrecker", name = "Track Wrecker", desc = "Throw twenty enemy tracks.", test = () => Depot.Total("tracked") >= 20 },
             new Medal { id = "daybreak", name = "Daybreak", desc = "Hold two minutes into daylight.", test = () => Depot.Total("daybreak") >= 1 },
+            new Medal { id = "spotter", name = "Spotter Hunter", desc = "Silence five forward observers.", test = () => Depot.Total("observers") >= 5 },
         };
 
         public static bool Earned(Medal m) => PlayerPrefs.GetInt("medal." + m.id, 0) == 1;

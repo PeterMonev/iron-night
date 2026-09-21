@@ -11,7 +11,7 @@ namespace IronNight
     /// </summary>
     public class Infantry : MonoBehaviour
     {
-        public class Soldier { public Transform t; public Vector3 pos; public float reload, phase, deadAge; public bool dead; public Vector3 face = Vector3.forward; }
+        public class Soldier { public Transform t; public Vector3 pos; public float reload, phase, deadAge; public bool dead, still; public Vector3 face = Vector3.forward; }   // still: an observer, he stays where he is and does not shoot
         public class Squad { public readonly List<Soldier> men = new List<Soldier>(); }
 
         public readonly List<Squad> squads = new List<Squad>();
@@ -82,7 +82,7 @@ namespace IronNight
                 var sq = squads[q]; bool any = false;
                 foreach (var m in sq.men)
                 {
-                    if (m.dead) continue; any = true;
+                    if (m.dead) continue; any = true; if (m.still) continue;
                     Vehicle target = null; float best = float.MaxValue;
                     foreach (var v in platoon) { if (v.dead) continue; var d = v.transform.position - m.pos; d.y = 0f; if (d.sqrMagnitude < best) { best = d.sqrMagnitude; target = v; } }
                     if (target == null) continue;
@@ -99,6 +99,18 @@ namespace IronNight
                 if (!any) squads.RemoveAt(q);
             }
             for (int i = fallen.Count - 1; i >= 0; i--) { var m = fallen[i]; m.deadAge += dt; if (m.deadAge > 25f) { Destroy(m.t.gameObject); fallen.RemoveAt(i); } }
+        }
+
+        /// <summary>One kneeling man who stays put: the forward observer with his radio.</summary>
+        public Soldier SpawnObserver(Vector3 at, Vector3 facing)
+        {
+            var sq = Spawn(at, facing); var keep = sq.men[1]; keep.still = true; keep.pos = at; keep.t.position = at; keep.t.rotation = Quaternion.LookRotation(facing, Vector3.up);
+            foreach (var m in sq.men) if (m != keep) { Destroy(m.t.gameObject); m.dead = true; }
+            sq.men.RemoveAll(m => m != keep);
+            // the radio: a box and a whip aerial beside him
+            var box = GameObject.CreatePrimitive(PrimitiveType.Cube); Destroy(box.GetComponent<Collider>()); box.transform.SetParent(keep.t, false); box.transform.localPosition = new Vector3(0.7f, 0.25f, -0.2f); box.transform.localScale = new Vector3(0.4f, 0.5f, 0.3f); box.GetComponent<Renderer>().sharedMaterial = helmet;
+            var whip = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(whip.GetComponent<Collider>()); whip.transform.SetParent(keep.t, false); whip.transform.localPosition = new Vector3(0.7f, 1.4f, -0.2f); whip.transform.localScale = new Vector3(0.02f, 0.9f, 0.02f); whip.GetComponent<Renderer>().sharedMaterial = helmet;
+            return keep;
         }
 
         /// <summary>The nearest living soldier to a point within reach, or null.</summary>

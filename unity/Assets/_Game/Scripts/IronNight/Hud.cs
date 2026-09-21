@@ -23,7 +23,7 @@ namespace IronNight
         public System.Action<Formation> OnFormation;
         public System.Action OnAd, OnAgain, OnStart, OnCampaign, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold; GameObject holdBtn;
 
-        Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel; GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
+        Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel, setSound, setQuality, setVibe; GameObject settingsSheet; GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
         class Rising { public Text t; public float life; public Vector3 world; }
         readonly List<Rising> popups = new List<Rising>(); readonly Stack<Text> popupPool = new Stack<Text>(); RectTransform canvasRect;
@@ -147,10 +147,31 @@ namespace IronNight
             rankBadge = MakeImage(titleSheet.transform, "Rank", new Vector2(0.5f, 0.5f), new Vector2(0, -625), new Vector2(90, 90), Color.white); rankBadge.preserveAspect = true;
             titleStats = MakeText(titleSheet.transform, "Stats", new Vector2(0.5f, 0.5f), new Vector2(0, -700), TextAnchor.MiddleCenter, 32, dim); titleStats.rectTransform.sizeDelta = new Vector2(900, 200);
             MakeText(titleSheet.transform, "Credits", new Vector2(0.5f, 0f), new Vector2(0, 70), TextAnchor.MiddleCenter, 24, new Color(0.45f, 0.44f, 0.4f)).text = "Tank models by mamont nikita, buffinbag, Hxhdjdjdk, Julian, Artem Goyko, XxRxX, Mr_Chiko, Joanthan To · Sketchfab, CC BY 4.0\nBuilt with DINOv3 · TRELLIS 2 · Unity";
-            MakeButton(titleSheet.transform, "How to play", new Vector2(0.5f, 0f), new Vector2(-310, 215), new Vector2(290, 70), 28, () => { helpSheet.SetActive(true); });
-            MakeButton(titleSheet.transform, "Medals", new Vector2(0.5f, 0f), new Vector2(0, 215), new Vector2(290, 70), 28, () => { ShowMedals(); });
-            MakeButton(titleSheet.transform, "Records", new Vector2(0.5f, 0f), new Vector2(310, 215), new Vector2(290, 70), 28, () => { ShowRecords(); });
+            MakeButton(titleSheet.transform, "How to play", new Vector2(0.5f, 0f), new Vector2(-345, 215), new Vector2(220, 70), 26, () => { helpSheet.SetActive(true); });
+            MakeButton(titleSheet.transform, "Medals", new Vector2(0.5f, 0f), new Vector2(-115, 215), new Vector2(220, 70), 26, () => { ShowMedals(); });
+            MakeButton(titleSheet.transform, "Records", new Vector2(0.5f, 0f), new Vector2(115, 215), new Vector2(220, 70), 26, () => { ShowRecords(); });
+            MakeButton(titleSheet.transform, "Settings", new Vector2(0.5f, 0f), new Vector2(345, 215), new Vector2(220, 70), 26, () => { ShowSettings(); });
             titleSheet.SetActive(false);
+
+            // settings and credits
+            settingsSheet = new GameObject("Settings", typeof(RectTransform), typeof(Image)); settingsSheet.transform.SetParent(root, false);
+            Stretch(settingsSheet); settingsSheet.GetComponent<Image>().color = new Color(0.03f, 0.04f, 0.05f, 1f);
+            MakeText(settingsSheet.transform, "Title", new Vector2(0.5f, 1f), new Vector2(0, -170), TextAnchor.MiddleCenter, 96, ink).text = "Settings";
+            setSound = MakeButton(settingsSheet.transform, "Sound", new Vector2(0.5f, 1f), new Vector2(0, -320), new Vector2(880, 110), 36, () => { OnSound?.Invoke(); RefreshSettings(); }).transform.Find("Label").GetComponent<Text>();
+            setQuality = MakeButton(settingsSheet.transform, "Quality", new Vector2(0.5f, 1f), new Vector2(0, -450), new Vector2(880, 110), 36, () => { OnQuality?.Invoke(); RefreshSettings(); }).transform.Find("Label").GetComponent<Text>();
+            setVibe = MakeButton(settingsSheet.transform, "Vibration", new Vector2(0.5f, 1f), new Vector2(0, -580), new Vector2(880, 110), 36, () => { PlayerPrefs.SetInt("vibe", PlayerPrefs.GetInt("vibe", 1) == 1 ? 0 : 1); PlayerPrefs.Save(); RefreshSettings(); }).transform.Find("Label").GetComponent<Text>();
+            MakeText(settingsSheet.transform, "QualityNote", new Vector2(0.5f, 1f), new Vector2(0, -660), TextAnchor.MiddleCenter, 26, dim).text = "Low quality: no shadows, no rain, simpler hedges - for phones that stutter.";
+            MakeText(settingsSheet.transform, "CreditsTitle", new Vector2(0.5f, 1f), new Vector2(0, -735), TextAnchor.MiddleCenter, 40, ink).text = "Credits";
+            var cr = MakeText(settingsSheet.transform, "Credits", new Vector2(0.5f, 1f), new Vector2(0, -790), TextAnchor.UpperLeft, 26, new Color(0.8f, 0.78f, 0.73f)); cr.rectTransform.sizeDelta = new Vector2(920, 900); cr.rectTransform.pivot = new Vector2(0.5f, 1f);
+            cr.text = "Tank models (Sketchfab, CC BY 4.0, modified):\n" +
+                "  Sherman M4A3 Green Set E - mamont nikita\n  M24 Chaffee - buffinbag\n  M26 Pershing Eagle 7 - Hxhdjdjdk\n  T-34 85 Tank - Julian\n  Kv-1 - Artem Goyko\n  SU-100 - XxRxX\n  IS-2M - Mr_Chiko\n  Panzer IV Medium Tank - Joanthan To (Toshueyi)\n" +
+                "  creativecommons.org/licenses/by/4.0\n\n" +
+                "Other vehicles, props and pictures: generated for this game (Microsoft TRELLIS 2, MIT; built with DINOv3).\n" +
+                "Sound effects: Pixabay (Pixabay Content License) and Mixkit (Mixkit License), authors listed in the game's SOURCES.\n" +
+                "Made with Unity.\n\nProgress is kept on this device only. No account, no personal data.";
+            MakeButton(settingsSheet.transform, "Privacy policy", new Vector2(0.5f, 0f), new Vector2(-230, 150), new Vector2(420, 130), 34, () => Application.OpenURL("https://petermonev.github.io/iron-night/privacy.html"));
+            MakeButton(settingsSheet.transform, "Back", new Vector2(0.5f, 0f), new Vector2(230, 150), new Vector2(420, 130), 40, () => settingsSheet.SetActive(false));
+            settingsSheet.SetActive(false);
 
             // how to play
             helpSheet = new GameObject("Help", typeof(RectTransform), typeof(Image)); helpSheet.transform.SetParent(root, false);
@@ -558,6 +579,12 @@ namespace IronNight
         public void SetConditions(string sector, string name, string note) { conditions.text = "Tonight: " + sector + " · " + (name == "Clear" ? "clear skies, full moon" : name.ToLowerInvariant() + " · " + note); assaultLabel.text = sector.ToUpperInvariant() + " · " + name.ToUpperInvariant(); }
         public void ShowPause(bool soundOn, bool highQuality) { soundLabel.text = soundOn ? "Sound: on" : "Sound: off"; qualityLabel.text = highQuality ? "Quality: high" : "Quality: low"; pauseSheet.SetActive(true); }
         public void HidePause() { pauseSheet.SetActive(false); }
+        public void SetQualityLabel(bool high) { qualityLabel.text = high ? "Quality: high" : "Quality: low"; }
+        void ShowSettings() { RefreshSettings(); settingsSheet.SetActive(true); }
+        void RefreshSettings()
+        {
+            setSound.text = PlayerPrefs.GetInt("sound", 1) == 1 ? "Sound: on" : "Sound: off"; setQuality.text = PlayerPrefs.GetInt("quality", 1) == 1 ? "Quality: high" : "Quality: low"; setVibe.text = PlayerPrefs.GetInt("vibe", 1) == 1 ? "Vibration: on" : "Vibration: off";
+        }
         public void SetAdNote(string s) { adNote.text = s; }
 
         void Update()
