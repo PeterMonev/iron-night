@@ -105,7 +105,7 @@ namespace IronNight
             NextObjective();
             hud.OnFormation = f => formation = f;
             hud.OnAd = OnAd; hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-            hud.OnStart = () => { hud.HideTitle(); phase = Phase.Play; stick.Blocked = false; };
+            hud.OnStart = () => { hud.HideTitle(); phase = Phase.Play; stick.Blocked = false; if (objective != null) Brief(objective.kind); };
             hud.garage = Garage.Build(); hud.garage.SetActive(false);
             hud.OnCampaign = () => { if (Depot.CampaignNight == 0) Depot.CampaignStart(); PlayerPrefs.SetInt("camp.launch", Depot.CampaignNight); PlayerPrefs.Save(); SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); };
             hud.OnDepot = () => { stick.Blocked = true; hud.ShowDepot(); }; hud.OnHold = HoldOn;
@@ -864,7 +864,15 @@ namespace IronNight
                 // the staff car starts 45 m ahead and drives off away from us for forty seconds
                 var car = Foe(VehicleSpec.Kubelwagen, props.PushOut(L.transform.position + L.Forward * 45f, 2f), L.yaw); car.unloaded = true; car.leaving = true; objective.targets.Add(car); objective.clock = 40f;
             }
+            if (phase == Phase.Play) Brief(kind);
             if (phase == Phase.Play) hud.Toast("Objective " + objective.n + " · " + (kind == "battery" ? "destroy the rocket battery, " : kind == "dump" ? "fuel dump · tap it to shell it, " : kind == "crew" ? "crew of a knocked-out tank · pick them up, " : kind == "car" ? "staff car making a run for it · stop it" : (hold ? "hold the crossing, " : "")) + (kind == "car" ? "" : Mathf.RoundToInt(dist) + " m ahead"), 3f);
+        }
+
+        /// <summary>The briefing card for an objective that is more than a point to reach.</summary>
+        void Brief(string kind)
+        {
+            if (kind == "reach") return;
+            hud.Briefing("obj_" + kind, kind == "battery" ? "Rocket battery" : kind == "car" ? "Staff car" : kind == "dump" ? "Fuel dump" : "Stranded crew", kind == "battery" ? "Two Nebelwerfers dug in ahead. Get close and put them out." : kind == "car" ? "An officer with maps is making a run for it. Stop the car." : kind == "dump" ? "Drums under a net, a guard. Tap it and the guns will do the rest." : "Two of ours by their wreck. Drive to them and pick them up.");
         }
 
         void TickObjective(float dt)
@@ -1289,7 +1297,7 @@ namespace IronNight
             Depot.Tally("objectives", objectivesReached - talliedObjectives); talliedObjectives = objectivesReached;
             if (bossKilled && !talliedAce) { talliedAce = true; Depot.Tally("aces", 1); }
             if (dawn && !crewCounted) { crewCounted = true; Depot.CrewNights = Depot.CrewNights + 1; Depot.Tally("crewNights", 1); }
-            if (!dawn && !revived && !crewLostTonight) { crewLostTonight = true; crewBefore = Depot.CrewNights; Depot.CrewNights = 0; }
+            if (!dawn && !revived && !crewLostTonight) { crewLostTonight = true; crewBefore = Depot.CrewNights; Depot.CrewNights = 0; Depot.CrewGeneration = Depot.CrewGeneration + 1; }
             if (dawn) { Depot.Tally("dawns", 1); if (veteran) Depot.Tally("veteranDawns", 1); } Depot.Tally("tracked", nightTracked - talliedTracked); talliedTracked = nightTracked; Depot.Tally("lamps", nightLamps - talliedLamps); talliedLamps = nightLamps;
             if (kills >= 15 && shotsFired > 0 && shotsHit * 2 >= shotsFired) Depot.Tally("sharp", 1);
             if (!logged) { logged = true; Depot.LogNight(winter ? "Ardennes" : "Normandy", kills, t, score, dawn); }
@@ -1374,7 +1382,7 @@ namespace IronNight
             if (t >= NightLength) { doubled = true; Depot.AddPoints(score); banked += score; hud.SetEndPoints(banked); hud.ShowEnd(true, $"{kills} enemy vehicles destroyed\nScore {score * 2} (doubled)", false); return; }
             revived = true;
             var L = Vehicle.Create(Wingman, true, platoon.Count > 0 ? platoon[0].transform.position - platoon[0].Forward * 8f : Vector3.zero, platoon.Count > 0 ? platoon[0].yaw : 0f);
-            if (crewLostTonight) { Depot.CrewNights = crewBefore; crewLostTonight = false; }   // pulled out alive: the crew keeps its nights
+            if (crewLostTonight) { Depot.CrewNights = crewBefore; Depot.CrewGeneration = Depot.CrewGeneration - 1; crewLostTonight = false; }   // pulled out alive: the same men, their nights kept
             L.hp = Depot.LeaderHp; platoon.Insert(0, L); leaderShield = 4f;
             hud.HideEnd(); phase = Phase.Play; stick.Blocked = false; hud.Toast("Field repair · back in the fight");
         }

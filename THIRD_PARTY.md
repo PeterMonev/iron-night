@@ -43,3 +43,20 @@ Licence: https://creativecommons.org/licenses/by/4.0/
 | Barlow | Jeremy Tribby | all other text |
 
 The licence texts are in `unity/Assets/_Game/Resources/Fonts/OFL-*.txt`. The fonts are used unmodified.
+
+## Tank photographs in the depot (Wikimedia Commons, public domain / CC0)
+Wartime photographs shown on the tank tiles in the depot's garage list. All public domain (US Army Signal Corps, RIA Novosti archive, Archives de Normandie) or CC0, cropped.
+
+| Tank | File on Commons | Author / source |
+|---|---|---|
+| M4 Sherman | SC 191908-S - A General Sherman tank ... near Tribehou, France, 25 July 1944 | US Army Signal Corps |
+| M4A3E8 Easy Eight | M4A3E8.JPG | Yellowute (public domain) |
+| M18 Hellcat | M18 tank destroyer fires its 90mm gun ... Brest, France, September 1944 | US Army Signal Corps |
+| M24 Chaffee | Side view of the new M-24 tank ... | US Army Signal Corps |
+| M26 Pershing | M26 Pershing at Remagen.png | US Army Signal Corps |
+| M10 Wolverine | SC 199025 - An M10 tank destroyer ... Berle, Luxembourg | US Army Signal Corps |
+| Sherman Firefly | Sherman Firefly in Field.jpg | Conseil Régional de Basse-Normandie / Archives Nationales du Canada |
+| T-34-85 | Колонна советских танков Т-34-85 в городе Швехат в пригороде Вены | Yevgeny Khaldei, RIA Novosti (public domain) |
+| KV-1 | Soviet tank KV-1 model 1939.jpg | public domain |
+| SU-100 | СУ-101 и СУ-100 танкодром Уралмашзавода апрель 1945 | Техотдел УЗТМ (CC0) |
+| IS-2 | САУ ИСУ-122 и танк ИС-2 на одной из дорог Трансильвании | Israel Ozersky, RIA Novosti (public domain) |

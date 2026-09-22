@@ -180,6 +180,13 @@ namespace IronNight
         // the leader's crew: nights survived together, per nation; lost with the leader unless the field repair pulls them out
         public static int CrewNights { get { Load(); return PlayerPrefs.GetInt("crew.nights." + Nation, 0); } set { PlayerPrefs.SetInt("crew.nights." + Nation, Mathf.Max(0, value)); Save(); } }
         public static int CrewLevel => CrewNights >= 10 ? 3 : CrewNights >= 5 ? 2 : CrewNights >= 2 ? 1 : 0;
+        // the men: a generation counter per nation picks their names; a lost crew is replaced by the next four
+        public static int CrewGeneration { get { Load(); return PlayerPrefs.GetInt("crew.gen." + Nation, 0); } set { PlayerPrefs.SetInt("crew.gen." + Nation, value); Save(); } }
+        static readonly string[] UsNames = { "Pvt. Dale Whitaker", "Cpl. Frank Moreno", "Pvt. Eddie Kowalczyk", "T/5 Sam Ruiz", "Pvt. Billy Hargrove", "Cpl. Ike Thompson", "Pvt. Lou Ferrante", "T/4 Andy Novak" };
+        static readonly string[] SuNames = { "Ryad. Vasya Petrov", "Mladshiy serzh. Kolya Orlov", "Ryad. Sasha Denisov", "Yefr. Grisha Volkov", "Ryad. Misha Krylov", "Serzh. Tolya Zaytsev", "Ryad. Yura Belyaev", "Yefr. Lena Sokolova" };
+        public static readonly string[] CrewRoles = { "gunner", "loader", "driver", "radio" };
+        public static string CrewMan(int role) { var names = Nation == "su" ? SuNames : UsNames; return names[(CrewGeneration * 4 + role) % names.Length]; }
+        public static string CrewRoleText(int role) => role == 0 ? "Gunner" : role == 1 ? "Loader" : role == 2 ? "Driver" : "Radio operator";
         public static string CrewName => CrewLevel == 3 ? "Old hands" : CrewLevel == 2 ? "Veteran crew" : CrewLevel == 1 ? "Blooded crew" : "Green crew";
         public static string CrewBonusText => CrewLevel == 3 ? "reloads 10% faster, one hit more, sees 5% farther" : CrewLevel == 2 ? "reloads 5% faster, one hit more" : CrewLevel == 1 ? "reloads 5% faster" : "no bonus yet · survive two nights";
         public static float ReloadMul => (1f - 0.06f * Level("loaders")) * (CrewLevel >= 3 ? 0.9f : CrewLevel >= 1 ? 0.95f : 1f);
