@@ -16,6 +16,10 @@ namespace IronNight
         // the racks: what the leader carries into the night and what is left of it
         int apRounds = 28, heRounds = 10, apMax = 28, heMax = 10; bool loadHe; float dryToast;
         float abilityLeft, abilityCool, spotLeft;   // the commander's one card, and the ten seconds his spotting lasts
+        // what the night's cards have given the platoon
+        bool wetStowage, savedTonight, sandbags, dozer, canister, phosphorus, radioNet, aceGunner, recovery, wideTracks, spotterPlane;
+        float planeTimer = 30f; readonly List<Vehicle> burning = new List<Vehicle>();
+        readonly Dictionary<Vehicle, float> burn = new Dictionary<Vehicle, float>();
         enum Weather { Clear, Overcast, Fog, Rain }
         static bool LowQuality { get => PlayerPrefs.GetInt("quality", 1) == 0; set { PlayerPrefs.SetInt("quality", value ? 0 : 1); PlayerPrefs.Save(); } }
         class Sky { public Color ambient, fog, moonColor; public float fogDensity, moonIntensity, shadow; }
@@ -45,7 +49,7 @@ namespace IronNight
         Material shellTemplate; Texture2D glowTex;
         Formation formation = Formation.Wedge; Phase phase = Phase.Title; bool reserveGranted;
         int campaignNight;   // 0: a single night; 1..3: the campaign
-        int nightTracked, nightFocus, talliedTracked, nightLamps, talliedLamps; bool litBySearchlight;
+        int nightTracked, nightFocus, talliedTracked, nightLamps, talliedLamps, nightAces; bool litBySearchlight;
         bool crewCounted, crewLostTonight; int crewBefore;   // the crew's nights: counted at dawn, lost with the leader unless he is pulled back
         Vehicle focus; float focusLeft; Transform focusRing;   // the enemy the platoon was told to hit
         float pointLeft; Vector3 point;                      // a spot the platoon was told to shell (the fuel dump)
@@ -54,6 +58,8 @@ namespace IronNight
         Infantry.Soldier observer; float observerTimer = 95f, observerAge; Transform observerRing;   // the forward observer on the flank
         float t, spawnTimer = 6f, leaderShield; int level = 1, xp, xpNeed = 6, score, kills, maxPlatoon = 4, reinforcements;
         bool wave2, wave3, wave4, revived, doubled, bossSpawned; Vehicle boss;
+        Vehicle ace; string aceName; float aceTimer = 105f, weatherTurn;   // a named enemy of the night, and the hour the weather turns
+        static readonly string[] AceNames = { "Hptm. Keller", "Ofw. Brandt", "Ltn. Hoffmann", "Fw. Ziegler", "Hptm. Vogel", "Ofw. Reinhardt", "Ltn. Stahl", "Fw. Neumann" };
         static readonly bool debugBoss = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--boss") >= 0;   // test switch: the boss comes at 0:06
         static readonly bool debugDawn = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--dawn") >= 0;   // test switch: the night starts at 4:10
         static readonly bool debugCrew = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--crew") >= 0;
@@ -77,7 +83,7 @@ namespace IronNight
         {
             cam = camera; hud = h; stick = s; fx = effects;
             shellTemplate = Resources.Load<Material>("Additive"); glowTex = Lightswarm.ProceduralSprites.Glow(64, 0.3f).texture;
-            PickWeather();
+            PickWeather(); weatherTurn = NightLength * Random.Range(0.35f, 0.62f);
             BuildWorld();
             // the night always starts with the leader alone; the platoon grows from flares to 3, a rewarded ad opens a 4th slot.
             // The depot's permanent upgrades set the starting numbers
@@ -181,9 +187,10 @@ namespace IronNight
                 var v = platoon[i]; var slot = Slot(i); var d = slot - v.transform.position; d.y = 0f;
                 if (d.magnitude > 1.2f) v.Drive(Steer(v, new Vector2(d.x, d.z) * (Mathf.Clamp01(d.magnitude / 5f))), dt);
             }
-            TickAbility(dt);
+            TickAbility(dt); TickCards(dt); if (phase != Phase.Play) return;
+            TickAce(dt); TickWeatherTurn(dt);
             bool fast = abilityLeft > 0f && bonus == "reload", hard = abilityLeft > 0f && bonus == "heavy", quick = abilityLeft > 0f && bonus == "speed";
-            foreach (var v in platoon) { if (v.trackOut > 0f) v.trackOut -= dt; v.speedMul = speedMul * (quick ? 1.6f : 1f); v.damageMul = damageMul * (hard ? 1.8f : 1f); v.rangeMul = rangeMul; v.reloadMul = reloadMul * (fast ? 0.45f : 1f); v.turretMul = turretMul; }
+            foreach (var v in platoon) { if (v.trackOut > 0f) v.trackOut -= dt; v.speedMul = speedMul * (quick ? 1.6f : 1f); v.damageMul = damageMul * (hard ? 1.8f : 1f); v.rangeMul = rangeMul; v.reloadMul = reloadMul * (fast ? 0.45f : 1f) * (radioNet && v != Leader ? 0.75f : 1f); v.turretMul = turretMul; }
 
             // a tap on an enemy: every gun onto it for eight seconds
             if (stick.ConsumeTap() && phase == Phase.Play)
@@ -359,6 +366,7 @@ namespace IronNight
                 foreach (var v in platoon) { if (v.dead) continue; var d = v.transform.position - m.pos; d.y = 0f; if (d.magnitude < 1.8f) { on = v; break; } }
                 if (on == null) foreach (var e in foes) { if (e.dead || e.spec.isGun) continue; var d = e.transform.position - m.pos; d.y = 0f; if (d.magnitude < 1.8f) { on = e; break; } }
                 if (on == null) continue;
+                if (dozer && on.friendly) { Blow(m); mines.RemoveAt(i); hud.Popup(m.pos, "Ploughed", new Color(0.8f, 0.8f, 0.7f)); continue; }
                 Blow(m); mines.RemoveAt(i); on.trackOut = 10f; Damage(on, 1f, m.pos); if (!on.friendly) { nightTracked++; hud.Popup(m.pos, on.spec.name + " on a mine", new Color(1f, 0.8f, 0.5f)); } else hud.Toast("Mine! Track off", 2f);
                 if (phase != Phase.Play) return;
             }
@@ -413,6 +421,7 @@ namespace IronNight
             var vis = fx.Tracer(v.friendly ? new Color(1f, 1f, 0.9f, 1f) : new Color(1f, 0.75f, 0.55f, 1f), v.friendly ? new Color(1f, 0.85f, 0.45f, 0.6f) : new Color(1f, 0.45f, 0.25f, 0.6f));
             vis.position = pos; vis.rotation = Quaternion.LookRotation(cam.transform.forward, dir);
             shells.Add(new Shell { pos = pos, vel = dir * speed, friendly = v.friendly, he = v.friendly && heShot, dmg = v.spec.damage * v.damageMul * (v.friendly ? ammoMul : 1f) * (leaderShot && loadHe ? 0.6f : 1f), life = v.Range / speed + 0.25f, vis = vis });
+            if (canister && leaderShot) { int swept = infantry.Blast(pos + v.GunDirection * 8f, 8f); if (swept > 0) { InfantryKilled(swept, pos + v.GunDirection * 8f); fx.Dust(new Vector3(pos.x, 0.3f, pos.z) + v.GunDirection * 8f); } }
             fx.MuzzleFlash(pos, dir); Sfx.Shot(pos, v.friendly, v.spec.gunLength > 3f || v.spec.isGun); if (v.friendly) Sfx.Reload(v.transform.position);
         }
 
@@ -429,6 +438,13 @@ namespace IronNight
                 // a wreck in the way stops the shell; a target in a hedge bank is missed one time in three
                 if (hit == null && !s.bounced) foreach (var w in wrecks) { if ((w.v.transform.position - s.pos).sqrMagnitude < w.v.spec.radius * w.v.spec.radius * 0.6f && s.pos.y < 2.2f) { fx.Spark(s.pos + Vector3.up * 0.5f, -s.vel.normalized); Sfx.Ricochet(s.pos); s.life = 0f; break; } }
                 if (hit != null && !s.bounced && props.InCover(hit.transform.position) && Random.value < 0.33f) { fx.Hit(new Vector3(s.pos.x, 0.8f, s.pos.z), 0.5f); if (hit.friendly) hud.Popup(hit.transform.position, "Hedge", new Color(0.55f, 0.8f, 0.5f)); s.life = 0f; hit = null; }
+                if (hit != null && sandbags && hit == Leader && !s.bounced && Vector3.Dot((s.pos - hit.transform.position).normalized, hit.Forward) > 0.35f && Random.value < 0.35f)
+                {
+                    // hung on the front plate: the shell skates off the sandbags and the track links
+                    var away2 = s.pos - hit.transform.position; away2.y = 0f; away2.Normalize();
+                    s.vel = Vector3.Reflect(s.vel, away2) * 0.4f + away2 * 8f + Vector3.up * 14f; s.life = 0.7f; s.bounced = true;
+                    fx.Spark(new Vector3(s.pos.x, 1.6f, s.pos.z), away2); Sfx.Ricochet(s.pos); hud.Popup(hit.transform.position, "Sandbags", new Color(0.85f, 0.8f, 0.6f)); hit = null;
+                }
                 if (hit != null && Ricochets(s, hit))
                 {
                     // glances off: sparks, a whine, and the shell tumbles away over the hull
@@ -440,7 +456,11 @@ namespace IronNight
                 if (hit != null)
                 {
                     if (s.friendly) shotsHit++;
-                    Damage(hit, s.dmg, s.pos);
+                    float dmg = s.dmg;
+                    if (s.friendly && aceGunner && hit != lastHitFoe) dmg *= 2f;   // the first shot at a fresh target
+                    if (s.friendly) lastHitFoe = hit;
+                    if (s.friendly && phosphorus && !hit.friendly) { burn[hit] = 6f; if (!burning.Contains(hit)) burning.Add(hit); }
+                    Damage(hit, dmg, s.pos);
                     TrackHit(hit, s.pos);
                     if (s.he) { float r = heBurst; foreach (var v in hitList) if (v != hit && !v.dead && Dist(v, hit) < r) Damage(v, s.dmg * 0.5f, v.transform.position); if (s.friendly) InfantryKilled(infantry.Blast(s.pos, r), s.pos); fx.Explosion(s.pos); }
                     fx.Hit(new Vector3(s.pos.x, 1.6f, s.pos.z), s.he ? 1.5f : 1f);
@@ -469,6 +489,7 @@ namespace IronNight
         void Damage(Vehicle v, float dmg, Vector3 at)
         {
             if (v.friendly && v == Leader && leaderShield > 0f) return;
+            if (v == Leader && wetStowage && !savedTonight && v.hp - dmg <= 0f) { savedTonight = true; v.hp = 1f; leaderShield = 2.5f; hud.Flash(); shake = Mathf.Max(shake, 0.9f); hud.Toast("The wet racks held · the leader is alive on one", 3.2f); Sfx.Ricochet(v.transform.position); if (Random.value < 0.7f) Radio("hit"); return; }
             if (!v.friendly && bonus == "heavy" && v.spec.hp >= 6f) dmg *= 1.5f;
             v.Hit(dmg); Sfx.Hit(v.transform.position);
             if (v.friendly && v == Leader) { hud.Flash(); shake = Mathf.Max(shake, 0.8f); Buzz(); }
@@ -479,6 +500,7 @@ namespace IronNight
             fire.transform.position = v.transform.position + Vector3.up * 2.5f;
             wrecks.Add(new Wreck { v = v, fire = fire });
             if (v.friendly) infantry.BailOut(v.transform.position, -v.Forward);
+            if (v.friendly && v != Leader && recovery && recoverySpec == null) { recoverySpec = v.spec; recoveryLeft = 20f; hud.Toast("Recovery crew is on it · " + v.spec.name + " back in twenty seconds", 2.8f); }
             if (v.friendly)
             {
                 bool wasLeader = v == Leader; platoon.Remove(v);
@@ -495,6 +517,7 @@ namespace IronNight
                 combo = Time.time - lastKill < 4f ? combo + 1 : 1; lastKill = Time.time;
                 if (combo >= 2) { int bonus = combo * 25; score += bonus; hud.Popup(v.transform.position + Vector3.up * 3f, "×" + combo + " +" + bonus, new Color(1f, 0.92f, 0.6f)); if (combo == 3) hud.Toast("Triple kill", 1.8f); else if (combo == 5) hud.Toast("Rampage", 1.8f); }
                 if (v == boss) { score += 1500; bossKilled = true; shake = 2f; hud.HideBoss(); hud.Toast("Tiger Ace destroyed · +1500"); }
+                if (v == ace) { score += 600; shake = Mathf.Max(shake, 1f); Depot.Tally("acesNamed", 1); nightAces++; hud.Popup(v.transform.position, "+600", new Color(1f, 0.8f, 0.4f)); hud.Toast(aceName + " is finished · +600", 3f); Radio("kill"); }
                 SpawnFlare(v.transform.position);
                 if (xp >= xpNeed) LevelUp(); else hud.SetLevel(level, (float)xp / xpNeed);
             }
@@ -683,8 +706,19 @@ namespace IronNight
                 new Hud.Card { id = "firefly", rare = true, title = "Firefly conversion", desc = "One Sherman is refitted with the 17-pounder now; the next reinforcement is a Firefly too." },
                 new Hud.Card { id = "gunners", rare = true, title = "Veteran gunners", desc = "Crews that fire true: scatter cut by two thirds, turrets swing 30% faster." },
                 new Hud.Card { id = "plates", title = "Applique armour", desc = "Welded plates: every wingman, now and later, takes 2 more hits." },
+                new Hud.Card { id = "wet", rare = true, title = "Wet stowage", desc = "The racks are jacketed in water: once tonight a killing hit leaves the leader alive on one." },
+                new Hud.Card { id = "sandbags", title = "Sandbags and track links", desc = "Hung on the front plate: shells from ahead glance off twice as often." },
+                new Hud.Card { id = "dozer", rare = true, title = "Dozer blade", desc = "Push through hedges and walls, and mines do nothing to the platoon." },
+                new Hud.Card { id = "canister", title = "Canister shot", desc = "A shotgun round for the gun: infantry within 14 m are swept away with every shot." },
+                new Hud.Card { id = "phos", title = "Phosphorus rounds", desc = "What you hit burns: another hit's worth of damage over six seconds." },
+                new Hud.Card { id = "radionet", title = "Radio net", desc = "The wingmen hear everything: they load 25% faster and hold their slots tighter." },
+                new Hud.Card { id = "ace", title = "Ace gunner", desc = "The first shot at a fresh target finds the weak spot: double damage." },
+                new Hud.Card { id = "recovery", rare = true, title = "Recovery crew", desc = "A knocked-out wingman is dragged back and rejoins after twenty seconds." },
+                new Hud.Card { id = "widetracks", title = "Wide tracks", desc = "Duckbills on the tracks: no more bogging down - full speed in mud and snow, sharper turns." },
+                new Hud.Card { id = "plane", rare = true, title = "Spotter plane", desc = "An L-4 circles overhead: every 30 seconds it marks the strongest enemy group." },
             };
             if (he) all.RemoveAll(c => c.id == "he"); if (gunners) all.RemoveAll(c => c.id == "gunners"); if (hasSmoke) all.RemoveAll(c => c.id == "smoke");
+            foreach (var taken in new[] { wetStowage ? "wet" : null, sandbags ? "sandbags" : null, dozer ? "dozer" : null, canister ? "canister" : null, phosphorus ? "phos" : null, radioNet ? "radionet" : null, aceGunner ? "ace" : null, recovery ? "recovery" : null, wideTracks ? "widetracks" : null, spotterPlane ? "plane" : null }) if (taken != null) all.RemoveAll(c => c.id == taken);
             if (artyInterval > 0f && artyInterval <= 12f) all.RemoveAll(c => c.id == "arty");
             if (Depot.Nation != "us" || (!platoon.Exists(p => p != Leader && p.spec == VehicleSpec.Sherman) && platoon.Count >= maxPlatoon)) all.RemoveAll(c => c.id == "firefly");
             var pick = new List<Hud.Card>(); while (pick.Count < 3 && all.Count > 0) { int i = Random.Range(0, all.Count); pick.Add(all[i]); all.RemoveAt(i); }
@@ -696,7 +730,7 @@ namespace IronNight
                     case "he": { int add = Mathf.Min(heMax + 8 - heRounds, 8 + heMax - heRounds); heMax += 8; heRounds = Mathf.Min(heMax, heRounds + 8); heBurst = 7f; hud.SetAmmo(apRounds, heRounds, loadHe); break; }
                     case "apcr": damageMul *= 1.5f; break;
                     case "rapid": reloadMul *= 0.8f; break;
-                    case "radar": rangeMul *= 1.15f; break;
+                    case "radar": cardRange *= 1.15f; rangeMul *= 1.15f; break;
                     case "engine": speedMul *= 1.15f; break;
                     case "repair": Leader.hp = Depot.LeaderHp + 1f; break;
                     case "reinf": Reinforce(); break;
@@ -710,9 +744,31 @@ namespace IronNight
                     }
                     case "gunners": gunners = true; scatterMul = 0.35f; turretMul = 1.3f; break;
                     case "plates": wingmanBonus += 2; foreach (var p in platoon) if (p != Leader) p.hp += 2f; break;
+                    case "wet": wetStowage = true; break;
+                    case "sandbags": sandbags = true; break;
+                    case "dozer": dozer = true; hud.Toast("Dozer blade fitted · drive straight through the hedges", 3f); break;
+                    case "canister": canister = true; break;
+                    case "phos": phosphorus = true; break;
+                    case "radionet": radioNet = true; reloadMul *= 1f; break;
+                    case "ace": aceGunner = true; break;
+                    case "recovery": recovery = true; break;
+                    case "widetracks": wideTracks = true; speedMul *= 1.08f; turretMul *= 1.05f; break;
+                    case "plane": spotterPlane = true; planeTimer = 6f; break;
                 }
                 phase = Phase.Play; stick.Blocked = false;
             });
+        }
+
+        /// <summary>The weather turns once, somewhere in the middle of the night: rain comes on, fog lifts off the
+        /// fields, or the clouds break and the moon comes out. Whatever it does, everyone has to fight in it.</summary>
+        void TickWeatherTurn(float dt)
+        {
+            if (weatherTurn <= 0f || t < weatherTurn) return; weatherTurn = 0f;
+            var was = weather;
+            weather = was == Weather.Rain ? Weather.Overcast : was == Weather.Fog ? Weather.Clear : was == Weather.Clear ? (Random.value < 0.5f ? Weather.Fog : Weather.Rain) : Weather.Rain;
+            ApplyWeather();
+            string line = weather == Weather.Rain ? "Rain coming down · the enemy shoots short" : weather == Weather.Fog ? "Fog rolling off the fields · nobody sees far" : weather == Weather.Clear ? "The clouds are breaking · the moon is out" : "The sky is closing in";
+            hud.Toast(line, 3.4f); Sfx.Rumble();
         }
 
         /// <summary>Tonight's weather: most nights are clear; overcast, fog and rain each change the light and the fight.</summary>
@@ -726,6 +782,12 @@ namespace IronNight
             var args = System.Environment.GetCommandLineArgs();   // test switches: --fog, --rain, --overcast, --clear, --winter, --summer
             foreach (Weather w in System.Enum.GetValues(typeof(Weather))) if (System.Array.IndexOf(args, "--" + w.ToString().ToLowerInvariant()) >= 0) weather = w;
             if (System.Array.IndexOf(args, "--winter") >= 0) winter = true; if (System.Array.IndexOf(args, "--summer") >= 0) winter = false;
+            SkyFor();
+        }
+
+        /// <summary>The sky the current weather calls for; the winter nights are paler and the beams stand out in fog.</summary>
+        void SkyFor()
+        {
             switch (weather)
             {
                 case Weather.Overcast: sky = new Sky { ambient = new Color(0.17f, 0.19f, 0.27f), fog = new Color(0.025f, 0.03f, 0.045f), fogDensity = 0.008f, moonColor = new Color(0.7f, 0.74f, 0.9f), moonIntensity = 1.7f, shadow = 0.5f }; break;
@@ -735,6 +797,22 @@ namespace IronNight
             }
             if (winter) { sky.ambient = sky.ambient * 1.15f + new Color(0.02f, 0.02f, 0.04f); sky.fog = sky.fog * 1.4f + new Color(0.02f, 0.02f, 0.03f); sky.moonColor = new Color(sky.moonColor.r * 0.95f, sky.moonColor.g, Mathf.Min(1f, sky.moonColor.b * 1.05f)); }
             LightShaft.boost = weather == Weather.Fog ? 1.8f : weather == Weather.Rain ? 1.3f : 1f;
+        }
+
+        /// <summary>Puts the sky into the scene: ambient, fog, moon, the rain or the snow, the wet ground, the ranges
+        /// everyone fights at and the line under the clock.</summary>
+        void ApplyWeather()
+        {
+            SkyFor();
+            RenderSettings.ambientLight = sky.ambient; RenderSettings.fogDensity = sky.fogDensity; RenderSettings.fogColor = sky.fog;
+            if (moon != null) { moon.color = sky.moonColor; moon.intensity = sky.moonIntensity; moon.shadowStrength = sky.shadow; }
+            rangeMul = Depot.RangeMul * (Depot.CrewLevel >= 3 ? 1.05f : 1f) * cardRange * (weather == Weather.Fog ? 0.8f : 1f);
+            enemyRangeMul = weather == Weather.Fog ? 0.8f : weather == Weather.Overcast ? 0.9f : weather == Weather.Rain ? 0.85f : 1f;
+            bool wet = weather == Weather.Rain && !winter;
+            if (props != null) { props.wet = wet; Vehicle.Wet = wet; if (wet) props.SetWet(0.5f); }
+            if (weather == Weather.Rain) { if (rain == null) BuildRain(); else { rain.Play(); } } else if (rain != null) rain.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            Sfx.Ambient(wet); LightShaft.boost = weather == Weather.Fog ? 1.8f : weather == Weather.Rain ? 1.3f : 1f;
+            hud.SetConditions(winter ? "Ardennes" : "Normandy", winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Rain ? "the enemy shoots short" : weather == Weather.Overcast ? "a dark night, the enemy sees less" : "the moon is up: they see you");
         }
 
         /// <summary>Low quality for weak phones: no moon shadows, no post-processing, no rain or snow.</summary>
@@ -901,6 +979,62 @@ namespace IronNight
             }
             Depot.Tally("abilities", 1);
         }
+
+        /// <summary>An ace of the night: a heavy with a name, thicker armour and a steadier gun. One at a time; killing
+        /// him pays 600 and goes into the tally. His name rides over his turret while he lives.</summary>
+        void TickAce(float dt)
+        {
+            if (ace != null && !ace.dead) { hud.NamePlate(aceName, ace.transform.position + Vector3.up * 3.4f, cam, ace.hp / (ace.spec.hp * 1.7f)); return; }
+            if (ace != null && ace.dead) { hud.NamePlate(null, Vector3.zero, cam, 0f); ace = null; aceTimer = 95f + Random.value * 40f; }
+            if (t < 100f || boss != null) return;
+            aceTimer -= dt; if (aceTimer > 0f) return;
+            var L = Leader; var spec = Random.value < 0.5f ? VehicleSpec.Tiger : Random.value < 0.6f ? VehicleSpec.Panther : VehicleSpec.PanzerIV;
+            if (!VehicleSpec.Available(spec)) spec = VehicleSpec.PanzerIV;
+            float a = (Random.value - 0.5f) * 1.2f; var at = L.transform.position + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * 62f;
+            ace = Foe(spec, props.PushOut(at, 3f), Mathf.Atan2(L.transform.position.x - at.x, L.transform.position.z - at.z));
+            ace.hp *= 1.7f; aceName = AceNames[Random.Range(0, AceNames.Length)] + " · " + spec.name;
+            hud.Toast(aceName + " · an ace is on the field, " + Clock(at), 3.4f); Sfx.Whistle(at); if (Random.value < 0.7f) Radio("hit");
+            fx.Marker(at, new Color(1f, 0.3f, 0.25f), 7f, true);
+        }
+
+        /// <summary>Phosphorus: what was hit goes on burning. The spotter plane marks the thickest group. The recovery
+        /// crew drags a wingman back into the fight.</summary>
+        void TickCards(float dt)
+        {
+            if (phosphorus && burning.Count > 0)
+                for (int i = burning.Count - 1; i >= 0; i--)
+                {
+                    var v = burning[i]; if (v == null || v.dead) { burn.Remove(v); burning.RemoveAt(i); continue; }
+                    float left = burn[v] - dt; burn[v] = left;
+                    if (Random.value < dt * 6f) fx.Trail(v.transform.position + Vector3.up * (1.4f + Random.value));
+                    if (left <= 0f) { burn.Remove(v); burning.RemoveAt(i); continue; }
+                    if (Mathf.FloorToInt(left + dt) != Mathf.FloorToInt(left)) { Damage(v, 0.17f, v.transform.position); if (phase != Phase.Play) return; }
+                }
+            if (spotterPlane)
+            {
+                planeTimer -= dt;
+                if (planeTimer <= 0f)
+                {
+                    planeTimer = 30f; var L = Leader; Vehicle best = null; int bestN = 0;
+                    foreach (var e in foes)
+                    {
+                        if (e.dead) continue; int n = 0; foreach (var o in foes) if (!o.dead && (o.transform.position - e.transform.position).sqrMagnitude < 900f) n++;
+                        if (n > bestN) { bestN = n; best = e; }
+                    }
+                    if (best != null) { var at = best.transform.position; foreach (var e in foes) if (!e.dead && (e.transform.position - at).sqrMagnitude < 900f) fx.Marker(e.transform.position, new Color(1f, 0.45f, 0.35f), 5f, true); hud.Toast("Spotter plane: " + bestN + " of them, " + Clock(at), 2.6f); Sfx.Click(); }
+                }
+            }
+            if (recovery && recoveryLeft > 0f)
+            {
+                recoveryLeft -= dt;
+                if (recoveryLeft <= 0f && recoverySpec != null && platoon.Count < maxPlatoon)
+                {
+                    var L = Leader; var v = Vehicle.Create(recoverySpec, true, L.transform.position - L.Forward * 9f, L.yaw); v.hp = Mathf.Max(2f, recoverySpec.hp * 0.6f) + wingmanBonus; platoon.Add(v);
+                    hud.Toast("Recovered · " + recoverySpec.name + " is back in the platoon", 2.8f); Sfx.Pickup(); recoverySpec = null;
+                }
+            }
+        }
+        Vehicle lastHitFoe; VehicleSpec recoverySpec; float recoveryLeft; float cardRange = 1f;   // what the cards have added to the sight, kept apart from the weather
 
         void TickAbility(float dt)
         {

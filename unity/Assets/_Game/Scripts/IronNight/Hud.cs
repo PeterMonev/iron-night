@@ -626,6 +626,25 @@ namespace IronNight
             abilityPic.color = charged >= 1f ? Color.white : new Color(0.55f, 0.55f, 0.58f);
         }
 
+        /// <summary>The ace's name over his turret, with what is left of him under it; null hides it.</summary>
+        Text nameText; Image nameBar, nameFill;
+        public void NamePlate(string name, Vector3 world, Camera cam, float fraction)
+        {
+            if (nameText == null)
+            {
+                nameText = MakeText(hudGroup.transform, "AceName", new Vector2(0.5f, 0.5f), Vector2.zero, TextAnchor.LowerCenter, 26, new Color(1f, 0.55f, 0.45f)); nameText.font = BoldFont(); nameText.rectTransform.sizeDelta = new Vector2(500, 40);
+                nameBar = MakeImage(hudGroup.transform, "AceBar", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(220, 8), new Color(0.1f, 0.05f, 0.05f, 0.85f)); nameBar.sprite = Rounded(); nameBar.type = Image.Type.Sliced;
+                nameFill = MakeImage(hudGroup.transform, "AceFill", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(220, 8), new Color(0.95f, 0.35f, 0.3f, 0.95f)); nameFill.sprite = Rounded(); nameFill.type = Image.Type.Sliced;
+            }
+            bool on = name != null; if (nameText.enabled != on) { nameText.enabled = on; nameBar.enabled = on; nameFill.enabled = on; }
+            if (!on) return;
+            var vp = cam.WorldToViewportPoint(world); if (vp.z < 0f) { nameText.enabled = nameBar.enabled = nameFill.enabled = false; return; }
+            var rect = canvas.GetComponent<RectTransform>().rect; var at = new Vector2((vp.x - 0.5f) * rect.width, (vp.y - 0.5f) * rect.height);
+            nameText.text = name; nameText.rectTransform.anchoredPosition = at + new Vector2(0f, 14f);
+            nameBar.rectTransform.anchoredPosition = at; nameFill.rectTransform.anchoredPosition = at - new Vector2(110f * (1f - Mathf.Clamp01(fraction)), 0f);
+            nameFill.rectTransform.sizeDelta = new Vector2(220f * Mathf.Clamp01(fraction), 8f);
+        }
+
         public void SetTally(int kills, int score) { tally.text = kills == 0 && score == 0 ? "" : $"{kills} kills · {score}"; }
 
         // the reload arc: a ring under the leader that fills while the gun reloads, gone when it is ready
@@ -863,6 +882,9 @@ namespace IronNight
                 case "he": return "card_he"; case "apcr": return "card_apcr"; case "rapid": case "loaders": return "card_loader"; case "radar": case "optics": return "card_optics";
                 case "engine": case "engines": return "card_engines"; case "repair": return "card_repair"; case "reinf": return "card_reinf"; case "arty": return "card_artillery";
                 case "smoke": return "card_smoke"; case "firefly": return "card_firefly"; case "gunners": return "card_gunner"; case "plates": case "armor": return "card_armour";
+                // the new cards borrow the nearest picture until they have their own
+                case "wet": case "sandbags": return "card_armour"; case "dozer": case "widetracks": return "card_engines"; case "canister": case "phos": return "card_he";
+                case "radionet": case "plane": return "card_optics"; case "ace": return "card_gunner"; case "recovery": return "card_repair";
                 case "reserve": return "card_crews"; case "veteran": return "card_veteran"; default: return null;
             }
         }
@@ -883,7 +905,7 @@ namespace IronNight
             var rt = go.GetComponent<RectTransform>(); rt.anchorMin = rt.anchorMax = anchor; rt.pivot = new Vector2(0.5f, 0.5f); rt.anchoredPosition = pos; rt.sizeDelta = size;
             var bi = go.GetComponent<Image>(); bi.color = new Color(0.03f, 0.04f, 0.06f, 0.6f); bi.sprite = Rounded(); bi.type = Image.Type.Sliced;
             go.AddComponent<PressFeel>();
-            var btn = go.GetComponent<Button>(); btn.onClick.AddListener(() => { Sfx.Click(); onClick(); }); var cb = btn.colors; cb.highlightedColor = new Color(1f, 1f, 1f, 0.92f); cb.pressedColor = new Color(0.75f, 0.75f, 0.75f, 1f); cb.fadeDuration = 0.06f; btn.colors = cb;
+            var btn = go.GetComponent<Button>(); btn.onClick.AddListener(() => { if (UnityEngine.EventSystems.EventSystem.current != null) UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(null); Sfx.Click(); onClick(); });   // nothing stays selected: a stray key never presses a button again var cb = btn.colors; cb.highlightedColor = new Color(1f, 1f, 1f, 0.92f); cb.pressedColor = new Color(0.75f, 0.75f, 0.75f, 1f); cb.fadeDuration = 0.06f; btn.colors = cb;
             var t = MakeText(go.transform, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, TextAnchor.MiddleCenter, fontSize, new Color(0.93f, 0.91f, 0.86f)); t.font = BoldFont();
             t.GetComponent<RectTransform>().sizeDelta = size; t.text = label;
             return go;

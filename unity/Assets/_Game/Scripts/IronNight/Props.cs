@@ -642,6 +642,9 @@ namespace IronNight
             return false;
         }
 
+        public readonly List<Vector3> gaps = new List<Vector3>();   // holes a dozer blade has pushed through the hedges
+        public bool Ploughed(Vector3 pos) { foreach (var g in gaps) { var d = g - pos; d.y = 0f; if (d.sqrMagnitude < 25f) return true; } return false; }
+
         public bool Blocks(Vector3 pos)
         {
             foreach (var p in active)

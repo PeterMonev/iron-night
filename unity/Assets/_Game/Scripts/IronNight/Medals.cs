@@ -32,6 +32,7 @@ namespace IronNight
             new Medal { id = "daybreak", name = "Daybreak", desc = "Hold two minutes into daylight.", test = () => Depot.Total("daybreak") >= 1 },
             new Medal { id = "spotter", name = "Spotter Hunter", desc = "Silence five forward observers.", test = () => Depot.Total("observers") >= 5 },
             new Medal { id = "samaritan", name = "Good Samaritan", desc = "Pick up five stranded crews.", test = () => Depot.Total("rescued") >= 5 },
+            new Medal { id = "acehunter", name = "Ace Hunter", desc = "Knock out ten named aces.", test = () => Depot.Total("acesNamed") >= 10 },
             new Medal { id = "oldhands", name = "Old Hands", desc = "Keep one crew alive for ten nights.", test = () => Depot.CrewNights >= 10 },
         };
 
