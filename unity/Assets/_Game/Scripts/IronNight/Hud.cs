@@ -248,8 +248,8 @@ namespace IronNight
             { var pts = MakeCard(depotSheet.transform, "Points", new Vector2(1f, 1f), new Vector2(-50, -70), new Vector2(300, 72), new Color(0.06f, 0.07f, 0.09f, 0.75f), 0.2f); pts.rectTransform.pivot = new Vector2(1f, 1f);
               var coin = MakeImage(pts.transform, "Coin", new Vector2(0f, 0.5f), new Vector2(18, 0), new Vector2(30, 30), new Color(0.96f, 0.68f, 0.24f)); coin.sprite = Lightswarm.ProceduralSprites.Ring(64, 0.16f); coin.rectTransform.pivot = new Vector2(0f, 0.5f);
               depotPoints = MakeText(pts.transform, "Text", new Vector2(0f, 0.5f), new Vector2(64, 0), TextAnchor.MiddleLeft, 30, new Color(0.96f, 0.68f, 0.24f)); depotPoints.rectTransform.pivot = new Vector2(0f, 0.5f); depotPoints.rectTransform.sizeDelta = new Vector2(230, 72); depotPoints.font = BoldFont(); }
-            MakeText(depotSheet.transform, "Hint", new Vector2(0.5f, 1f), new Vector2(0, -1010), TextAnchor.MiddleCenter, 22, dim).text = "drag the tank to turn it · tap a tank in the list to see it";
-            var panel = MakeCard(depotSheet.transform, "Panel", new Vector2(0.5f, 0f), new Vector2(0, 40), new Vector2(1000, 1230), new Color(0.04f, 0.05f, 0.07f, 0.82f), 0.14f); panel.rectTransform.pivot = new Vector2(0.5f, 0f);
+            MakeText(depotSheet.transform, "Hint", new Vector2(0.5f, 0f), new Vector2(0, 1062), TextAnchor.MiddleCenter, 22, dim).text = "drag the tank to turn it · tap a tank in the list to see it";
+            var panel = MakeCard(depotSheet.transform, "Panel", new Vector2(0.5f, 0f), new Vector2(0, 40), new Vector2(1000, 1000), new Color(0.04f, 0.05f, 0.07f, 0.82f), 0.14f); panel.rectTransform.pivot = new Vector2(0.5f, 0f);
             { var seg = MakeCard(panel.transform, "Tabs", new Vector2(0.5f, 1f), new Vector2(0, -22), new Vector2(920, 84), new Color(0.03f, 0.04f, 0.05f, 0.9f), 0.1f); seg.rectTransform.pivot = new Vector2(0.5f, 1f);
               depotTabs[0] = MakeButton(seg.transform, "Upgrades", new Vector2(0.5f, 0.5f), new Vector2(-228, 0), new Vector2(446, 70), 28, () => { depotTab = 0; RefreshDepot(); }).GetComponent<Button>();
               depotTabs[1] = MakeButton(seg.transform, "Garage", new Vector2(0.5f, 0.5f), new Vector2(228, 0), new Vector2(446, 70), 28, () => { depotTab = 1; RefreshDepot(); }).GetComponent<Button>();
@@ -267,7 +267,7 @@ namespace IronNight
 
         public void ShowTitle(bool reserveGranted)
         {
-            if (garage != null) { garage.SetActive(false); garage.Show(VehicleSpec.ById(Depot.LeaderId)); garage.SetTitle(true); titleBackdrop.texture = garage.TitleTexture; }
+            if (garage != null) { garage.SetActive(false); garage.Show(VehicleSpec.ById(Depot.LeaderId)); garage.SetTitle(true); garage.Frame(false); titleBackdrop.texture = garage.TitleTexture; }
             Depot.Load(); Medals.Check(); hudGroup.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(false); dailyBtn.SetActive(Depot.DailyReady);
             rankLine.text = Depot.Rank.ToUpperInvariant() + "\n" + (Depot.NightsFought == 0 ? "first night" : Depot.NightsFought + " nights · " + Depot.CrewName.ToLowerInvariant() + " · " + Depot.CrewNights + " together"); pointsLine.text = Depot.Points.ToString("N0");
             int m = Mathf.FloorToInt(Depot.BestTime / 60f), s = Mathf.FloorToInt(Depot.BestTime % 60f);
@@ -296,7 +296,7 @@ namespace IronNight
         public void ShowDepot()
         {
             Depot.Load(); titleSheet.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(true);
-            if (garage != null) { garage.Show(VehicleSpec.ById(Depot.LeaderId)); garage.SetTitle(true); depotBackdrop.texture = garage.TitleTexture; depotDrag.garage = garage; }
+            if (garage != null) { garage.Show(VehicleSpec.ById(Depot.LeaderId)); garage.SetTitle(true); garage.Frame(true); depotBackdrop.texture = garage.TitleTexture; depotDrag.garage = garage; }
             RefreshDepot(); if (depotScroll != null) depotScroll.verticalNormalizedPosition = 1f;
         }
 
@@ -359,7 +359,7 @@ namespace IronNight
                 for (int k = 0; k < Depot.Leaders.Length; k++)
                 {
                     var c = Depot.Leaders[k]; bool owned = Depot.OwnsLeader(c), chosen = Depot.LeaderId == c.id, can = owned || Depot.Points >= c.cost;
-                    var b = MakeButton(row.transform, owned ? c.name : $"{c.name} · {c.cost}", new Vector2(0f, 0f), new Vector2(240 + k * 440, 50), new Vector2(420, 80), 28, () => { if (Depot.PickLeader(c)) RefreshDepot(); });
+                    var b = MakeButton(row.transform, owned ? c.name : $"{c.name} · {c.cost}", new Vector2(0f, 0f), new Vector2(240 + k * 440, 50), new Vector2(420, 80), 28, () => { if (Depot.PickLeader(c)) { if (garage != null) garage.Show(VehicleSpec.ById(c.id)); RefreshDepot(); } });
                     b.GetComponent<Image>().color = chosen ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : can ? new Color(0.2f, 0.22f, 0.24f, 0.95f) : new Color(0.12f, 0.12f, 0.13f, 0.9f);
                     b.transform.Find("Label").GetComponent<Text>().color = chosen ? new Color(0.1f, 0.08f, 0.05f) : can ? new Color(0.93f, 0.91f, 0.86f) : new Color(0.5f, 0.48f, 0.45f);
                     b.GetComponent<Button>().interactable = can && !chosen;
@@ -396,7 +396,7 @@ namespace IronNight
                 var stats = MakeText(row.transform, "Stats", new Vector2(0f, 1f), new Vector2(30, -58), TextAnchor.UpperLeft, 24, amber); stats.text = $"speed {spec.speed:0}  ·  gun {spec.damage:0.#}  ·  reload {spec.reload:0.#} s  ·  range {spec.range:0} m  ·  hits {spec.hp:0.#}"; stats.rectTransform.sizeDelta = new Vector2(600, 34);
                 var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(30, -92), TextAnchor.UpperLeft, 24, dim); desc.text = c.desc; desc.rectTransform.sizeDelta = new Vector2(600, 56);
                 if (garage != null && here) { var look = MakeButton(row.transform, "", new Vector2(0f, 0.5f), new Vector2(320, 0), new Vector2(640, 150), 10, () => garage.Show(spec)); look.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.01f); look.transform.SetAsFirstSibling(); }
-                var b = MakeButton(row.transform, chosen ? "Leading" : owned ? "Lead" : $"{c.cost} pts", new Vector2(1f, 0.5f), new Vector2(-150, 0), new Vector2(260, 80), 28, () => { if (Depot.PickLeader(c)) RefreshDepot(); });
+                var b = MakeButton(row.transform, chosen ? "Leading" : owned ? "Lead" : $"{c.cost} pts", new Vector2(1f, 0.5f), new Vector2(-150, 0), new Vector2(260, 80), 28, () => { if (Depot.PickLeader(c)) { if (garage != null) garage.Show(spec); RefreshDepot(); } });
                 b.GetComponent<Image>().color = chosen ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : can ? new Color(0.2f, 0.22f, 0.24f, 0.95f) : new Color(0.12f, 0.12f, 0.13f, 0.9f);
                 b.transform.Find("Label").GetComponent<Text>().color = chosen ? new Color(0.1f, 0.08f, 0.05f) : can ? ink : new Color(0.5f, 0.48f, 0.45f);
                 b.GetComponent<Button>().interactable = can && !chosen;

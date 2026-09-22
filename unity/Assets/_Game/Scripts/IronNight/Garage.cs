@@ -112,6 +112,8 @@ namespace IronNight
         }
 
         public void SetActive(bool on) { cam.enabled = on; gameObject.SetActive(on || titleOn); }
+        /// <summary>The menu camera's framing: the tank in the middle of the screen for the title, high in the frame for the depot (a card fills the lower half).</summary>
+        public void Frame(bool depot) { titleCam.transform.LookAt(transform.position + (depot ? new Vector3(0.2f, -1.7f, 0.3f) : new Vector3(0.2f, 1.05f, 0.3f))); }
         /// <summary>The menu backdrop: the tank turning slowly under the roof lights.</summary>
         public void SetTitle(bool on) { titleOn = on; titleCam.enabled = on; if (on) gameObject.SetActive(true); else if (!cam.enabled) gameObject.SetActive(false); }
         public void Drag(float dx) { spinVel = dx * 0.35f; }
