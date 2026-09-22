@@ -384,23 +384,29 @@ namespace IronNight
                     var lbl = b.transform.Find("Label").GetComponent<Text>(); lbl.color = on ? new Color(0.1f, 0.08f, 0.05f) : ink; lbl.alignment = TextAnchor.MiddleLeft; lbl.rectTransform.anchorMin = Vector2.zero; lbl.rectTransform.anchorMax = Vector2.one; lbl.rectTransform.offsetMin = new Vector2(150f, 0f); lbl.rectTransform.offsetMax = Vector2.zero;
                     if (flags != null) { var f = MakeImage(b.transform, "Flag", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(120f, 90f), Color.white); f.sprite = UiSprite("flags", new Rect(k * flags.width / 2f, 0f, flags.width / 2f, flags.height)); f.preserveAspect = true; }
                 }
-                y -= 230f;
+                y -= 272f;
             }
             // the tanks of the tree
             foreach (var c in Depot.Leaders)
             {
                 if (c.nation != nation) continue; var spec = VehicleSpec.ById(c.id); bool here = VehicleSpec.Available(spec);
                 bool owned = Depot.OwnsLeader(c), chosen = Depot.LeaderId == c.id, can = here && (owned || Depot.Points >= c.cost);
-                var row = MakeImage(depotRows, "Row " + c.id, new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 150), new Color(0.08f, 0.09f, 0.1f, here ? 0.96f : 0.6f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);
-                var name = MakeText(row.transform, "Name", new Vector2(0f, 1f), new Vector2(30, -14), TextAnchor.UpperLeft, 38, here ? ink : dim); name.text = c.name + (here ? "" : "  · coming"); name.rectTransform.sizeDelta = new Vector2(560, 46);
-                var stats = MakeText(row.transform, "Stats", new Vector2(0f, 1f), new Vector2(30, -58), TextAnchor.UpperLeft, 24, amber); stats.text = $"speed {spec.speed:0}  ·  gun {spec.damage:0.#}  ·  reload {spec.reload:0.#} s  ·  range {spec.range:0} m  ·  hits {spec.hp:0.#}"; stats.rectTransform.sizeDelta = new Vector2(600, 34);
-                var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(30, -92), TextAnchor.UpperLeft, 24, dim); desc.text = c.desc; desc.rectTransform.sizeDelta = new Vector2(600, 56);
-                if (garage != null && here) { var look = MakeButton(row.transform, "", new Vector2(0f, 0.5f), new Vector2(320, 0), new Vector2(640, 150), 10, () => garage.Show(spec)); look.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.01f); look.transform.SetAsFirstSibling(); }
-                var b = MakeButton(row.transform, chosen ? "Leading" : owned ? "Lead" : $"{c.cost} pts", new Vector2(1f, 0.5f), new Vector2(-150, 0), new Vector2(260, 80), 28, () => { if (Depot.PickLeader(c)) { if (garage != null) garage.Show(spec); RefreshDepot(); } });
+                var row = MakeImage(depotRows, "Row " + c.id, new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 190), new Color(0.08f, 0.09f, 0.1f, here ? 0.96f : 0.6f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);
+                float left = 30f;
+                if (garage != null && here)
+                {
+                    // the tank's own picture from the hangar
+                    var pt = garage.Portrait(spec); if (pt != null) { var pic = MakeImage(row.transform, "Pic", new Vector2(0f, 0.5f), new Vector2(14, 0), new Vector2(300, 170), chosen ? Color.white : new Color(0.85f, 0.85f, 0.85f)); pic.rectTransform.pivot = new Vector2(0f, 0.5f); pic.sprite = Sprite.Create(pt, new Rect(0, 0, pt.width, pt.height), new Vector2(0.5f, 0.5f), 100f); pic.type = Image.Type.Simple; pic.preserveAspect = true; left = 330f; }
+                }
+                var name = MakeText(row.transform, "Name", new Vector2(0f, 1f), new Vector2(left, -16), TextAnchor.UpperLeft, 36, here ? ink : dim); name.text = c.name + (here ? "" : "  · coming"); name.font = BoldFont(); name.rectTransform.sizeDelta = new Vector2(560, 44);
+                var stats = MakeText(row.transform, "Stats", new Vector2(0f, 1f), new Vector2(left, -62), TextAnchor.UpperLeft, 22, amber); stats.text = $"speed {spec.speed:0}  ·  gun {spec.damage:0.#}  ·  reload {spec.reload:0.#} s\nrange {spec.range:0} m  ·  hits {spec.hp:0.#}"; stats.rectTransform.sizeDelta = new Vector2(420, 60);
+                var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(left, -124), TextAnchor.UpperLeft, 22, dim); desc.text = c.desc; desc.rectTransform.sizeDelta = new Vector2(400, 60);
+                if (garage != null && here) { var look = MakeButton(row.transform, "", new Vector2(0f, 0.5f), new Vector2(330, 0), new Vector2(660, 190), 10, () => garage.Show(spec)); look.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.01f); look.transform.SetAsFirstSibling(); }
+                var b = MakeButton(row.transform, chosen ? "Leading" : owned ? "Lead" : $"{c.cost} pts", new Vector2(1f, 0f), new Vector2(-120, 44), new Vector2(200, 64), 26, () => { if (Depot.PickLeader(c)) { if (garage != null) garage.Show(spec); RefreshDepot(); } });
                 b.GetComponent<Image>().color = chosen ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : can ? new Color(0.2f, 0.22f, 0.24f, 0.95f) : new Color(0.12f, 0.12f, 0.13f, 0.9f);
                 b.transform.Find("Label").GetComponent<Text>().color = chosen ? new Color(0.1f, 0.08f, 0.05f) : can ? ink : new Color(0.5f, 0.48f, 0.45f);
                 b.GetComponent<Button>().interactable = can && !chosen;
-                y -= 160f;
+                y -= 202f;
             }
             // the commanders: three portraits
             {

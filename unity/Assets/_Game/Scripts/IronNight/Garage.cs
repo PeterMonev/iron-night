@@ -16,6 +16,29 @@ namespace IronNight
         static readonly Vector3 Home = new Vector3(0f, -600f, 0f);
 
         Transform parked; Vehicle parkedTank;
+        Camera portraitCam; RenderTexture portraitRt; readonly System.Collections.Generic.Dictionary<string, Texture2D> portraits = new System.Collections.Generic.Dictionary<string, Texture2D>();
+
+        /// <summary>A picture of the tank for the garage list: put on the turntable and photographed by the portrait camera; kept for the session.</summary>
+        public Texture2D Portrait(VehicleSpec spec)
+        {
+            if (spec == null) return null; if (portraits.TryGetValue(spec.id, out var have)) return have;
+            if (portraitCam == null)
+            {
+                portraitRt = new RenderTexture(600, 340, 24) { antiAliasing = 2 };
+                var pc = new GameObject("PortraitCamera"); pc.transform.SetParent(transform, false); pc.transform.localPosition = new Vector3(-5.6f, 2.1f, -6.9f); pc.transform.LookAt(transform.position + new Vector3(0.2f, 1.1f, 0.2f));
+                portraitCam = pc.AddComponent<Camera>(); portraitCam.targetTexture = portraitRt; portraitCam.fieldOfView = 34f; portraitCam.nearClipPlane = 0.3f; portraitCam.farClipPlane = 60f; portraitCam.clearFlags = CameraClearFlags.SolidColor; portraitCam.backgroundColor = new Color(0.03f, 0.03f, 0.04f); portraitCam.enabled = false;
+                var d = pc.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>(); d.renderShadows = true; d.renderPostProcessing = false;
+            }
+            var before = shown != null ? shown.spec : null; bool wasActive = gameObject.activeSelf; gameObject.SetActive(true);
+            var spinBefore = stage.localRotation; stage.localRotation = Quaternion.Euler(0f, 28f, 0f);
+            Show(spec); if (shown != null) shown.Apply();
+            portraitCam.Render();
+            var tex = new Texture2D(portraitRt.width, portraitRt.height, TextureFormat.RGB24, false); var prev = RenderTexture.active; RenderTexture.active = portraitRt; tex.ReadPixels(new Rect(0, 0, portraitRt.width, portraitRt.height), 0, 0); RenderTexture.active = prev;
+            var px = tex.GetPixels(); for (int i = 0; i < px.Length; i++) px[i] = new Color(Mathf.Min(1f, px[i].r * 1.45f), Mathf.Min(1f, px[i].g * 1.45f), Mathf.Min(1f, px[i].b * 1.45f), 1f); tex.SetPixels(px); tex.Apply();   // a little exposure: the list is smaller and darker than the hangar
+            portraits[spec.id] = tex; stage.localRotation = spinBefore;
+            if (before != null) Show(before); if (!wasActive) gameObject.SetActive(false);
+            return tex;
+        }
         static Material Surface(string tex, Vector2 tiling, Color tint, float smooth)
         {
             var m = new Material(Resources.Load<Material>("VehicleLitN")); m.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/" + tex)); m.SetTexture("_BumpMap", Resources.Load<Texture2D>("Textures/" + tex + "_n"));
