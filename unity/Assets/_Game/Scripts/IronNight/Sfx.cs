@@ -25,6 +25,31 @@ namespace IronNight
 
         /// <summary>The sound switch on the pause sheet; remembered between nights.</summary>
         public static bool Muted { get => PlayerPrefs.GetInt("sound", 1) == 0; set { PlayerPrefs.SetInt("sound", value ? 0 : 1); PlayerPrefs.Save(); AudioListener.volume = value ? 0f : 1f; } }
+        public static bool MusicOff { get => PlayerPrefs.GetInt("music", 1) == 0; set { PlayerPrefs.SetInt("music", value ? 0 : 1); PlayerPrefs.Save(); if (instance != null) instance.MusicTick(0f); } }
+        AudioSource music; float musicWant;   // the menu theme: up in the hangar, out in the field
+
+        /// <summary>The march in the menu: fades in when the hangar is on screen, out when the night starts.</summary>
+        public static void Music(bool on)
+        {
+            if (instance == null) return;
+            if (instance.music == null)
+            {
+                var clip = Resources.Load<AudioClip>("Audio/menu_theme"); if (clip == null) return;
+                var go = new GameObject("Music"); go.transform.SetParent(instance.transform, false);
+                instance.music = go.AddComponent<AudioSource>(); instance.music.clip = clip; instance.music.loop = true; instance.music.volume = 0f; instance.music.spatialBlend = 0f; instance.music.priority = 0;
+            }
+            instance.musicWant = on ? 0.38f : 0f;
+            if (on && !instance.music.isPlaying && !MusicOff) instance.music.Play();
+        }
+        void Update() { MusicTick(Time.unscaledDeltaTime); }
+
+        void MusicTick(float dt)
+        {
+            if (music == null) return;
+            float want = MusicOff ? 0f : musicWant;
+            music.volume = Mathf.MoveTowards(music.volume, want, dt <= 0f ? 1f : dt * 0.7f);
+            if (music.volume <= 0.001f && music.isPlaying) music.Pause(); else if (want > 0f && !music.isPlaying) music.UnPause();
+        }
 
         // ---- the DSP kit: everything works on float buffers at 44.1 kHz ----
 

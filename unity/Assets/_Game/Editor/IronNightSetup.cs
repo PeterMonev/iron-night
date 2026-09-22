@@ -52,7 +52,7 @@ namespace IronNight.EditorTools
             Directory.CreateDirectory(Res);
             SetupPipeline();
             CreateMaterials();
-            ImportModels();
+            ImportModels(); ImportAudio();
             CreateScene();
             AssetDatabase.SaveAssets();
             Debug.Log("Iron Night: project setup complete.");
@@ -161,6 +161,20 @@ namespace IronNight.EditorTools
         }
 
         // the generated vehicles: smooth normals, no importer materials (the code assigns its own, textured per vehicle)
+        // the menu theme is minutes long: streamed and compressed, not decompressed into memory
+        static void ImportAudio()
+        {
+            foreach (var guid in AssetDatabase.FindAssets("t:AudioClip", new[] { "Assets/_Game/Resources/Audio" }))
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid); var imp = AssetImporter.GetAtPath(path) as AudioImporter; if (imp == null) continue;
+                bool music = path.Contains("menu_theme"); var s = imp.defaultSampleSettings;
+                var want = music ? AudioClipLoadType.Streaming : AudioClipLoadType.DecompressOnLoad;
+                var fmt = music ? AudioCompressionFormat.Vorbis : AudioCompressionFormat.PCM;
+                if (s.loadType == want && s.compressionFormat == fmt) continue;
+                s.loadType = want; s.compressionFormat = fmt; s.quality = 0.55f; imp.defaultSampleSettings = s; imp.SaveAndReimport();
+            }
+        }
+
         static void ImportModels()
         {
             foreach (var guid in AssetDatabase.FindAssets("t:Model", new[] { "Assets/_Game/Resources/Models", "Assets/_Game/Resources/Props" }))

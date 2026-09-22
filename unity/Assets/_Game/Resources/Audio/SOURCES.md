@@ -29,3 +29,9 @@ Sound Effects Free License (free for commercial use). Neither may be redistribut
 | click | Mixkit 1117 "Classic click" | Mixkit |
 | pickup | Mixkit 2544 "Metal button radio ping" | Mixkit |
 | levelUp | Mixkit 265 "Quick positive video game notification interface" | Mixkit |
+
+## Menu theme
+`menu_theme.wav` — "The U.S. Field Artillery" (John Philip Sousa, 1917; the tune of "The Army Goes Rolling Along"),
+performed by the United States Marine Band, 2019. A work of the US federal government: public domain.
+Source: https://commons.wikimedia.org/wiki/File:Sousa%27s_%22U.S._Field_Artillery%22_-_United_States_Marine_Band_(2019).mp3
+Prepared with `art/pipeline/music-prep.py` (stereo 44.1 kHz, fades, normalised); imported streaming + Vorbis.
