@@ -29,7 +29,7 @@ namespace IronNight
             volume.isGlobal = true; volume.profile = Resources.Load<VolumeProfile>("BattleProfile");
 
             var hud = new GameObject("Hud").AddComponent<Hud>(); hud.Build();
-            var stick = new GameObject("Stick").AddComponent<TouchStick>(); stick.Build(hud.Canvas);
+            var stick = new GameObject("Stick").AddComponent<TouchStick>(); stick.Build(hud.Canvas); hud.HandTo(stick);
             Sfx.Build(cam);
             var fx = new GameObject("Fx").AddComponent<Fx>(); fx.Build(cam);
             var battle = new GameObject("Battle").AddComponent<Battle>(); battle.Build(cam, hud, stick, fx);

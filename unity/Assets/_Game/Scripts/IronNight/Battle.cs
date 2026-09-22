@@ -13,6 +13,9 @@ namespace IronNight
     public class Battle : MonoBehaviour
     {
         class Shell { public Vector3 pos, vel; public bool friendly, he, bounced, faust; public float dmg, life, trail; public Transform vis; }
+        // the racks: what the leader carries into the night and what is left of it
+        int apRounds = 28, heRounds = 10, apMax = 28, heMax = 10; bool loadHe; float dryToast;
+        float abilityLeft, abilityCool, spotLeft;   // the commander's one card, and the ten seconds his spotting lasts
         enum Weather { Clear, Overcast, Fog, Rain }
         static bool LowQuality { get => PlayerPrefs.GetInt("quality", 1) == 0; set { PlayerPrefs.SetInt("quality", value ? 0 : 1); PlayerPrefs.Save(); } }
         class Sky { public Color ambient, fog, moonColor; public float fogDensity, moonIntensity, shadow; }
@@ -61,7 +64,7 @@ namespace IronNight
         static readonly bool debugDrops = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--drops") >= 0;   // test switch: the first supply drop at 0:03
         static readonly bool debugInfantry = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--infantry") >= 0;   // test switch: a squad at 0:04
         bool debugSquadSent;
-        float damageMul = 1f, reloadMul = 1f, rangeMul = 1f, speedMul = 1f, scatterMul = 1f, turretMul = 1f; bool he, gunners, hasSmoke, fireflyNext, firstNight; string bonus = "";
+        float damageMul = 1f, reloadMul = 1f, rangeMul = 1f, speedMul = 1f, scatterMul = 1f, turretMul = 1f; float heBurst = 5f; bool he, gunners, hasSmoke, fireflyNext, firstNight; string bonus = "";
         VehicleSpec Wingman => VehicleSpec.ById(Depot.WingmanId);
         float artyInterval, artyTimer, smokeLeft, smokeCooldown; int wingmanBonus, hintIndex; readonly List<ArtyShell> arty = new List<ArtyShell>();
         static readonly float[] steerAngles = { 0f, 35f, -35f, 70f, -70f, 110f, -110f };
@@ -102,6 +105,9 @@ namespace IronNight
             }
             // the commander riding with the leader
             bonus = Depot.CommanderBonus; commander = System.Array.Find(Depot.Commanders, c => c.id == Depot.CommanderId && c.nation == Depot.Nation); if (bonus == "reload") reloadMul *= 0.85f; if (bonus == "speed") speedMul *= 1.12f; if (bonus == "armour") Leader.hp += 1f;
+            apMax += Depot.Level("ammo") * 6; heMax += Depot.Level("ammo") * 3; apRounds = apMax; heRounds = heMax;
+            hud.OnAmmo = () => { loadHe = !loadHe; if (loadHe && heRounds <= 0) loadHe = false; else if (!loadHe && apRounds <= 0 && heRounds > 0) loadHe = true; Sfx.Click(); hud.SetAmmo(apRounds, heRounds, loadHe); };
+            hud.OnAbility = UseAbility;
             NextObjective();
             hud.OnFormation = f => formation = f;
             hud.OnAd = OnAd; hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
@@ -175,7 +181,9 @@ namespace IronNight
                 var v = platoon[i]; var slot = Slot(i); var d = slot - v.transform.position; d.y = 0f;
                 if (d.magnitude > 1.2f) v.Drive(Steer(v, new Vector2(d.x, d.z) * (Mathf.Clamp01(d.magnitude / 5f))), dt);
             }
-            foreach (var v in platoon) { if (v.trackOut > 0f) v.trackOut -= dt; v.speedMul = speedMul; v.damageMul = damageMul; v.rangeMul = rangeMul; v.reloadMul = reloadMul; v.turretMul = turretMul; }
+            TickAbility(dt);
+            bool fast = abilityLeft > 0f && bonus == "reload", hard = abilityLeft > 0f && bonus == "heavy", quick = abilityLeft > 0f && bonus == "speed";
+            foreach (var v in platoon) { if (v.trackOut > 0f) v.trackOut -= dt; v.speedMul = speedMul * (quick ? 1.6f : 1f); v.damageMul = damageMul * (hard ? 1.8f : 1f); v.rangeMul = rangeMul; v.reloadMul = reloadMul * (fast ? 0.45f : 1f); v.turretMul = turretMul; }
 
             // a tap on an enemy: every gun onto it for eight seconds
             if (stick.ConsumeTap() && phase == Phase.Play)
@@ -199,7 +207,7 @@ namespace IronNight
                 {
                     // told to shell a spot: every gun in range onto it
                     var toP = point - v.transform.position; toP.y = 0f;
-                    if (toP.magnitude <= v.Range) { bool onP = v.Aim(point, dt); if (v.spec.casemate) { float offP = Mathf.DeltaAngle(v.yaw * Mathf.Rad2Deg, v.turretYaw * Mathf.Rad2Deg); v.turretYaw = v.yaw + Mathf.Clamp(offP, -14f, 14f) * Mathf.Deg2Rad; onP = onP && Mathf.Abs(offP) <= 14f; } if (onP && v.reloadLeft <= 0f) Fire(v); v.Apply(); continue; }
+                    if (toP.magnitude <= v.Range) { bool onP = v.Aim(point, dt); if (v.spec.casemate) { float offP = Mathf.DeltaAngle(v.yaw * Mathf.Rad2Deg, v.turretYaw * Mathf.Rad2Deg); v.turretYaw = v.yaw + Mathf.Clamp(offP, -14f, 14f) * Mathf.Deg2Rad; onP = onP && Mathf.Abs(offP) <= 14f; } if (onP && v.reloadLeft <= 0f && (v != Leader || apRounds > 0 || heRounds > 0)) Fire(v); v.Apply(); continue; }
                 }
                 if (target != null)
                 {
@@ -211,7 +219,7 @@ namespace IronNight
                         if (v != L && Mathf.Abs(off) > 6f && (Slot(platoon.IndexOf(v)) - v.transform.position).magnitude <= 1.2f) v.yaw += Mathf.Sign(off) * v.spec.turnRate * 0.6f * dt;
                         v.turretYaw = v.yaw + Mathf.Clamp(off, -14f, 14f) * Mathf.Deg2Rad; on = on && Mathf.Abs(off) <= 14f;
                     }
-                    if (on && v.reloadLeft <= 0f && Dist(v, target) <= v.Range) Fire(v, target);
+                    if (on && v.reloadLeft <= 0f && Dist(v, target) <= v.Range) { if (v != Leader || apRounds > 0 || heRounds > 0) Fire(v, target); else Dry(); }
                 }
                 else v.IdleTurret(dt);
                 v.Apply();
@@ -264,7 +272,7 @@ namespace IronNight
             hud.Indicators(foes, cam);
             TickObjective(dt); TickDrops(dt); TickMortars(dt); TickStar(dt);
             if (ammoLeft > 0f) { ammoLeft -= dt; if (ammoLeft <= 0f) { ammoMul = 1f; hud.Toast("APCR spent"); } }
-            hud.Radar(foes, platoon, L.transform.position, objective != null ? objective.pos : Vector3.zero, objective != null);
+            hud.Radar(foes, platoon, L.transform.position, objective != null ? objective.pos : Vector3.zero, objective != null);   // the commander's spotting shows them all: the markers are placed when it is called
             hud.HpBars(foes, cam, boss);
             if (objective != null) { var od = objective.pos - L.transform.position; od.y = 0f; hud.Objective(objective.pos, od.magnitude, cam, true); }
             TickObjectiveLabel();
@@ -397,12 +405,14 @@ namespace IronNight
         {
             v.reloadLeft = v.spec.reload * v.reloadMul * (v.friendly ? 1f : Mathf.Lerp(1.9f, 1.1f, t / 120f) * (firstNight ? 1.3f : 1f)); v.Recoil();
             var scatter = (v.friendly ? 1.5f * scatterMul : 4f * (smokeLeft > 0f ? 3f : 1f) * (lit ? 0.5f : 1f)) * Mathf.Deg2Rad * Random.Range(-1f, 1f);
+            bool leaderShot = v == Leader, heShot = he || (leaderShot && loadHe);
+            if (leaderShot) { if (loadHe) heRounds--; else apRounds--; if (loadHe && heRounds <= 0 && apRounds > 0) loadHe = false; hud.SetAmmo(apRounds, heRounds, loadHe); }
             if (v.friendly) shotsFired++;
             var dir = Quaternion.Euler(0f, scatter * Mathf.Rad2Deg, 0f) * v.GunDirection; var pos = v.MuzzlePosition;
             float speed = v.friendly ? ShellSpeed : EnemyShellSpeed;
             var vis = fx.Tracer(v.friendly ? new Color(1f, 1f, 0.9f, 1f) : new Color(1f, 0.75f, 0.55f, 1f), v.friendly ? new Color(1f, 0.85f, 0.45f, 0.6f) : new Color(1f, 0.45f, 0.25f, 0.6f));
             vis.position = pos; vis.rotation = Quaternion.LookRotation(cam.transform.forward, dir);
-            shells.Add(new Shell { pos = pos, vel = dir * speed, friendly = v.friendly, he = v.friendly && he, dmg = v.spec.damage * v.damageMul * (v.friendly ? ammoMul : 1f), life = v.Range / speed + 0.25f, vis = vis });
+            shells.Add(new Shell { pos = pos, vel = dir * speed, friendly = v.friendly, he = v.friendly && heShot, dmg = v.spec.damage * v.damageMul * (v.friendly ? ammoMul : 1f) * (leaderShot && loadHe ? 0.6f : 1f), life = v.Range / speed + 0.25f, vis = vis });
             fx.MuzzleFlash(pos, dir); Sfx.Shot(pos, v.friendly, v.spec.gunLength > 3f || v.spec.isGun); if (v.friendly) Sfx.Reload(v.transform.position);
         }
 
@@ -432,7 +442,7 @@ namespace IronNight
                     if (s.friendly) shotsHit++;
                     Damage(hit, s.dmg, s.pos);
                     TrackHit(hit, s.pos);
-                    if (s.he) { foreach (var v in hitList) if (v != hit && !v.dead && Dist(v, hit) < 5f) Damage(v, s.dmg * 0.5f, v.transform.position); if (s.friendly) InfantryKilled(infantry.Blast(s.pos, 5f), s.pos); }
+                    if (s.he) { float r = heBurst; foreach (var v in hitList) if (v != hit && !v.dead && Dist(v, hit) < r) Damage(v, s.dmg * 0.5f, v.transform.position); if (s.friendly) InfantryKilled(infantry.Blast(s.pos, r), s.pos); fx.Explosion(s.pos); }
                     fx.Hit(new Vector3(s.pos.x, 1.6f, s.pos.z), s.he ? 1.5f : 1f);
                 }
                 if (s.bounced) s.vel += Vector3.down * (30f * dt);
@@ -661,7 +671,7 @@ namespace IronNight
             xp -= xpNeed; level++; xpNeed = 6 + level * 3; hud.SetLevel(level, (float)xp / xpNeed);
             var all = new List<Hud.Card>
             {
-                new Hud.Card { id = "he", title = "HE shells", desc = "High explosive: every hit also damages tanks within 5 m." },
+                new Hud.Card { id = "he", title = "High explosive", desc = "Eight more HE rounds in the racks and a wider burst: 7 m instead of 5." },
                 new Hud.Card { id = "apcr", title = "APCR rounds", desc = "Tungsten core. +50% damage for the whole platoon." },
                 new Hud.Card { id = "rapid", title = "Faster loaders", desc = "The crews reload 20% faster." },
                 new Hud.Card { id = "radar", title = "Night optics", desc = "Gunners see 15% farther in the dark." },
@@ -683,7 +693,7 @@ namespace IronNight
             {
                 switch (id)
                 {
-                    case "he": he = true; break;
+                    case "he": { int add = Mathf.Min(heMax + 8 - heRounds, 8 + heMax - heRounds); heMax += 8; heRounds = Mathf.Min(heMax, heRounds + 8); heBurst = 7f; hud.SetAmmo(apRounds, heRounds, loadHe); break; }
                     case "apcr": damageMul *= 1.5f; break;
                     case "rapid": reloadMul *= 0.8f; break;
                     case "radar": rangeMul *= 1.15f; break;
@@ -868,6 +878,39 @@ namespace IronNight
             if (phase == Phase.Play) hud.Toast("Objective " + objective.n + " · " + (kind == "battery" ? "destroy the rocket battery, " : kind == "dump" ? "fuel dump · tap it to shell it, " : kind == "crew" ? "crew of a knocked-out tank · pick them up, " : kind == "car" ? "staff car making a run for it · stop it" : (hold ? "hold the crossing, " : "")) + (kind == "car" ? "" : Mathf.RoundToInt(dist) + " m ahead"), 3f);
         }
 
+        /// <summary>The gun is empty: the crew says so, once every few seconds, and the drops become the thing to drive for.</summary>
+        void Dry()
+        {
+            if (dryToast > 0f) return; dryToast = 6f; Sfx.Click();
+            hud.Toast("Racks empty · find a supply drop", 2.6f); if (Random.value < 0.6f) Radio("hit");
+        }
+
+        /// <summary>The commander's one order of the night, on a long cooldown: what it does depends on the man riding with you.</summary>
+        void UseAbility()
+        {
+            if (phase != Phase.Play || abilityCool > 0f || commander == null) return;
+            var L = Leader; abilityCool = 52f; Sfx.Pickup(); hud.Flash();
+            switch (bonus)
+            {
+                case "reload": abilityLeft = 9f; hud.Toast(commander.name + ": \"Load! Load! Load!\" · the gun works twice as fast", 3f); break;
+                case "radar": spotLeft = 11f; abilityLeft = 11f; hud.Toast(commander.name + ": \"Every one of them, marked.\"", 3f); foreach (var e in foes) if (!e.dead && (e.transform.position - L.transform.position).magnitude < 130f) fx.Marker(e.transform.position, new Color(1f, 0.4f, 0.35f), 6f, true); break;
+                case "heavy": abilityLeft = 9f; hud.Toast(commander.name + ": \"Aim for the mantlet. Now.\" · the shells bite deeper", 3f); break;
+                case "armour": abilityLeft = 8f; leaderShield = 8f; hud.Toast(commander.name + ": \"Button up!\" · nothing gets through for eight seconds", 3f); break;
+                case "repair": abilityLeft = 0f; L.hp = Mathf.Min(Depot.LeaderHp + 2f, L.hp + 3f); hud.SetLeader(Mathf.CeilToInt(L.hp), Mathf.CeilToInt(Depot.LeaderHp)); hud.Toast(commander.name + ": \"Patch her up.\" · leader +3", 3f); break;
+                default: abilityLeft = 9f; hud.Toast(commander.name + ": \"Full throttle!\" · the platoon runs", 3f); break;
+            }
+            Depot.Tally("abilities", 1);
+        }
+
+        void TickAbility(float dt)
+        {
+            if (abilityCool > 0f) abilityCool -= dt;
+            if (abilityLeft > 0f) abilityLeft -= dt;
+            if (spotLeft > 0f) spotLeft -= dt;
+            hud.SetAbility(commander != null, abilityCool <= 0f ? 1f : 1f - abilityCool / 52f, abilityLeft > 0f);
+            if (dryToast > 0f) dryToast -= dt;
+        }
+
         /// <summary>The briefing card for an objective that is more than a point to reach.</summary>
         void Brief(string kind)
         {
@@ -1023,7 +1066,7 @@ namespace IronNight
                     switch (d.kind)
                     {
                         case 0: { float mend = bonus == "repair" ? 3f : 2f; L.hp = Mathf.Min(Depot.LeaderHp + 2f, L.hp + mend); hud.Toast("Repair kit · leader +" + mend, 2.6f); break; }
-                        case 1: ammoMul = 1.5f; ammoLeft = 25f; hud.Toast("APCR ammunition · +50% damage for 25 s", 2.8f); break;
+                        case 1: { int ap = Mathf.Min(apMax - apRounds, 14), he2 = Mathf.Min(heMax - heRounds, 6); apRounds += ap; heRounds += he2; hud.SetAmmo(apRounds, heRounds, loadHe); ammoMul = 1.5f; ammoLeft = 25f; hud.Toast($"Ammunition · +{ap} AP, +{he2} HE · APCR for 25 s", 2.8f); break; }
                         case 2: if (smokeCooldown <= 0f) PopSmoke(); else { L.hp = Mathf.Min(Depot.LeaderHp + 2f, L.hp + 1f); hud.Toast("Spare parts · leader +1", 2.6f); } break;
                         default: if (!FireMission()) { score += 150; hud.Toast("Radio set · +150", 2.6f); } break;
                     }

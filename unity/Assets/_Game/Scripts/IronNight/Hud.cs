@@ -45,7 +45,7 @@ namespace IronNight
         public class Card { public string id, title, desc; public bool rare; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain, OnStart, OnCampaign, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold; GameObject holdBtn;
+        public System.Action OnAd, OnAgain, OnStart, OnCampaign, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility; GameObject holdBtn, ammoBtn, abilityBtn; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
 
         Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel, setSound, setQuality, setVibe, setMusic, rankLine, pointsLine, ordersCount; GameObject settingsSheet, ordersSheet; RawImage titleBackdrop, depotBackdrop; GarageDrag depotDrag; readonly List<RectTransform> embers = new List<RectTransform>(); readonly List<float> emberPhase = new List<float>(); GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
@@ -90,7 +90,7 @@ namespace IronNight
             bossFill = MakeImage(bbg.transform, "Fill", new Vector2(0, 0.5f), Vector2.zero, new Vector2(960, 10), new Color(0.95f, 0.35f, 0.3f));
             bossBar.SetActive(false);
             toast = MakeText(t, "Toast", new Vector2(0.5f, 0.5f), new Vector2(0, 420), TextAnchor.MiddleCenter, 60, ink); toast.text = "";
-            var pauseBtn = MakeButton(t, "II", new Vector2(0.5f, 1f), new Vector2(0, -150), new Vector2(120, 76), 40, () => OnPause?.Invoke()); pauseBtn.name = "Pause";
+            var pauseBtn = MakeButton(t, "II", new Vector2(0.5f, 1f), new Vector2(0, -150), new Vector2(120, 76), 40, () => OnPause?.Invoke()); pauseBtn.name = "Pause"; pauseBtnRect = pauseBtn.GetComponent<RectTransform>();
             radar = MakeImage(t, "Radar", new Vector2(1f, 0f), new Vector2(-150, 330), new Vector2(240, 240), new Color(0.02f, 0.03f, 0.04f, 0.55f)); radar.sprite = Lightswarm.ProceduralSprites.Glow(64, 0.98f); radar.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             var ring = MakeImage(radar.transform, "Ring", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(240, 240), new Color(0.93f, 0.91f, 0.86f, 0.35f)); ring.sprite = Lightswarm.ProceduralSprites.Ring(128, 0.03f); ring.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             var me = MakeImage(radar.transform, "Me", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(14, 14), new Color(0.95f, 0.66f, 0.23f, 1f)); me.rectTransform.pivot = new Vector2(0.5f, 0.5f);
@@ -129,6 +129,23 @@ namespace IronNight
             adNote = MakeText(endSheet.transform, "AdNote", new Vector2(0.5f, 0.5f), new Vector2(0, -130), TextAnchor.MiddleCenter, 28, dim); adNote.rectTransform.sizeDelta = new Vector2(900, 100);
             againBtn = MakeButton(endSheet.transform, "New assault", new Vector2(0.5f, 0.5f), new Vector2(0, -260), new Vector2(880, 130), 40, () => OnAgain?.Invoke());
             endSheet.SetActive(false);
+            // the two things the thumb can press in the night: what is loaded, and the commander's order
+            {
+                ammoBtn = MakeButton(hudGroup.transform, "", new Vector2(0f, 0f), new Vector2(330, 268), new Vector2(190, 120), 22, () => OnAmmo?.Invoke());
+                ammoBtn.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.11f, 0.85f);
+                var ae = MakeImage(ammoBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190, 120), new Color(1f, 1f, 1f, 0.2f)); ae.sprite = Outline(); ae.type = Image.Type.Sliced; ae.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                ammoKind = MakeText(ammoBtn.transform, "Kind", new Vector2(0.5f, 1f), new Vector2(0, -12), TextAnchor.UpperCenter, 30, new Color(0.96f, 0.68f, 0.24f)); ammoKind.font = BoldFont(); ammoKind.rectTransform.sizeDelta = new Vector2(190, 40);
+                ammoLabel = MakeText(ammoBtn.transform, "Count", new Vector2(0.5f, 0f), new Vector2(0, 12), TextAnchor.LowerCenter, 26, new Color(0.85f, 0.83f, 0.78f)); ammoLabel.rectTransform.sizeDelta = new Vector2(190, 60);
+                ammoBtn.transform.Find("Label").GetComponent<Text>().text = "";
+                abilityBtn = MakeButton(hudGroup.transform, "", new Vector2(0f, 0f), new Vector2(130, 298), new Vector2(180, 180), 20, () => OnAbility?.Invoke());
+                abilityBtn.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.11f, 0.9f);
+                var mask = new GameObject("Mask", typeof(RectTransform), typeof(RectMask2D)); mask.transform.SetParent(abilityBtn.transform, false); var mkrt = mask.GetComponent<RectTransform>(); mkrt.anchorMin = mkrt.anchorMax = new Vector2(0.5f, 0.5f); mkrt.sizeDelta = new Vector2(168, 168);
+                abilityPic = MakeImage(mask.transform, "Pic", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(168, 168), Color.white); abilityPic.rectTransform.pivot = new Vector2(0.5f, 0.5f); abilityPic.preserveAspect = true;
+                abilityFill = MakeImage(abilityBtn.transform, "Cool", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(180, 180), new Color(0.02f, 0.02f, 0.03f, 0.78f)); abilityFill.rectTransform.pivot = new Vector2(0.5f, 0.5f); abilityFill.sprite = Rounded(); abilityFill.type = Image.Type.Filled; abilityFill.fillMethod = Image.FillMethod.Vertical; abilityFill.fillOrigin = 0; abilityFill.fillAmount = 1f;
+                var be = MakeImage(abilityBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(180, 180), new Color(0.96f, 0.68f, 0.24f, 0.5f)); be.sprite = Outline(); be.type = Image.Type.Sliced; be.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                abilityBtn.transform.Find("Label").GetComponent<Text>().text = "";
+                abilityBtn.SetActive(false);
+            }
             arrowSprite = ArrowSprite(); objectiveArrow.sprite = arrowSprite;
             var root = canvasGo.transform;
             endPoints = MakeText(endSheet.transform, "Points", new Vector2(0.5f, 0.5f), new Vector2(0, 120), TextAnchor.MiddleCenter, 44, amber);
@@ -584,6 +601,31 @@ namespace IronNight
             int m = Mathf.FloorToInt(seconds / 60f), s = Mathf.FloorToInt(seconds % 60f);
             clock.text = $"{m}:{s:00}"; count.text = platoon.ToString();
         }
+        /// <summary>What is in the racks, and which round is loaded.</summary>
+        /// <summary>The stick must let these buttons have their own presses.</summary>
+        public void HandTo(TouchStick stick) { if (stick == null) return; stick.Blockers.Add(ammoBtn.GetComponent<RectTransform>()); stick.Blockers.Add(abilityBtn.GetComponent<RectTransform>()); stick.Blockers.Add(pauseBtnRect); }
+
+        public void SetAmmo(int ap, int he, bool loadHe)
+        {
+            if (ammoKind == null) return;
+            ammoKind.text = loadHe ? "HE" : "AP"; ammoKind.color = loadHe ? new Color(1f, 0.55f, 0.3f) : new Color(0.96f, 0.68f, 0.24f);
+            ammoLabel.text = (loadHe ? he : ap) + "\n" + (loadHe ? ap + " AP" : he + " HE");
+            ammoBtn.GetComponent<Image>().color = (loadHe ? he : ap) > 0 ? new Color(0.08f, 0.09f, 0.11f, 0.85f) : new Color(0.3f, 0.08f, 0.06f, 0.9f);
+        }
+
+        /// <summary>The commander's button: his portrait, the cooldown draining down it, a glow while his order lasts.</summary>
+        public void SetAbility(bool has, float charged, bool running)
+        {
+            if (abilityBtn == null) return;
+            if (abilityBtn.activeSelf != has) abilityBtn.SetActive(has);
+            if (!has) return;
+            if (abilityPic.sprite == null) { var c = System.Array.Find(Depot.Commanders, x => x.id == Depot.CommanderId && x.nation == Depot.Nation); if (c != null) abilityPic.sprite = UiSprite(c.picture); }
+            abilityFill.fillAmount = 1f - Mathf.Clamp01(charged);
+            var edge = abilityBtn.transform.Find("Edge").GetComponent<Image>();
+            edge.color = running ? new Color(1f, 0.85f, 0.4f, 0.95f) : charged >= 1f ? new Color(0.96f, 0.68f, 0.24f, 0.85f) : new Color(0.96f, 0.68f, 0.24f, 0.35f);
+            abilityPic.color = charged >= 1f ? Color.white : new Color(0.55f, 0.55f, 0.58f);
+        }
+
         public void SetTally(int kills, int score) { tally.text = kills == 0 && score == 0 ? "" : $"{kills} kills · {score}"; }
 
         // the reload arc: a ring under the leader that fills while the gun reloads, gone when it is ready

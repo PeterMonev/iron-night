@@ -15,6 +15,7 @@ namespace IronNight
         public Vector2 Direction { get; private set; }
         public bool Active { get; private set; }
         public bool Blocked;   // true while a sheet is open
+        public readonly System.Collections.Generic.List<RectTransform> Blockers = new System.Collections.Generic.List<RectTransform>();   // buttons the thumb may press without driving
         public Vector2 TapAt { get; private set; } public bool Tapped { get; private set; }   // a press released within 0.25 s and 18 px: a tap, held until ConsumeTap
         public bool ConsumeTap() { bool t = Tapped; Tapped = false; return t; }
         float pressTime; Vector2 pressAt; bool moved;
@@ -48,6 +49,7 @@ namespace IronNight
                 pressed = Mouse.current.leftButton.isPressed && pos.x >= 0f && pos.y >= 0f && pos.x <= Screen.width && pos.y <= Screen.height;
             }
             if (Blocked) pressed = false;
+            if (pressed && !Active) foreach (var r in Blockers) { if (r != null && r.gameObject.activeInHierarchy && RectTransformUtility.RectangleContainsScreenPoint(r, pos, null)) { pressed = false; break; } }   // a press that starts on a button is the button's
             // keyboard on the desktop build: arrows or WASD drive the leader without the stick
             var kb = Keyboard.current;
             if (kb != null && !Blocked)
