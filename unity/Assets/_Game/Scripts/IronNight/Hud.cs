@@ -8,6 +8,30 @@ namespace IronNight
     /// The overlay: night clock, platoon count, level bar, formation buttons, pause button, toast line, the three-card
     /// level-up sheet, the pause sheet and the end-of-assault sheet with the (mock) rewarded-ad button. Built in code with the legacy UI, English only.
     /// </summary>
+    /// <summary>A button that gives a little under the finger and springs back.</summary>
+    public class PressFeel : MonoBehaviour, UnityEngine.EventSystems.IPointerDownHandler, UnityEngine.EventSystems.IPointerUpHandler, UnityEngine.EventSystems.IPointerExitHandler
+    {
+        float want = 1f, at = 1f;
+        public void OnPointerDown(UnityEngine.EventSystems.PointerEventData e) { want = 0.965f; }
+        public void OnPointerUp(UnityEngine.EventSystems.PointerEventData e) { want = 1f; }
+        public void OnPointerExit(UnityEngine.EventSystems.PointerEventData e) { want = 1f; }
+        void Update() { if (Mathf.Approximately(at, want)) return; at = Mathf.MoveTowards(at, want, Time.unscaledDeltaTime * 3.5f); transform.localScale = new Vector3(at, at, 1f); }
+    }
+
+    /// <summary>A band of light that sweeps across the gold button every few seconds.</summary>
+    public class Sheen : MonoBehaviour
+    {
+        public RectTransform band; public float width = 900f;
+        float t = -2f;
+        void Update()
+        {
+            if (band == null) return; t += Time.unscaledDeltaTime;
+            if (t > 4.5f) t = -1.2f;
+            float k = Mathf.Clamp01(t / 1.1f); band.anchoredPosition = new Vector2(Mathf.Lerp(-width * 0.75f, width * 0.75f, k), 0f);
+            var img = band.GetComponent<Image>(); var c = img.color; c.a = t < 0f || t > 1.1f ? 0f : 0.16f * Mathf.Sin(k * Mathf.PI); img.color = c;
+        }
+    }
+
     /// <summary>A drag across the showroom picture turns the turntable.</summary>
     public class GarageDrag : MonoBehaviour, UnityEngine.EventSystems.IDragHandler, UnityEngine.EventSystems.IPointerDownHandler
     {
@@ -163,6 +187,9 @@ namespace IronNight
             // to battle: gold, a highlight along the top, a shadow under
             var start = MakePrimary(titleSheet.transform, "To battle", new Vector2(0.5f, 0f), new Vector2(0, 610), new Vector2(920, 160), 62, () => OnStart?.Invoke());
             { var g1 = MakeImage(start.transform, "Depth", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(920, 160), new Color(0.45f, 0.22f, 0.02f, 0.55f)); g1.sprite = Lightswarm.ProceduralSprites.GradientDown(64, 1.0f); g1.rectTransform.pivot = new Vector2(0.5f, 0.5f); g1.transform.SetSiblingIndex(0);
+              var sheenMask = new GameObject("SheenMask", typeof(RectTransform), typeof(RectMask2D)); sheenMask.transform.SetParent(start.transform, false); var smrt = sheenMask.GetComponent<RectTransform>(); smrt.anchorMin = smrt.anchorMax = new Vector2(0.5f, 0.5f); smrt.sizeDelta = new Vector2(912, 152);
+              var band = MakeImage(sheenMask.transform, "Sheen", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(160, 260), new Color(1f, 0.98f, 0.9f, 0f)); band.rectTransform.pivot = new Vector2(0.5f, 0.5f); band.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 18f); band.sprite = Lightswarm.ProceduralSprites.Glow(64, 0.1f);
+              var sh = start.AddComponent<Sheen>(); sh.band = band.rectTransform; sh.width = 920f;
               var hi = MakeImage(start.transform, "Highlight", new Vector2(0.5f, 1f), new Vector2(0, -6), new Vector2(860, 3), new Color(1f, 0.93f, 0.7f, 0.8f)); hi.rectTransform.pivot = new Vector2(0.5f, 1f);
               var lbl = start.transform.Find("Label").GetComponent<Text>(); lbl.font = DisplayFont(); lbl.fontSize = 72; lbl.text = "TO  BATTLE"; lbl.transform.SetAsLastSibling(); }
             dailyBtn = MakeGhost(titleSheet.transform, "Daily supply drop · +" + Depot.DailyPoints + " points", new Vector2(0.5f, 0f), new Vector2(-235, 470), new Vector2(450, 70), 24, () => OnDaily?.Invoke(), 0.1f);
@@ -267,6 +294,7 @@ namespace IronNight
             depotRows = rows.transform; depotScroll = viewport.GetComponent<ScrollRect>(); depotScroll.content = rrt; depotScroll.viewport = vrt; depotScroll.horizontal = false; depotScroll.vertical = true;
             depotScroll.movementType = ScrollRect.MovementType.Clamped; depotScroll.scrollSensitivity = 40f; depotScroll.inertia = true; depotScroll.decelerationRate = 0.12f;
             depotSheet.SetActive(false);
+            { curtain = MakeImage(canvasGo.transform, "Curtain", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(4000, 4000), new Color(0.01f, 0.01f, 0.015f, 1f)); curtain.transform.SetAsLastSibling(); Curtain(0f); }
         }
 
         public void ShowTitle(bool reserveGranted)
@@ -274,7 +302,7 @@ namespace IronNight
             if (garage != null) { garage.SetActive(false); garage.Show(VehicleSpec.ById(Depot.LeaderId)); garage.SetTitle(true); garage.Frame(false); titleBackdrop.texture = garage.TitleTexture; }
             Sfx.Music(true);
             Depot.Load(); Medals.Check(); hudGroup.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(false); dailyBtn.SetActive(Depot.DailyReady);
-            rankLine.text = Depot.Rank.ToUpperInvariant() + "\n" + (Depot.NightsFought == 0 ? "first night" : Depot.NightsFought + " nights · " + Depot.CrewName.ToLowerInvariant() + " · " + Depot.CrewNights + " together"); pointsLine.text = Depot.Points.ToString("N0");
+            rankLine.text = Depot.Rank.ToUpperInvariant() + "\n" + (Depot.NightsFought == 0 ? "first night" : Depot.NightsFought + " nights · " + Depot.CrewName.ToLowerInvariant() + " · " + Depot.CrewNights + " together"); Tick(pointsLine, Depot.Points);
             int m = Mathf.FloorToInt(Depot.BestTime / 60f), s = Mathf.FloorToInt(Depot.BestTime % 60f);
             { var sheet = Resources.Load<Texture2D>("UI/rank_insignia"); if (sheet != null && rankBadge != null) { int cell = Depot.RankIndex; rankBadge.sprite = UiSprite("rank_insignia", new Rect(cell * sheet.width / 6f, 0f, sheet.width / 6f, sheet.height)); rankBadge.enabled = Depot.NightsFought > 0; } }
             { int cn = Depot.CampaignNight; var lbl = campaignBtn.transform.Find("Label").GetComponent<Text>(); lbl.text = cn == 0 ? Spaced("CAMPAIGN") : Spaced("NIGHT " + cn + " OF 3");
@@ -308,7 +336,7 @@ namespace IronNight
 
         void RefreshDepot()
         {
-            depotPoints.text = Depot.Points.ToString("N0");
+            Tick(depotPoints, Depot.Points);
             foreach (Transform c in depotRows) Destroy(c.gameObject);
             for (int k = 0; k < 3; k++) { bool on = depotTab == k; depotTabs[k].GetComponent<Image>().color = on ? new Color(0.96f, 0.68f, 0.24f, 1f) : new Color(0f, 0f, 0f, 0f); depotTabs[k].transform.Find("Label").GetComponent<Text>().color = on ? new Color(0.12f, 0.09f, 0.04f) : new Color(0.82f, 0.8f, 0.76f); }
             if (depotTab == 1) { RefreshGarage(); FitDepotRows(); return; }
@@ -475,7 +503,7 @@ namespace IronNight
             if (depotScroll != null && depotScroll.verticalNormalizedPosition > 1f) depotScroll.verticalNormalizedPosition = 1f;
         }
 
-        public void SetEndPoints(int points) { endPoints.text = points > 0 ? $"+{points} depot points" : ""; }
+        public void SetEndPoints(int points) { if (points > 0) Tick(endPoints, points, "+", " depot points"); else endPoints.text = ""; }
 
         /// <summary>Red chevrons on the screen edge pointing at enemies that are outside the view.</summary>
         public void Indicators(List<Vehicle> foes, Camera cam)
@@ -682,6 +710,7 @@ namespace IronNight
             if (fpsTimer >= 0.5f) { float f = fpsFrames / fpsAccum; fps.text = $"{f:0} fps"; fpsAccum = 0; fpsFrames = 0; fpsTimer = 0; if (f < 38f && hudGroup.activeSelf) slowFor += 0.5f; else slowFor = 0f; if (slowFor >= 5f && !slowOffered && PlayerPrefs.GetInt("quality", 1) != 0) { slowOffered = true; Toast("Stuttering? Pause · Quality: low turns off shadows and rain", 5f); } }
             if (toastLeft > 0f) { toastLeft -= Time.unscaledDeltaTime; if (toastLeft <= 0f) toast.text = ""; }
             if (briefingLeft > 0f) { briefingLeft -= Time.unscaledDeltaTime; if (briefingLeft <= 0f && briefing != null) briefing.SetActive(false); }
+            TickNumbers(Time.unscaledDeltaTime); CurtainTick(Time.unscaledDeltaTime);
             if (titleSheet != null && titleSheet.activeSelf) for (int i = 0; i < embers.Count; i++)
             {
                 var e = embers[i]; float ph = emberPhase[i]; var p = e.anchoredPosition; p.y += (18f + 10f * Mathf.Sin(ph)) * Time.unscaledDeltaTime; p.x += Mathf.Sin(Time.unscaledTime * 0.7f + ph) * 12f * Time.unscaledDeltaTime;
@@ -705,6 +734,35 @@ namespace IronNight
         static Font BoldFont() { if (uiBold == null) uiBold = Resources.Load<Font>("Fonts/Barlow-SemiBold") ?? DefaultFont(); return uiBold; }
         static Font DisplayFont() { if (displayFont == null) displayFont = Resources.Load<Font>("Fonts/BebasNeue-Regular") ?? BoldFont(); return displayFont; }
         static Sprite roundSprite, outlineSprite, shadowSprite, scrimSprite;
+        Image curtain; float curtainWant, curtainAt = 1f;   // the black that screens change behind
+        readonly List<Ticker> tickers = new List<Ticker>();
+        class Ticker { public Text text; public string prefix, suffix; public float shown, want; }
+
+        /// <summary>A number that runs up to its new value instead of jumping.</summary>
+        void Tick(Text t, float value, string prefix = "", string suffix = "")
+        {
+            var k = tickers.Find(x => x.text == t); if (k == null) { k = new Ticker { text = t, shown = value }; tickers.Add(k); }
+            k.prefix = prefix; k.suffix = suffix; k.want = value; if (Mathf.Abs(k.shown - value) > value * 0.5f + 200f) k.shown = value;   // a fresh screen starts on the number, only changes run up
+            t.text = prefix + Mathf.RoundToInt(k.shown).ToString("N0") + suffix;
+        }
+        void TickNumbers(float dt)
+        {
+            foreach (var k in tickers)
+            {
+                if (k.text == null || Mathf.Approximately(k.shown, k.want)) continue;
+                k.shown = Mathf.MoveTowards(k.shown, k.want, Mathf.Max(60f, Mathf.Abs(k.want - k.shown) * 3.2f) * dt);
+                k.text.text = k.prefix + Mathf.RoundToInt(k.shown).ToString("N0") + k.suffix;
+            }
+        }
+
+        /// <summary>Black over everything: 1 hides the screen, 0 shows it. Screens change behind it.</summary>
+        public void Curtain(float to) { curtainWant = to; }
+        void CurtainTick(float dt)
+        {
+            if (curtain == null) return;
+            curtainAt = Mathf.MoveTowards(curtainAt, curtainWant, dt * 2.6f);
+            var c = curtain.color; c.a = curtainAt; curtain.color = c; curtain.raycastTarget = curtainAt > 0.9f; curtain.enabled = curtainAt > 0.001f;
+        }
         static Sprite Rounded() => roundSprite ??= Lightswarm.ProceduralSprites.RoundedRect(24, 96);
         static Sprite Outline() => outlineSprite ??= Lightswarm.ProceduralSprites.RoundedOutline(24, 96, 2f);
         static Sprite Shadow() => shadowSprite ??= Lightswarm.ProceduralSprites.SoftShadow(24, 28, 160);
@@ -782,6 +840,7 @@ namespace IronNight
             var go = new GameObject("Btn " + label, typeof(RectTransform), typeof(Image), typeof(Button)); go.transform.SetParent(parent, false);
             var rt = go.GetComponent<RectTransform>(); rt.anchorMin = rt.anchorMax = anchor; rt.pivot = new Vector2(0.5f, 0.5f); rt.anchoredPosition = pos; rt.sizeDelta = size;
             var bi = go.GetComponent<Image>(); bi.color = new Color(0.03f, 0.04f, 0.06f, 0.6f); bi.sprite = Rounded(); bi.type = Image.Type.Sliced;
+            go.AddComponent<PressFeel>();
             var btn = go.GetComponent<Button>(); btn.onClick.AddListener(() => { Sfx.Click(); onClick(); }); var cb = btn.colors; cb.highlightedColor = new Color(1f, 1f, 1f, 0.92f); cb.pressedColor = new Color(0.75f, 0.75f, 0.75f, 1f); cb.fadeDuration = 0.06f; btn.colors = cb;
             var t = MakeText(go.transform, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, TextAnchor.MiddleCenter, fontSize, new Color(0.93f, 0.91f, 0.86f)); t.font = BoldFont();
             t.GetComponent<RectTransform>().sizeDelta = size; t.text = label;

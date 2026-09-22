@@ -27,7 +27,7 @@ namespace IronNight
                 portraitRt = new RenderTexture(600, 340, 24) { antiAliasing = 2 };
                 var pc = new GameObject("PortraitCamera"); pc.transform.SetParent(transform, false); pc.transform.localPosition = new Vector3(-5.6f, 2.1f, -6.9f); pc.transform.LookAt(transform.position + new Vector3(0.2f, 1.1f, 0.2f));
                 portraitCam = pc.AddComponent<Camera>(); portraitCam.targetTexture = portraitRt; portraitCam.fieldOfView = 34f; portraitCam.nearClipPlane = 0.3f; portraitCam.farClipPlane = 60f; portraitCam.clearFlags = CameraClearFlags.SolidColor; portraitCam.backgroundColor = new Color(0.03f, 0.03f, 0.04f); portraitCam.enabled = false;
-                var d = pc.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>(); d.renderShadows = true; d.renderPostProcessing = false;
+                var d = pc.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>(); d.renderShadows = true; d.renderPostProcessing = true; d.volumeLayerMask = 1 << HangarLayer;
             }
             var before = shown != null ? shown.spec : null; bool wasActive = gameObject.activeSelf; gameObject.SetActive(true);
             var spinBefore = stage.localRotation; stage.localRotation = Quaternion.Euler(0f, 28f, 0f);
@@ -56,9 +56,15 @@ namespace IronNight
             foreach (var r in p.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
         }
 
+        const int HangarLayer = 30;   // the hangar's own volume layer, so the field camera never sees this grading
+
         public static Garage Build()
         {
             var go = new GameObject("Garage"); go.transform.position = Home; var g = go.AddComponent<Garage>();
+            {
+                var vol = new GameObject("HangarVolume"); vol.transform.SetParent(go.transform, false); vol.layer = HangarLayer;
+                var v = vol.AddComponent<UnityEngine.Rendering.Volume>(); v.isGlobal = true; v.priority = 10f; v.sharedProfile = Resources.Load<UnityEngine.Rendering.VolumeProfile>("HangarProfile");
+            }
             g.Texture = new RenderTexture(1024, 768, 24) { antiAliasing = 2 };
             // the hangar: concrete underfoot, brick at the back, corrugated steel at the sides, steel beams and lamps overhead, the door open on the night
             var floor = GameObject.CreatePrimitive(PrimitiveType.Plane); Destroy(floor.GetComponent<Collider>()); floor.transform.SetParent(go.transform, false); floor.transform.localScale = new Vector3(4.4f, 1f, 4.4f);
@@ -108,7 +114,7 @@ namespace IronNight
             g.TitleTexture = new RenderTexture(Mathf.Max(480, Screen.width * 2 / 3), Mathf.Max(800, Screen.height * 2 / 3), 24) { antiAliasing = 2 };
             var tcGo = new GameObject("TitleCamera"); tcGo.transform.SetParent(go.transform, false); tcGo.transform.localPosition = new Vector3(-9.6f, 3.4f, -15.2f); tcGo.transform.LookAt(go.transform.position + new Vector3(0.2f, 1.05f, 0.3f));
             g.titleCam = tcGo.AddComponent<Camera>(); g.titleCam.targetTexture = g.TitleTexture; g.titleCam.fieldOfView = 40f; g.titleCam.nearClipPlane = 0.3f; g.titleCam.farClipPlane = 60f; g.titleCam.clearFlags = CameraClearFlags.SolidColor; g.titleCam.backgroundColor = new Color(0.03f, 0.03f, 0.04f); g.titleCam.enabled = false;
-            var tdata = tcGo.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>(); tdata.renderShadows = true; tdata.renderPostProcessing = false;
+            var tdata = tcGo.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>(); tdata.renderShadows = true; tdata.renderPostProcessing = true; tdata.volumeLayerMask = 1 << HangarLayer; tdata.antialiasing = UnityEngine.Rendering.Universal.AntialiasingMode.FastApproximateAntialiasing;
             for (int i = 0; i < 3; i++)
             {
                 var shaft = new GameObject("Shaft").AddComponent<LightShaft>(); shaft.transform.SetParent(go.transform, false); shaft.facing = g.titleCam; shaft.length = 15f; shaft.width0 = 1.2f; shaft.width1 = 6.5f;
@@ -116,7 +122,7 @@ namespace IronNight
             }
             var camGo = new GameObject("GarageCamera"); camGo.transform.SetParent(go.transform, false); camGo.transform.localPosition = new Vector3(0f, 3.6f, -9f); camGo.transform.LookAt(go.transform.position + new Vector3(0f, 1.2f, 0f));
             g.cam = camGo.AddComponent<Camera>(); g.cam.targetTexture = g.Texture; g.cam.fieldOfView = 34f; g.cam.nearClipPlane = 0.3f; g.cam.farClipPlane = 60f; g.cam.clearFlags = CameraClearFlags.SolidColor; g.cam.backgroundColor = new Color(0.05f, 0.05f, 0.06f); g.cam.enabled = false;
-            var data = camGo.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>(); data.renderShadows = true; data.renderPostProcessing = false;
+            var data = camGo.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>(); data.renderShadows = true; data.renderPostProcessing = true; data.volumeLayerMask = 1 << HangarLayer;
             return g;
         }
 

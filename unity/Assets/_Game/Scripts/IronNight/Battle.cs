@@ -105,11 +105,11 @@ namespace IronNight
             NextObjective();
             hud.OnFormation = f => formation = f;
             hud.OnAd = OnAd; hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-            hud.OnStart = () => { hud.HideTitle(); phase = Phase.Play; stick.Blocked = false; if (objective != null) Brief(objective.kind); };
+            hud.OnStart = () => { StartCoroutine(Curtained(() => { hud.HideTitle(); phase = Phase.Play; stick.Blocked = false; if (objective != null) Brief(objective.kind); })); };
             hud.garage = Garage.Build(); hud.garage.SetActive(false);
             hud.OnCampaign = () => { if (Depot.CampaignNight == 0) Depot.CampaignStart(); PlayerPrefs.SetInt("camp.launch", Depot.CampaignNight); PlayerPrefs.Save(); SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); };
-            hud.OnDepot = () => { stick.Blocked = true; hud.ShowDepot(); }; hud.OnHold = HoldOn;
-            hud.OnBack = () => { if (phase == Phase.End) SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); else hud.ShowTitle(reserveGranted); };
+            hud.OnDepot = () => { stick.Blocked = true; StartCoroutine(Curtained(hud.ShowDepot)); }; hud.OnHold = HoldOn;
+            hud.OnBack = () => { if (phase == Phase.End) SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); else StartCoroutine(Curtained(() => hud.ShowTitle(reserveGranted))); };
             hud.OnReserveAd = () => { reserveGranted = true; maxPlatoon = 4; hud.ShowTitle(true); };   // the ad is a mock: granted at once
             hud.OnPause = Pause; hud.OnResume = Resume; hud.OnSound = () => { Sfx.Muted = !Sfx.Muted; hud.ShowPause(!Sfx.Muted, !LowQuality); };
             hud.OnQuit = () => { Resume(); revived = true; End(false); };   // no rewarded repair after walking away
@@ -1228,6 +1228,14 @@ namespace IronNight
             var vis = fx.Tracer(new Color(1f, 0.8f, 0.6f, 1f), new Color(1f, 0.5f, 0.3f, 0.6f)); vis.position = from; vis.rotation = Quaternion.LookRotation(cam.transform.forward, dir);
             shells.Add(new Shell { pos = from, vel = dir * 32f, friendly = false, faust = true, dmg = 2f, life = 0.6f, vis = vis });
             fx.MuzzleFlash(from, dir); Sfx.Faust(from);
+        }
+
+        /// <summary>A change of screen behind the black: down, swap, up.</summary>
+        System.Collections.IEnumerator Curtained(System.Action swap)
+        {
+            hud.Curtain(1f); yield return new WaitForSecondsRealtime(0.42f);
+            swap(); yield return new WaitForSecondsRealtime(0.05f);
+            hud.Curtain(0f);
         }
 
         void Pause() { if (phase != Phase.Play) return; phase = Phase.Pause; stick.Blocked = true; Sfx.Quiet(true); hud.ShowPause(!Sfx.Muted, !LowQuality); }

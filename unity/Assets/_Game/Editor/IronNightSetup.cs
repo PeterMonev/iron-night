@@ -130,6 +130,27 @@ namespace IronNight.EditorTools
             field.SetTexture("_Variation", Tex("ground_variation")); field.SetFloat("_Tiling", 40f / 3f); field.SetFloat("_VariationTiling", 300f); field.SetFloat("_VariationStrength", 0.5f); field.SetFloat("_BumpScale", 1f); field.SetFloat("_Smoothness", 0.06f);
             foreach (var m in new[] { vehicle, vehicleN, barrel, ground, additive, smoke, decal, foliage, field, leaves }) EditorUtility.SetDirty(m);
 
+            const string hangarPath = Res + "HangarProfile.asset";
+            var oldH = AssetDatabase.LoadAssetAtPath<VolumeProfile>(hangarPath); if (oldH != null) AssetDatabase.DeleteAsset(hangarPath);
+            {
+                // the menu and the depot: warm lamps blooming, the walls falling into shadow, the background soft, a little grain
+                var profile = ScriptableObject.CreateInstance<VolumeProfile>();
+                AssetDatabase.CreateAsset(profile, hangarPath);
+                var bloom = profile.Add<Bloom>(true); bloom.intensity.Override(1.4f); bloom.threshold.Override(0.85f); bloom.scatter.Override(0.72f); bloom.tint.Override(new Color(1f, 0.92f, 0.8f));
+                AssetDatabase.AddObjectToAsset(bloom, profile);
+                var vig = profile.Add<Vignette>(true); vig.intensity.Override(0.38f); vig.smoothness.Override(0.55f); vig.color.Override(new Color(0.02f, 0.02f, 0.03f));
+                AssetDatabase.AddObjectToAsset(vig, profile);
+                var dof = profile.Add<DepthOfField>(true); dof.mode.Override(DepthOfFieldMode.Gaussian); dof.gaussianStart.Override(14f); dof.gaussianEnd.Override(34f); dof.gaussianMaxRadius.Override(1.1f);
+                AssetDatabase.AddObjectToAsset(dof, profile);
+                var grain = profile.Add<FilmGrain>(true); grain.type.Override(FilmGrainLookup.Medium1); grain.intensity.Override(0.22f); grain.response.Override(0.7f);
+                AssetDatabase.AddObjectToAsset(grain, profile);
+                var grading = profile.Add<ColorAdjustments>(true); grading.postExposure.Override(0.15f); grading.contrast.Override(12f); grading.saturation.Override(6f);
+                AssetDatabase.AddObjectToAsset(grading, profile);
+                var tone = profile.Add<Tonemapping>(true); tone.mode.Override(TonemappingMode.ACES);
+                AssetDatabase.AddObjectToAsset(tone, profile);
+                EditorUtility.SetDirty(profile);
+            }
+
             const string profilePath = Res + "BattleProfile.asset";
             var old = AssetDatabase.LoadAssetAtPath<VolumeProfile>(profilePath); if (old != null) AssetDatabase.DeleteAsset(profilePath);
             {
