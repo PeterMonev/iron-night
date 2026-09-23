@@ -60,7 +60,7 @@ namespace IronNight
         bool endless, daybreak;                              // holding on past dawn
         Infantry.Soldier observer; float observerTimer = 95f, observerAge; Transform observerRing;   // the forward observer on the flank
         float t, spawnTimer = 6f, leaderShield; int level = 1, xp, xpNeed = 6, score, kills, maxPlatoon = 4, reinforcements;
-        bool wave2, wave3, wave4, revived, doubled, bossSpawned; Vehicle boss;
+        bool wave1, wave2, wave3, wave4, revived, doubled, bossSpawned; Vehicle boss;
         Vehicle ace; string aceName; float aceTimer = 105f, weatherTurn;
         string theatre = "normandy", builtTheatre = "normandy";   // the map: it also decides the nation
         string TheatreName => theatre == "kursk" ? "Kursk" : winter ? "Ardennes" : "Normandy";
@@ -76,6 +76,7 @@ namespace IronNight
         static readonly bool debugGuns = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--guns") >= 0;   // test switch: a PaK and an 88 out of range ahead, to look at
         static readonly bool debugDrops = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--drops") >= 0;   // test switch: the first supply drop at 0:03
         static readonly bool debugHe = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--he") >= 0;   // test switch: the leader starts loaded with HE
+        static readonly bool debugKeil = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--keil") >= 0;   // test switch: a Panzerkeil at 0:04
         static readonly bool debugSalvage = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--salvage") >= 0;   // test switch: three crates ahead at 0:02, the racks nearly dry
         static readonly bool debugInfantry = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--infantry") >= 0;   // test switch: a squad at 0:04
         bool debugSquadSent;
@@ -97,7 +98,7 @@ namespace IronNight
             Depot.Load(); if (!Depot.TheatreOpen(theatre) && System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--theatre=" + theatre) < 0) theatre = "normandy";
             builtRoute = route; Props.Route = route; routePay = route == "village" ? 1.2f : route == "bocage" ? 1.15f : 1.1f;   // the country is built for this way in
             PickWeather(); weatherTurn = NightLength * Random.Range(0.35f, 0.62f);
-            builtTheatre = theatre; Props.Theatre = theatre; string nation = theatre == "kursk" ? "su" : "us"; if (Depot.Nation != nation) Depot.Nation = nation;
+            builtTheatre = theatre; Props.Theatre = theatre; if (theatre == "kursk") routePay *= 1.15f; string nation = theatre == "kursk" ? "su" : "us"; if (Depot.Nation != nation) Depot.Nation = nation;
             BuildWorld();
             // the night always starts with the leader alone; the platoon grows from the salvaged crates to 3, a rewarded ad opens a 4th slot.
             // The depot's permanent upgrades set the starting numbers
@@ -598,13 +599,14 @@ namespace IronNight
                 foreach (var sp in new[] { VehicleSpec.Hetzer, VehicleSpec.KingTiger, VehicleSpec.Flak38, VehicleSpec.Nebelwerfer, VehicleSpec.Kubelwagen }) if (VehicleSpec.Available(sp)) { var z = Foe(sp, L0.transform.position + f0 * (44f + 8f * System.Array.IndexOf(new[] { VehicleSpec.Hetzer, VehicleSpec.KingTiger, VehicleSpec.Flak38, VehicleSpec.Nebelwerfer, VehicleSpec.Kubelwagen }, sp)) - r0 * 14f, L0.yaw + Mathf.PI); z.hp = 999f; }
                 infantry.Spawn(L0.transform.position + f0 * 24f, -f0); hud.Toast("Zoo", 2f);
             }
-            if (spawnTimer <= 0f && foes.Count < 12)
+            if (spawnTimer <= 0f && foes.Count < (theatre == "kursk" ? 15 : 12))
             {
                 spawnTimer = interval;
                 var L = Leader; float ahead = L.yaw + Random.Range(-1.7f, 1.7f);
                 var dir = new Vector3(Mathf.Sin(ahead), 0f, Mathf.Cos(ahead));
                 float roll = Random.value;
                 float infantryShare = route == "village" ? 0.3f : route == "bocage" ? 0.34f : 0.14f, gunShare = route == "village" ? 0.62f : route == "bocage" ? 0.5f : 0.3f;
+                if (theatre == "kursk") gunShare = infantryShare + (gunShare - infantryShare) * 0.5f;   // the attacker does not dig in
                 if (t > (route == "open" ? 45f : 30f) && roll < infantryShare && infantry.squads.Count < (route == "open" ? 3 : 4))
                 {
                     if (Random.value < 0.5f)
@@ -644,18 +646,20 @@ namespace IronNight
                 }
                 else
                 {
-                    var spec = (t > 90f && Random.value < Mathf.Lerp(0.1f, 0.35f, (t - 90f) / 180f)) ? VehicleSpec.Tiger : VehicleSpec.PanzerIV;
-                    if (spec == VehicleSpec.Tiger && t > 150f && Random.value < 0.5f) spec = VehicleSpec.Panther;
-                    else if (spec == VehicleSpec.PanzerIV && t > 60f && Random.value < 0.25f) spec = VehicleSpec.StuG;
-                    if (spec == VehicleSpec.StuG && Random.value < 0.5f && VehicleSpec.Available(VehicleSpec.Hetzer)) spec = VehicleSpec.Hetzer;
+                    bool ks = theatre == "kursk"; float tigerFrom = ks ? 40f : 90f;   // Kursk: the Tigers lead from the start
+                    var spec = (t > tigerFrom && Random.value < Mathf.Lerp(ks ? 0.18f : 0.1f, ks ? 0.4f : 0.35f, (t - tigerFrom) / 180f)) ? VehicleSpec.Tiger : VehicleSpec.PanzerIV;
+                    if (spec == VehicleSpec.Tiger && t > (ks ? 90f : 150f) && Random.value < 0.5f) spec = VehicleSpec.Panther;
+                    else if (spec == VehicleSpec.PanzerIV && t > 60f && Random.value < (ks ? 0.35f : 0.25f)) spec = VehicleSpec.StuG;
+                    if (spec == VehicleSpec.StuG && !ks && Random.value < 0.5f && VehicleSpec.Available(VehicleSpec.Hetzer)) spec = VehicleSpec.Hetzer;   // the Hetzer is 1944
                     var pos = L.transform.position + dir * Random.Range(44f, 52f);
                     Foe(spec, pos, Mathf.Atan2(-dir.x, -dir.z));
                     if (spec == VehicleSpec.Tiger) { hud.Toast("Tiger! " + Clock(pos), 2.8f); Radio("tiger"); } else if (spec == VehicleSpec.Panther) hud.Toast("Panther! " + Clock(pos), 2.8f);
                 }
             }
-            if (t >= 120f && !wave2) { wave2 = true; Column(); }
+            if (theatre == "kursk" && ((t >= 75f && !wave1) || (debugKeil && t >= 4f && !wave1))) { wave1 = true; Panzerkeil(3); }
+            if (t >= 120f && !wave2) { wave2 = true; if (theatre == "kursk") Panzerkeil(5); else Column(); }
             if (t >= 200f && !wave3) { wave3 = true; Counterattack(); }
-            if (t >= 240f && !wave4) { wave4 = true; Column(); }
+            if (t >= 240f && !wave4) { wave4 = true; if (theatre == "kursk") Panzerkeil(5); else Column(); }
             if ((t >= (campaignNight == 3 ? 210f : 270f) || (debugBoss && t >= 6f)) && !bossSpawned) { bossSpawned = true; Boss(); }
             if (boss != null && !boss.dead) hud.SetBoss(boss.hp / boss.spec.hp);
         }
@@ -668,6 +672,22 @@ namespace IronNight
             boss = Foe(bossSpec, L.transform.position + f * 52f, L.yaw + Mathf.PI);
             foreach (var side in new[] { -1f, 1f }) Foe(VehicleSpec.PanzerIV, L.transform.position + f * 58f + r * side * 9f, L.yaw + Mathf.PI);
             hud.ShowBoss(bossSpec.name); hud.Toast(bossSpec == VehicleSpec.KingTiger ? "King Tiger · kill it before dawn" : "Tiger Ace · kill it before dawn"); Debug.Log("Iron Night: boss spawned at " + t.ToString("0.0"));
+        }
+
+        /// <summary>Kursk's wave: a Panzerkeil driving straight at the platoon from 62 m ahead, a Tiger at the tip and the
+        /// escorts fanned out behind it: Panzer IVs, a StuG or two on the wings, a Panther or a second Tiger at the back.</summary>
+        void Panzerkeil(int escorts)
+        {
+            var L = Leader; var fw = Quaternion.Euler(0f, Random.Range(-28f, 28f), 0f) * L.Forward; var rt = new Vector3(fw.z, 0f, -fw.x);
+            var tip = L.transform.position + fw * 62f; float yaw = Mathf.Atan2(-fw.x, -fw.z);
+            Foe(VehicleSpec.Tiger, props.PushOut(tip, 3f), yaw);
+            float[] side = { 1f, -1f, 1f, -1f, 0f }, back = { 8f, 8f, 16f, 16f, 20f };
+            for (int i = 0; i < escorts && i < 5; i++)
+            {
+                var spec = i == 4 ? (VehicleSpec.Available(VehicleSpec.Panther) && t > 150f ? VehicleSpec.Panther : VehicleSpec.Tiger) : i >= 2 && Random.value < 0.4f ? VehicleSpec.StuG : VehicleSpec.PanzerIV;
+                Foe(spec, props.PushOut(tip + fw * back[i] + rt * side[i] * back[i] * 0.8f, 3f), yaw);
+            }
+            hud.Toast("Panzerkeil! " + Clock(tip), 3f); Radio("tiger"); Sfx.Rumble(); shake = Mathf.Max(shake, 0.4f);
         }
 
         /// <summary>An armoured column crossing the front 34 m ahead: four Panzer IV and a Tiger in a line.</summary>

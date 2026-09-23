@@ -45,7 +45,7 @@ namespace IronNight
         public class Card { public string id, title, desc; public bool rare; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain, OnStart, OnCampaign, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder; public System.Action<string> OnRoute, OnTheatre; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[3]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], theatreLabels = new Text[3]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, routeSheet; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
+        public System.Action OnAd, OnAgain, OnStart, OnCampaign, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder; public System.Action<string> OnRoute, OnTheatre; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[3]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], routePays = new Text[3], theatreLabels = new Text[3]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, routeSheet; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
 
         Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel, setSound, setQuality, setVibe, setMusic, rankLine, pointsLine, ordersCount; GameObject settingsSheet, ordersSheet; RawImage titleBackdrop, depotBackdrop; GarageDrag depotDrag; readonly List<RectTransform> embers = new List<RectTransform>(); readonly List<float> emberPhase = new List<float>(); GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
@@ -632,7 +632,6 @@ namespace IronNight
                     theatreTabs[k] = tab.GetComponent<Image>(); theatreLabels[k] = tab.GetComponentInChildren<Text>();
                 }
                 string[] ids = { "village", "open", "bocage" };
-                string[] pays = { "points +20%", "points +10%", "points +15%" };
                 for (int i = 0; i < 3; i++)
                 {
                     string id = ids[i]; float y = -400 - i * 470;
@@ -643,7 +642,7 @@ namespace IronNight
                     var fade = MakeImage(mask.transform, "Fade", new Vector2(0.5f, 0f), Vector2.zero, new Vector2(924, 140), new Color(0.07f, 0.08f, 0.1f, 1f)); fade.sprite = Lightswarm.ProceduralSprites.GradientDown(64, 1.1f); fade.rectTransform.pivot = new Vector2(0.5f, 0f);
                     var edge = MakeImage(card.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(940, 430), new Color(1f, 1f, 1f, 0.16f)); edge.sprite = Outline(); edge.type = Image.Type.Sliced; edge.rectTransform.pivot = new Vector2(0.5f, 0.5f);
                     var nm = MakeText(card.transform, "Name", new Vector2(0f, 0f), new Vector2(30, 150), TextAnchor.LowerLeft, 44, new Color(0.96f, 0.94f, 0.9f)); routeNames[i] = nm; nm.font = BoldFont(); nm.rectTransform.pivot = new Vector2(0f, 0f); nm.rectTransform.sizeDelta = new Vector2(640, 56);
-                    var py = MakeText(card.transform, "Pay", new Vector2(1f, 0f), new Vector2(-30, 154), TextAnchor.LowerRight, 30, new Color(0.96f, 0.68f, 0.24f)); py.text = pays[i]; py.font = BoldFont(); py.rectTransform.pivot = new Vector2(1f, 0f); py.rectTransform.sizeDelta = new Vector2(260, 44);
+                    var py = MakeText(card.transform, "Pay", new Vector2(1f, 0f), new Vector2(-30, 154), TextAnchor.LowerRight, 30, new Color(0.96f, 0.68f, 0.24f)); routePays[i] = py; py.font = BoldFont(); py.rectTransform.pivot = new Vector2(1f, 0f); py.rectTransform.sizeDelta = new Vector2(260, 44);
                     var ln = MakeText(card.transform, "Line", new Vector2(0f, 0f), new Vector2(30, 24), TextAnchor.UpperLeft, 26, new Color(0.78f, 0.76f, 0.72f)); routeLines[i] = ln; ln.rectTransform.pivot = new Vector2(0f, 0f); ln.rectTransform.sizeDelta = new Vector2(880, 118);
                 }
             }
@@ -658,9 +657,10 @@ namespace IronNight
             string[] pics = k ? new[] { "route_kursk_village", "route_kursk_steppe", "route_kursk_belts" } : new[] { "route_village", "route_open", "route_bocage" };
             string[] names = k ? new[] { "Through the village", "Across the steppe", "Along the tree belts" } : new[] { "Through the village", "Across the open fields", "Through the bocage" };
             string[] lines = k
-                ? new[] { "Whitewashed huts and a church on every other field. Guns in the gardens, infantry among the houses.", "Wheat to the horizon, some of it burning. Long sight lines: the big cats come at you in the open.", "Wattle fences and birch belts. Short sight, hedgehogs by the roads, tank hunters close." }
+                ? new[] { "Whitewashed huts and a church on every other field. Panzergrenadiers among the houses, Tigers in the lanes.", "Wheat to the horizon, some of it burning. The Panzerkeils come straight at you, Tigers at the tip.", "Wattle fences and birch belts. Short sight, hedgehogs by the roads, tank hunters close." }
                 : new[] { "Farms and houses on every other field. Anti-tank guns in the gardens, infantry in the lanes. Cover for you and for them.", "Few hedges, long sight lines. The tanks come at you in the open - and you see them coming.", "Hedges on every side and trees along them. Short sight, tank hunters close. Slow, dark and dangerous." };
-            for (int i = 0; i < 3; i++) { routePics[i].sprite = UiSprite(pics[i]); routeNames[i].text = names[i]; routeLines[i].text = lines[i]; }
+            string[] pays = k ? new[] { "points +38%", "points +27%", "points +32%" } : new[] { "points +20%", "points +10%", "points +15%" };   // Kursk pays 15% more on top
+            for (int i = 0; i < 3; i++) { routePics[i].sprite = UiSprite(pics[i]); routeNames[i].text = names[i]; routeLines[i].text = lines[i]; routePays[i].text = pays[i]; }
             string[] th = { "normandy", "ardennes", "kursk" }; string[] label = { "NORMANDY", "ARDENNES", "KURSK" }; string[] shut = { "", "after 1 night", "after 1 dawn" };
             for (int t = 0; t < 3; t++)
             {
