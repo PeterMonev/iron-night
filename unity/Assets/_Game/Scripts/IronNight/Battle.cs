@@ -44,6 +44,8 @@ namespace IronNight
         int talliedKills, talliedTigers, talliedGuns, talliedInfantry, talliedObjectives; bool talliedAce, logged; readonly List<Drop> drops = new List<Drop>(); Material crateMaterial, chuteMaterial;
         class Salvage { public Vector3 pos; public int ap, he; public float age; public Transform crate; public Light glow; }
         readonly List<Salvage> salvage = new List<Salvage>(); readonly List<Vector3> cratePos = new List<Vector3>(); Material salvageMaterial;
+        class HeHole { public Vehicle v; public Vector3 local; public float left, tick; }
+        readonly List<HeHole> holes = new List<HeHole>();
         Light flareLight, moon; float shake; int banked, nightTigers, nightPaks, nightCrates; bool nightRecorded, bossKilled;
         readonly List<Vehicle> platoon = new List<Vehicle>(); readonly List<Vehicle> foes = new List<Vehicle>();
         readonly List<Shell> shells = new List<Shell>(); readonly List<Wreck> wrecks = new List<Wreck>();
@@ -71,6 +73,7 @@ namespace IronNight
         static readonly bool debugZoo = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--zoo") >= 0;   // test switch: one of each new enemy at 0:04
         static readonly bool debugGuns = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--guns") >= 0;   // test switch: a PaK and an 88 out of range ahead, to look at
         static readonly bool debugDrops = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--drops") >= 0;   // test switch: the first supply drop at 0:03
+        static readonly bool debugHe = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--he") >= 0;   // test switch: the leader starts loaded with HE
         static readonly bool debugSalvage = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--salvage") >= 0;   // test switch: three crates ahead at 0:02, the racks nearly dry
         static readonly bool debugInfantry = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--infantry") >= 0;   // test switch: a squad at 0:04
         bool debugSquadSent;
@@ -117,7 +120,7 @@ namespace IronNight
             }
             // the commander riding with the leader
             bonus = Depot.CommanderBonus; commander = System.Array.Find(Depot.Commanders, c => c.id == Depot.CommanderId && c.nation == Depot.Nation); if (bonus == "reload") reloadMul *= 0.85f; if (bonus == "speed") speedMul *= 1.12f; if (bonus == "armour") Leader.hp += 1f;
-            apMax += Depot.Level("ammo") * 6; heMax += Depot.Level("ammo") * 3; apRounds = apMax; heRounds = heMax;
+            apMax += Depot.Level("ammo") * 6; heMax += Depot.Level("ammo") * 3; apRounds = apMax; heRounds = heMax; if (debugHe) { heMax = heRounds = 60; loadHe = true; }
             hud.OnAmmo = () => { heAuto = false; loadHe = !loadHe; if (loadHe && heRounds <= 0) loadHe = false; else if (!loadHe && apRounds <= 0 && heRounds > 0) loadHe = true; Sfx.Click(); hud.SetAmmo(apRounds, heRounds, loadHe); };
             hud.OnAbility = UseAbility;
             NextObjective();
@@ -299,7 +302,7 @@ namespace IronNight
             hud.Set(t, platoon.Count); hud.SetLeader(Mathf.CeilToInt(L.hp), Mathf.CeilToInt(Depot.LeaderHp)); hud.SetTally(kills, score);
             hud.ReloadArc(L.transform.position + Vector3.up * 0.2f, L.reloadLeft <= 0f ? 1f : 1f - L.reloadLeft / Mathf.Max(0.1f, L.spec.reload * L.reloadMul), cam);
             hud.Indicators(foes, cam);
-            TickObjective(dt); TickDrops(dt); TickSalvage(dt); TickMortars(dt); TickStar(dt);
+            TickObjective(dt); TickDrops(dt); TickSalvage(dt); TickHoles(dt); TickMortars(dt); TickStar(dt);
             if (ammoLeft > 0f) { ammoLeft -= dt; if (ammoLeft <= 0f) { ammoMul = 1f; hud.Toast("APCR spent"); } }
             hud.Radar(foes, platoon, L.transform.position, objective != null ? objective.pos : Vector3.zero, objective != null, cratePos);   // the commander's spotting shows them all: the markers are placed when it is called
             hud.HpBars(foes, cam, boss);
@@ -484,8 +487,8 @@ namespace IronNight
                     if (s.friendly && phosphorus && !hit.friendly) { burn[hit] = 6f; if (!burning.Contains(hit)) burning.Add(hit); }
                     Damage(hit, dmg, s.pos);
                     TrackHit(hit, s.pos);
-                    if (s.he) { float r = heBurst; foreach (var v in hitList) if (v != hit && !v.dead && Dist(v, hit) < r) Damage(v, s.dmg * 0.5f, v.transform.position); if (s.friendly) InfantryKilled(infantry.Blast(s.pos, r), s.pos); fx.Explosion(s.pos); }
-                    fx.Hit(new Vector3(s.pos.x, 1.6f, s.pos.z), s.he ? 1.5f : 1f);
+                    if (s.he) { float r = heBurst; foreach (var v in hitList) if (v != hit && !v.dead && Dist(v, hit) < r) Damage(v, s.dmg * 0.5f, v.transform.position); if (s.friendly) InfantryKilled(infantry.Blast(s.pos, r), s.pos); Hole(hit, s.pos); }
+                    else fx.Hit(new Vector3(s.pos.x, 1.6f, s.pos.z), 1f);
                 }
                 if (s.bounced) s.vel += Vector3.down * (30f * dt);
                 if (hit == null && !s.bounced && s.friendly && objective != null && objective.kind == "dump" && new Vector2(s.pos.x - objective.pos.x, s.pos.z - objective.pos.z).magnitude < 4.5f && s.pos.y < 4f) { DumpHit(s.pos); s.life = 0f; }
@@ -1288,7 +1291,7 @@ namespace IronNight
             DropCrate(props.PushOut(v.transform.position + new Vector3(Random.Range(-2.4f, 2.4f), 0f, Random.Range(-2.4f, 2.4f)), 1.4f), ap, Random.value < 0.3f ? 1 : 0);
         }
 
-        /// <summary>A crate on the ground, fitted to 1.5 m whichever model it is, with a low warm light so the brass
+        /// <summary>A crate on the ground, fitted to 1.8 m whichever model it is, with a low warm light so the brass
         /// reads at night. When there are ten, the oldest goes.</summary>
         void DropCrate(Vector3 pos, int ap, int he)
         {
@@ -1299,15 +1302,15 @@ namespace IronNight
             s.crate = Instantiate(pf).transform; s.crate.name = "AmmoCrate";
             var rs = s.crate.GetComponentsInChildren<Renderer>(); var b = rs[0].bounds;
             foreach (var r in rs) { b.Encapsulate(r.bounds); r.sharedMaterial = salvageMaterial; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
-            float k = 1.5f / Mathf.Max(0.1f, Mathf.Max(b.size.x, b.size.z)); s.crate.localScale = Vector3.one * k;
+            float k = 1.8f / Mathf.Max(0.1f, Mathf.Max(b.size.x, b.size.z)); s.crate.localScale = Vector3.one * k;
             s.crate.position = pos - Vector3.up * b.min.y * k; s.crate.rotation = Quaternion.Euler(0f, Random.value * 360f, 0f);
             var glow = new GameObject("CrateGlow"); glow.transform.SetParent(s.crate, false); glow.transform.localPosition = new Vector3(0.8f, 1.1f, -0.6f) / k;
             s.glow = glow.AddComponent<Light>(); s.glow.type = LightType.Point; s.glow.range = 4.5f; s.glow.intensity = 1f; s.glow.color = new Color(1f, 0.84f, 0.6f); s.glow.shadows = LightShadows.None;
             salvage.Add(s);
         }
 
-        /// <summary>Within four metres the leader takes what fits in the racks and, while the platoon is short, a new
-        /// tank comes up with it. A crate nobody needs stays where it is for a minute.</summary>
+        /// <summary>Within four metres the leader takes what fits in the racks; now and then (one crate in seven) a new
+        /// tank comes up with it while the platoon is short. A crate the racks have no room for stays a minute.</summary>
         void TickSalvage(float dt)
         {
             var L = Leader; if (L == null) return; cratePos.Clear();
@@ -1315,17 +1318,40 @@ namespace IronNight
             {
                 var s = salvage[i]; s.age += dt; s.glow.intensity = 0.9f + Mathf.Sin(s.age * 3f) * 0.2f;
                 var toL = L.transform.position - s.pos; toL.y = 0f;
-                if (toL.magnitude < 4f && (apRounds < apMax || heRounds < heMax || platoon.Count < maxPlatoon))
+                if (toL.magnitude < 4f && (apRounds < apMax || heRounds < heMax))
                 {
                     int ap = Mathf.Min(apMax - apRounds, s.ap), he = Mathf.Min(heMax - heRounds, s.he);
                     apRounds += ap; heRounds += he; if (heAuto && apRounds > 0) { loadHe = false; heAuto = false; } hud.SetAmmo(apRounds, heRounds, loadHe);
                     Sfx.Pickup(); nightCrates++;
                     if (ap + he > 0) hud.Popup(s.pos, (ap > 0 ? "+" + ap + " AP" : "") + (ap > 0 && he > 0 ? " · " : "") + (he > 0 ? "+" + he + " HE" : ""), new Color(1f, 0.84f, 0.45f));
-                    if (platoon.Count < maxPlatoon) Reinforce();
+                    if (platoon.Count < maxPlatoon && Random.value < 0.15f) Reinforce();
                     Destroy(s.crate.gameObject); salvage.RemoveAt(i); continue;
                 }
                 if (s.age > 60f) { Destroy(s.crate.gameObject); salvage.RemoveAt(i); continue; }
                 cratePos.Add(s.pos);
+            }
+        }
+
+        /// <summary>Where an HE round burst on a hull: a point on the plate, a little out from the centre, that burns
+        /// for six seconds and rides with the tank.</summary>
+        void Hole(Vehicle v, Vector3 at)
+        {
+            var o = at - v.transform.position; o.y = 0f;
+            var p = v.transform.position + o.normalized * Mathf.Max(o.magnitude, v.spec.radius * 0.8f) + Vector3.up * Mathf.Clamp(at.y, 1.1f, 1.9f);
+            fx.HeImpact(p);
+            if (v.dead) return;
+            if (holes.Count >= 16) holes.RemoveAt(0);
+            holes.Add(new HeHole { v = v, local = v.transform.InverseTransformPoint(p), left = 6f });
+        }
+
+        void TickHoles(float dt)
+        {
+            for (int i = holes.Count - 1; i >= 0; i--)
+            {
+                var h = holes[i]; h.left -= dt;
+                if (h.v == null || h.left <= 0f) { holes.RemoveAt(i); continue; }
+                h.tick -= dt; if (h.tick > 0f) continue; h.tick = 0.12f;
+                fx.Ember(h.v.transform.TransformPoint(h.local), h.left / 6f);
             }
         }
 

@@ -124,6 +124,26 @@ namespace IronNight
             Flash(pos + Vector3.up * 1.5f, new Color(1f, 0.6f, 0.3f), 60f * power, 18f, 0.3f);
         }
 
+        /// <summary>An HE round bursting on armour; it does not go in. A short hard flash, a small ball of fire,
+        /// fragments thrown off the plate and a puff of black smoke. The hole it leaves burns on (Ember).</summary>
+        public void HeImpact(Vector3 pos)
+        {
+            Spawn(addGlow, pos, 3.2f, new Color(1f, 0.95f, 0.85f, 1f), 0.07f, Vector3.zero, 0.3f);
+            Sheet(Spawn(addExplosion, pos + Vector3.up * 0.4f, 3.6f, Color.white, 0.4f, Vector3.up * 1.2f, 0.6f), 4, 4, 16);
+            for (int i = 0; i < 12; i++) { var v = (Random.insideUnitSphere + Vector3.up * 0.5f).normalized * (10f + Random.value * 14f); var s = Spawn(addSpark, pos, 0.2f + Random.value * 0.2f, new Color(1f, 0.8f, 0.45f, 1f), 0.25f + Random.value * 0.35f, v, 0f); s.gravity = true; }
+            for (int i = 0; i < 3; i++) Spawn(smokeRagged, pos + Random.insideUnitSphere * 0.6f, 1.6f + Random.value * 1.2f, new Color(0.1f, 0.09f, 0.08f, 0.8f), 2.2f + Random.value, new Vector3(Random.Range(-0.5f, 0.5f), 1.4f + Random.value, Random.Range(-0.5f, 0.5f)), 1.8f, true);
+            Flash(pos + Vector3.up, new Color(1f, 0.6f, 0.3f), 70f, 14f, 0.18f);
+        }
+
+        /// <summary>The hole an HE round left, still burning: a flickering red-hot rim, now and then a small tongue of
+        /// flame and a thread of smoke. Heat 1 is fresh, 0 is cold.</summary>
+        public void Ember(Vector3 pos, float heat)
+        {
+            Spawn(addGlow, pos, 0.45f + 0.3f * heat, new Color(1f, 0.35f + 0.25f * heat, 0.08f, 0.85f), 0.16f, Vector3.zero, 0f);
+            if (Random.value < 0.2f + 0.4f * heat) Spawn(addFlame, pos + Vector3.up * 0.25f, 0.55f + Random.value * 0.4f * heat, Warm(Random.value * 0.6f), 0.25f + Random.value * 0.15f, Vector3.up * (1.2f + Random.value), 0.5f);
+            if (Random.value < 0.3f) Spawn(smokeRagged, pos + Vector3.up * 0.6f, 0.8f + Random.value * 0.6f, new Color(0.12f, 0.11f, 0.1f, 0.5f), 1.8f + Random.value, new Vector3(Random.Range(-0.2f, 0.2f), 1.4f, Random.Range(-0.2f, 0.2f)), 1.8f, true);
+        }
+
         /// <summary>A shell glancing off: a white flash and a handful of sparks thrown off the armour.</summary>
         public void Spark(Vector3 pos, Vector3 away)
         {

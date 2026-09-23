@@ -262,7 +262,7 @@ namespace IronNight
             MakeText(helpSheet.transform, "Title", new Vector2(0.5f, 1f), new Vector2(0, -170), TextAnchor.MiddleCenter, 96, ink).text = "How to play";
             var help = MakeText(helpSheet.transform, "Text", new Vector2(0.5f, 1f), new Vector2(0, -320), TextAnchor.UpperLeft, 34, new Color(0.85f, 0.83f, 0.78f)); help.rectTransform.sizeDelta = new Vector2(920, 1400);
             help.text = "Drag anywhere to drive the leader. The turrets aim and fire on their own.\n\n" +
-                "The leader carries a limited rack of AP and HE. Every enemy you destroy leaves an ammunition crate by its wreck: drive over it to rearm. While the platoon is short, a new tank comes up with it, up to three (a fourth with the ad).\n\n" +
+                "The leader carries a limited rack of AP and HE. Every enemy you destroy leaves an ammunition crate by its wreck: drive over it to rearm. Now and then, while the platoon is short, a new tank comes up with a crate, up to three (a fourth with the ad).\n\n" +
                 "Pick a formation at the bottom. Wedge for the open field, column for the lanes, line to bring every gun to bear.\n\n" +
                 "Hedges stop tanks; drive through the gates. Farm buildings stop shells: use them as cover, or deny them to the enemy.\n\n" +
                 "Anti-tank guns dig in behind sandbags and the 88s stand with the searchlights. Hit them from the side.\n\n" +
