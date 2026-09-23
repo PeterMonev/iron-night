@@ -262,7 +262,7 @@ namespace IronNight
             MakeText(helpSheet.transform, "Title", new Vector2(0.5f, 1f), new Vector2(0, -170), TextAnchor.MiddleCenter, 96, ink).text = "How to play";
             var help = MakeText(helpSheet.transform, "Text", new Vector2(0.5f, 1f), new Vector2(0, -320), TextAnchor.UpperLeft, 34, new Color(0.85f, 0.83f, 0.78f)); help.rectTransform.sizeDelta = new Vector2(920, 1400);
             help.text = "Drag anywhere to drive the leader. The turrets aim and fire on their own.\n\n" +
-                "Every enemy you destroy leaves a flare. Drive over it: a new tank joins the platoon, up to three (a fourth with the ad).\n\n" +
+                "The leader carries a limited rack of AP and HE. Every enemy you destroy leaves an ammunition crate by its wreck: drive over it to rearm. While the platoon is short, a new tank comes up with it, up to three (a fourth with the ad).\n\n" +
                 "Pick a formation at the bottom. Wedge for the open field, column for the lanes, line to bring every gun to bear.\n\n" +
                 "Hedges stop tanks; drive through the gates. Farm buildings stop shells: use them as cover, or deny them to the enemy.\n\n" +
                 "Anti-tank guns dig in behind sandbags and the 88s stand with the searchlights. Hit them from the side.\n\n" +
@@ -545,8 +545,9 @@ namespace IronNight
             for (int i = used; i < arrows.Count; i++) arrows[i].enabled = false;
         }
 
-        /// <summary>The radar in the corner: enemies red, wingmen green, the objective amber, ninety metres to the rim, north up.</summary>
-        public void Radar(List<Vehicle> foes, List<Vehicle> platoon, Vector3 leader, Vector3 objective, bool hasObjective)
+        /// <summary>The radar in the corner: enemies red, guns orange, wingmen and the objective green, ammunition crates
+        /// small and gold, ninety metres to the rim, north up.</summary>
+        public void Radar(List<Vehicle> foes, List<Vehicle> platoon, Vector3 leader, Vector3 objective, bool hasObjective, List<Vector3> crates)
         {
             int used = 0; float range = Depot.CommanderBonus == "radar" ? 120f : 90f; const float rim = 110f;
             Image Dot(Vector3 world, Color c, float size)
@@ -555,6 +556,7 @@ namespace IronNight
                 used++; var o = new Vector2(world.x - leader.x, world.z - leader.z) * (rim / range); if (o.magnitude > rim) o = o.normalized * rim;
                 d.enabled = true; d.color = c; d.rectTransform.sizeDelta = new Vector2(size, size); d.rectTransform.anchoredPosition = o; return d;
             }
+            foreach (var c in crates) Dot(c, new Color(1f, 0.86f, 0.5f), 7f);
             foreach (var e in foes) if (!e.dead) Dot(e.transform.position, e.spec.isGun ? new Color(1f, 0.55f, 0.3f) : new Color(0.95f, 0.3f, 0.25f), e.spec == VehicleSpec.TigerAce ? 16f : 11f);
             for (int i = 1; i < platoon.Count; i++) if (!platoon[i].dead) Dot(platoon[i].transform.position, new Color(0.45f, 0.9f, 0.5f), 10f);
             if (hasObjective) Dot(objective, new Color(0.35f, 0.95f, 0.45f), 14f);

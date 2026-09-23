@@ -11,13 +11,13 @@ namespace IronNight
     public static class Missions
     {
         public class Mission { public int index; public string stat, text; public int goal, reward, progress, start; public bool perNight; public string Title => string.Format(text, goal); public string Key => stat + goal; }
-        public class Night { public int kills, tigers, paks, flares, level, objectives, infantry, tracked, focus, campaign, lamps, rescued; public float time; public bool boss; }
+        public class Night { public int kills, tigers, paks, crates, level, objectives, infantry, tracked, focus, campaign, lamps, rescued; public float time; public bool boss; }
 
         static readonly Mission[] Pool =
         {
             new Mission { stat = "kills", goal = 10, reward = 200, text = "Destroy {0} enemy vehicles" },
             new Mission { stat = "time", goal = 120, reward = 300, text = "Hold until 2:00 in one night", perNight = true },
-            new Mission { stat = "flares", goal = 6, reward = 200, text = "Pick up {0} flares" },
+            new Mission { stat = "flares", goal = 6, reward = 200, text = "Pick up {0} ammo crates" },
             new Mission { stat = "tigers", goal = 1, reward = 250, text = "Destroy a Tiger" },
             new Mission { stat = "objectives", goal = 3, reward = 300, text = "Reach {0} objectives" },
             new Mission { stat = "kills", goal = 30, reward = 500, text = "Destroy {0} enemy vehicles" },
@@ -31,7 +31,7 @@ namespace IronNight
             new Mission { stat = "nightkills", goal = 15, reward = 300, text = "Destroy {0} enemies in one night", perNight = true },
             new Mission { stat = "time", goal = 210, reward = 600, text = "Hold until 3:30 in one night", perNight = true },
             new Mission { stat = "tigers", goal = 4, reward = 600, text = "Destroy {0} Tigers" },
-            new Mission { stat = "flares", goal = 20, reward = 600, text = "Pick up {0} flares" },
+            new Mission { stat = "flares", goal = 20, reward = 600, text = "Pick up {0} ammo crates" },
             new Mission { stat = "kills", goal = 80, reward = 1200, text = "Destroy {0} enemy vehicles" },
             new Mission { stat = "boss", goal = 1, reward = 1500, text = "Destroy the Tiger Ace", perNight = true },
             new Mission { stat = "objectives", goal = 12, reward = 900, text = "Reach {0} objectives" },
@@ -78,7 +78,7 @@ namespace IronNight
         {
             switch (stat)
             {
-                case "kills": case "nightkills": return n.kills; case "tigers": return n.tigers; case "paks": return n.paks; case "flares": return n.flares;
+                case "kills": case "nightkills": return n.kills; case "tigers": return n.tigers; case "paks": return n.paks; case "flares": return n.crates;
                 case "level": return n.level; case "time": return Mathf.FloorToInt(n.time); case "boss": return n.boss ? 1 : 0; case "objectives": return n.objectives; case "infantry": return n.infantry;
                 case "tracked": return n.tracked; case "lamps": return n.lamps; case "focus": return n.focus; case "campaign": return n.campaign; case "rescued": return n.rescued; default: return 0;
             }
