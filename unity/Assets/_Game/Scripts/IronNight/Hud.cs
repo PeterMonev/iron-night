@@ -45,7 +45,7 @@ namespace IronNight
         public class Card { public string id, title, desc; public bool rare; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain, OnStart, OnCampaign, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility; GameObject holdBtn, ammoBtn, abilityBtn; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
+        public System.Action OnAd, OnAgain, OnStart, OnCampaign, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder; public System.Action<string> OnRoute; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, routeSheet; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
 
         Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel, setSound, setQuality, setVibe, setMusic, rankLine, pointsLine, ordersCount; GameObject settingsSheet, ordersSheet; RawImage titleBackdrop, depotBackdrop; GarageDrag depotDrag; readonly List<RectTransform> embers = new List<RectTransform>(); readonly List<float> emberPhase = new List<float>(); GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
@@ -145,6 +145,11 @@ namespace IronNight
                 var be = MakeImage(abilityBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(180, 180), new Color(0.96f, 0.68f, 0.24f, 0.5f)); be.sprite = Outline(); be.type = Image.Type.Sliced; be.rectTransform.pivot = new Vector2(0.5f, 0.5f);
                 abilityBtn.transform.Find("Label").GetComponent<Text>().text = "";
                 abilityBtn.SetActive(false);
+                orderBtn = MakeButton(hudGroup.transform, "FOLLOW", new Vector2(0f, 0f), new Vector2(530, 268), new Vector2(190, 120), 26, () => OnOrder?.Invoke());
+                orderBtn.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.11f, 0.85f);
+                var oe = MakeImage(orderBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190, 120), new Color(1f, 1f, 1f, 0.2f)); oe.sprite = Outline(); oe.type = Image.Type.Sliced; oe.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                var ot = MakeText(orderBtn.transform, "Top", new Vector2(0.5f, 1f), new Vector2(0, -12), TextAnchor.UpperCenter, 20, new Color(0.66f, 0.64f, 0.59f)); ot.text = Spaced("WINGMEN"); ot.rectTransform.sizeDelta = new Vector2(190, 30);
+                orderLabel = orderBtn.transform.Find("Label").GetComponent<Text>(); orderLabel.alignment = TextAnchor.MiddleCenter; orderLabel.rectTransform.anchoredPosition = new Vector2(0, -12); orderLabel.fontSize = 30; orderLabel.color = new Color(0.96f, 0.68f, 0.24f);
             }
             arrowSprite = ArrowSprite(); objectiveArrow.sprite = arrowSprite;
             var root = canvasGo.transform;
@@ -603,7 +608,40 @@ namespace IronNight
         }
         /// <summary>What is in the racks, and which round is loaded.</summary>
         /// <summary>The stick must let these buttons have their own presses.</summary>
-        public void HandTo(TouchStick stick) { if (stick == null) return; stick.Blockers.Add(ammoBtn.GetComponent<RectTransform>()); stick.Blockers.Add(abilityBtn.GetComponent<RectTransform>()); stick.Blockers.Add(pauseBtnRect); }
+        public void HandTo(TouchStick stick) { if (stick == null) return; stick.Blockers.Add(ammoBtn.GetComponent<RectTransform>()); stick.Blockers.Add(abilityBtn.GetComponent<RectTransform>()); stick.Blockers.Add(orderBtn.GetComponent<RectTransform>()); stick.Blockers.Add(pauseBtnRect); }
+
+        public void SetOrder(string text) { if (orderLabel != null) orderLabel.text = text; }
+
+        /// <summary>The way in, chosen before the night: three cards with the country, what waits there and what it pays.</summary>
+        public void ShowRoutes(System.Action go)
+        {
+            routeGo = go;
+            if (routeSheet == null)
+            {
+                routeSheet = new GameObject("Routes", typeof(RectTransform), typeof(Image)); routeSheet.transform.SetParent(canvas.transform, false); Stretch(routeSheet); routeSheet.GetComponent<Image>().color = new Color(0.02f, 0.02f, 0.03f, 1f);
+                var ey = MakeText(routeSheet.transform, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -170), TextAnchor.MiddleCenter, 26, new Color(0.96f, 0.68f, 0.24f)); ey.text = Spaced("TONIGHT'S ORDERS"); ey.font = BoldFont();
+                var ti = MakeText(routeSheet.transform, "Title", new Vector2(0.5f, 1f), new Vector2(0, -250), TextAnchor.MiddleCenter, 100, new Color(0.93f, 0.91f, 0.86f)); ti.text = "CHOOSE THE WAY IN"; ti.font = DisplayFont(); ti.verticalOverflow = VerticalWrapMode.Overflow; ti.horizontalOverflow = HorizontalWrapMode.Overflow;
+                string[] ids = { "village", "open", "bocage" };
+                string[] names = { "Through the village", "Across the open fields", "Through the bocage" };
+                string[] pics = { "campaign_lastpush", "campaign_normandy", "obj_crew" };
+                string[] lines = { "Farms and houses on every other field. Anti-tank guns in the gardens, infantry in the lanes. Cover for you and for them.", "Few hedges, long sight lines. The tanks come at you in the open - and you see them coming.", "Hedges on every side and trees along them. Short sight, tank hunters close. Slow, dark and dangerous." };
+                string[] pays = { "points +20%", "points +10%", "points +15%" };
+                for (int i = 0; i < 3; i++)
+                {
+                    string id = ids[i]; float y = -400 - i * 470;
+                    var card = MakeButton(routeSheet.transform, "", new Vector2(0.5f, 1f), new Vector2(0, y - 215), new Vector2(940, 430), 20, () => { OnRoute?.Invoke(id); routeSheet.SetActive(false); routeGo?.Invoke(); });
+                    card.GetComponent<Image>().color = new Color(0.07f, 0.08f, 0.1f, 1f);
+                    var mask = new GameObject("Mask", typeof(RectTransform), typeof(RectMask2D)); mask.transform.SetParent(card.transform, false); var mkrt = mask.GetComponent<RectTransform>(); mkrt.anchorMin = mkrt.anchorMax = new Vector2(0.5f, 1f); mkrt.pivot = new Vector2(0.5f, 1f); mkrt.sizeDelta = new Vector2(924, 250); mkrt.anchoredPosition = new Vector2(0, -8);
+                    var pic = MakeImage(mask.transform, "Pic", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(924, 924), Color.white); pic.rectTransform.pivot = new Vector2(0.5f, 0.5f); pic.sprite = UiSprite(pics[i]);
+                    var fade = MakeImage(mask.transform, "Fade", new Vector2(0.5f, 0f), Vector2.zero, new Vector2(924, 140), new Color(0.07f, 0.08f, 0.1f, 1f)); fade.sprite = Lightswarm.ProceduralSprites.GradientDown(64, 1.1f); fade.rectTransform.pivot = new Vector2(0.5f, 0f);
+                    var edge = MakeImage(card.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(940, 430), new Color(1f, 1f, 1f, 0.16f)); edge.sprite = Outline(); edge.type = Image.Type.Sliced; edge.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                    var nm = MakeText(card.transform, "Name", new Vector2(0f, 0f), new Vector2(30, 150), TextAnchor.LowerLeft, 44, new Color(0.96f, 0.94f, 0.9f)); nm.text = names[i]; nm.font = BoldFont(); nm.rectTransform.pivot = new Vector2(0f, 0f); nm.rectTransform.sizeDelta = new Vector2(640, 56);
+                    var py = MakeText(card.transform, "Pay", new Vector2(1f, 0f), new Vector2(-30, 154), TextAnchor.LowerRight, 30, new Color(0.96f, 0.68f, 0.24f)); py.text = pays[i]; py.font = BoldFont(); py.rectTransform.pivot = new Vector2(1f, 0f); py.rectTransform.sizeDelta = new Vector2(260, 44);
+                    var ln = MakeText(card.transform, "Line", new Vector2(0f, 0f), new Vector2(30, 24), TextAnchor.UpperLeft, 26, new Color(0.78f, 0.76f, 0.72f)); ln.text = lines[i]; ln.rectTransform.pivot = new Vector2(0f, 0f); ln.rectTransform.sizeDelta = new Vector2(880, 118);
+                }
+            }
+            routeSheet.transform.SetAsLastSibling(); if (curtain != null) curtain.transform.SetAsLastSibling(); routeSheet.SetActive(true);
+        }
 
         public void SetAmmo(int ap, int he, bool loadHe)
         {

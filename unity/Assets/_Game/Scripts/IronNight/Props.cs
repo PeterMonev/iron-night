@@ -109,11 +109,16 @@ namespace IronNight
         static int FieldType(int ix, int iz) => Rnd(ix, iz, 902) < 0.2f ? (int)(Hash(ix, iz, 903) % 4) : (int)(Hash(FloorDiv(ix, 2), FloorDiv(iz, 2), 901) % 4);
         static bool LaneX(int ix) => ix == 0 || Hash(ix, 1, 910) % 3 == 0;                    // a lane on the line x = ix*40+20
         static bool LaneZ(int iz) => Hash(1, iz, 911) % 4 == 0;                               // a lane on the line z = iz*40+20
-        static bool Farm(int ix, int iz) => (ix == 1 && iz == 1) || (!Start(ix, iz) && Rnd(ix, iz, 930) < 0.09f);
+        public static string Route = "open";   // "village", "open" or "bocage": set before the night is built
+        static float FarmChance => Route == "village" ? 0.17f : Route == "bocage" ? 0.08f : 0.07f;
+        static float VillageChance => Route == "village" ? 0.24f : Route == "bocage" ? 0.03f : 0.04f;
+        static float HedgeBias => Route == "bocage" ? 1.45f : Route == "open" ? 0.5f : 0.85f;
+        static float TreeBias => Route == "bocage" ? 1.8f : Route == "open" ? 0.6f : 1f;
+        static bool Farm(int ix, int iz) => (ix == 1 && iz == 1) || (!Start(ix, iz) && Rnd(ix, iz, 930) < FarmChance);
         static bool Battery(int ix, int iz) => (ix == -1 && iz == 0) || (!Start(ix, iz) && !Farm(ix, iz) && Rnd(ix, iz, 940) < 0.16f);
-        static bool Village(int ix, int iz) => (ix == 0 && iz == 3) || (!Start(ix, iz) && !Farm(ix, iz) && !Battery(ix, iz) && Rnd(ix, iz, 1100) < 0.05f);
-        static bool HedgeX(int ix, int iz) { if (LaneX(ix)) return false; if (Farm(ix, iz) || Farm(ix + 1, iz)) return true; return Rnd(ix, iz, 920) < (FieldType(ix, iz) != FieldType(ix + 1, iz) ? 0.85f : 0.3f); }
-        static bool HedgeZ(int ix, int iz) { if (LaneZ(iz)) return false; if (Farm(ix, iz) || Farm(ix, iz + 1)) return true; return Rnd(ix, iz, 921) < (FieldType(ix, iz) != FieldType(ix, iz + 1) ? 0.85f : 0.3f); }
+        static bool Village(int ix, int iz) => (ix == 0 && iz == 3) || (!Start(ix, iz) && !Farm(ix, iz) && !Battery(ix, iz) && Rnd(ix, iz, 1100) < VillageChance);
+        static bool HedgeX(int ix, int iz) { if (LaneX(ix)) return false; if (Farm(ix, iz) || Farm(ix + 1, iz)) return true; return Rnd(ix, iz, 920) < Mathf.Min(0.97f, (FieldType(ix, iz) != FieldType(ix + 1, iz) ? 0.85f : 0.3f) * HedgeBias); }
+        static bool HedgeZ(int ix, int iz) { if (LaneZ(iz)) return false; if (Farm(ix, iz) || Farm(ix, iz + 1)) return true; return Rnd(ix, iz, 921) < Mathf.Min(0.97f, (FieldType(ix, iz) != FieldType(ix, iz + 1) ? 0.85f : 0.3f) * HedgeBias); }
         static Vector3 In(int ix, int iz, int salt, float r) => new Vector3((Rnd(ix, iz, salt) - 0.5f) * 2f * r, 0f, (Rnd(ix, iz, salt + 1) - 0.5f) * 2f * r);
 
         // the generated textures come out at different brightnesses; this evens them under the moon
@@ -159,9 +164,9 @@ namespace IronNight
             for (float u = 1.25f; u < len; u += 2.5f) if (!Open(p, u)) { var c = a + dir * u; centers.Add(new Vector2(c.x, c.z)); radii.Add(1.6f); }
             p.circleCenters = centers.ToArray(); p.radii = radii.ToArray();
             list.Add(p);
-            if (Rnd(ix, iz, 968 + salt) < 0.55f)
+            if (Rnd(ix, iz, 968 + salt) < Mathf.Min(0.95f, 0.55f * TreeBias))
             {
-                int n = 1 + (int)(Rnd(ix, iz, 969 + salt) * 2f); var side = new Vector3(dir.z, 0f, -dir.x);
+                int n = 1 + (int)(Rnd(ix, iz, 969 + salt) * 2f * TreeBias); var side = new Vector3(dir.z, 0f, -dir.x);
                 for (int i = 0; i < n; i++) { float u = len * (0.1f + 0.8f * (i + Rnd(ix, iz, 970 + salt + i)) / n); if (Open(p, u)) continue; HedgeTree(list, a + dir * u + side * 0.4f, (int)(Hash(ix, iz, 975 + salt + i) & 0xffff)); }
             }
         }
@@ -228,7 +233,7 @@ namespace IronNight
             if (type >= 2) { int n = (int)(Rnd(ix, iz, 1010) * 4f); for (int h = 0; h < n; h++) Place(list, "haystack", c + In(ix, iz, 1011 + h * 2, 13f), Rnd(ix, iz, 1030 + h) * 6.28f); }
             if (Rnd(ix, iz, 1040) < 0.1f) Place(list, "truck", c + In(ix, iz, 1041, 12f), Rnd(ix, iz, 1043) * 6.28f);
             if (Rnd(ix, iz, 1044) < 0.1f) Place(list, "deadtree", c + In(ix, iz, 1045, 14f), Rnd(ix, iz, 1047) * 6.28f);
-            if (Rnd(ix, iz, 1048) < 0.08f) Tree(list, c + In(ix, iz, 1049, 12f), (int)(Hash(ix, iz, 1051) & 0xffff));
+            if (Rnd(ix, iz, 1048) < 0.08f * TreeBias) Tree(list, c + In(ix, iz, 1049, 12f), (int)(Hash(ix, iz, 1051) & 0xffff));
             if (wet) { int puddles = (type == 0 ? 3 : 1) + (int)(Rnd(ix, iz, 1080) * 3f); for (int k = 0; k < puddles; k++) list.Add(new Prop { what = What.Decal, seed = 2, pos = c + In(ix, iz, 1081 + k * 2, 17f), yaw = Rnd(ix, iz, 1090 + k) * 6.28f, size = 3f + Rnd(ix, iz, 1096 + k) * 4f }); }
             int craters = Rnd(ix, iz, 1052) < 0.35f ? 1 + (int)(Rnd(ix, iz, 1053) * 2f) : 0;
             for (int k = 0; k < craters; k++) list.Add(new Prop { what = What.Decal, seed = 1, pos = c + In(ix, iz, 1054 + k * 2, 16f), yaw = Rnd(ix, iz, 1060 + k) * 6.28f, size = 4f + Rnd(ix, iz, 1064 + k) * 3f });
