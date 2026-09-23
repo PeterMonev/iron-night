@@ -62,6 +62,8 @@ namespace IronNight
         float t, spawnTimer = 6f, leaderShield; int level = 1, xp, xpNeed = 6, score, kills, maxPlatoon = 4, reinforcements;
         bool wave2, wave3, wave4, revived, doubled, bossSpawned; Vehicle boss;
         Vehicle ace; string aceName; float aceTimer = 105f, weatherTurn;
+        string theatre = "normandy", builtTheatre = "normandy";   // the map: it also decides the nation
+        string TheatreName => theatre == "kursk" ? "Kursk" : winter ? "Ardennes" : "Normandy";
         string route = "open", builtRoute = "open"; float routePay = 1.1f;   // the way in the player chose, the one the country was built for, and what it pays
         enum Order { Follow, Hold, Advance } Order order = Order.Follow; Vector3[] holdAt = new Vector3[8];   // what the wingmen were told   // a named enemy of the night, and the hour the weather turns
         static readonly string[] AceNames = { "Hptm. Keller", "Ofw. Brandt", "Ltn. Hoffmann", "Fw. Ziegler", "Hptm. Vogel", "Ofw. Reinhardt", "Ltn. Stahl", "Fw. Neumann" };
@@ -91,15 +93,18 @@ namespace IronNight
             cam = camera; hud = h; stick = s; fx = effects;
             shellTemplate = Resources.Load<Material>("Additive"); glowTex = Lightswarm.ProceduralSprites.Glow(64, 0.3f).texture;
             route = PlayerPrefs.GetString("route", "open"); foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--route=")) route = arg.Substring(8);
+            theatre = PlayerPrefs.GetString("theatre", "normandy"); foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--theatre=")) theatre = arg.Substring(10);   // test switch: --theatre=kursk
+            Depot.Load(); if (!Depot.TheatreOpen(theatre) && System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--theatre=" + theatre) < 0) theatre = "normandy";
             builtRoute = route; Props.Route = route; routePay = route == "village" ? 1.2f : route == "bocage" ? 1.15f : 1.1f;   // the country is built for this way in
             PickWeather(); weatherTurn = NightLength * Random.Range(0.35f, 0.62f);
+            builtTheatre = theatre; Props.Theatre = theatre; string nation = theatre == "kursk" ? "su" : "us"; if (Depot.Nation != nation) Depot.Nation = nation;
             BuildWorld();
             // the night always starts with the leader alone; the platoon grows from the salvaged crates to 3, a rewarded ad opens a 4th slot.
             // The depot's permanent upgrades set the starting numbers
             Depot.Load(); firstNight = Depot.NightsFought == 0;
             reloadMul = Depot.ReloadMul; rangeMul = Depot.RangeMul * (Depot.CrewLevel >= 3 ? 1.05f : 1f); speedMul = Depot.SpeedMul; maxPlatoon = 3;
             if (weather == Weather.Fog) { rangeMul *= 0.8f; enemyRangeMul = 0.8f; } else if (weather == Weather.Overcast) enemyRangeMul = 0.9f; else if (weather == Weather.Rain) { speedMul *= 0.92f; enemyRangeMul = 0.95f; }
-            hud.SetConditions((winter ? "Ardennes" : "Normandy") + (route == "village" ? " · village" : route == "bocage" ? " · bocage" : " · open fields"), winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Overcast ? "a dark night, the enemy sees 10% less" : weather == Weather.Rain ? (winter ? "the platoon slows in the drifts, the enemy sees 5% less" : "mud slows the platoon, the enemy sees 5% less") : "");
+            hud.SetConditions(TheatreName + (route == "village" ? " · village" : route == "bocage" ? (theatre == "kursk" ? " · tree belts" : " · bocage") : (theatre == "kursk" ? " · steppe" : " · open fields")), winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Overcast ? "a dark night, the enemy sees 10% less" : weather == Weather.Rain ? (winter ? "the platoon slows in the drifts, the enemy sees 5% less" : "mud slows the platoon, the enemy sees 5% less") : "");
             hud.OnQuality = () => { LowQuality = !LowQuality; ApplyQuality(); hud.SetQualityLabel(!LowQuality); };
             if (veteran) hud.Toast("Veteran night · points ×1.5", 3f);
             hud.OnDaily = () => { Depot.ClaimDaily(); hud.ShowTitle(reserveGranted); };
@@ -133,10 +138,11 @@ namespace IronNight
                 hud.Toast(order == Order.Follow ? "Platoon, on me" : order == Order.Hold ? "Platoon, hold here" : "Platoon, push ahead", 1.8f); if (Random.value < 0.5f) Radio("start");
             };
             hud.OnRoute = r => { route = r; PlayerPrefs.SetString("route", r); PlayerPrefs.Save(); };
+            hud.OnTheatre = t => theatre = t;
             hud.OnAd = OnAd; hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             hud.OnStart = () => hud.ShowRoutes(() =>
             {
-                if (route == builtRoute) StartCoroutine(Curtained(StartNight));
+                if (route == builtRoute && theatre == builtTheatre) StartCoroutine(Curtained(StartNight));
                 else { PlayerPrefs.SetInt("route.launch", 1); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); }   // another way in: the country is built again
             });
             hud.garage = Garage.Build(); hud.garage.SetActive(false);
@@ -778,13 +784,13 @@ namespace IronNight
         void PickWeather()
         {
             float r = Random.value; weather = r < 0.45f ? Weather.Clear : r < 0.7f ? Weather.Overcast : r < 0.85f ? Weather.Fog : Weather.Rain;
-            Depot.Load(); winter = Depot.NightsFought >= 1 && Random.value < 0.5f;   // the first night is always Normandy
+            winter = theatre == "ardennes";
             campaignNight = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--campaign") >= 0 ? Mathf.Max(1, Depot.CampaignNight) : PlayerPrefs.GetInt("camp.launch", 0);
             PlayerPrefs.SetInt("camp.launch", 0);
-            if (campaignNight > 0) { winter = campaignNight == 2; if (campaignNight == 3 && weather == Weather.Clear) weather = Weather.Overcast; }
+            if (campaignNight > 0) { winter = campaignNight == 2; theatre = winter ? "ardennes" : "normandy"; if (campaignNight == 3 && weather == Weather.Clear) weather = Weather.Overcast; }
             var args = System.Environment.GetCommandLineArgs();   // test switches: --fog, --rain, --overcast, --clear, --winter, --summer
             foreach (Weather w in System.Enum.GetValues(typeof(Weather))) if (System.Array.IndexOf(args, "--" + w.ToString().ToLowerInvariant()) >= 0) weather = w;
-            if (System.Array.IndexOf(args, "--winter") >= 0) winter = true; if (System.Array.IndexOf(args, "--summer") >= 0) winter = false;
+            if (System.Array.IndexOf(args, "--winter") >= 0) { winter = true; theatre = "ardennes"; } if (System.Array.IndexOf(args, "--summer") >= 0) { winter = false; if (theatre == "ardennes") theatre = "normandy"; }
             SkyFor();
         }
 
@@ -815,7 +821,7 @@ namespace IronNight
             if (props != null) { props.wet = wet; Vehicle.Wet = wet; if (wet) props.SetWet(0.5f); }
             if (weather == Weather.Rain) { if (rain == null) BuildRain(); else { rain.Play(); } } else if (rain != null) rain.Stop(true, ParticleSystemStopBehavior.StopEmitting);
             Sfx.Ambient(wet); LightShaft.boost = weather == Weather.Fog ? 1.8f : weather == Weather.Rain ? 1.3f : 1f;
-            hud.SetConditions((winter ? "Ardennes" : "Normandy") + (route == "village" ? " · village" : route == "bocage" ? " · bocage" : " · open fields"), winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Rain ? "the enemy shoots short" : weather == Weather.Overcast ? "a dark night, the enemy sees less" : "the moon is up: they see you");
+            hud.SetConditions(TheatreName + (route == "village" ? " · village" : route == "bocage" ? (theatre == "kursk" ? " · tree belts" : " · bocage") : (theatre == "kursk" ? " · steppe" : " · open fields")), winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Rain ? "the enemy shoots short" : weather == Weather.Overcast ? "a dark night, the enemy sees less" : "the moon is up: they see you");
         }
 
         /// <summary>Low quality for weak phones: no moon shadows, no post-processing, no rain or snow.</summary>
@@ -1564,7 +1570,7 @@ namespace IronNight
             if (!dawn && !revived && !crewLostTonight) { crewLostTonight = true; crewBefore = Depot.CrewNights; Depot.CrewNights = 0; Depot.CrewGeneration = Depot.CrewGeneration + 1; }
             if (dawn) { Depot.Tally("dawns", 1); if (veteran) Depot.Tally("veteranDawns", 1); } Depot.Tally("tracked", nightTracked - talliedTracked); talliedTracked = nightTracked; Depot.Tally("lamps", nightLamps - talliedLamps); talliedLamps = nightLamps;
             if (kills >= 15 && shotsFired > 0 && shotsHit * 2 >= shotsFired) Depot.Tally("sharp", 1);
-            if (!logged) { logged = true; Depot.LogNight(winter ? "Ardennes" : "Normandy", kills, t, score, dawn); }
+            if (!logged) { logged = true; Depot.LogNight(TheatreName, kills, t, score, dawn); }
             var medals = Medals.Check();
             int bonus = 0; var lines = new System.Text.StringBuilder(); foreach (var o in done) { bonus += o.reward; lines.Append("\nOrder carried out · " + o.Title + " · +" + o.reward); }
             foreach (var md in medals) { bonus += Medals.Reward; lines.Append("\nMedal · " + md.name + " · +" + Medals.Reward); }

@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: de58687449a2c494885f307a85cb5694
+guid: f1c316ee4199bdd499bc8df15b340ab6
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 336827386328862181
-    second: ammocrate_tex_0
+      213: 2276096480318087378
+    second: k_sunflowers_tex_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -128,7 +128,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: ammocrate_tex_0
+      name: k_sunflowers_tex_0
       rect:
         serializedVersion: 2
         x: 0
@@ -143,8 +143,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 5ed41c829b6aca400800000000000000
-      internalID: 336827386328862181
+      spriteID: 2d060e780b1569f10800000000000000
+      internalID: 2276096480318087378
       vertices: []
       indices: 
       edges: []
@@ -163,7 +163,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      ammocrate_tex_0: 336827386328862181
+      k_sunflowers_tex_0: 2276096480318087378
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

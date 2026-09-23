@@ -151,6 +151,8 @@ namespace IronNight
 
         // running tallies across every night (kills, tigers, guns, infantry, objectives, aces, dawns...) for the medals
         public static int Total(string key) => PlayerPrefs.GetInt("tally." + key, 0);
+        /// <summary>Normandy is always open; the Ardennes after the first night, Kursk after the first dawn.</summary>
+        public static bool TheatreOpen(string t) => t == "normandy" || (t == "ardennes" && NightsFought >= 1) || (t == "kursk" && Total("dawns") >= 1);
         public static void Tally(string key, int add) { if (add <= 0) return; PlayerPrefs.SetInt("tally." + key, Total(key) + add); }
 
         /// <summary>The last ten nights, newest first: date, sector, kills, time, score, dawn.</summary>

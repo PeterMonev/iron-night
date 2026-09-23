@@ -1,0 +1,3 @@
+newmtl k_izba
+Kd 1 1 1
+map_Kd k_izba_tex.png

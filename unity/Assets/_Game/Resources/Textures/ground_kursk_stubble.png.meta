@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: de58687449a2c494885f307a85cb5694
+guid: a11e8592501427442bc24a4e699dc3d4
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 336827386328862181
-    second: ammocrate_tex_0
+      213: 3192070183413982922
+    second: ground_kursk_stubble_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -128,13 +128,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: ammocrate_tex_0
+      name: ground_kursk_stubble_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 2048
-        height: 2048
+        width: 1024
+        height: 1024
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -143,8 +143,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 5ed41c829b6aca400800000000000000
-      internalID: 336827386328862181
+      spriteID: ac6a1846be28c4c20800000000000000
+      internalID: 3192070183413982922
       vertices: []
       indices: 
       edges: []
@@ -163,7 +163,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      ammocrate_tex_0: 336827386328862181
+      ground_kursk_stubble_0: 3192070183413982922
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

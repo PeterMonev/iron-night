@@ -45,7 +45,7 @@ namespace IronNight
         public class Card { public string id, title, desc; public bool rare; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain, OnStart, OnCampaign, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder; public System.Action<string> OnRoute; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, routeSheet; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
+        public System.Action OnAd, OnAgain, OnStart, OnCampaign, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder; public System.Action<string> OnRoute, OnTheatre; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[3]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], theatreLabels = new Text[3]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, routeSheet; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
 
         Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel, setSound, setQuality, setVibe, setMusic, rankLine, pointsLine, ordersCount; GameObject settingsSheet, ordersSheet; RawImage titleBackdrop, depotBackdrop; GarageDrag depotDrag; readonly List<RectTransform> embers = new List<RectTransform>(); readonly List<float> emberPhase = new List<float>(); GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
@@ -436,7 +436,7 @@ namespace IronNight
                 for (int k = 0; k < 2; k++)
                 {
                     string id = k == 0 ? "us" : "su"; bool on = nation == id;
-                    var b = MakeButton(row.transform, k == 0 ? "United States" : "Soviet Union", new Vector2(0f, 0f), new Vector2(240 + k * 460, 20), new Vector2(440, 120), 30, () => { Depot.Nation = id; RefreshDepot(); });
+                    var b = MakeButton(row.transform, k == 0 ? "United States" : "Soviet Union", new Vector2(0f, 0f), new Vector2(240 + k * 460, 20), new Vector2(440, 120), 30, () => { if (Depot.Nation != id) PlayerPrefs.SetString("theatre", id == "su" ? "kursk" : "normandy"); Depot.Nation = id; RefreshDepot(); });
                     b.GetComponent<Image>().color = on ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : new Color(0.2f, 0.22f, 0.24f, 0.95f);
                     var lbl = b.transform.Find("Label").GetComponent<Text>(); lbl.color = on ? new Color(0.1f, 0.08f, 0.05f) : ink; lbl.alignment = TextAnchor.MiddleLeft; lbl.rectTransform.anchorMin = Vector2.zero; lbl.rectTransform.anchorMax = Vector2.one; lbl.rectTransform.offsetMin = new Vector2(150f, 0f); lbl.rectTransform.offsetMax = Vector2.zero;
                     if (flags != null) { var f = MakeImage(b.transform, "Flag", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(120f, 90f), Color.white); f.sprite = UiSprite("flags", new Rect(k * flags.width / 2f, 0f, flags.width / 2f, flags.height)); f.preserveAspect = true; }
@@ -621,12 +621,17 @@ namespace IronNight
             if (routeSheet == null)
             {
                 routeSheet = new GameObject("Routes", typeof(RectTransform), typeof(Image)); routeSheet.transform.SetParent(canvas.transform, false); Stretch(routeSheet); routeSheet.GetComponent<Image>().color = new Color(0.02f, 0.02f, 0.03f, 1f);
-                var ey = MakeText(routeSheet.transform, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -170), TextAnchor.MiddleCenter, 26, new Color(0.96f, 0.68f, 0.24f)); ey.text = Spaced("TONIGHT'S ORDERS"); ey.font = BoldFont();
-                var ti = MakeText(routeSheet.transform, "Title", new Vector2(0.5f, 1f), new Vector2(0, -250), TextAnchor.MiddleCenter, 100, new Color(0.93f, 0.91f, 0.86f)); ti.text = "CHOOSE THE WAY IN"; ti.font = DisplayFont(); ti.verticalOverflow = VerticalWrapMode.Overflow; ti.horizontalOverflow = HorizontalWrapMode.Overflow;
+                var ey = MakeText(routeSheet.transform, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -80), TextAnchor.MiddleCenter, 26, new Color(0.96f, 0.68f, 0.24f)); ey.text = Spaced("TONIGHT'S ORDERS"); ey.font = BoldFont();
+                var ti = MakeText(routeSheet.transform, "Title", new Vector2(0.5f, 1f), new Vector2(0, -275), TextAnchor.MiddleCenter, 100, new Color(0.93f, 0.91f, 0.86f)); ti.text = "CHOOSE THE WAY IN"; ti.font = DisplayFont(); ti.verticalOverflow = VerticalWrapMode.Overflow; ti.horizontalOverflow = HorizontalWrapMode.Overflow;
+                // the three fronts across the top; a closed one says what opens it
+                string[] th = { "normandy", "ardennes", "kursk" };
+                for (int k = 0; k < 3; k++)
+                {
+                    string tid = th[k];
+                    var tab = MakeButton(routeSheet.transform, "", new Vector2(0.5f, 1f), new Vector2(-310 + k * 310, -165), new Vector2(290, 80), 28, () => { if (!Depot.TheatreOpen(tid)) return; sheetTheatre = tid; PlayerPrefs.SetString("theatre", tid); PlayerPrefs.Save(); OnTheatre?.Invoke(tid); FillRoutes(); });
+                    theatreTabs[k] = tab.GetComponent<Image>(); theatreLabels[k] = tab.GetComponentInChildren<Text>();
+                }
                 string[] ids = { "village", "open", "bocage" };
-                string[] names = { "Through the village", "Across the open fields", "Through the bocage" };
-                string[] pics = { "route_village", "route_open", "route_bocage" };
-                string[] lines = { "Farms and houses on every other field. Anti-tank guns in the gardens, infantry in the lanes. Cover for you and for them.", "Few hedges, long sight lines. The tanks come at you in the open - and you see them coming.", "Hedges on every side and trees along them. Short sight, tank hunters close. Slow, dark and dangerous." };
                 string[] pays = { "points +20%", "points +10%", "points +15%" };
                 for (int i = 0; i < 3; i++)
                 {
@@ -634,15 +639,36 @@ namespace IronNight
                     var card = MakeButton(routeSheet.transform, "", new Vector2(0.5f, 1f), new Vector2(0, y - 215), new Vector2(940, 430), 20, () => { OnRoute?.Invoke(id); routeSheet.SetActive(false); routeGo?.Invoke(); });
                     card.GetComponent<Image>().color = new Color(0.07f, 0.08f, 0.1f, 1f);
                     var mask = new GameObject("Mask", typeof(RectTransform), typeof(RectMask2D)); mask.transform.SetParent(card.transform, false); var mkrt = mask.GetComponent<RectTransform>(); mkrt.anchorMin = mkrt.anchorMax = new Vector2(0.5f, 1f); mkrt.pivot = new Vector2(0.5f, 1f); mkrt.sizeDelta = new Vector2(924, 250); mkrt.anchoredPosition = new Vector2(0, -8);
-                    var pic = MakeImage(mask.transform, "Pic", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(924, 924), Color.white); pic.rectTransform.pivot = new Vector2(0.5f, 0.5f); pic.sprite = UiSprite(pics[i]);
+                    var pic = MakeImage(mask.transform, "Pic", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(924, 924), Color.white); pic.rectTransform.pivot = new Vector2(0.5f, 0.5f); routePics[i] = pic;
                     var fade = MakeImage(mask.transform, "Fade", new Vector2(0.5f, 0f), Vector2.zero, new Vector2(924, 140), new Color(0.07f, 0.08f, 0.1f, 1f)); fade.sprite = Lightswarm.ProceduralSprites.GradientDown(64, 1.1f); fade.rectTransform.pivot = new Vector2(0.5f, 0f);
                     var edge = MakeImage(card.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(940, 430), new Color(1f, 1f, 1f, 0.16f)); edge.sprite = Outline(); edge.type = Image.Type.Sliced; edge.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-                    var nm = MakeText(card.transform, "Name", new Vector2(0f, 0f), new Vector2(30, 150), TextAnchor.LowerLeft, 44, new Color(0.96f, 0.94f, 0.9f)); nm.text = names[i]; nm.font = BoldFont(); nm.rectTransform.pivot = new Vector2(0f, 0f); nm.rectTransform.sizeDelta = new Vector2(640, 56);
+                    var nm = MakeText(card.transform, "Name", new Vector2(0f, 0f), new Vector2(30, 150), TextAnchor.LowerLeft, 44, new Color(0.96f, 0.94f, 0.9f)); routeNames[i] = nm; nm.font = BoldFont(); nm.rectTransform.pivot = new Vector2(0f, 0f); nm.rectTransform.sizeDelta = new Vector2(640, 56);
                     var py = MakeText(card.transform, "Pay", new Vector2(1f, 0f), new Vector2(-30, 154), TextAnchor.LowerRight, 30, new Color(0.96f, 0.68f, 0.24f)); py.text = pays[i]; py.font = BoldFont(); py.rectTransform.pivot = new Vector2(1f, 0f); py.rectTransform.sizeDelta = new Vector2(260, 44);
-                    var ln = MakeText(card.transform, "Line", new Vector2(0f, 0f), new Vector2(30, 24), TextAnchor.UpperLeft, 26, new Color(0.78f, 0.76f, 0.72f)); ln.text = lines[i]; ln.rectTransform.pivot = new Vector2(0f, 0f); ln.rectTransform.sizeDelta = new Vector2(880, 118);
+                    var ln = MakeText(card.transform, "Line", new Vector2(0f, 0f), new Vector2(30, 24), TextAnchor.UpperLeft, 26, new Color(0.78f, 0.76f, 0.72f)); routeLines[i] = ln; ln.rectTransform.pivot = new Vector2(0f, 0f); ln.rectTransform.sizeDelta = new Vector2(880, 118);
                 }
             }
+            sheetTheatre = PlayerPrefs.GetString("theatre", "normandy"); if (!Depot.TheatreOpen(sheetTheatre)) sheetTheatre = "normandy"; FillRoutes();
             routeSheet.transform.SetAsLastSibling(); if (curtain != null) curtain.transform.SetAsLastSibling(); routeSheet.SetActive(true);
+        }
+
+        /// <summary>The three ways in of the chosen front, and the front tabs lit, dimmed or closed.</summary>
+        void FillRoutes()
+        {
+            bool k = sheetTheatre == "kursk";
+            string[] pics = k ? new[] { "route_kursk_village", "route_kursk_steppe", "route_kursk_belts" } : new[] { "route_village", "route_open", "route_bocage" };
+            string[] names = k ? new[] { "Through the village", "Across the steppe", "Along the tree belts" } : new[] { "Through the village", "Across the open fields", "Through the bocage" };
+            string[] lines = k
+                ? new[] { "Whitewashed huts and a church on every other field. Guns in the gardens, infantry among the houses.", "Wheat to the horizon, some of it burning. Long sight lines: the big cats come at you in the open.", "Wattle fences and birch belts. Short sight, hedgehogs by the roads, tank hunters close." }
+                : new[] { "Farms and houses on every other field. Anti-tank guns in the gardens, infantry in the lanes. Cover for you and for them.", "Few hedges, long sight lines. The tanks come at you in the open - and you see them coming.", "Hedges on every side and trees along them. Short sight, tank hunters close. Slow, dark and dangerous." };
+            for (int i = 0; i < 3; i++) { routePics[i].sprite = UiSprite(pics[i]); routeNames[i].text = names[i]; routeLines[i].text = lines[i]; }
+            string[] th = { "normandy", "ardennes", "kursk" }; string[] label = { "NORMANDY", "ARDENNES", "KURSK" }; string[] shut = { "", "after 1 night", "after 1 dawn" };
+            for (int t = 0; t < 3; t++)
+            {
+                bool open = Depot.TheatreOpen(th[t]), on = th[t] == sheetTheatre;
+                theatreTabs[t].color = on ? new Color(0.96f, 0.68f, 0.24f) : open ? new Color(0.1f, 0.11f, 0.13f) : new Color(0.05f, 0.05f, 0.06f);
+                theatreLabels[t].text = open ? label[t] : label[t] + "\n<size=18>" + shut[t] + "</size>"; theatreLabels[t].supportRichText = true;
+                theatreLabels[t].color = on ? new Color(0.08f, 0.07f, 0.05f) : open ? new Color(0.93f, 0.91f, 0.86f) : new Color(0.45f, 0.44f, 0.42f);
+            }
         }
 
         public void SetAmmo(int ap, int he, bool loadHe)

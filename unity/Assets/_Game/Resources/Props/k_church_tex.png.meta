@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: de58687449a2c494885f307a85cb5694
+guid: df373177c5d3d0f4882baa55dc036802
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 336827386328862181
-    second: ammocrate_tex_0
+      213: -591525563737430601
+    second: k_church_tex_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -128,7 +128,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: ammocrate_tex_0
+      name: k_church_tex_0
       rect:
         serializedVersion: 2
         x: 0
@@ -143,8 +143,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 5ed41c829b6aca400800000000000000
-      internalID: 336827386328862181
+      spriteID: 7b52ed142aa7ac7f0800000000000000
+      internalID: -591525563737430601
       vertices: []
       indices: 
       edges: []
@@ -163,7 +163,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      ammocrate_tex_0: 336827386328862181
+      k_church_tex_0: -591525563737430601
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

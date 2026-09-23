@@ -13,13 +13,13 @@ namespace IronNight
     public class Props : MonoBehaviour
     {
         class Kind { public string mesh; public float length, height; public float[] circles; }
-        enum What { Model, Lane, Hedge, Tree, Decal, Searchlight }
+        enum What { Model, Lane, Hedge, Tree, Decal, Searchlight, Fire }
         class Prop
         {
             public What what; public Kind kind; public Vector3 pos; public float yaw, size, bound = 8f, height = -1f; public int seed;
             public Vector2[] circleCenters = new Vector2[0]; public float[] radii = new float[0];
             public Vector3 a, b; public float[] gaps; public float clearA, clearB;              // hedges: the line and its openings
-            public GameObject go; public Mesh mesh, leaves; public float az, el = 42f, track; public LightShaft shaft; public Transform yoke, drum, lamp; public float flakTimer = 4f; public int burst;
+            public GameObject go; public Mesh mesh, leaves; public float az, el = 42f, track; public LightShaft shaft; public Transform yoke, drum, lamp; public float flakTimer = 4f; public int burst; public Light glow;
         }
 
         // circles: triples (offsetAlong, offsetSide, radius) in metres, along the prop's own forward axis
@@ -48,6 +48,16 @@ namespace IronNight
             new Kind { mesh = "wreck", length = 6f, height = 2.2f, circles = new[] { -1.6f, 0f, 1.7f, 1.6f, 0f, 1.7f } },
             new Kind { mesh = "marker_smoke", length = 0.5f, height = -1f, circles = new float[0] },
             new Kind { mesh = "hedge", length = 8f, height = -1f, circles = new float[0] },   // placed by the hedge lines, which carry the collision
+            // Kursk: stand-ins for the Normandy models, and the steppe's own
+            new Kind { mesh = "k_izba", length = 9f, height = 6f, circles = new[] { -2.4f, 0f, 3.2f, 2.4f, 0f, 3.2f } },
+            new Kind { mesh = "k_khata", length = 9f, height = 5.5f, circles = new[] { -2.4f, 0f, 3.2f, 2.4f, 0f, 3.2f } },
+            new Kind { mesh = "k_church", length = 16f, height = 14f, circles = new[] { -4.5f, 0f, 4.2f, 0f, 0f, 4.6f, 4.5f, 0f, 4.2f } },
+            new Kind { mesh = "k_well", length = 5f, height = -1f, circles = new[] { 0f, 0f, 1.1f } },
+            new Kind { mesh = "k_birches", length = 6f, height = -1f, circles = new[] { 0f, 0f, 0.8f } },
+            new Kind { mesh = "k_wattle", length = 6f, height = -1f, circles = new[] { -2f, 0f, 0.6f, 0f, 0f, 0.6f, 2f, 0f, 0.6f } },
+            new Kind { mesh = "k_hedgehogs", length = 4f, height = -1f, circles = new[] { 0f, 0f, 1.7f } },
+            new Kind { mesh = "k_sunflowers", length = 3f, height = -1f, circles = new float[0] },
+            new Kind { mesh = "k_sheaves", length = 1.8f, height = -1f, circles = new float[0] },
         };
 
         const float Cell = 40f, Half = 20f;
@@ -64,6 +74,8 @@ namespace IronNight
         public Fx fx;
 
         public bool winter;   // the Ardennes: snow on the fields, bare trees
+        public static string Theatre = "normandy";   // "normandy", "ardennes" or "kursk": set before the night is built
+        static bool Kursk => Theatre == "kursk";
         public bool wet;      // a rainy night: puddles in the fields
         public Vector3 platoon; public bool alert;          // where the leader is, and whether the posts have been told to look for him
         public bool Lit { get; private set; } public Vector3 LitBy { get; private set; }   // a beam is on the platoon
@@ -72,10 +84,11 @@ namespace IronNight
 
         public void Build(Camera camera)
         {
-            cam = camera.transform; LightShaft.cam = camera; string sn = winter ? "_snow" : "";
+            cam = camera.transform; LightShaft.cam = camera; string sn = winter ? "_snow" : Kursk ? "_kursk" : "";
             var lit = Resources.Load<Material>("VehicleLit"); var decal = Resources.Load<Material>("GroundDecal");
             foreach (var k in Kinds)
             {
+                if (k.mesh.StartsWith("k_") && !Kursk) continue;
                 var pf = Resources.Load<GameObject>("Props/" + k.mesh); if (pf == null) continue;
                 prefabs[k.mesh] = pf;
                 var m = new Material(lit); m.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + k.mesh + "_tex")); m.SetColor("_BaseColor", Tint(k.mesh)); m.SetFloat("_Smoothness", 0.15f); m.SetFloat("_Cull", 0f);
@@ -112,7 +125,7 @@ namespace IronNight
         public static string Route = "open";   // "village", "open" or "bocage": set before the night is built
         static float FarmChance => Route == "village" ? 0.17f : Route == "bocage" ? 0.08f : 0.07f;
         static float VillageChance => Route == "village" ? 0.24f : Route == "bocage" ? 0.03f : 0.04f;
-        static float HedgeBias => Route == "bocage" ? 1.45f : Route == "open" ? 0.5f : 0.85f;
+        static float HedgeBias => (Route == "bocage" ? 1.45f : Route == "open" ? 0.5f : 0.85f) * (Kursk ? 0.6f : 1f);   // the steppe is open country
         static float TreeBias => Route == "bocage" ? 1.8f : Route == "open" ? 0.6f : 1f;
         static bool Farm(int ix, int iz) => (ix == 1 && iz == 1) || (!Start(ix, iz) && Rnd(ix, iz, 930) < FarmChance);
         static bool Battery(int ix, int iz) => (ix == -1 && iz == 0) || (!Start(ix, iz) && !Farm(ix, iz) && Rnd(ix, iz, 940) < 0.16f);
@@ -122,12 +135,26 @@ namespace IronNight
         static Vector3 In(int ix, int iz, int salt, float r) => new Vector3((Rnd(ix, iz, salt) - 0.5f) * 2f * r, 0f, (Rnd(ix, iz, salt + 1) - 0.5f) * 2f * r);
 
         // the generated textures come out at different brightnesses; this evens them under the moon
-        static Color Tint(string mesh) { switch (mesh) { case "tree_poplar": case "tree_oak": case "spruce_snow": case "hedge": return new Color(0.42f, 0.5f, 0.4f); case "deadtree": return new Color(0.78f, 0.72f, 0.66f); case "haystack": return new Color(0.82f, 0.76f, 0.6f); case "sandbags": return new Color(0.78f, 0.74f, 0.66f); default: return new Color(0.8f, 0.78f, 0.74f); } }
+        static Color Tint(string mesh) { switch (mesh) { case "tree_poplar": case "tree_oak": case "spruce_snow": case "hedge": return new Color(0.42f, 0.5f, 0.4f); case "deadtree": return new Color(0.78f, 0.72f, 0.66f); case "haystack": return new Color(0.82f, 0.76f, 0.6f); case "k_birches": return new Color(0.58f, 0.64f, 0.54f); case "k_sunflowers": return new Color(0.7f, 0.68f, 0.56f); case "k_sheaves": return new Color(0.8f, 0.74f, 0.6f); case "sandbags": return new Color(0.78f, 0.74f, 0.66f); default: return new Color(0.8f, 0.78f, 0.74f); } }
 
         Kind K(string mesh) { foreach (var k in Kinds) if (k.mesh == mesh) return k; return null; }
 
+        /// <summary>What stands in for a Normandy model on the steppe; null when it has none (the gates).</summary>
+        static string Local(string mesh)
+        {
+            if (!Kursk) return mesh;
+            switch (mesh)
+            {
+                case "farmhouse": return "k_izba"; case "cottage": return "k_khata"; case "church": return "k_church"; case "well": return "k_well";
+                case "wall_a": case "wall_b": return "k_wattle"; case "gate": return null;
+                case "tree_oak": case "tree_poplar": return "k_birches"; case "haystack": return "k_sheaves";
+                default: return mesh;
+            }
+        }
+
         Prop Place(List<Prop> list, string mesh, Vector3 pos, float yaw)
         {
+            mesh = Local(mesh); if (mesh == null) return null;
             var kind = K(mesh); if (kind == null || !prefabs.ContainsKey(mesh)) return null;
             foreach (var o in list) if (o.what == What.Model && (o.pos - pos).sqrMagnitude < 5f * 5f) return null;
             var p = new Prop { what = What.Model, kind = kind, pos = pos, yaw = yaw, height = kind.height, bound = kind.length };
@@ -230,7 +257,17 @@ namespace IronNight
         /// <summary>Hay bales in the mown and stubble fields, a wreck or a crater anywhere, a lone tree, a dead one.</summary>
         void Loose(List<Prop> list, int ix, int iz, Vector3 c, int type)
         {
-            if (type >= 2) { int n = (int)(Rnd(ix, iz, 1010) * 4f); for (int h = 0; h < n; h++) Place(list, "haystack", c + In(ix, iz, 1011 + h * 2, 13f), Rnd(ix, iz, 1030 + h) * 6.28f); }
+            if (Kursk)
+            {
+                if (type == 1 && Rnd(ix, iz, 1200) < 0.5f) { int m = 2 + (int)(Rnd(ix, iz, 1201) * 4f); for (int h = 0; h < m; h++) Place(list, "k_sunflowers", c + In(ix, iz, 1202 + h * 2, 14f), Rnd(ix, iz, 1215 + h) * 6.28f); }
+                if (Rnd(ix, iz, 1220) < 0.12f) Place(list, "k_hedgehogs", c + In(ix, iz, 1221, 13f), Rnd(ix, iz, 1223) * 6.28f);
+                if (type == 2 && Rnd(ix, iz, 1230) < 0.22f)
+                {
+                    var mid = c + In(ix, iz, 1231, 9f); float ang = Rnd(ix, iz, 1233) * 6.28f; var d = new Vector3(Mathf.Sin(ang), 0f, Mathf.Cos(ang));
+                    list.Add(new Prop { what = What.Fire, pos = mid, yaw = ang, a = mid - d * 8f, b = mid + d * 8f, seed = (int)(Hash(ix, iz, 1234) & 0xffff), bound = 10f });
+                }
+            }
+            if (type >= 2 && !(Kursk && type == 2)) { int n = (int)(Rnd(ix, iz, 1010) * 4f); for (int h = 0; h < n; h++) Place(list, "haystack", c + In(ix, iz, 1011 + h * 2, 13f), Rnd(ix, iz, 1030 + h) * 6.28f); }
             if (Rnd(ix, iz, 1040) < 0.1f) Place(list, "truck", c + In(ix, iz, 1041, 12f), Rnd(ix, iz, 1043) * 6.28f);
             if (Rnd(ix, iz, 1044) < 0.1f) Place(list, "deadtree", c + In(ix, iz, 1045, 14f), Rnd(ix, iz, 1047) * 6.28f);
             if (Rnd(ix, iz, 1048) < 0.08f * TreeBias) Tree(list, c + In(ix, iz, 1049, 12f), (int)(Hash(ix, iz, 1051) & 0xffff));
@@ -266,10 +303,10 @@ namespace IronNight
         void BuildGround()
         {
             groundMat = new Material(Resources.Load<Material>("Ground"));
-            if (winter)
+            if (winter || Kursk)
             {
-                string[] set = { "plough", "pasture", "mown", "stubble" };
-                for (int i = 0; i < 4; i++) { groundMat.SetTexture("_Tex" + i, Resources.Load<Texture2D>("Textures/ground_snow_" + set[i])); groundMat.SetTexture("_Nrm" + i, Resources.Load<Texture2D>("Textures/ground_snow_" + set[i] + "_n")); }
+                string[] set = { "plough", "pasture", "mown", "stubble" }; string pre = winter ? "Textures/ground_snow_" : "Textures/ground_kursk_";   // Kursk: black earth, steppe, standing wheat, stubble
+                for (int i = 0; i < 4; i++) { groundMat.SetTexture("_Tex" + i, Resources.Load<Texture2D>(pre + set[i])); groundMat.SetTexture("_Nrm" + i, Resources.Load<Texture2D>(pre + set[i] + "_n")); }
                 groundMat.SetFloat("_VariationStrength", 0.25f);
             }
             int n = GroundN + 1; var v = new Vector3[n * n]; var nm = new Vector3[n * n]; groundColors = new Color[n * n];
@@ -335,6 +372,13 @@ namespace IronNight
             float time = Time.time; bool litNow = false; Vector3 litBy = Vector3.zero;
             foreach (var p in active)
             {
+                if (p.what != What.Fire || fx == null) continue;
+                p.glow.intensity = 4f + Mathf.PerlinNoise(time * 3f, p.seed * 0.01f) * 3f;
+                p.flakTimer -= Time.deltaTime; if (p.flakTimer > 0f) continue; p.flakTimer = 0.07f;
+                fx.Burn(Vector3.Lerp(p.a, p.b, Random.value) + new Vector3(Random.Range(-0.8f, 0.8f), -1.6f, Random.Range(-0.8f, 0.8f)));
+            }
+            foreach (var p in active)
+            {
                 if (p.what != What.Searchlight || deadLamps.Contains(p.seed)) continue;
                 // the beam wanders round the sky between 22 and 62 degrees up; the lamp glow faces the camera. Once the posts are
                 // alerted, one within 75 m swings down and follows the leader; the sweep is picked up again when he is gone
@@ -378,6 +422,14 @@ namespace IronNight
                 case What.Hedge: SpawnHedge(p); break;
                 case What.Tree: SpawnTree(p); break;
                 case What.Searchlight: SpawnSearchlight(p); break;
+                case What.Fire:
+                {
+                    var go = new GameObject("FieldFire"); go.transform.SetParent(transform, false); go.transform.position = p.pos;
+                    Quad(go.transform, p.pos, yawDeg, 5f, 18f, scorchMaterial, 0.045f);
+                    var lg = new GameObject("FireLight"); lg.transform.SetParent(go.transform, false); lg.transform.position = p.pos + Vector3.up * 2.5f;
+                    p.glow = lg.AddComponent<Light>(); p.glow.type = LightType.Point; p.glow.color = new Color(1f, 0.55f, 0.2f); p.glow.range = 22f; p.glow.intensity = 5f; p.glow.shadows = LightShadows.None;
+                    p.flakTimer = 0f; p.go = go; break;
+                }
                 default:
                 {
                     var go = Instantiate(prefabs[p.kind.mesh], transform); go.name = p.kind.mesh;
@@ -395,7 +447,8 @@ namespace IronNight
         /// along the line, skipping the gates; the blob hedge stays for the low quality setting.</summary>
         void SpawnHedge(Prop p)
         {
-            if (prefabs.ContainsKey("hedge") && PlayerPrefs.GetInt("quality", 1) != 0) { SpawnHedgeModel(p); return; }
+            string hm = Kursk ? "k_wattle" : "hedge";
+            if (prefabs.ContainsKey(hm) && PlayerPrefs.GetInt("quality", 1) != 0) { SpawnHedgeModel(p, hm); return; }
             var rng = new System.Random(p.seed); var dir = (p.b - p.a).normalized; var side = new Vector3(dir.z, 0f, -dir.x);
             var parts = new List<CombineInstance>();
             for (float u = 0.7f; u < p.size - 0.5f; u += 1.1f)
@@ -415,17 +468,17 @@ namespace IronNight
             p.go = go; p.mesh = mesh;
         }
 
-        void SpawnHedgeModel(Prop p)
+        void SpawnHedgeModel(Prop p, string hm)
         {
             var rng = new System.Random(p.seed); var dir = (p.b - p.a).normalized; float yawDeg = p.yaw * Mathf.Rad2Deg;
             var go = new GameObject("Hedge"); go.transform.SetParent(transform, false); go.transform.position = p.pos;
-            const float Section = 7.6f;   // the model is 8 m: a little overlap hides the joins
+            float Section = hm == "hedge" ? 7.6f : 5.8f;   // the models are 8 and 6 m: a little overlap hides the joins
             for (float u = 0f; u + Section * 0.6f < p.size; u += Section)
             {
                 float mid = u + Section * 0.5f; if (Open(p, u + 0.8f) || Open(p, mid) || Open(p, u + Section - 0.8f)) continue;
-                var sec = Instantiate(prefabs["hedge"], go.transform); sec.transform.position = p.a + dir * mid; sec.transform.rotation = Quaternion.Euler(0f, yawDeg + (rng.Next(2) == 0 ? 0f : 180f), 0f);
+                var sec = Instantiate(prefabs[hm], go.transform); sec.transform.position = p.a + dir * mid; sec.transform.rotation = Quaternion.Euler(0f, yawDeg + (rng.Next(2) == 0 ? 0f : 180f), 0f);
                 sec.transform.localScale = new Vector3(1f, 0.85f + (float)rng.NextDouble() * 0.3f, 1f);
-                foreach (var r in sec.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = materials["hedge"]; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+                foreach (var r in sec.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = materials[hm]; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
             }
             p.go = go;
         }

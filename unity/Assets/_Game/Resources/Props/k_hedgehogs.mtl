@@ -1,0 +1,3 @@
+newmtl k_hedgehogs
+Kd 1 1 1
+map_Kd k_hedgehogs_tex.png
