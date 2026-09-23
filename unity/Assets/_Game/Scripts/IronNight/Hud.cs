@@ -623,7 +623,7 @@ namespace IronNight
                 var ti = MakeText(routeSheet.transform, "Title", new Vector2(0.5f, 1f), new Vector2(0, -250), TextAnchor.MiddleCenter, 100, new Color(0.93f, 0.91f, 0.86f)); ti.text = "CHOOSE THE WAY IN"; ti.font = DisplayFont(); ti.verticalOverflow = VerticalWrapMode.Overflow; ti.horizontalOverflow = HorizontalWrapMode.Overflow;
                 string[] ids = { "village", "open", "bocage" };
                 string[] names = { "Through the village", "Across the open fields", "Through the bocage" };
-                string[] pics = { "campaign_lastpush", "campaign_normandy", "obj_crew" };
+                string[] pics = { "route_village", "route_open", "route_bocage" };
                 string[] lines = { "Farms and houses on every other field. Anti-tank guns in the gardens, infantry in the lanes. Cover for you and for them.", "Few hedges, long sight lines. The tanks come at you in the open - and you see them coming.", "Hedges on every side and trees along them. Short sight, tank hunters close. Slow, dark and dangerous." };
                 string[] pays = { "points +20%", "points +10%", "points +15%" };
                 for (int i = 0; i < 3; i++)
