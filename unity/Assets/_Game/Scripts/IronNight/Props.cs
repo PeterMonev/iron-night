@@ -20,6 +20,7 @@ namespace IronNight
             public Vector2[] circleCenters = new Vector2[0]; public float[] radii = new float[0];
             public Vector3 a, b; public float[] gaps; public float clearA, clearB;              // hedges: the line and its openings
             public GameObject go; public Mesh mesh, leaves; public float az, el = 42f, track; public LightShaft shaft; public Transform yoke, drum, lamp; public float flakTimer = 4f; public int burst; public Light glow;
+            public int state; public float hp = -1f, fallYaw, burn; public bool drivable;   // 0 standing, 1 knocked over, 2 crushed, 3 ruined; a ruin is driven over
         }
 
         // circles: triples (offsetAlong, offsetSide, radius) in metres, along the prop's own forward axis
@@ -66,6 +67,8 @@ namespace IronNight
         readonly Dictionary<string, Material> materials = new Dictionary<string, Material>();
         readonly List<Prop> active = new List<Prop>(); readonly HashSet<Prop> wanted = new HashSet<Prop>();
         Transform cam; Material patchMaterial, laneMaterial, yardMaterial, craterMaterial, hedgeMaterial, canopyMaterial, trunkMaterial;
+        class Falling { public Prop p; public float a; public Quaternion rot0; public Vector3 axis; }
+        readonly List<Falling> falling = new List<Falling>(); Prop blocker; Material burntMaterial; readonly Dictionary<string, Material> sooty = new Dictionary<string, Material>();
         Mesh[] blobs; GameObject lampTemplate; Material leafMaterial; readonly Mesh[] cards = new Mesh[4];   // one leaf-cluster quad per cell of the leaves sheet
         // the ground itself: one grid of 2 m quads that follows the camera; a vertex colour channel per field type
         const float GroundSize = 240f, GroundStep = 2f; const int GroundN = (int)(GroundSize / GroundStep);
@@ -93,6 +96,8 @@ namespace IronNight
                 prefabs[k.mesh] = pf;
                 var m = new Material(lit); m.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + k.mesh + "_tex")); m.SetColor("_BaseColor", Tint(k.mesh)); m.SetFloat("_Smoothness", 0.15f); m.SetFloat("_Cull", 0f);
                 materials[k.mesh] = m;
+                var rp = Resources.Load<GameObject>("Props/" + k.mesh + "_ruin");   // what it looks like knocked down, when there is a model of that
+                if (rp != null) { prefabs[k.mesh + "_ruin"] = rp; var rm = new Material(lit); rm.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + k.mesh + "_ruin_tex")); rm.SetColor("_BaseColor", Tint(k.mesh)); rm.SetFloat("_Smoothness", 0.15f); rm.SetFloat("_Cull", 0f); materials[k.mesh + "_ruin"] = rm; }
             }
             BuildGround();
             Material Decal(string tex, int queue) { var m = new Material(decal); m.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/" + tex)); m.SetTexture("_BumpMap", Resources.Load<Texture2D>("Textures/" + tex + "_n")); m.SetColor("_BaseColor", new Color(0.95f, 0.95f, 0.95f)); m.renderQueue = queue; return m; }
@@ -370,6 +375,19 @@ namespace IronNight
             for (int i = active.Count - 1; i >= 0; i--) if (!wanted.Contains(active[i])) { Unload(active[i]); active.RemoveAt(i); }
             foreach (var p in wanted) if (p.go == null) { Spawn(p); active.Add(p); }
             float time = Time.time; bool litNow = false; Vector3 litBy = Vector3.zero;
+            for (int i = falling.Count - 1; i >= 0; i--)
+            {
+                var f = falling[i]; if (f.p.go == null) { falling.RemoveAt(i); continue; }
+                f.a = Mathf.Min(1f, f.a + Time.deltaTime / 1.1f); f.p.go.transform.rotation = Quaternion.AngleAxis(88f * f.a * f.a, f.axis) * f.rot0;   // slow to start, fast at the end, like a tree going over
+                if (f.a >= 1f) { if (fx != null) fx.Dust(f.p.pos + FallDir(f.p) * 3.5f); falling.RemoveAt(i); }
+            }
+            foreach (var p in active)
+            {
+                if (p.burn <= 0f) continue;
+                p.burn -= Time.deltaTime; if (p.glow != null) p.glow.intensity = Mathf.Min(1f, p.burn / 4f) * (3f + Mathf.PerlinNoise(time * 4f, p.seed * 0.01f) * 2.5f);
+                p.flakTimer -= Time.deltaTime; if (p.flakTimer > 0f || fx == null) continue; p.flakTimer = p.burn > 4f ? 0.12f : 0.3f;
+                fx.Burn(p.pos + new Vector3(Random.Range(-2f, 2f), -1.4f, Random.Range(-2f, 2f)));
+            }
             foreach (var p in active)
             {
                 if (p.what != What.Fire || fx == null) continue;
@@ -420,7 +438,7 @@ namespace IronNight
                 case What.Lane: p.go = Quad(transform, p.pos, yawDeg, 6f, Cell, laneMaterial, 0.02f); p.go.name = "Lane"; break;
                 case What.Decal: p.go = Quad(transform, p.pos, yawDeg, p.size, p.size, p.seed == 0 ? yardMaterial : p.seed == 2 ? puddleMaterial : craterMaterial, p.seed == 0 ? 0.03f : p.seed == 2 ? 0.04f : 0.05f); p.go.name = p.seed == 0 ? "Yard" : p.seed == 2 ? "Puddle" : "Crater"; break;
                 case What.Hedge: SpawnHedge(p); break;
-                case What.Tree: SpawnTree(p); break;
+                case What.Tree: SpawnTree(p); if (p.state == 1 && p.go != null) p.go.transform.rotation = Fallen(p); break;
                 case What.Searchlight: SpawnSearchlight(p); break;
                 case What.Fire:
                 {
@@ -432,11 +450,13 @@ namespace IronNight
                 }
                 default:
                 {
+                    if (p.state == 3) { SpawnRuin(p); break; }
                     var go = Instantiate(prefabs[p.kind.mesh], transform); go.name = p.kind.mesh;
                     go.transform.position = p.pos; go.transform.rotation = Quaternion.Euler(0f, yawDeg, 0f);
                     foreach (var r in go.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = materials[p.kind.mesh]; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
                     // trodden earth under it: a soft dark patch a little wider than the footprint
                     for (int c = 0; c < p.radii.Length; c++) { var q = Quad(go.transform, new Vector3(p.circleCenters[c].x, 0f, p.circleCenters[c].y), 0f, p.radii[c] * 2.4f, p.radii[c] * 2.4f, patchMaterial, 0.06f); q.GetComponent<Renderer>().receiveShadows = false; }
+                    if (p.state == 1) go.transform.rotation = Fallen(p); else if (p.state == 2) go.transform.localScale = new Vector3(1f, 0.22f, 1f);
                     p.go = go; break;
                 }
             }
@@ -626,7 +646,7 @@ namespace IronNight
         {
             for (int pass = 0; pass < 2; pass++) foreach (var p in active)
             {
-                if (p.radii.Length == 0) continue; float reach = p.bound + 6f; if ((p.pos - pos).sqrMagnitude > reach * reach) continue;
+                if (p.radii.Length == 0 || p.drivable) continue; float reach = p.bound + 6f; if ((p.pos - pos).sqrMagnitude > reach * reach) continue;
                 for (int c = 0; c < p.radii.Length; c++)
                 {
                     var d = new Vector2(pos.x, pos.z) - p.circleCenters[c]; float min = p.radii[c] + radius; float sq = d.sqrMagnitude;
@@ -641,7 +661,7 @@ namespace IronNight
         {
             foreach (var p in active)
             {
-                if (p.radii.Length == 0) continue; float reach = p.bound + 6f; if ((p.pos - pos).sqrMagnitude > reach * reach) continue;
+                if (p.radii.Length == 0 || p.drivable) continue; float reach = p.bound + 6f; if ((p.pos - pos).sqrMagnitude > reach * reach) continue;
                 for (int c = 0; c < p.radii.Length; c++) { float min = p.radii[c] + radius; if ((new Vector2(pos.x, pos.z) - p.circleCenters[c]).sqrMagnitude < min * min) return false; }
             }
             return true;
@@ -653,7 +673,7 @@ namespace IronNight
             var list = new List<Vector3>();
             foreach (var p in active)
             {
-                if (p.what != What.Model || p.kind.mesh != "sandbags") continue;
+                if (p.what != What.Model || p.kind.mesh != "sandbags" || p.state != 0) continue;
                 var d = p.pos - from; d.y = 0f; float len = d.magnitude; if (len < min || len > max) continue;
                 if (Vector3.Dot(d / len, dir) > 0.35f) list.Add(p.pos);
             }
@@ -700,15 +720,225 @@ namespace IronNight
             return false;
         }
 
-        public readonly List<Vector3> gaps = new List<Vector3>();   // holes a dozer blade has pushed through the hedges
-        public bool Ploughed(Vector3 pos) { foreach (var g in gaps) { var d = g - pos; d.y = 0f; if (d.sqrMagnitude < 25f) return true; } return false; }
+
+        /// <summary>How a prop gives way: 0 never, 1 it goes over (trees, poles), 2 any tank crushes it, 3 explosions bring
+        /// it down, 4 explosions or a dozer blade.</summary>
+        static int BreakKind(Prop p)
+        {
+            if (p.what == What.Tree) return 1;
+            if (p.what == What.Hedge) return 4;
+            if (p.what != What.Model) return 0;
+            switch (p.kind.mesh)
+            {
+                case "tree_oak": case "tree_poplar": case "deadtree": case "spruce_snow": case "k_birches": case "pole": case "signpost": return 1;
+                case "k_wattle": case "cart": case "barrels": case "haystack": case "k_sheaves": case "gate": case "k_well": case "k_sunflowers": return 2;
+                case "farmhouse": case "cottage": case "barn": case "church": case "k_khata": case "k_izba": case "k_church": case "bunker": case "truck": return 3;
+                case "wall_a": case "wall_b": case "sandbags": case "well": return 4;
+                default: return 0;
+            }
+        }
+        static float MaxHp(string mesh) { switch (mesh) { case "church": return 12f; case "k_church": return 9f; case "bunker": return 8f; case "farmhouse": return 6f; case "cottage": case "barn": case "k_izba": return 4f; case "k_khata": return 3f; case "truck": case "sandbags": return 1.5f; default: return 2f; } }
+        static bool Burns(string mesh) => mesh == "barn" || mesh == "cottage" || mesh == "k_khata" || mesh == "k_izba" || mesh == "truck" || mesh == "haystack" || mesh == "k_sheaves" || mesh == "cart";
+        static Vector3 FallDir(Prop p) => new Vector3(Mathf.Sin(p.fallYaw), 0f, Mathf.Cos(p.fallYaw));
+        static Quaternion Fallen(Prop p) => Quaternion.AngleAxis(88f, Vector3.Cross(Vector3.up, FallDir(p))) * Quaternion.Euler(0f, p.yaw * Mathf.Rad2Deg, 0f);
+
+        /// <summary>A hull against the country: trees and poles go over the way it drives, fences, carts and hay are
+        /// crushed; with a dozer blade the walls, sandbags and hedges give way too.</summary>
+        public void Ram(Vector3 pos, float radius, Vector3 forward, bool dozer)
+        {
+            for (int i = 0; i < active.Count; i++)
+            {
+                var p = active[i]; if (p.radii.Length == 0 || p.drivable || p.state != 0) continue;
+                float reach = p.bound + radius + 1f; if ((p.pos - pos).sqrMagnitude > reach * reach) continue;
+                int kind = BreakKind(p); if (kind == 0 || kind == 3 || (kind == 4 && !dozer)) continue;
+                for (int c = 0; c < p.radii.Length; c++)
+                {
+                    float min = p.radii[c] + radius * 0.97f; var cc = p.circleCenters[c];   // the hull is pushed back out every frame: only a hull driving in reaches this
+                    if ((new Vector2(pos.x, pos.z) - cc).sqrMagnitude >= min * min) continue;
+                    if (p.what == What.Hedge) Gap(p, new Vector3(cc.x, 0f, cc.y)); else if (kind == 1) Fall(p, forward); else Crush(p, false);
+                    break;
+                }
+            }
+        }
+
+        /// <summary>An explosion among the props: buildings and walls in reach lose hit points, trees go over away from
+        /// it, fences and hay are flattened, fuel goes up, a heavy one opens a gap in a hedge.</summary>
+        public void Blast(Vector3 at, float radius, float dmg)
+        {
+            for (int i = 0; i < active.Count; i++)
+            {
+                var p = active[i]; if (p.state != 0) continue;
+                float reach = p.bound + radius; var d = p.pos - at; d.y = 0f; if (d.sqrMagnitude > reach * reach) continue;
+                float near = p.radii.Length == 0 ? d.magnitude : float.MaxValue;
+                for (int c = 0; c < p.radii.Length; c++) near = Mathf.Min(near, (new Vector2(at.x, at.z) - p.circleCenters[c]).magnitude - p.radii[c]);
+                if (near > radius) continue;
+                float k = 1f - Mathf.Clamp01(near / radius) * 0.6f; int kind = BreakKind(p);   // full at contact, less at the edge
+                if (p.what == What.Hedge) { if (dmg >= 1.5f) Gap(p, at); }
+                else if (kind == 1) { if (dmg * k >= 0.8f) Fall(p, d.sqrMagnitude > 0.01f ? d.normalized : Vector3.forward); }
+                else if (kind == 2) { if (p.kind.mesh == "barrels") Explode(p); else Crush(p, true); }
+                else if (kind >= 3) Hurt(p, dmg * k, at);
+            }
+        }
+
+        /// <summary>A shell stopped by whatever Blocks found: a building or a wall loses hit points, a cart or hay is
+        /// knocked flat, fuel drums go up.</summary>
+        public void Strike(Vector3 at, float dmg)
+        {
+            var p = blocker; blocker = null; if (p == null || p.state != 0) return;
+            int kind = BreakKind(p);
+            if (p.what == What.Model && p.kind.mesh == "barrels") Explode(p);
+            else if (kind == 2) Crush(p, true);
+            else if (kind >= 3) Hurt(p, dmg, at);
+        }
+
+        void Hurt(Prop p, float dmg, Vector3 at)
+        {
+            if (p.what != What.Model || p.state != 0) return;
+            if (p.hp < 0f) p.hp = MaxHp(p.kind.mesh);
+            p.hp -= dmg; if (fx != null) fx.Dust(new Vector3(at.x, 0.4f, at.z));   // plaster and splinters off the wall
+            if (p.hp > 0f) return;
+            if (p.kind.mesh == "truck") Explode(p); else Collapse(p);
+        }
+
+        void Fall(Prop p, Vector3 dir)
+        {
+            if (p.state != 0) return;
+            p.state = 1; p.radii = new float[0]; p.circleCenters = new Vector2[0]; p.fallYaw = Mathf.Atan2(dir.x, dir.z);
+            if (p.go != null) falling.Add(new Falling { p = p, rot0 = p.go.transform.rotation, axis = Vector3.Cross(Vector3.up, FallDir(p)) });
+        }
+
+        void Crush(Prop p, bool byShell)
+        {
+            if (p.state != 0) return;
+            p.state = 2; p.radii = new float[0]; p.circleCenters = new Vector2[0]; p.height = -1f;
+            if (byShell && Burns(p.kind.mesh)) p.burn = 12f + Random.value * 10f;
+            if (p.go != null) p.go.transform.localScale = new Vector3(1f, 0.22f, 1f);
+            if (fx != null) fx.Dust(p.pos);
+        }
+
+        /// <summary>A building coming down: it sinks into its own dust and a heap of rubble is left in its place.</summary>
+        void Collapse(Prop p)
+        {
+            p.state = 3; p.drivable = true; p.height = 1.2f; if (Burns(p.kind.mesh) || Random.value < 0.35f) p.burn = 18f + Random.value * 14f;
+            if (fx != null) fx.Collapse(p.pos, p.kind.length);
+            Sfx.Explosion(p.pos);
+            if (p.go != null) StartCoroutine(Sink(p, p.go)); 
+        }
+
+        System.Collections.IEnumerator Sink(Prop p, GameObject old)
+        {
+            float h = Mathf.Max(3f, p.kind.height); var start = old.transform.position; var rot0 = old.transform.rotation; var tilt = Quaternion.Euler(Random.Range(-9f, 9f), 0f, Random.Range(-9f, 9f)) * rot0;
+            for (float a = 0f; a < 1f; a += Time.deltaTime / 0.9f)
+            {
+                if (old == null) yield break;   // its cell was unloaded: the ruin is built when it comes back
+                old.transform.position = start - Vector3.up * (h * 0.85f * a * a); old.transform.rotation = Quaternion.Slerp(rot0, tilt, a); yield return null;
+            }
+            if (old == null || p.go != old) yield break;
+            Destroy(old); p.go = null; SpawnRuin(p);
+        }
+
+        /// <summary>A truck or fuel drums going up: a fireball, a fire that burns on, and whatever stands next to it hit.</summary>
+        void Explode(Prop p)
+        {
+            if (p.state != 0) return;
+            p.state = 3; p.drivable = true; p.height = -1f; p.burn = 20f + Random.value * 15f;
+            if (fx != null) fx.Explosion(p.pos + Vector3.up);
+            Sfx.Explosion(p.pos);
+            if (p.go != null) { Unload(p); Spawn(p); }
+            Blast(p.pos, 5f, 1.5f);
+        }
+
+        /// <summary>A hedge opened where the blast or the blade struck it; the gap stays for the night.</summary>
+        void Gap(Prop h, Vector3 at)
+        {
+            var dir = (h.b - h.a).normalized; float u = Vector3.Dot(at - h.a, dir); if (u < 0f || u > h.size) return;
+            foreach (var g in h.gaps) if (Mathf.Abs(g - u) < 4f) return;
+            var list = new List<float>(h.gaps) { u }; h.gaps = list.ToArray();
+            var centers = new List<Vector2>(); var radii = new List<float>();
+            for (float s = 1.25f; s < h.size; s += 2.5f) if (!Open(h, s)) { var c = h.a + dir * s; centers.Add(new Vector2(c.x, c.z)); radii.Add(1.6f); }
+            h.circleCenters = centers.ToArray(); h.radii = radii.ToArray();
+            if (fx != null) { fx.Dust(h.a + dir * u); fx.Dust(h.a + dir * (u + 2f)); }
+            if (h.go != null) { Unload(h); Spawn(h); }
+        }
+
+        Material Sooty(string mesh)
+        {
+            if (sooty.TryGetValue(mesh, out var m)) return m;
+            m = new Material(materials[mesh]); var c = m.GetColor("_BaseColor"); m.SetColor("_BaseColor", new Color(c.r * 0.72f, c.g * 0.7f, c.b * 0.67f, 1f)); sooty[mesh] = m; return m;
+        }
+        Material Burnt()
+        {
+            if (burntMaterial == null) { burntMaterial = new Material(Resources.Load<Material>("VehicleLit")); burntMaterial.SetColor("_BaseColor", new Color(0.1f, 0.09f, 0.08f)); burntMaterial.SetFloat("_Smoothness", 0.08f); }
+            return burntMaterial;
+        }
+        static GameObject Piece(Transform parent, PrimitiveType shape, Vector3 localPos, Quaternion localRot, Vector3 size, Material m)
+        {
+            var g = GameObject.CreatePrimitive(shape); Destroy(g.GetComponent<Collider>()); g.transform.SetParent(parent, false);
+            g.transform.localPosition = localPos; g.transform.localRotation = localRot; g.transform.localScale = size;
+            var r = g.GetComponent<Renderer>(); r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; return g;
+        }
+
+        /// <summary>What is left: a ruin model when there is one (<mesh>_ruin), else a heap of the building's own stones and
+        /// beams, sooted, with stubs of wall still standing; a truck or a cart is a burnt husk, fuel drums leave
+        /// scorched ground. A ruin that burns carries its own light.</summary>
+        void SpawnRuin(Prop p)
+        {
+            float yawDeg = p.yaw * Mathf.Rad2Deg; var mesh = p.kind.mesh; float L = p.kind.length, W = 2f;
+            foreach (var r in p.radii) W = Mathf.Max(W, r * 2f);
+            var go = new GameObject("Ruin " + mesh); go.transform.SetParent(transform, false); go.transform.position = p.pos; go.transform.rotation = Quaternion.Euler(0f, yawDeg, 0f); p.go = go;
+            Quad(go.transform, p.pos, yawDeg, Mathf.Max(L, W) * 1.3f, Mathf.Max(L, W) * 1.3f, scorchMaterial, 0.06f);
+            var rng = new System.Random(p.seed * 7919 + 17); float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+            if (mesh == "truck" || mesh == "cart")
+            {
+                var husk = Instantiate(prefabs[mesh], go.transform); husk.transform.localPosition = new Vector3(0f, -0.12f, 0f); husk.transform.localRotation = Quaternion.Euler(R(-4f, 4f), 0f, R(-6f, 6f));
+                foreach (var r in husk.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = Burnt(); r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+            }
+            else if (mesh != "barrels" && prefabs.ContainsKey(mesh + "_ruin"))
+            {
+                var ruin = Instantiate(prefabs[mesh + "_ruin"], go.transform);
+                foreach (var r in ruin.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = materials[mesh + "_ruin"]; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+            }
+            else if (mesh != "barrels")
+            {
+                var mat = Sooty(mesh); float h = Mathf.Clamp(p.kind.height * 0.2f, 0.6f, 1.6f); bool big = L > 7f;
+                // the building itself fallen in: its roof and walls flattened into a low heap, tilted the way it came down
+                var fallen = Instantiate(prefabs[mesh], go.transform); fallen.name = "Fallen";
+                fallen.transform.localPosition = new Vector3(R(-0.3f, 0.3f), -0.05f, R(-0.3f, 0.3f)); fallen.transform.localRotation = Quaternion.Euler(R(-5f, 5f), R(-10f, 10f), R(-5f, 5f)); fallen.transform.localScale = new Vector3(0.95f, 0.16f, 0.95f);
+                foreach (var r in fallen.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+                // stones, plaster, soot and tile thrown over it and round it, each its own shade
+                var tints = new[] { new Color(0.66f, 0.63f, 0.58f), new Color(0.78f, 0.74f, 0.66f), new Color(0.32f, 0.3f, 0.28f), new Color(0.55f, 0.36f, 0.28f) };
+                var block = new MaterialPropertyBlock(); int chunks = big ? 24 : 12;
+                for (int i = 0; i < chunks; i++)
+                {
+                    float s = R(0.25f, 0.85f);
+                    var c = Piece(go.transform, PrimitiveType.Cube, new Vector3(R(-L, L) * 0.5f, R(0.05f, h), R(-W, W) * 0.5f), Quaternion.Euler(R(0f, 360f), R(0f, 360f), R(0f, 360f)), new Vector3(s, s * R(0.4f, 0.9f), s * R(0.6f, 1.2f)), mat);
+                    block.SetColor("_BaseColor", tints[rng.Next(tints.Length)]); c.GetComponent<Renderer>().SetPropertyBlock(block);
+                }
+                for (int i = 0; i < (big ? 6 : 3); i++) Piece(go.transform, PrimitiveType.Cube, new Vector3(R(-L, L) * 0.35f, R(0.4f, h + 0.4f), R(-W, W) * 0.35f), Quaternion.Euler(R(12f, 42f), R(0f, 360f), 0f), new Vector3(0.18f, 0.18f, L * R(0.3f, 0.5f)), trunkMaterial);   // roof beams sticking out
+                if (mesh != "sandbags" && mesh != "well")
+                {
+                    int stubs = big ? 3 : 1;   // stubs of wall still standing round the heap
+                    for (int i = 0; i < stubs; i++)
+                    {
+                        bool side = rng.Next(2) == 0; float along = R(-0.35f, 0.35f), sh = R(1.2f, Mathf.Max(1.4f, p.kind.height * 0.45f)), sw = R(1.8f, 3.4f);
+                        var at = side ? new Vector3((rng.Next(2) == 0 ? -1f : 1f) * W * 0.44f, sh * 0.5f - 0.1f, along * L) : new Vector3(along * W, sh * 0.5f - 0.1f, (rng.Next(2) == 0 ? -1f : 1f) * L * 0.44f);
+                        Piece(go.transform, PrimitiveType.Cube, at, Quaternion.Euler(R(-4f, 4f), side ? 0f : 90f, R(-4f, 4f)), new Vector3(0.35f, sh, sw), mat);
+                    }
+                }
+            }
+            if (p.burn > 0f)
+            {
+                var lg = new GameObject("RuinFire"); lg.transform.SetParent(go.transform, false); lg.transform.localPosition = Vector3.up * 2.5f;
+                p.glow = lg.AddComponent<Light>(); p.glow.type = LightType.Point; p.glow.color = new Color(1f, 0.55f, 0.22f); p.glow.range = 16f; p.glow.intensity = 4f; p.glow.shadows = LightShadows.None;
+            }
+        }
 
         public bool Blocks(Vector3 pos)
         {
             foreach (var p in active)
             {
                 if (p.radii.Length == 0 || pos.y > p.height) continue; float reach = p.bound + 4f; if ((p.pos - pos).sqrMagnitude > reach * reach) continue;
-                for (int c = 0; c < p.radii.Length; c++) if ((new Vector2(pos.x, pos.z) - p.circleCenters[c]).sqrMagnitude < p.radii[c] * p.radii[c]) return true;
+                for (int c = 0; c < p.radii.Length; c++) if ((new Vector2(pos.x, pos.z) - p.circleCenters[c]).sqrMagnitude < p.radii[c] * p.radii[c]) { blocker = p; return true; }
             }
             return false;
         }

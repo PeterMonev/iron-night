@@ -155,6 +155,16 @@ namespace IronNight
             if (Random.value < 0.3f) Flash(pos + Vector3.up * 2f, new Color(1f, 0.6f, 0.25f), 20f + 80f * k, 20f, 0.12f);
         }
 
+        /// <summary>A building coming down: a wall of dust rolling out low and rising, dark chunks and splinters thrown
+        /// out and falling back, a pall of smoke over it all.</summary>
+        public void Collapse(Vector3 pos, float size)
+        {
+            float r = Mathf.Clamp(size * 0.45f, 2f, 7f);
+            for (int i = 0; i < 12; i++) { var d = Random.insideUnitCircle; Spawn(blendDust, pos + new Vector3(d.x * r, 0.6f + Random.value, d.y * r), 3.5f + Random.value * 3f, new Color(0.62f, 0.56f, 0.48f, 0.75f), 2.4f + Random.value * 1.6f, new Vector3(d.x * 3f, 1f + Random.value * 1.5f, d.y * 3f), 1.7f, true); }
+            for (int i = 0; i < 6; i++) Spawn(smokeRagged, pos + Random.insideUnitSphere * r * 0.6f + Vector3.up * 2.5f, 4f + Random.value * 3f, new Color(0.3f, 0.27f, 0.24f, 0.7f), 4f + Random.value * 2f, new Vector3(Random.Range(-0.5f, 0.5f), 1.8f + Random.value, Random.Range(-0.5f, 0.5f)), 2.2f, true);
+            for (int i = 0; i < 18; i++) { var v = (Random.insideUnitSphere + Vector3.up * 1.3f).normalized * (5f + Random.value * 9f); var c = Spawn(blendDust, pos + Vector3.up * (1.5f + Random.value * 2f), 0.3f + Random.value * 0.35f, new Color(0.16f, 0.14f, 0.12f, 0.95f), 0.9f + Random.value * 0.6f, v, 0f, true); c.gravity = true; }
+        }
+
         /// <summary>A shell glancing off: a white flash and a handful of sparks thrown off the armour.</summary>
         public void Spark(Vector3 pos, Vector3 away)
         {

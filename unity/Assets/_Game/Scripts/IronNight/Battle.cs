@@ -47,7 +47,7 @@ namespace IronNight
         class HeHole { public Vehicle v; public Vector3 local; public float left, tick; }
         readonly List<HeHole> holes = new List<HeHole>();
         class Toss { public Transform t; public Vehicle owner; public Vector3 vel, spin; public Quaternion rest; public float jet, tick, h, restY; public bool bounced, down; }
-        readonly List<Toss> tosses = new List<Toss>(); float slowLeft;   // turrets in the air; real seconds of slow motion left
+        readonly List<Toss> tosses = new List<Toss>(); float slowLeft; readonly bool[] rubbleDone = new bool[2];   // turrets in the air; real seconds of slow motion left
         Light flareLight, moon; float shake; int banked, nightTigers, nightPaks, nightCrates; bool nightRecorded, bossKilled;
         readonly List<Vehicle> platoon = new List<Vehicle>(); readonly List<Vehicle> foes = new List<Vehicle>();
         readonly List<Shell> shells = new List<Shell>(); readonly List<Wreck> wrecks = new List<Wreck>();
@@ -78,6 +78,7 @@ namespace IronNight
         static readonly bool debugGuns = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--guns") >= 0;   // test switch: a PaK and an 88 out of range ahead, to look at
         static readonly bool debugDrops = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--drops") >= 0;   // test switch: the first supply drop at 0:03
         static readonly bool debugHe = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--he") >= 0;   // test switch: the leader starts loaded with HE
+        static readonly bool debugRubble = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--rubble") >= 0;   // test switch: heavy blasts 25 m ahead at 0:02 and 0:05, a dozer blade fitted
         static readonly bool debugCook = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--cookoff") >= 0;   // test switch: every kill cooks off, in slow motion
         static readonly bool debugKeil = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--keil") >= 0;   // test switch: a Panzerkeil at 0:04
         static readonly bool debugSalvage = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--salvage") >= 0;   // test switch: three crates ahead at 0:02, the racks nearly dry
@@ -295,8 +296,8 @@ namespace IronNight
             TickShells(dt); if (phase != Phase.Play) return;                    // the leader may have just died
             TickWrecks(dt); TickSpawns(dt);
             KeepApart();
-            foreach (var v in platoon) v.transform.position = props.PushOut(v.transform.position, v.spec.radius * 0.7f);
-            foreach (var e in foes) if (!e.spec.isGun) e.transform.position = props.PushOut(e.transform.position, e.spec.radius * 0.7f);
+            foreach (var v in platoon) { props.Ram(v.transform.position, v.spec.radius * 0.7f, v.Forward, dozer); v.transform.position = props.PushOut(v.transform.position, v.spec.radius * 0.7f); }
+            foreach (var e in foes) if (!e.spec.isGun) { props.Ram(e.transform.position, e.spec.radius * 0.7f, e.Forward, false); e.transform.position = props.PushOut(e.transform.position, e.spec.radius * 0.7f); }
             foreach (var v in platoon) tracks.Mark(v); foreach (var e in foes) if (!e.spec.isGun) tracks.Mark(e);
             foreach (var v in platoon) Smoulder(v, dt); foreach (var e in foes) Smoulder(e, dt);
             props.platoon = L.transform.position; props.alert = false; props.Tick();
@@ -333,7 +334,7 @@ namespace IronNight
             if (objective.hits < 3) return;
             var pos = objective.pos; score += 500; objectivesReached++; shake = Mathf.Max(shake, 0.9f); Sfx.Explosion(pos); Sfx.Pickup();
             foreach (var p in objective.props) { if (p == null) continue; fx.Explosion(p.transform.position + Vector3.up * 0.5f); props.Crater(p.transform.position, 3f); Destroy(p); }
-            fx.Explosion(pos + Vector3.up); props.Crater(pos, 5f);
+            fx.Explosion(pos + Vector3.up); props.Crater(pos, 5f); props.Blast(pos, 9f, 4f);
             var fire = new GameObject("DumpFire").AddComponent<Light>(); fire.type = LightType.Point; fire.color = new Color(1f, 0.55f, 0.2f); fire.range = 26f; fire.intensity = 14f; fire.shadows = LightShadows.None; fire.transform.position = pos + Vector3.up * 3f; dumpFires.Add(fire);
             InfantryKilled(infantry.Blast(pos, 9f), pos); foreach (var e in foes.ToArray()) { var d = e.transform.position - pos; d.y = 0f; if (d.magnitude < 9f && !e.dead) Damage(e, 2f, pos); }
             hud.Popup(pos, "+500", new Color(1f, 0.6f, 0.3f)); hud.Toast("Fuel dump destroyed · +500", 2.6f);
@@ -408,7 +409,7 @@ namespace IronNight
             var cap = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(cap.GetComponent<Collider>()); cap.transform.SetParent(go.transform, false); cap.transform.localPosition = new Vector3(0f, 1f, 0f); cap.transform.localScale = new Vector3(0.45f, 0.6f, 0.45f); cap.GetComponent<Renderer>().sharedMaterial = mineMaterial;
             mines.Add(new Mine { pos = go.transform.position, vis = go.transform });
         }
-        void Blow(Mine m) { fx.Explosion(m.pos); Sfx.Explosion(m.pos); props.Crater(m.pos, 2.5f); shake = Mathf.Max(shake, 0.35f); Destroy(m.vis.gameObject); InfantryKilled(infantry.Blast(m.pos, 3f), m.pos); }
+        void Blow(Mine m) { fx.Explosion(m.pos); Sfx.Explosion(m.pos); props.Crater(m.pos, 2.5f); props.Blast(m.pos, 3f, 1f); shake = Mathf.Max(shake, 0.35f); Destroy(m.vis.gameObject); InfantryKilled(infantry.Blast(m.pos, 3f), m.pos); }
         bool MineShot(Vector3 at)
         {
             for (int i = mines.Count - 1; i >= 0; i--) { var d = mines[i].pos - at; d.y = 0f; if (d.magnitude < 2.2f) { Blow(mines[i]); mines.RemoveAt(i); score += 40; hud.Popup(at, "Mine · +40", new Color(1f, 0.85f, 0.5f)); return true; } }
@@ -466,7 +467,7 @@ namespace IronNight
                 if (!s.bounced) foreach (var v in hitList) { if (v.dead) continue; var d = v.transform.position - s.pos; d.y = 0f; if (d.sqrMagnitude < v.spec.radius * v.spec.radius) { hit = v; break; } }
                 // a wreck in the way stops the shell; a target in a hedge bank is missed one time in three
                 if (hit == null && !s.bounced) foreach (var w in wrecks) { if ((w.v.transform.position - s.pos).sqrMagnitude < w.v.spec.radius * w.v.spec.radius * 0.6f && s.pos.y < 2.2f) { fx.Spark(s.pos + Vector3.up * 0.5f, -s.vel.normalized); Sfx.Ricochet(s.pos); s.life = 0f; break; } }
-                if (hit != null && !s.bounced && props.InCover(hit.transform.position) && Random.value < 0.33f) { fx.Hit(new Vector3(s.pos.x, 0.8f, s.pos.z), 0.5f); if (hit.friendly) hud.Popup(hit.transform.position, "Hedge", new Color(0.55f, 0.8f, 0.5f)); s.life = 0f; hit = null; }
+                if (hit != null && !s.bounced && props.InCover(hit.transform.position) && Random.value < 0.33f) { fx.Hit(new Vector3(s.pos.x, 0.8f, s.pos.z), 0.5f); if (hit.friendly) hud.Popup(hit.transform.position, "Hedge", new Color(0.55f, 0.8f, 0.5f)); if (s.he) props.Blast(hit.transform.position, 2f, 1.5f); s.life = 0f; hit = null; }
                 if (hit != null && sandbags && hit == Leader && !s.bounced && Vector3.Dot((s.pos - hit.transform.position).normalized, hit.Forward) > 0.35f && Random.value < 0.35f)
                 {
                     // hung on the front plate: the shell skates off the sandbags and the track links
@@ -491,7 +492,7 @@ namespace IronNight
                     if (s.friendly && phosphorus && !hit.friendly) { burn[hit] = 6f; if (!burning.Contains(hit)) burning.Add(hit); }
                     Damage(hit, dmg, s.pos);
                     TrackHit(hit, s.pos);
-                    if (s.he) { float r = heBurst; foreach (var v in hitList) if (v != hit && !v.dead && Dist(v, hit) < r) Damage(v, s.dmg * 0.5f, v.transform.position); if (s.friendly) InfantryKilled(infantry.Blast(s.pos, r), s.pos); Hole(hit, s.pos); }
+                    if (s.he) { float r = heBurst; foreach (var v in hitList) if (v != hit && !v.dead && Dist(v, hit) < r) Damage(v, s.dmg * 0.5f, v.transform.position); if (s.friendly) InfantryKilled(infantry.Blast(s.pos, r), s.pos); Hole(hit, s.pos); props.Blast(s.pos, r * 0.5f, 0.8f); }
                     else fx.Hit(new Vector3(s.pos.x, 1.6f, s.pos.z), 1f);
                 }
                 if (s.bounced) s.vel += Vector3.down * (30f * dt);
@@ -499,7 +500,7 @@ namespace IronNight
                 if (hit == null && !s.bounced && s.friendly && s.life > 0f && MineShot(s.pos)) s.life = 0f;
                 if (hit == null && !s.bounced && s.friendly) { int men = infantry.Blast(s.pos, 1.6f); if (men > 0) { InfantryKilled(men, s.pos); fx.Hit(s.pos, 0.7f); s.life = 0f; } }
                 if (hit == null && !s.bounced && s.friendly && props.HitLamp(s.pos)) { fx.Explosion(s.pos); Sfx.Explosion(s.pos); score += 150; hud.Popup(s.pos, "Searchlight out · +150", new Color(1f, 0.9f, 0.6f)); nightLamps++; s.life = 0f; }
-                if (hit == null && !s.bounced && props.Blocks(s.pos)) { fx.Hit(s.pos, 0.6f); Sfx.Hit(s.pos); s.life = 0f; }
+                if (hit == null && !s.bounced && props.Blocks(s.pos)) { fx.Hit(s.pos, 0.6f); Sfx.Hit(s.pos); props.Strike(s.pos, s.he ? 1f : 0.35f); s.life = 0f; }
                 else if (hit == null && s.life <= 0f) { var g = new Vector3(s.pos.x, 0f, s.pos.z); fx.Dust(g); props.Crater(g, 2.2f); }   // spent: into the dirt
                 if (hit != null || s.life <= 0f) { fx.Release(s.vis); shells.RemoveAt(i); }
             }
@@ -524,7 +525,7 @@ namespace IronNight
             if (v.friendly && v == Leader) { hud.Flash(); shake = Mathf.Max(shake, 0.8f); Buzz(); }
             if (v.hp > 0f) { if (v == Leader) { hud.Toast("Leader hit"); if (Random.value < 0.4f) Radio("hit"); if (hasSmoke && smokeCooldown <= 0f) PopSmoke(); } return; }
             tracks.Forget(v);
-            v.Wreck(); fx.Explosion(v.transform.position); Sfx.Explosion(v.transform.position); props.Scorch(v.transform, 6f + v.spec.radius * 1.5f); InfantryKilled(infantry.Blast(v.transform.position, 6f), v.transform.position);
+            v.Wreck(); fx.Explosion(v.transform.position); Sfx.Explosion(v.transform.position); props.Scorch(v.transform, 6f + v.spec.radius * 1.5f); props.Blast(v.transform.position, 5f, 1.2f); InfantryKilled(infantry.Blast(v.transform.position, 6f), v.transform.position);
             var fire = new GameObject("WreckFire").AddComponent<Light>(); fire.type = LightType.Point; fire.color = new Color(1f, 0.5f, 0.2f); fire.range = 16f; fire.intensity = 6f; fire.shadows = LightShadows.None;
             fire.transform.position = v.transform.position + Vector3.up * 2.5f;
             wrecks.Add(new Wreck { v = v, fire = fire });
@@ -588,6 +589,8 @@ namespace IronNight
                 apRounds = 4; heRounds = 0; loadHe = false; hud.SetAmmo(apRounds, heRounds, loadHe);
                 DropCrate(props.PushOut(L0.transform.position + f0 * 9f, 1.4f), 5, 1); DropCrate(props.PushOut(L0.transform.position + f0 * 16f + r0 * 2.5f, 1.4f), 3, 0); DropCrate(props.PushOut(L0.transform.position + f0 * 23f - r0 * 2f, 1.4f), 2, 1);
             }
+            if (debugRubble && t > 2f && !rubbleDone[0]) { rubbleDone[0] = true; dozer = true; var L0 = Leader; props.Blast(L0.transform.position + L0.Forward * 25f, 12f, 30f); fx.Explosion(L0.transform.position + L0.Forward * 25f); }
+            if (debugRubble && t > 5f && !rubbleDone[1]) { rubbleDone[1] = true; var L0 = Leader; props.Blast(L0.transform.position + L0.Forward * 40f, 12f, 30f); fx.Explosion(L0.transform.position + L0.Forward * 40f); }
             if (debugCook && !debugSquadSent && t > 2f)   // two Panzer IVs on their last legs 20 m ahead, to watch them go up
             {
                 debugSquadSent = true; var L0 = Leader; var f0 = L0.Forward; var r0 = new Vector3(f0.z, 0f, -f0.x);
@@ -1257,7 +1260,7 @@ namespace IronNight
             for (int i = mortars.Count - 1; i >= 0; i--)
             {
                 var mo = mortars[i]; mo.timer -= dt; if (mo.timer > 0f) continue;
-                Destroy(mo.ring.gameObject); fx.Explosion(mo.at); Sfx.Artillery(mo.at); props.Crater(mo.at, 3.5f); mortars.RemoveAt(i); shake = Mathf.Max(shake, 0.4f);
+                Destroy(mo.ring.gameObject); fx.Explosion(mo.at); Sfx.Artillery(mo.at); props.Crater(mo.at, 3.5f); props.Blast(mo.at, 5f, 1.5f); mortars.RemoveAt(i); shake = Mathf.Max(shake, 0.4f);
                 foreach (var v in platoon.ToArray()) { if (v.dead) continue; var d = v.transform.position - mo.at; d.y = 0f; if (d.magnitude < 6f) Damage(v, 1f, mo.at); }
                 InfantryKilled(infantry.Blast(mo.at, 6f), mo.at);
                 if (phase != Phase.Play) return;
@@ -1625,7 +1628,7 @@ namespace IronNight
             for (int i = arty.Count - 1; i >= 0; i--)
             {
                 var a = arty[i]; a.timer -= dt; if (a.timer > 0f) continue;
-                fx.Explosion(a.at); Sfx.Artillery(a.at); props.Crater(a.at, 5f); arty.RemoveAt(i); InfantryKilled(infantry.Blast(a.at, 7f), a.at);
+                fx.Explosion(a.at); Sfx.Artillery(a.at); props.Crater(a.at, 5f); props.Blast(a.at, 7f, 3f); arty.RemoveAt(i); InfantryKilled(infantry.Blast(a.at, 7f), a.at);
                 foreach (var e in foes.ToArray()) { if (e.dead) continue; var d = e.transform.position - a.at; d.y = 0f; if (d.magnitude < 7f) Damage(e, d.magnitude < 3.5f ? 2f : 1f, a.at); }
             }
         }
