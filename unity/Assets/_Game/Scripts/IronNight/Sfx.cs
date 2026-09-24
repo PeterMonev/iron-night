@@ -13,7 +13,7 @@ namespace IronNight
     {
         const int Rate = 44100;
         static Sfx instance;
-        AudioClip shot, shotHeavy, shotFar, hit, explosion, artillery, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, front, whistle, rumble, ricochet, ricochet2, flak, reload, turretLoop, mg, faust;
+        AudioClip shot, shotHeavy, shotFar, hit, explosion, artillery, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, front, whistle, rumble, ricochet, ricochet2, flak, reload, turretLoop, mg, faust, stuka, drone;
         readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, turret, ambient, frontLine, ui; Transform listener;
 
         public static void Build(Camera cam)
@@ -196,6 +196,34 @@ namespace IronNight
             Dsp.Normalize(mix, 0.45f); return mix;
         }
 
+        /// <summary>A Ju 87 diving: the wind-driven siren howling up the scale as it comes down, the engine roaring under
+        /// it, both falling away as it pulls out over the target and climbs off. The loudest moment is at 3.6 s.</summary>
+        static float[] MakeStukaDive()
+        {
+            const float len = 5.5f, pass = 3.6f; int n = Dsp.N(len);
+            System.Func<float, float> doppler = t => t < pass ? 1f + 0.12f * (t / pass) : 1.12f - 0.3f * Mathf.Clamp01((t - pass) / 0.8f);   // up as it comes, down as it goes
+            System.Func<float, float> siren = t => 240f * Mathf.Pow(2f, Mathf.Min(t, pass) / 2.1f) * doppler(t);
+            var mix = new float[n];
+            for (int h = 1; h <= 4; h++) { var s = Dsp.Sine(n, t => siren(t) * h); Dsp.Add(mix, s, 0.55f / h); }   // a rough, reedy howl
+            for (int i = 0; i < n; i++) { float t = i / (float)Rate; mix[i] *= 0.75f + 0.25f * Mathf.Sin(2f * Mathf.PI * 38f * t); }   // the chop of the siren's rotor
+            var engine = new float[n];
+            for (int h = 1; h <= 6; h++) { var s = Dsp.Sine(n, t => 78f * h * doppler(t)); Dsp.Add(engine, s, 0.6f / h); }
+            var grit = Dsp.Noise(n); Dsp.Bandpass(grit, 320f, 1.2f); Dsp.Add(engine, grit, 0.5f); Dsp.Clip(engine, 2.2f);
+            Dsp.Add(mix, engine, 0.8f);
+            Dsp.Env(mix, t => t < pass ? Mathf.Pow(t / pass, 1.6f) : Mathf.Max(0f, 1f - (t - pass) / (len - pass)));
+            Dsp.Normalize(mix, 0.9f); return mix;
+        }
+
+        /// <summary>Aero engines somewhere overhead in the dark: a low, beating drone that swells and hangs.</summary>
+        static float[] MakeDrone()
+        {
+            const float len = 6f; int n = Dsp.N(len); var mix = new float[n];
+            foreach (var f in new[] { 68f, 70.5f }) for (int h = 1; h <= 5; h++) { var s = Dsp.Sine(n, t => f * h); Dsp.Add(mix, s, 0.5f / h); }   // two engines a little apart: the beat
+            var air = Dsp.Noise(n); Dsp.Lowpass(air, 260f); Dsp.Add(mix, air, 0.6f);
+            Dsp.Env(mix, t => Mathf.Min(1f, t / 2.5f) * Mathf.Min(1f, (len - t) / 1.5f));
+            Dsp.Normalize(mix, 0.7f); return mix;
+        }
+
         static float[] MakeWhistle()
         {
             int n = Dsp.N(1.3f); var air = Dsp.Noise(n);
@@ -252,7 +280,7 @@ namespace IronNight
             mg = Load("mg", () => Gun(0f, 0.3f, false)); faust = Load("faust", () => Gun(0.2f, 0.8f, false));
             explosion = Load("explosion", MakeExplosion); artillery = Load("artillery", MakeExplosion); hit = Load("hit", ArmourHit); ricochet = Load("ricochet", MakeRicochet); ricochet2 = Resources.Load<AudioClip>("Audio/ricochet2");
             engineLoop = Load("engine", MakeEngine); tracksLoop = Load("tracks", Tracks);
-            whistle = Load("whistle", MakeWhistle); rumble = Load("shotFar", MakeRumble); wind = Load("wind", Wind); rain = Load("rain", Rain); front = Resources.Load<AudioClip>("Audio/front");
+            whistle = Load("whistle", MakeWhistle); stuka = Load("stuka", MakeStukaDive); drone = Load("drone", MakeDrone); rumble = Load("shotFar", MakeRumble); wind = Load("wind", Wind); rain = Load("rain", Rain); front = Resources.Load<AudioClip>("Audio/front");
             pickup = Load("pickup", () => Radio(new[] { 880f, 1320f }, 0.12f)); levelUp = Load("levelUp", () => Radio(new[] { 523f, 659f, 784f }, 0.2f)); click = Load("click", MakeClick);
 
             for (int i = 0; i < 12; i++) { var s = NewSource("Voice " + i); s.spatialBlend = 0.75f; s.rolloffMode = AudioRolloffMode.Linear; s.minDistance = 12f; s.maxDistance = 140f; pool.Add(s); }
@@ -288,6 +316,8 @@ namespace IronNight
         public static void Reload(Vector3 pos) { if (instance && instance.reload != null) instance.PlayAt(instance.reload, pos, 0.5f, Random.Range(0.95f, 1.05f), 0.5f); }
         /// <summary>The leader's turret motor: audible while the turret swings, quiet when it rests.</summary>
         public static void Turret(float swing) { if (!instance || instance.turretLoop == null) return; var t = instance.turret; t.volume = Mathf.Lerp(t.volume, Mathf.Clamp01(swing * 0.6f) * 0.35f, 0.2f); }
+        public static void StukaDive(Vector3 pos) { if (instance) instance.PlayAt(instance.stuka, pos, 1f, Random.Range(0.97f, 1.03f)); }
+        public static void Drone(Vector3 pos) { if (instance) instance.PlayAt(instance.drone, pos, 0.9f, 1f); }
         public static void Whistle(Vector3 pos) { if (instance) instance.PlayAt(instance.whistle, pos, 0.7f, Random.Range(0.95f, 1.05f)); }
         public static void Mg(Vector3 pos) { if (instance) instance.PlayAt(instance.mg, pos, 0.55f, Random.Range(0.95f, 1.05f)); }
         public static void Faust(Vector3 pos) { if (instance) instance.PlayAt(instance.faust, pos, 0.8f, Random.Range(0.95f, 1.05f)); }

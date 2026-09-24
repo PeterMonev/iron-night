@@ -28,7 +28,7 @@ namespace IronNight
         class Objective { public Vector3 pos; public Transform marker; public GameObject grenade; public float smokeTimer, held, salvo, clock; public int n, hits; public bool hold; public string kind = "reach"; public List<Vehicle> targets = new List<Vehicle>(); public List<GameObject> props = new List<GameObject>(); public List<Transform> figures = new List<Transform>(); }
         class Mine { public Vector3 pos; public Transform vis; }
         class Drop { public Vector3 pos; public float height, age, lift, top; public int kind; public Transform crate, chute, marker; public LineRenderer lines; public Mesh canopy; public Vector3[] rest; }   // lift: the crate origin above its base; top: where the shrouds tie
-        class Mortar { public Vector3 at; public float timer; public Transform ring; }
+        class Mortar { public Vector3 at; public float timer; public Transform ring; public bool bomb; }   // bomb: a dive bomber's, heavier
         class Star { public Vector3 pos; public float height, life, puff; public Transform flare, chute; public Light light; }
         enum Phase { Title, Play, LevelUp, Pause, End }
 
@@ -78,6 +78,7 @@ namespace IronNight
         static readonly bool debugGuns = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--guns") >= 0;   // test switch: a PaK and an 88 out of range ahead, to look at
         static readonly bool debugDrops = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--drops") >= 0;   // test switch: the first supply drop at 0:03
         static readonly bool debugHe = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--he") >= 0;   // test switch: the leader starts loaded with HE
+        static readonly bool debugRaid = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--raid") >= 0;   // test switch: a raid at 0:03 and every 14 s after
         static readonly bool debugRubble = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--rubble") >= 0;   // test switch: heavy blasts 25 m ahead at 0:02 and 0:05, a dozer blade fitted
         static readonly bool debugCook = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--cookoff") >= 0;   // test switch: every kill cooks off, in slow motion
         static readonly bool debugKeil = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--keil") >= 0;   // test switch: a Panzerkeil at 0:04
@@ -307,7 +308,7 @@ namespace IronNight
             hud.Set(t, platoon.Count); hud.SetLeader(Mathf.CeilToInt(L.hp), Mathf.CeilToInt(Depot.LeaderHp)); hud.SetTally(kills, score);
             hud.ReloadArc(L.transform.position + Vector3.up * 0.2f, L.reloadLeft <= 0f ? 1f : 1f - L.reloadLeft / Mathf.Max(0.1f, L.spec.reload * L.reloadMul), cam);
             hud.Indicators(foes, cam);
-            TickObjective(dt); TickDrops(dt); TickSalvage(dt); TickHoles(dt); TickTosses(dt); TickMortars(dt); TickStar(dt);
+            TickObjective(dt); TickDrops(dt); TickSalvage(dt); TickHoles(dt); TickTosses(dt); TickMortars(dt); TickStar(dt); TickRaid(dt);
             if (ammoLeft > 0f) { ammoLeft -= dt; if (ammoLeft <= 0f) { ammoMul = 1f; hud.Toast("APCR spent"); } }
             hud.Radar(foes, platoon, L.transform.position, objective != null ? objective.pos : Vector3.zero, objective != null, cratePos);   // the commander's spotting shows them all: the markers are placed when it is called
             hud.HpBars(foes, cam, boss);
@@ -1260,9 +1261,10 @@ namespace IronNight
             for (int i = mortars.Count - 1; i >= 0; i--)
             {
                 var mo = mortars[i]; mo.timer -= dt; if (mo.timer > 0f) continue;
-                Destroy(mo.ring.gameObject); fx.Explosion(mo.at); Sfx.Artillery(mo.at); props.Crater(mo.at, 3.5f); props.Blast(mo.at, 5f, 1.5f); mortars.RemoveAt(i); shake = Mathf.Max(shake, 0.4f);
-                foreach (var v in platoon.ToArray()) { if (v.dead) continue; var d = v.transform.position - mo.at; d.y = 0f; if (d.magnitude < 6f) Damage(v, 1f, mo.at); }
-                InfantryKilled(infantry.Blast(mo.at, 6f), mo.at);
+                Destroy(mo.ring.gameObject); fx.Explosion(mo.at); Sfx.Artillery(mo.at); props.Crater(mo.at, mo.bomb ? 6f : 3.5f); props.Blast(mo.at, mo.bomb ? 8f : 5f, mo.bomb ? 3.5f : 1.5f); mortars.RemoveAt(i); shake = Mathf.Max(shake, mo.bomb ? 0.9f : 0.4f);
+                foreach (var v in platoon.ToArray()) { if (v.dead) continue; var d = v.transform.position - mo.at; d.y = 0f; if (d.magnitude < (mo.bomb ? 8f : 6f)) Damage(v, mo.bomb ? 2.5f : 1f, mo.at); }
+                if (mo.bomb) foreach (var e in foes.ToArray()) { if (e.dead) continue; var d = e.transform.position - mo.at; d.y = 0f; if (d.magnitude < 8f) Damage(e, 2.5f, mo.at); }   // a bomb does not ask whose tank it is
+                InfantryKilled(infantry.Blast(mo.at, mo.bomb ? 9f : 6f), mo.at);
                 if (phase != Phase.Play) return;
             }
         }
@@ -1274,11 +1276,25 @@ namespace IronNight
             var L = Leader;
             if (star == null && t > 60f) { starTimer -= dt; if (starTimer <= 0f) {
                 starTimer = 45f + Random.value * 25f;
-                star = new Star { pos = L.transform.position + new Vector3(Random.Range(-8f, 8f), 0f, Random.Range(-4f, 12f)), height = 42f, life = 16f, flare = fx.StarFlare() };
+                HangStar(L.transform.position + new Vector3(Random.Range(-8f, 8f), 0f, Random.Range(-4f, 12f)), "Star shell! You are lit up · move");
+            } }
+            TickStarBody(dt);
+        }
+
+        /// <summary>A flare on a parachute over a point, burning for sixteen seconds.</summary>
+        void HangStar(Vector3 over, string toast)
+        {
+            {
+                star = new Star { pos = over, height = 42f, life = 16f, flare = fx.StarFlare() };
                 star.chute = new GameObject("StarCanopy").transform; star.chute.gameObject.AddComponent<MeshFilter>().sharedMesh = Canopy(10, 4, 1.5f, 1f, out _); star.chute.gameObject.AddComponent<MeshRenderer>(); star.chute.GetComponent<Renderer>().sharedMaterial = ChuteMaterial();
                 star.light = new GameObject("StarLight").AddComponent<Light>(); star.light.type = LightType.Point; star.light.color = new Color(1f, 0.96f, 0.86f); star.light.range = 80f; star.light.intensity = 70f; star.light.shadows = LightShadows.None;
-                Sfx.Flak(star.pos + Vector3.up * 30f); hud.Toast("Star shell! You are lit up · move", 3f);
-            } }
+                Sfx.Flak(star.pos + Vector3.up * 30f); hud.Toast(toast, 3f);
+            }
+        }
+
+        void TickStarBody(float dt)
+        {
+            var L = Leader;
             if (props.Lit && !litBySearchlight) { litBySearchlight = true; hud.Toast("Caught in the searchlight · drive out or shoot the lamp", 3f); }
             if (!props.Lit) litBySearchlight = false;
             if (star == null) { lit = props.Lit; return; }
@@ -1288,6 +1304,83 @@ namespace IronNight
             star.puff -= dt; if (star.puff <= 0f) { star.puff = 0.25f; fx.Signal(at, new Color(0.8f, 0.8f, 0.8f, 0.5f)); }
             var d = L.transform.position - star.pos; d.y = 0f; lit = (star.life > 0f && d.magnitude < 40f) || props.Lit;
             if (star.life <= 0f) { fx.Release(star.flare); Destroy(star.chute.gameObject); Destroy(star.light.gameObject); star = null; lit = false; }
+        }
+
+        class Raid { public float t; public Vector3 a, b, dir, last; public bool lit, siren, marked, shown, whistled; public Transform plane, glow; }
+        Raid raid; float raidTimer = 150f; Material stukaMaterial, stukaGlow;
+
+        /// <summary>A night raid: the drone of engines, flares over the platoon, a red line on the ground three seconds
+        /// before the stick of five bombs lands on it, and the Ju 87 coming down out of the dark with its siren howling,
+        /// pulling out low over the line and climbing away. From 2:30, every 80-120 s; not in fog or rain.</summary>
+        void TickRaid(float dt)
+        {
+            var L = Leader; if (L == null) return;
+            if (raid == null)
+            {
+                if (weather == Weather.Fog || weather == Weather.Rain || t < (debugRaid ? 3f : 150f)) return;
+                raidTimer -= dt; if (raidTimer > 0f && !(debugRaid && raidTimer > 140f)) return;
+                raidTimer = debugRaid ? 14f : 80f + Random.value * 40f;
+                float ang = Random.value * Mathf.PI * 2f; var dir = new Vector3(Mathf.Sin(ang), 0f, Mathf.Cos(ang));
+                var aim = L.transform.position + L.Forward * 6f;   // where the leader is heading, near enough
+                raid = new Raid { a = aim - dir * 16f, b = aim + dir * 16f, dir = dir };
+                Sfx.Drone(aim + Vector3.up * 40f - dir * 60f); hud.Toast("Aircraft overhead · Stukas!", 3f); if (Random.value < 0.7f) Radio("hit");
+                return;
+            }
+            raid.t += dt; var mid = (raid.a + raid.b) * 0.5f;
+            if (!raid.lit && raid.t >= 1f) { raid.lit = true; if (star == null) HangStar(mid + new Vector3(Random.Range(-6f, 6f), 0f, Random.Range(-6f, 6f)), "Flares! Bombers coming"); }
+            if (!raid.siren && raid.t >= 1.4f) { raid.siren = true; Sfx.StukaDive(raid.a + raid.dir * 4f + Vector3.up * 18f); }
+            if (!raid.marked && raid.t >= 1.8f)
+            {
+                raid.marked = true;
+                for (int i = 0; i < 5; i++) { var at = Vector3.Lerp(raid.a, raid.b, i / 4f); float when = 3.2f + i * 0.16f; mortars.Add(new Mortar { at = at, timer = when, ring = fx.Marker(at, new Color(1f, 0.18f, 0.12f), 8f), bomb = true }); fx.Incoming(at, when); }
+                hud.Toast("Dive bomber! Off the red line", 2.6f);
+            }
+            if (!raid.whistled && raid.t >= 4.4f) { raid.whistled = true; Sfx.Whistle(mid); }
+            if (!raid.shown && raid.t >= 3.3f) { raid.shown = true; raid.plane = Stuka(out raid.glow); }
+            if (raid.plane != null)
+            {
+                // down in a straight dive to the start of the line, pulled out at 18 m, then climbing away beyond its end
+                float tau = raid.t - 3.3f; var p0 = raid.a - raid.dir * 90f + Vector3.up * 110f; var q = raid.a + raid.dir * 4f + Vector3.up * 18f;
+                Vector3 pos;
+                if (tau < 1.7f) pos = Vector3.Lerp(p0, q, Mathf.Pow(tau / 1.7f, 1.4f));
+                else { float u = Mathf.Clamp01((tau - 1.7f) / 2.6f); var c = q + raid.dir * 45f + Vector3.up * 2f; var e = raid.b + raid.dir * 140f + Vector3.up * 95f; pos = (1 - u) * (1 - u) * q + 2 * (1 - u) * u * c + u * u * e; }
+                var vel = pos - raid.plane.position; if (vel.sqrMagnitude > 1e-4f) raid.plane.rotation = Quaternion.LookRotation(vel.normalized, Vector3.up) * Quaternion.Euler(0f, 0f, Mathf.Sin(raid.t * 2f) * 6f);
+                raid.plane.position = pos; if (raid.glow != null) raid.glow.rotation = cam.transform.rotation;
+            }
+            if (raid.t > 7.6f) { if (raid.plane != null) Destroy(raid.plane.gameObject); raid = null; }
+        }
+
+        /// <summary>The Ju 87 as it is seen at night: the model when there is one (Models/ju87_hull), else a dark
+        /// gull-winged shape; either way with the glow of its exhaust stacks on the nose and their light on the ground.</summary>
+        Transform Stuka(out Transform glowQuad)
+        {
+            var root = new GameObject("Ju 87").transform; root.position = raid.a - raid.dir * 90f + Vector3.up * 110f;
+            if (stukaMaterial == null) { stukaMaterial = new Material(Resources.Load<Material>("VehicleLit")); var tex = Resources.Load<Texture2D>("Models/ju87"); if (tex != null) stukaMaterial.SetTexture("_BaseMap", tex); else stukaMaterial.SetColor("_BaseColor", new Color(0.09f, 0.1f, 0.1f)); }
+            var pf = Resources.Load<GameObject>("Models/ju87_hull");
+            if (pf != null) { var body = Instantiate(pf, root); foreach (var r in body.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = stukaMaterial; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; } }
+            else
+            {
+                // the fuselage, the inverted gull wings, the tail, the fixed undercarriage in its spats: enough of a shape against the flare light
+                StukaPart(root, Vector3.zero, Quaternion.identity, new Vector3(1.2f, 1.3f, 11f));
+                foreach (var s in new[] { -1f, 1f })
+                {
+                    StukaPart(root, new Vector3(s * 1.9f, -0.35f, 0.8f), Quaternion.Euler(0f, 0f, s * -12f), new Vector3(3.4f, 0.3f, 2.4f));
+                    StukaPart(root, new Vector3(s * 5.2f, 0.25f, 0.6f), Quaternion.Euler(0f, 0f, s * 8f), new Vector3(3.8f, 0.25f, 1.9f));
+                    StukaPart(root, new Vector3(s * 1.9f, -1.1f, 1.3f), Quaternion.identity, new Vector3(0.4f, 1.2f, 0.9f));
+                }
+                StukaPart(root, new Vector3(0f, 0.3f, -5f), Quaternion.identity, new Vector3(5f, 0.2f, 1.4f)); StukaPart(root, new Vector3(0f, 1.3f, -5.1f), Quaternion.identity, new Vector3(0.2f, 1.8f, 1.5f));
+            }
+            var lamp = new GameObject("Exhaust").AddComponent<Light>(); lamp.transform.SetParent(root, false); lamp.transform.localPosition = new Vector3(0f, 0.2f, 4.2f);
+            lamp.type = LightType.Point; lamp.color = new Color(1f, 0.5f, 0.2f); lamp.range = 12f; lamp.intensity = 4f; lamp.shadows = LightShadows.None;
+            if (stukaGlow == null) { stukaGlow = new Material(shellTemplate); stukaGlow.SetTexture("_BaseMap", glowTex); stukaGlow.SetColor("_BaseColor", new Color(1f, 0.55f, 0.25f, 1f)); }
+            var g = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(g.GetComponent<Collider>()); g.name = "ExhaustGlow"; g.transform.SetParent(root, false); g.transform.localPosition = new Vector3(0f, 0.2f, 4.4f); g.transform.localScale = Vector3.one * 2.4f;
+            var gr = g.GetComponent<Renderer>(); gr.sharedMaterial = stukaGlow; gr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; glowQuad = g.transform;
+            return root;
+        }
+        void StukaPart(Transform root, Vector3 pos, Quaternion rot, Vector3 size)
+        {
+            var g = GameObject.CreatePrimitive(PrimitiveType.Cube); Destroy(g.GetComponent<Collider>()); g.transform.SetParent(root, false); g.transform.localPosition = pos; g.transform.localRotation = rot; g.transform.localScale = size;
+            var r = g.GetComponent<Renderer>(); r.sharedMaterial = stukaMaterial; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         // the transport that drops the crate: crosses the sky over the drop point and is gone
