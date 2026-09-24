@@ -40,7 +40,7 @@ namespace IronNight
             new Mission { stat = "level", goal = 8, reward = 700, text = "Reach level {0} in one night", perNight = true },
             new Mission { stat = "nightkills", goal = 35, reward = 800, text = "Destroy {0} enemies in one night", perNight = true },
             new Mission { stat = "time", goal = 300, reward = 1200, text = "See the dawn", perNight = true },
-            new Mission { stat = "campaign", goal = 1, reward = 2000, text = "Win a three-night campaign", perNight = true },
+            new Mission { stat = "campaign", goal = 1, reward = 2000, text = "Win an operation", perNight = true },
         };
 
         public static readonly List<Mission> Active = new List<Mission>();

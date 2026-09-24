@@ -134,18 +134,6 @@ namespace IronNight
             PlayerPrefs.SetString("depot.commander." + c.nation, CommanderId == c.id ? "" : c.id); Save(); return true;   // picking the chosen one again rides without a commander
         }
 
-        // the campaign in progress: which night is next (1..3, 0 = none), what the platoon carried over, the running totals
-        public static int CampaignNight { get => PlayerPrefs.GetInt("camp.night", 0); set { PlayerPrefs.SetInt("camp.night", value); PlayerPrefs.Save(); } }
-        public static int CampaignKills { get => PlayerPrefs.GetInt("camp.kills", 0); set => PlayerPrefs.SetInt("camp.kills", value); }
-        public static int CampaignScore { get => PlayerPrefs.GetInt("camp.score", 0); set => PlayerPrefs.SetInt("camp.score", value); }
-        public static float CampaignLeaderHp { get => PlayerPrefs.GetFloat("camp.leaderHp", -1f); set => PlayerPrefs.SetFloat("camp.leaderHp", value); }
-        public static string CampaignPlatoon { get => PlayerPrefs.GetString("camp.platoon", ""); set => PlayerPrefs.SetString("camp.platoon", value); }   // "id:hp,id:hp" of the wingmen that lived
-        public static int CampaignsWon => PlayerPrefs.GetInt("camp.won", 0);
-        public static int CampaignBest => PlayerPrefs.GetInt("camp.best", 0);
-        public static void CampaignStart() { CampaignNight = 1; CampaignKills = 0; CampaignScore = 0; CampaignLeaderHp = -1f; CampaignPlatoon = ""; PlayerPrefs.Save(); }
-        public static void CampaignClear() { CampaignNight = 0; CampaignPlatoon = ""; CampaignLeaderHp = -1f; PlayerPrefs.Save(); }
-        public static void CampaignWon(int score) { PlayerPrefs.SetInt("camp.won", CampaignsWon + 1); if (score > CampaignBest) PlayerPrefs.SetInt("camp.best", score); CampaignClear(); }
-
         /// <summary>Veteran nights: the enemy takes half again as many hits, the night pays half again as much.</summary>
         public static bool Veteran { get => PlayerPrefs.GetInt("depot.veteran", 0) == 1; set { PlayerPrefs.SetInt("depot.veteran", value ? 1 : 0); PlayerPrefs.Save(); } }
 

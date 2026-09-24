@@ -45,13 +45,13 @@ namespace IronNight
         public class Card { public string id, title, desc; public bool rare; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain, OnStart, OnCampaign, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder; public System.Action<string> OnRoute, OnTheatre; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[3]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], routePays = new Text[3], theatreLabels = new Text[3]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, routeSheet; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
+        public System.Action OnAd, OnAgain, OnStart, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder; public System.Action<string> OnRoute, OnTheatre; public System.Action<string, int> OnOperation; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[3]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], routePays = new Text[3], theatreLabels = new Text[3]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, routeSheet; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
 
         Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel, setSound, setQuality, setVibe, setMusic, rankLine, pointsLine, ordersCount; GameObject settingsSheet, ordersSheet; RawImage titleBackdrop, depotBackdrop; GarageDrag depotDrag; readonly List<RectTransform> embers = new List<RectTransform>(); readonly List<float> emberPhase = new List<float>(); GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
         class Rising { public Text t; public float life; public Vector3 world; }
         readonly List<Rising> popups = new List<Rising>(); readonly Stack<Text> popupPool = new Stack<Text>(); RectTransform canvasRect;
-        Image radar, objectiveArrow; Text objectiveLabel; readonly List<Image> radarDots = new List<Image>(); readonly List<Image> hpBars = new List<Image>(); readonly List<Image> hpFills = new List<Image>(); Transform cardRoot, depotRows; Image rankBadge; GameObject campaignBtn, againBtn; public Garage garage; int depotTab; readonly Button[] depotTabs = new Button[3]; Image campaignPic, briefingPic; GameObject briefing; Text briefingTitle, briefingText; float briefingLeft; ScrollRect depotScroll; Canvas canvas; Text depotPoints, titleStats, endPoints, reserveNote, bossName; Image bossFill; GameObject bossBar;
+        Image radar, objectiveArrow; Text objectiveLabel; readonly List<Image> radarDots = new List<Image>(); readonly List<Image> hpBars = new List<Image>(); readonly List<Image> hpFills = new List<Image>(); Transform cardRoot, depotRows; Image rankBadge; GameObject opsTile, againBtn; public Garage garage; int depotTab; readonly Button[] depotTabs = new Button[3]; Image opsPic, briefingPic; GameObject briefing; Text briefingTitle, briefingText; float briefingLeft; ScrollRect depotScroll; Canvas canvas; Text depotPoints, titleStats, endPoints, reserveNote, bossName; Image bossFill; GameObject bossBar;
         readonly Button[] formButtons = new Button[4];
         readonly List<Image> arrows = new List<Image>(); Sprite arrowSprite;
         float fpsAccum, fpsTimer, toastLeft; int fpsFrames;
@@ -192,19 +192,19 @@ namespace IronNight
             var rule = MakeImage(titleSheet.transform, "Rule", new Vector2(0.5f, 1f), new Vector2(0, -400), new Vector2(110, 4), new Color(0.96f, 0.68f, 0.24f, 0.9f)); rule.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             // tonight
             conditions = MakeChip(titleSheet.transform, "Conditions", new Vector2(0.5f, 0f), new Vector2(0, 1060), 640f, new Color(0.96f, 0.68f, 0.24f), new Color(0.06f, 0.07f, 0.09f, 0.7f));
-            // three tiles with pictures: the campaign, the depot, the standing orders
-            string[] tileNames = { "CAMPAIGN", "DEPOT", "ORDERS" }; string[] tilePics = { "campaign_normandy", "card_crews", "card_reinf" }; System.Action[] tileActs = { () => OnCampaign?.Invoke(), () => OnDepot?.Invoke(), () => ShowOrders() };
+            // three tiles with pictures: the operations, the depot, the standing orders
+            string[] tileNames = { "OPERATIONS", "DEPOT", "ORDERS" }; string[] tilePics = { "campaign_normandy", "card_crews", "card_reinf" }; System.Action[] tileActs = { () => ShowOperations(), () => OnDepot?.Invoke(), () => ShowOrders() };
             for (int i = 0; i < 3; i++)
             {
                 float x = -305f + i * 305f; var tile = MakeButton(titleSheet.transform, tileNames[i], new Vector2(0.5f, 0f), new Vector2(x, 860), new Vector2(290, 250), 26, tileActs[i]); tile.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.11f, 1f);
                 var mask = new GameObject("Mask", typeof(RectTransform), typeof(RectMask2D)); mask.transform.SetParent(tile.transform, false); var mkrt = mask.GetComponent<RectTransform>(); mkrt.anchorMin = mkrt.anchorMax = new Vector2(0.5f, 0.5f); mkrt.sizeDelta = new Vector2(280, 240); mkrt.anchoredPosition = Vector2.zero;
                 var pic = MakeImage(mask.transform, "Pic", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(280, 240), new Color(0.85f, 0.85f, 0.85f, 1f)); pic.rectTransform.pivot = new Vector2(0.5f, 0.5f); var sp = UiSprite(tilePics[i]);
                 if (sp != null) { pic.sprite = sp; float cover = Mathf.Max(280f / sp.rect.width, 240f / sp.rect.height); pic.rectTransform.sizeDelta = new Vector2(sp.rect.width * cover, sp.rect.height * cover); }
-                if (i == 0) campaignPic = pic;
+                if (i == 0) opsPic = pic;
                 var fade = MakeImage(mask.transform, "Fade", new Vector2(0.5f, 0f), Vector2.zero, new Vector2(280, 150), new Color(0.02f, 0.02f, 0.03f, 0.95f)); fade.sprite = Lightswarm.ProceduralSprites.GradientDown(64, 1.2f); fade.rectTransform.pivot = new Vector2(0.5f, 0f);
                 var edge = MakeImage(tile.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(290, 250), new Color(1f, 1f, 1f, 0.16f)); edge.sprite = Outline(); edge.type = Image.Type.Sliced; edge.rectTransform.pivot = new Vector2(0.5f, 0.5f);
                 var lt = tile.transform.Find("Label").GetComponent<Text>(); lt.text = Spaced(tileNames[i]); lt.alignment = TextAnchor.LowerCenter; lt.rectTransform.sizeDelta = new Vector2(290, 230); lt.transform.SetAsLastSibling(); lt.font = BoldFont();
-                if (i == 0) campaignBtn = tile; if (i == 2) { ordersCount = MakeText(tile.transform, "Count", new Vector2(0.5f, 0f), new Vector2(0, 50), TextAnchor.LowerCenter, 20, new Color(0.96f, 0.68f, 0.24f)); ordersCount.rectTransform.sizeDelta = new Vector2(280, 30); ordersCount.transform.SetAsLastSibling(); }
+                if (i == 0) { opsTile = tile; opsCount = MakeText(tile.transform, "Count", new Vector2(0.5f, 0f), new Vector2(0, 50), TextAnchor.LowerCenter, 20, OpAmber); opsCount.rectTransform.sizeDelta = new Vector2(280, 30); opsCount.transform.SetAsLastSibling(); } if (i == 2) { ordersCount = MakeText(tile.transform, "Count", new Vector2(0.5f, 0f), new Vector2(0, 50), TextAnchor.LowerCenter, 20, new Color(0.96f, 0.68f, 0.24f)); ordersCount.rectTransform.sizeDelta = new Vector2(280, 30); ordersCount.transform.SetAsLastSibling(); }
             }
             // to battle: gold, a highlight along the top, a shadow under
             var start = MakePrimary(titleSheet.transform, "To battle", new Vector2(0.5f, 0f), new Vector2(0, 610), new Vector2(920, 160), 62, () => OnStart?.Invoke());
@@ -327,8 +327,8 @@ namespace IronNight
             rankLine.text = Depot.Rank.ToUpperInvariant() + "\n" + (Depot.NightsFought == 0 ? "first night" : Depot.NightsFought + " nights · " + Depot.CrewName.ToLowerInvariant() + " · " + Depot.CrewNights + " together"); Tick(pointsLine, Depot.Points);
             int m = Mathf.FloorToInt(Depot.BestTime / 60f), s = Mathf.FloorToInt(Depot.BestTime % 60f);
             { var sheet = Resources.Load<Texture2D>("UI/rank_insignia"); if (sheet != null && rankBadge != null) { int cell = Depot.RankIndex; rankBadge.sprite = UiSprite("rank_insignia", new Rect(cell * sheet.width / 6f, 0f, sheet.width / 6f, sheet.height)); rankBadge.enabled = Depot.NightsFought > 0; } }
-            { int cn = Depot.CampaignNight; var lbl = campaignBtn.transform.Find("Label").GetComponent<Text>(); lbl.text = cn == 0 ? Spaced("CAMPAIGN") : Spaced("NIGHT " + cn + " OF 3");
-              var cs = UiSprite(cn == 2 ? "campaign_ardennes" : cn == 3 ? "campaign_lastpush" : "campaign_normandy"); if (cs != null && campaignPic != null) { campaignPic.sprite = cs; float cover = Mathf.Max(280f / cs.rect.width, 240f / cs.rect.height); campaignPic.rectTransform.sizeDelta = new Vector2(cs.rect.width * cover, cs.rect.height * cover); } }
+            { opsCount.text = Operations.TotalStars + " / " + Operations.All.Length * 15 + " stars";
+              var cs = UiSprite(Operations.Current.cover) ?? UiSprite("campaign_normandy"); if (cs != null && opsPic != null) { opsPic.sprite = cs; float cover = Mathf.Max(280f / cs.rect.width, 240f / cs.rect.height); opsPic.rectTransform.sizeDelta = new Vector2(cs.rect.width * cover, cs.rect.height * cover); } }
             titleStats.text = Depot.NightsFought == 0 ? "First night. Drag anywhere to drive; the turrets fire on their own." : $"Best {Depot.BestKills} kills · longest {m}:{s:00} · {Depot.CrewName}: {Depot.CrewBonusText}";
             reserveBtn.SetActive(!reserveGranted); reserveNote.text = reserveGranted ? "Reserve tank granted: the platoon can grow to 4 tonight." : "";
             Missions.Load(); foreach (Transform c in missionRoot) Destroy(c.gameObject); if (ordersCount != null) ordersCount.text = Missions.Active.Count + " standing";
@@ -614,6 +614,113 @@ namespace IronNight
 
         public void SetOrder(string text) { if (orderLabel != null) orderLabel.text = text; }
 
+        // ---- the operations: three fronts, five nights each, up to three stars a night
+        GameObject opsSheet; Transform opsBody; Text opsCount; static Sprite starSprite;
+        static readonly Color OpAmber = new Color(0.96f, 0.68f, 0.24f), OpInk = new Color(0.93f, 0.91f, 0.86f), OpDim = new Color(0.66f, 0.64f, 0.59f), OpOff = new Color(0.22f, 0.22f, 0.24f);
+        static Sprite StarSprite() => starSprite ??= Lightswarm.ProceduralSprites.Star(128);
+
+        /// <summary>The operations sheet from the title: the three operations, then an operation's nights, then a night's briefing.</summary>
+        void ShowOperations()
+        {
+            if (opsSheet == null)
+            {
+                opsSheet = new GameObject("Operations", typeof(RectTransform), typeof(Image)); opsSheet.transform.SetParent(canvas.transform, false); Stretch(opsSheet); opsSheet.GetComponent<Image>().color = new Color(0.02f, 0.02f, 0.03f, 1f);
+                var body = new GameObject("Body", typeof(RectTransform)); body.transform.SetParent(opsSheet.transform, false); Stretch(body); opsBody = body.transform;
+            }
+            OpsList(); opsSheet.transform.SetAsLastSibling(); if (curtain != null) curtain.transform.SetAsLastSibling(); opsSheet.SetActive(true);
+        }
+
+        /// <summary>Clears the sheet for a page: the back button, and the eyebrow and title when there are any.</summary>
+        GameObject OpsPage(string eyebrow, string title, System.Action back)
+        {
+            foreach (Transform c in opsBody) Destroy(c.gameObject);
+            var b = MakeGhost(opsBody, "BACK", new Vector2(0f, 1f), new Vector2(130, -95), new Vector2(200, 80), 26, back);
+            if (title == null) return b;
+            var ey = MakeText(opsBody, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -160), TextAnchor.MiddleCenter, 26, OpAmber); ey.text = Spaced(eyebrow); ey.font = BoldFont(); ey.rectTransform.sizeDelta = new Vector2(1040, 40);
+            var ti = MakeText(opsBody, "Title", new Vector2(0.5f, 1f), new Vector2(0, -240), TextAnchor.MiddleCenter, 96, OpInk); ti.text = title; ti.font = DisplayFont(); ti.horizontalOverflow = HorizontalWrapMode.Overflow; ti.verticalOverflow = VerticalWrapMode.Overflow;
+            return b;
+        }
+
+        /// <summary>A picture filling a box, cropped to cover it, fading into the colour below at the bottom.</summary>
+        void Framed(Transform parent, string picture, string fallback, Vector2 anchor, Vector2 pos, Vector2 size, Color fadeTo)
+        {
+            var frame = new GameObject("Frame", typeof(RectTransform), typeof(RectMask2D)); frame.transform.SetParent(parent, false);
+            var rt = frame.GetComponent<RectTransform>(); rt.anchorMin = rt.anchorMax = anchor; rt.pivot = new Vector2(0.5f, 1f); rt.sizeDelta = size; rt.anchoredPosition = pos;
+            var sp = UiSprite(picture) ?? UiSprite(fallback) ?? UiSprite("campaign_normandy");
+            var img = MakeImage(frame.transform, "Pic", new Vector2(0.5f, 0.5f), Vector2.zero, size, Color.white); img.rectTransform.pivot = new Vector2(0.5f, 0.5f); img.raycastTarget = false;
+            if (sp != null) { img.sprite = sp; float k = Mathf.Max(size.x / sp.rect.width, size.y / sp.rect.height); img.rectTransform.sizeDelta = new Vector2(sp.rect.width * k, sp.rect.height * k); }
+            if (fadeTo.a <= 0f) return;
+            var fade = MakeImage(frame.transform, "Fade", new Vector2(0.5f, 0f), Vector2.zero, new Vector2(size.x, size.y * 0.5f), fadeTo); fade.sprite = Lightswarm.ProceduralSprites.GradientDown(64, 1.1f); fade.rectTransform.pivot = new Vector2(0.5f, 0f); fade.raycastTarget = false;
+        }
+
+        void StarRow(Transform parent, Vector2 anchor, Vector2 pos, float size, int mask)
+        {
+            for (int i = 0; i < 3; i++) { var s = MakeImage(parent, "Star", anchor, pos + new Vector2(i * size * 1.15f, 0f), new Vector2(size, size), (mask & (1 << i)) != 0 ? OpAmber : OpOff); s.sprite = StarSprite(); s.rectTransform.pivot = new Vector2(0.5f, 0.5f); s.raycastTarget = false; }
+        }
+
+        void OpsList()
+        {
+            OpsPage("HISTORICAL OPERATIONS", "OPERATIONS", () => opsSheet.SetActive(false));
+            var total = MakeText(opsBody, "Total", new Vector2(0.5f, 1f), new Vector2(0, -365), TextAnchor.MiddleCenter, 28, OpDim); total.text = Operations.TotalStars + " of " + Operations.All.Length * 15 + " stars won"; total.rectTransform.sizeDelta = new Vector2(900, 40);
+            for (int i = 0; i < Operations.All.Length; i++)
+            {
+                var op = Operations.All[i]; bool open = Depot.TheatreOpen(op.theatre); float y = -410 - i * 488;
+                var card = MakeButton(opsBody, "", new Vector2(0.5f, 1f), new Vector2(0, y - 225), new Vector2(940, 450), 20, () => { if (open) OpNights(op); });
+                card.GetComponent<Image>().color = new Color(0.07f, 0.08f, 0.1f, 1f);
+                Framed(card.transform, op.cover, op.nights[0].picture, new Vector2(0.5f, 1f), new Vector2(0, -8), new Vector2(924, 270), new Color(0.07f, 0.08f, 0.1f, 1f));
+                var edge = MakeImage(card.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(940, 450), new Color(1f, 1f, 1f, 0.16f)); edge.sprite = Outline(); edge.type = Image.Type.Sliced; edge.rectTransform.pivot = new Vector2(0.5f, 0.5f); edge.raycastTarget = false;
+                var nm = MakeText(card.transform, "Name", new Vector2(0f, 0f), new Vector2(30, 112), TextAnchor.LowerLeft, 50, OpInk); nm.text = op.name; nm.font = BoldFont(); nm.rectTransform.pivot = new Vector2(0f, 0f); nm.rectTransform.sizeDelta = new Vector2(620, 64);
+                var ln = MakeText(card.transform, "Front", new Vector2(0f, 0f), new Vector2(30, 66), TextAnchor.LowerLeft, 26, OpDim); ln.text = op.front; ln.rectTransform.pivot = new Vector2(0f, 0f); ln.rectTransform.sizeDelta = new Vector2(880, 40);
+                var got = MakeText(card.transform, "Stars", new Vector2(1f, 0f), new Vector2(-30, 118), TextAnchor.LowerRight, 36, OpAmber); got.text = Operations.Stars(op) + " / " + op.nights.Length * 3; got.font = BoldFont(); got.rectTransform.pivot = new Vector2(1f, 0f); got.rectTransform.sizeDelta = new Vector2(160, 50);
+                var st = MakeImage(card.transform, "Star", new Vector2(1f, 0f), new Vector2(-215, 143), new Vector2(40, 40), OpAmber); st.sprite = StarSprite(); st.rectTransform.pivot = new Vector2(0.5f, 0.5f); st.raycastTarget = false;
+                if (!open)
+                {
+                    var shut = MakeImage(card.transform, "Shut", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(940, 450), new Color(0.01f, 0.01f, 0.02f, 0.72f)); shut.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                    var why = MakeText(card.transform, "Why", new Vector2(0.5f, 0.5f), new Vector2(0, 20), TextAnchor.MiddleCenter, 34, OpInk); why.text = op.theatre == "kursk" ? "Opens after your first dawn" : "Opens after your first night"; why.font = BoldFont(); why.rectTransform.sizeDelta = new Vector2(900, 60);
+                }
+            }
+        }
+
+        void OpNights(Operations.Op op)
+        {
+            OpsPage(op.front.ToUpperInvariant(), op.name.ToUpperInvariant(), OpsList);
+            var blurb = MakeText(opsBody, "Blurb", new Vector2(0.5f, 1f), new Vector2(0, -368), TextAnchor.UpperCenter, 28, OpDim); blurb.text = op.blurb; blurb.rectTransform.sizeDelta = new Vector2(920, 110);
+            for (int n = 1; n <= op.nights.Length; n++)
+            {
+                var night = op.nights[n - 1]; bool open = Operations.Open(op, n); int nn = n; float y = -500 - (n - 1) * 258;
+                var row = MakeButton(opsBody, "", new Vector2(0.5f, 1f), new Vector2(0, y - 120), new Vector2(940, 240), 20, () => { if (open) OpBrief(op, nn); });
+                row.GetComponent<Image>().color = open ? new Color(0.07f, 0.08f, 0.1f, 1f) : new Color(0.04f, 0.045f, 0.055f, 1f);
+                Framed(row.transform, night.picture, op.cover, new Vector2(0f, 1f), new Vector2(128, -10), new Vector2(236, 220), new Color(0f, 0f, 0f, 0f));
+                if (!open) { var dim = MakeImage(row.transform, "Shut", new Vector2(0f, 1f), new Vector2(128, -120), new Vector2(236, 220), new Color(0.02f, 0.02f, 0.03f, 0.78f)); dim.rectTransform.pivot = new Vector2(0.5f, 0.5f); }
+                var edge = MakeImage(row.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(940, 240), new Color(1f, 1f, 1f, open ? 0.16f : 0.07f)); edge.sprite = Outline(); edge.type = Image.Type.Sliced; edge.rectTransform.pivot = new Vector2(0.5f, 0.5f); edge.raycastTarget = false;
+                var num = MakeText(row.transform, "Night", new Vector2(0f, 1f), new Vector2(270, -26), TextAnchor.UpperLeft, 22, OpAmber); num.text = Spaced("NIGHT " + n); num.font = BoldFont(); num.rectTransform.pivot = new Vector2(0f, 1f); num.rectTransform.sizeDelta = new Vector2(400, 30);
+                var nm = MakeText(row.transform, "Name", new Vector2(0f, 1f), new Vector2(270, -58), TextAnchor.UpperLeft, 40, open ? OpInk : OpDim); nm.text = night.name; nm.font = BoldFont(); nm.rectTransform.pivot = new Vector2(0f, 1f); nm.rectTransform.sizeDelta = new Vector2(640, 52);
+                var ln = MakeText(row.transform, "Line", new Vector2(0f, 1f), new Vector2(270, -116), TextAnchor.UpperLeft, 24, OpDim); ln.text = open ? Operations.Conditions(op, night) : "Opens when night " + (n - 1) + " is held until dawn"; ln.rectTransform.pivot = new Vector2(0f, 1f); ln.rectTransform.sizeDelta = new Vector2(640, 70);
+                StarRow(row.transform, new Vector2(1f, 1f), new Vector2(-150, -46), 40, Operations.Mask(op.id, n));
+            }
+        }
+
+        void OpBrief(Operations.Op op, int n)
+        {
+            var night = op.nights[n - 1]; int mask = Operations.Mask(op.id, n);
+            var back = OpsPage(null, null, () => OpNights(op));
+            Framed(opsBody, night.picture, op.cover, new Vector2(0.5f, 1f), Vector2.zero, new Vector2(1080, 860), new Color(0.02f, 0.02f, 0.03f, 1f));
+            back.transform.SetAsLastSibling();
+            var ey = MakeText(opsBody, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -700), TextAnchor.MiddleCenter, 26, OpAmber); ey.text = Spaced(op.name.ToUpperInvariant() + " · NIGHT " + n + " OF " + op.nights.Length); ey.font = BoldFont(); ey.rectTransform.sizeDelta = new Vector2(1040, 40);
+            var ti = MakeText(opsBody, "Title", new Vector2(0.5f, 1f), new Vector2(0, -770), TextAnchor.MiddleCenter, 96, OpInk); ti.text = night.name.ToUpperInvariant(); ti.font = DisplayFont(); ti.horizontalOverflow = HorizontalWrapMode.Overflow; ti.verticalOverflow = VerticalWrapMode.Overflow;
+            var chip = MakeChip(opsBody, "Conditions", new Vector2(0.5f, 1f), new Vector2(0, -905), 720f, OpAmber, new Color(0.06f, 0.07f, 0.09f, 0.8f)); chip.text = Operations.Conditions(op, night);
+            var brief = MakeText(opsBody, "Brief", new Vector2(0.5f, 1f), new Vector2(0, -975), TextAnchor.UpperCenter, 32, new Color(0.86f, 0.84f, 0.8f)); brief.text = night.brief; brief.rectTransform.sizeDelta = new Vector2(900, 170);
+            var head = MakeText(opsBody, "Goals", new Vector2(0.5f, 1f), new Vector2(0, -1190), TextAnchor.MiddleCenter, 24, OpAmber); head.text = Spaced("TONIGHT'S STARS"); head.font = BoldFont(); head.rectTransform.sizeDelta = new Vector2(900, 36);
+            string[] goals = { "Hold until dawn", night.second.text, night.third.text };
+            for (int i = 0; i < 3; i++)
+            {
+                float y = -1255 - i * 82;
+                var st = MakeImage(opsBody, "Star", new Vector2(0.5f, 1f), new Vector2(-330, y), new Vector2(50, 50), (mask & (1 << i)) != 0 ? OpAmber : OpOff); st.sprite = StarSprite(); st.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                var g = MakeText(opsBody, "Goal", new Vector2(0.5f, 1f), new Vector2(70, y), TextAnchor.MiddleLeft, 34, OpInk); g.text = goals[i]; g.rectTransform.sizeDelta = new Vector2(740, 50);
+            }
+            MakePrimary(opsBody, "INTO THE NIGHT", new Vector2(0.5f, 0f), new Vector2(0, 170), new Vector2(880, 140), 44, () => { opsSheet.SetActive(false); OnOperation?.Invoke(op.id, n); });
+        }
+
         /// <summary>The way in, chosen before the night: three cards with the country, what waits there and what it pays.</summary>
         public void ShowRoutes(System.Action go)
         {
@@ -775,6 +882,7 @@ namespace IronNight
 
         public void ShowEnd(bool dawn, string statLine, bool adAvailable, string eyebrow = null, string title = null, string again = null)
         {
+            if (endStars != null) foreach (var st in endStars) st.gameObject.SetActive(false);
             endEyebrow.text = eyebrow ?? (dawn ? "05:00 · DAWN" : "PLATOON LEADER KNOCKED OUT");
             endTitle.text = title ?? (dawn ? "You held the line" : "Assault over");
             againBtn.transform.Find("Label").GetComponent<Text>().text = again ?? "New assault";
@@ -785,6 +893,42 @@ namespace IronNight
             endSheet.SetActive(true);
         }
         public void HideEnd() { endSheet.SetActive(false); }
+
+        Image[] endStars;
+        /// <summary>An operation night's three stars over the end sheet, the ones won lighting up one after another.</summary>
+        public void ShowStars(bool[] got)
+        {
+            if (endStars == null)
+            {
+                endStars = new Image[3];
+                for (int i = 0; i < 3; i++) { float sz = i == 1 ? 170f : 140f; var s = MakeImage(endSheet.transform, "Star" + i, new Vector2(0.5f, 0.5f), new Vector2(-175 + i * 175, i == 1 ? 690 : 660), new Vector2(sz, sz), OpOff); s.sprite = StarSprite(); s.rectTransform.pivot = new Vector2(0.5f, 0.5f); endStars[i] = s; }
+            }
+            foreach (var s in endStars) { s.gameObject.SetActive(true); s.color = OpOff; s.rectTransform.localScale = Vector3.one; }
+            StartCoroutine(PopStars(got));
+        }
+        System.Collections.IEnumerator PopStars(bool[] got)
+        {
+            yield return new WaitForSecondsRealtime(0.4f);
+            for (int i = 0; i < 3; i++)
+            {
+                if (!got[i]) continue;
+                var s = endStars[i]; s.color = OpAmber; Sfx.Pickup();
+                for (float a = 0f; a < 1f; a += Time.unscaledDeltaTime / 0.3f) { s.rectTransform.localScale = Vector3.one * (a < 0.6f ? Mathf.Lerp(0.3f, 1.3f, a / 0.6f) : Mathf.Lerp(1.3f, 1f, (a - 0.6f) / 0.4f)); yield return null; }
+                s.rectTransform.localScale = Vector3.one; yield return new WaitForSecondsRealtime(0.2f);
+            }
+        }
+
+        Text goalsText;
+        /// <summary>The operation night's two goals under the level bar, each lit amber once it is met.</summary>
+        public void SetGoals(string line)
+        {
+            if (goalsText == null)
+            {
+                goalsText = MakeText(hudGroup.transform, "Goals", new Vector2(0.5f, 1f), new Vector2(0, -300), TextAnchor.MiddleCenter, 26, new Color(0.86f, 0.84f, 0.78f)); goalsText.font = BoldFont(); goalsText.supportRichText = true; goalsText.rectTransform.sizeDelta = new Vector2(1000, 40);
+                var sh = goalsText.gameObject.AddComponent<UnityEngine.UI.Shadow>(); sh.effectColor = new Color(0f, 0f, 0f, 0.8f); sh.effectDistance = new Vector2(0f, -2f);
+            }
+            goalsText.text = line; goalsText.enabled = briefing == null || !briefing.activeSelf;   // under the briefing card while it is up
+        }
         public void ShowHold(bool on) { if (holdBtn != null) holdBtn.SetActive(on); }
 
         void ShowMedals()
@@ -807,7 +951,7 @@ namespace IronNight
             foreach (Transform c in recordRows) Destroy(c.gameObject);
             var ink = new Color(0.93f, 0.91f, 0.86f); var dim = new Color(0.66f, 0.64f, 0.59f); var amber = new Color(0.95f, 0.66f, 0.23f);
             var totals = MakeText(recordRows, "Totals", new Vector2(0.5f, 1f), new Vector2(0, 0), TextAnchor.UpperCenter, 30, dim); totals.rectTransform.sizeDelta = new Vector2(940, 120);
-            totals.text = (Depot.CampaignsWon > 0 ? $"{Depot.CampaignsWon} campaigns won · best {Depot.CampaignBest}\n" : "") + $"{Depot.NightsFought} nights · {Depot.Total("kills")} vehicles · {Depot.Total("tigers")} Tigers · {Depot.Total("guns")} guns · {Depot.Total("infantry")} infantry\n{Depot.Total("dawns")} dawns · {Depot.Total("objectives")} objectives · {Medals.Count}/{Medals.All.Length} medals";
+            totals.text = (Operations.TotalStars > 0 ? $"{Operations.TotalStars} of {Operations.All.Length * 15} operation stars\n" : "") + $"{Depot.NightsFought} nights · {Depot.Total("kills")} vehicles · {Depot.Total("tigers")} Tigers · {Depot.Total("guns")} guns · {Depot.Total("infantry")} infantry\n{Depot.Total("dawns")} dawns · {Depot.Total("objectives")} objectives · {Medals.Count}/{Medals.All.Length} medals";
             var log = Depot.NightLog();
             if (log.Count == 0) { var none = MakeText(recordRows, "None", new Vector2(0.5f, 1f), new Vector2(0, -160), TextAnchor.UpperCenter, 30, dim); none.text = "No nights fought yet."; }
             for (int i = 0; i < log.Count; i++)
