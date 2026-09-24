@@ -45,7 +45,7 @@ namespace IronNight
         public class Card { public string id, title, desc; public bool rare; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain, OnStart, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder; public System.Action<string> OnRoute, OnTheatre; public System.Action<string, int> OnOperation; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[3]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], routePays = new Text[3], theatreLabels = new Text[3]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, routeSheet; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
+        public System.Action OnAd, OnAgain, OnStart, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder, OnAir; public System.Action<string> OnRoute, OnTheatre; public System.Action<string, int> OnOperation; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[3]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], routePays = new Text[3], theatreLabels = new Text[3]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, airBtn, routeSheet; Text airLabel; Image airFill; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
 
         Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel, setSound, setQuality, setVibe, setMusic, rankLine, pointsLine, ordersCount; GameObject settingsSheet, ordersSheet; RawImage titleBackdrop, depotBackdrop; GarageDrag depotDrag; readonly List<RectTransform> embers = new List<RectTransform>(); readonly List<float> emberPhase = new List<float>(); GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
@@ -150,6 +150,14 @@ namespace IronNight
                 var oe = MakeImage(orderBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190, 120), new Color(1f, 1f, 1f, 0.2f)); oe.sprite = Outline(); oe.type = Image.Type.Sliced; oe.rectTransform.pivot = new Vector2(0.5f, 0.5f);
                 var ot = MakeText(orderBtn.transform, "Top", new Vector2(0.5f, 1f), new Vector2(0, -12), TextAnchor.UpperCenter, 20, new Color(0.66f, 0.64f, 0.59f)); ot.text = Spaced("WINGMEN"); ot.rectTransform.sizeDelta = new Vector2(190, 30);
                 orderLabel = orderBtn.transform.Find("Label").GetComponent<Text>(); orderLabel.alignment = TextAnchor.MiddleCenter; orderLabel.rectTransform.anchoredPosition = new Vector2(0, -12); orderLabel.fontSize = 30; orderLabel.color = new Color(0.96f, 0.68f, 0.24f);
+                // air support: fills while the next strike is being readied
+                airBtn = MakeButton(hudGroup.transform, "", new Vector2(0f, 0f), new Vector2(730, 268), new Vector2(190, 120), 26, () => OnAir?.Invoke());
+                airBtn.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.11f, 0.85f);
+                airFill = MakeImage(airBtn.transform, "Cool", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190, 120), new Color(0.02f, 0.02f, 0.03f, 0.78f)); airFill.rectTransform.pivot = new Vector2(0.5f, 0.5f); airFill.sprite = Rounded(); airFill.type = Image.Type.Filled; airFill.fillMethod = Image.FillMethod.Vertical; airFill.fillOrigin = (int)Image.OriginVertical.Top;
+                var airEdge = MakeImage(airBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190, 120), new Color(0.96f, 0.68f, 0.24f, 0.5f)); airEdge.sprite = Outline(); airEdge.type = Image.Type.Sliced; airEdge.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                var atop = MakeText(airBtn.transform, "Top", new Vector2(0.5f, 1f), new Vector2(0, -12), TextAnchor.UpperCenter, 20, new Color(0.66f, 0.64f, 0.59f)); atop.text = Spaced("AIR"); atop.rectTransform.sizeDelta = new Vector2(190, 30);
+                airLabel = airBtn.transform.Find("Label").GetComponent<Text>(); airLabel.alignment = TextAnchor.MiddleCenter; airLabel.rectTransform.anchoredPosition = new Vector2(0, -12); airLabel.fontSize = 28; airLabel.color = new Color(0.96f, 0.68f, 0.24f);
+                airLabel.transform.SetAsLastSibling(); atop.transform.SetAsLastSibling(); airBtn.SetActive(false);
             }
             arrowSprite = ArrowSprite(); objectiveArrow.sprite = arrowSprite;
             var root = canvasGo.transform;
@@ -267,6 +275,7 @@ namespace IronNight
                 "Hedges stop tanks; drive through the gates. Farm buildings stop shells: use them as cover, or deny them to the enemy.\n\n" +
                 "Anti-tank guns dig in behind sandbags and the 88s stand with the searchlights. Hit them from the side.\n\n" +
                 "Green smoke marks the objective. Supply crates come down by parachute. Level up and choose a card.\n\n" +
+                "From 1:00 the AIR button calls in fighter-bombers: press it, then tap where they should hit.\n\n" +
                 "Hold until 5:00. Dawn is a win.";
             MakeButton(helpSheet.transform, "Back", new Vector2(0.5f, 0f), new Vector2(0, 150), new Vector2(880, 130), 40, () => helpSheet.SetActive(false));
             helpSheet.SetActive(false);
@@ -610,7 +619,7 @@ namespace IronNight
         }
         /// <summary>What is in the racks, and which round is loaded.</summary>
         /// <summary>The stick must let these buttons have their own presses.</summary>
-        public void HandTo(TouchStick stick) { if (stick == null) return; stick.Blockers.Add(ammoBtn.GetComponent<RectTransform>()); stick.Blockers.Add(abilityBtn.GetComponent<RectTransform>()); stick.Blockers.Add(orderBtn.GetComponent<RectTransform>()); stick.Blockers.Add(pauseBtnRect); }
+        public void HandTo(TouchStick stick) { if (stick == null) return; stick.Blockers.Add(ammoBtn.GetComponent<RectTransform>()); stick.Blockers.Add(abilityBtn.GetComponent<RectTransform>()); stick.Blockers.Add(orderBtn.GetComponent<RectTransform>()); stick.Blockers.Add(pauseBtnRect); stick.Blockers.Add(airBtn.GetComponent<RectTransform>()); }
 
         public void SetOrder(string text) { if (orderLabel != null) orderLabel.text = text; }
 
@@ -787,6 +796,17 @@ namespace IronNight
         }
 
         /// <summary>The commander's button: his portrait, the cooldown draining down it, a glow while his order lasts.</summary>
+        /// <summary>The AIR button: hidden until the planes are on station, filling while the next strike is readied,
+        /// lit while it waits for a tap on the target.</summary>
+        public void SetAir(bool has, float charged, string label, bool armed)
+        {
+            if (airBtn == null) return;
+            if (airBtn.activeSelf != has) airBtn.SetActive(has);
+            if (!has) return;
+            airFill.fillAmount = 1f - Mathf.Clamp01(charged); if (airLabel.text != label) airLabel.text = label;
+            airBtn.transform.Find("Edge").GetComponent<Image>().color = armed ? new Color(1f, 0.85f, 0.4f, 0.95f) : charged >= 1f ? new Color(0.96f, 0.68f, 0.24f, 0.85f) : new Color(0.96f, 0.68f, 0.24f, 0.3f);
+        }
+
         public void SetAbility(bool has, float charged, bool running)
         {
             if (abilityBtn == null) return;

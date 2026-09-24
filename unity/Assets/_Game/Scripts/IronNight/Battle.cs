@@ -78,6 +78,7 @@ namespace IronNight
         static readonly bool debugGuns = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--guns") >= 0;   // test switch: a PaK and an 88 out of range ahead, to look at
         static readonly bool debugDrops = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--drops") >= 0;   // test switch: the first supply drop at 0:03
         static readonly bool debugHe = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--he") >= 0;   // test switch: the leader starts loaded with HE
+        static readonly bool debugAir = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--air") >= 0;   // test switch: a strike 34 m ahead at 0:05 (with --zoo there is something there)
         static readonly bool debugRaid = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--raid") >= 0;   // test switch: a raid at 0:03 and every 14 s after
         static readonly bool debugRubble = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--rubble") >= 0;   // test switch: heavy blasts 25 m ahead at 0:02 and 0:05, a dozer blade fitted
         static readonly bool debugCook = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--cookoff") >= 0;   // test switch: every kill cooks off, in slow motion
@@ -137,6 +138,7 @@ namespace IronNight
             };
             hud.OnRoute = r => { route = r; PlayerPrefs.SetString("route", r); PlayerPrefs.Save(); };
             hud.OnTheatre = t => theatre = t;
+            hud.OnAir = () => { if (!airUp || airCool > 0f || phase != Phase.Play || strike != null) return; airArmed = !airArmed; airArmedLeft = 8f; hud.Toast(airArmed ? "Tap the target" : "Air strike called off", 2f); Sfx.Click(); };
             hud.OnAd = OnAd; hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             hud.OnStart = () => hud.ShowRoutes(() =>
             {
@@ -218,7 +220,7 @@ namespace IronNight
                 if (d.magnitude > 1.2f) v.Drive(Steer(v, new Vector2(d.x, d.z) * (Mathf.Clamp01(d.magnitude / 5f))), dt);
             }
             TickAbility(dt); TickCards(dt); if (phase != Phase.Play) return;
-            TickAce(dt); TickWeatherTurn(dt);
+            TickAce(dt); TickWeatherTurn(dt); TickAir(dt);
             if (opNight > 0) { goalsTick -= dt; if (goalsTick <= 0f) { goalsTick = 0.5f; hud.SetGoals(GoalLine(opN.second) + "      " + GoalLine(opN.third)); } }
             bool fast = abilityLeft > 0f && bonus == "reload", hard = abilityLeft > 0f && bonus == "heavy", quick = abilityLeft > 0f && bonus == "speed";
             foreach (var v in platoon) { if (v.trackOut > 0f) v.trackOut -= dt; v.speedMul = speedMul * (quick ? 1.6f : 1f); v.damageMul = damageMul * (hard ? 1.8f : 1f); v.rangeMul = rangeMul; v.reloadMul = reloadMul * (fast ? 0.45f : 1f) * (radioNet && v != Leader ? 0.75f : 1f); v.turretMul = turretMul; }
@@ -226,9 +228,9 @@ namespace IronNight
             // a tap on an enemy: every gun onto it for eight seconds
             if (stick.ConsumeTap() && phase == Phase.Play)
             {
-                var ray = cam.ScreenPointToRay(stick.TapAt); if (ray.direction.y < -0.01f) { var g = ray.origin + ray.direction * (-ray.origin.y / ray.direction.y); var pick = Nearest(foes, g, 9f);
-                    if (pick == null && objective != null && objective.kind == "dump" && new Vector2(g.x - objective.pos.x, g.z - objective.pos.z).magnitude < 10f) { point = objective.pos; pointLeft = 10f; hud.Toast("Shell the fuel dump", 1.6f); Sfx.Click(); }
-                    else if (pick == null) { var man = infantry.Nearest(g, 7f); if (man != null) { point = man.pos; pointLeft = 6f; hud.Toast(man.still ? "Shell the observer" : "Shell the infantry", 1.6f); Sfx.Click(); } }
+                var ray = cam.ScreenPointToRay(stick.TapAt); if (ray.direction.y < -0.01f) { var g = ray.origin + ray.direction * (-ray.origin.y / ray.direction.y); bool called = airArmed; if (called) { airArmed = false; CallAir(g); } var pick = called ? null : Nearest(foes, g, 9f);
+                    if (!called && pick == null && objective != null && objective.kind == "dump" && new Vector2(g.x - objective.pos.x, g.z - objective.pos.z).magnitude < 10f) { point = objective.pos; pointLeft = 10f; hud.Toast("Shell the fuel dump", 1.6f); Sfx.Click(); }
+                    else if (!called && pick == null) { var man = infantry.Nearest(g, 7f); if (man != null) { point = man.pos; pointLeft = 6f; hud.Toast(man.still ? "Shell the observer" : "Shell the infantry", 1.6f); Sfx.Click(); } }
                     if (pick != null) { focus = pick; focusLeft = 8f; if (focusRing == null) focusRing = fx.Marker(pick.transform.position, new Color(1f, 0.55f, 0.3f), 7f); focusRing.gameObject.SetActive(true); hud.Toast("Focus fire · " + pick.spec.name, 1.6f); Sfx.Click(); } }
             }
             if (focus != null) { focusLeft -= dt; if (focus.dead || focusLeft <= 0f) { focus = null; if (focusRing != null) focusRing.gameObject.SetActive(false); } else focusRing.position = focus.transform.position; }
@@ -1308,6 +1310,9 @@ namespace IronNight
 
         class Raid { public float t; public Vector3 a, b, dir, last; public bool lit, siren, marked, shown, whistled; public Transform plane, glow; }
         Raid raid; float raidTimer = 150f; Material stukaMaterial, stukaGlow;
+        class AirStrike { public Vector3 target, dir; public float t, smoke, gun1, gun2; public bool roar, shown, fired1, fired2; public Transform p1, p2, g1, g2; }
+        class Rocket { public Transform vis; public Vector3 from, to; public float t, flight; }
+        AirStrike strike; readonly List<Rocket> rockets = new List<Rocket>(); float airCool; bool airUp, airArmed, airTested; float airArmedLeft; Material allyMaterial, stripeWhite, stripeBlack;
 
         /// <summary>A night raid: the drone of engines, flares over the platoon, a red line on the ground three seconds
         /// before the stick of five bombs lands on it, and the Ju 87 coming down out of the dark with its siren howling,
@@ -1377,10 +1382,131 @@ namespace IronNight
             var gr = g.GetComponent<Renderer>(); gr.sharedMaterial = stukaGlow; gr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; glowQuad = g.transform;
             return root;
         }
-        void StukaPart(Transform root, Vector3 pos, Quaternion rot, Vector3 size)
+        void StukaPart(Transform root, Vector3 pos, Quaternion rot, Vector3 size) => PlanePart(root, stukaMaterial, pos, rot, size);
+        void PlanePart(Transform root, Material m, Vector3 pos, Quaternion rot, Vector3 size)
         {
             var g = GameObject.CreatePrimitive(PrimitiveType.Cube); Destroy(g.GetComponent<Collider>()); g.transform.SetParent(root, false); g.transform.localPosition = pos; g.transform.localRotation = rot; g.transform.localScale = size;
-            var r = g.GetComponent<Renderer>(); r.sharedMaterial = stukaMaterial; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            var r = g.GetComponent<Renderer>(); r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+
+        /// <summary>Air support: on station from 1:00, one strike a minute. AIR arms it and a tap marks the target: yellow
+        /// smoke goes up on it, and a pair of Thunderbolts (Il-2s on the Eastern Front) comes in low over our own heads
+        /// along the line from the leader, guns walking up to the smoke, four rockets each into it, and climbs away.</summary>
+        void TickAir(float dt)
+        {
+            bool su = Depot.Nation == "su";
+            if (!airUp && (t >= 60f || debugAir)) { airUp = true; if (!debugAir) hud.Toast(su ? "Shturmoviks on station · press AIR" : "Thunderbolts on station · press AIR", 3.2f); }
+            if (debugAir && !airTested && t > 5f) { airTested = true; var L0 = Leader; CallAir(L0.transform.position + L0.Forward * 34f); }
+            if (airCool > 0f) airCool = Mathf.Max(0f, airCool - dt);
+            if (airArmed) { airArmedLeft -= dt; if (airArmedLeft <= 0f) { airArmed = false; hud.Toast("Air strike called off", 1.6f); } }
+            hud.SetAir(airUp, 1f - airCool / 60f, airArmed ? "MARK" : strike != null ? "INBOUND" : airCool > 0f ? Mathf.CeilToInt(airCool) + " s" : "READY", airArmed);
+            TickRockets(dt);
+            if (strike == null) return;
+            var s = strike; s.t += dt;
+            s.smoke -= dt; if (s.smoke <= 0f && s.t < 6f) { s.smoke = 0.22f; fx.Signal(s.target, new Color(0.95f, 0.82f, 0.2f, 0.75f)); }
+            if (!s.shown && s.t >= 1.6f) { s.shown = true; s.p1 = Ally(su, out s.g1); s.p2 = Ally(su, out s.g2); }
+            if (!s.roar && s.t >= 1.8f) { s.roar = true; Sfx.FighterPass(s.target - s.dir * 10f + Vector3.up * 20f); }
+            FlyAlly(s.p1, s.g1, s, s.t - 1.6f, 0f); FlyAlly(s.p2, s.g2, s, s.t - 2.3f, 7f);
+            Guns(s, s.p1, s.t - 2.5f, ref s.gun1, 0f, dt); Guns(s, s.p2, s.t - 3.2f, ref s.gun2, 7f, dt);
+            if (!s.fired1 && s.t >= 2.9f) { s.fired1 = true; Salvo(s.p1, s, -6f, 0f); }
+            if (!s.fired2 && s.t >= 3.6f) { s.fired2 = true; Salvo(s.p2, s, 2f, 7f); }
+            if (s.t > 7f) { if (s.p1 != null) Destroy(s.p1.gameObject); if (s.p2 != null) Destroy(s.p2.gameObject); strike = null; }
+        }
+
+        void CallAir(Vector3 target)
+        {
+            var L = Leader; var d = target - L.transform.position; d.y = 0f; if (d.sqrMagnitude < 1f) d = L.Forward;
+            target.y = 0f; airCool = 60f; strike = new AirStrike { target = target, dir = d.normalized };
+            hud.Toast(Depot.Nation == "su" ? "Shturmoviks inbound · yellow smoke" : "Thunderbolts inbound · yellow smoke", 2.6f); Sfx.Click(); Radio("start");
+        }
+
+        /// <summary>A plane's run: a shallow dive from behind us to 24 m just short of the smoke, then climbing away past it.</summary>
+        void FlyAlly(Transform p, Transform glow, AirStrike s, float tau, float off)
+        {
+            if (p == null) return;
+            if (tau < 0f) { if (p.gameObject.activeSelf) p.gameObject.SetActive(false); return; }
+            var side = new Vector3(s.dir.z, 0f, -s.dir.x) * off;
+            var p0 = s.target - s.dir * 150f + Vector3.up * 75f + side; var q = s.target - s.dir * 12f + Vector3.up * 24f + side;
+            Vector3 pos;
+            if (tau < 1.6f) pos = Vector3.Lerp(p0, q, tau / 1.6f);
+            else { float u = Mathf.Clamp01((tau - 1.6f) / 2.2f); var c = q + s.dir * 45f + Vector3.up * 1f; var e = s.target + s.dir * 160f + Vector3.up * 85f + side; pos = (1 - u) * (1 - u) * q + 2 * (1 - u) * u * c + u * u * e; }
+            if (!p.gameObject.activeSelf) { p.gameObject.SetActive(true); p.position = pos; }
+            var vel = pos - p.position; if (vel.sqrMagnitude > 1e-4f) p.rotation = Quaternion.LookRotation(vel.normalized, Vector3.up);
+            p.position = pos; if (glow != null) glow.rotation = cam.transform.rotation;
+        }
+
+        /// <summary>The guns: the strike of the rounds walks up the line to the smoke in six tenths of a second.</summary>
+        void Guns(AirStrike s, Transform plane, float tau, ref float next, float off, float dt)
+        {
+            if (plane == null || tau < 0f || tau > 0.6f) return;
+            next -= dt; if (next > 0f) return; next = 0.045f;
+            var side = new Vector3(s.dir.z, 0f, -s.dir.x);
+            var at = s.target - s.dir * Mathf.Lerp(26f, 2f, tau / 0.6f) + side * (off + Random.Range(-1.5f, 1.5f));
+            fx.MgTracer(plane.position, (at - plane.position).normalized); if (Random.value < 0.5f) fx.Dust(at); if (Random.value < 0.3f) Sfx.Mg(at);
+            foreach (var v in foes.ToArray()) if (!v.dead && Flat(v.transform.position - at) < 2.6f) Damage(v, 0.35f, at);
+            foreach (var v in platoon.ToArray()) if (!v.dead && Flat(v.transform.position - at) < 2.6f) Damage(v, 0.35f, at);
+            InfantryKilled(infantry.Blast(at, 2.5f), at);
+        }
+
+        /// <summary>Four rockets off the rails, two from each wing, into the line round the smoke.</summary>
+        void Salvo(Transform plane, AirStrike s, float start, float off)
+        {
+            if (plane == null) return; var side = new Vector3(s.dir.z, 0f, -s.dir.x);
+            for (int i = 0; i < 4; i++)
+            {
+                var at = s.target + s.dir * (start + i * 3f) + side * (off + (i % 2 == 0 ? -1.6f : 1.6f));
+                var vis = fx.Tracer(new Color(1f, 0.85f, 0.6f, 1f), new Color(1f, 0.55f, 0.25f, 0.7f));
+                rockets.Add(new Rocket { vis = vis, from = plane.position + side * (i % 2 == 0 ? -2.5f : 2.5f), to = at, flight = 0.45f + i * 0.06f });
+            }
+            Sfx.Faust(plane.position);
+        }
+
+        void TickRockets(float dt)
+        {
+            for (int i = rockets.Count - 1; i >= 0; i--)
+            {
+                var r = rockets[i]; r.t += dt; float k = Mathf.Clamp01(r.t / r.flight);
+                var pos = Vector3.Lerp(r.from, r.to, k); r.vis.position = pos; r.vis.rotation = Quaternion.LookRotation(cam.transform.forward, (r.to - r.from).normalized); fx.Trail(pos);
+                if (k < 1f) continue;
+                fx.Release(r.vis); rockets.RemoveAt(i);
+                fx.Explosion(r.to); Sfx.Explosion(r.to); props.Crater(r.to, 3f); props.Blast(r.to, 4.5f, 2f); shake = Mathf.Max(shake, 0.35f);
+                foreach (var v in foes.ToArray()) if (!v.dead && Flat(v.transform.position - r.to) < 4.5f) Damage(v, 2.2f, r.to);
+                foreach (var v in platoon.ToArray()) if (!v.dead && Flat(v.transform.position - r.to) < 4.5f) Damage(v, 2.2f, r.to);
+                InfantryKilled(infantry.Blast(r.to, 6f), r.to);
+                if (phase != Phase.Play) return;
+            }
+        }
+        static float Flat(Vector3 d) { d.y = 0f; return d.magnitude; }
+
+        /// <summary>A P-47 Thunderbolt (an Il-2 on the Eastern Front) as it is seen at night: the model when there is one
+        /// (Models/p47_hull, Models/il2_hull), else its dark shape - the Thunderbolt with the D-Day stripes on its wings -
+        /// with the glow of its exhaust on the nose.</summary>
+        Transform Ally(bool su, out Transform glowQuad)
+        {
+            var root = new GameObject(su ? "Il-2" : "P-47").transform; root.gameObject.SetActive(false); var id = su ? "il2" : "p47";
+            if (allyMaterial == null) { allyMaterial = new Material(Resources.Load<Material>("VehicleLit")); var tex = Resources.Load<Texture2D>("Models/" + id); if (tex != null) allyMaterial.SetTexture("_BaseMap", tex); else allyMaterial.SetColor("_BaseColor", su ? new Color(0.16f, 0.2f, 0.14f) : new Color(0.2f, 0.21f, 0.15f)); }
+            var pf = Resources.Load<GameObject>("Models/" + id + "_hull");
+            if (pf != null) { var body = Instantiate(pf, root); foreach (var r in body.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = allyMaterial; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; } }
+            else
+            {
+                PlanePart(root, allyMaterial, Vector3.zero, Quaternion.identity, new Vector3(1.4f, 1.5f, 10.5f));
+                PlanePart(root, allyMaterial, new Vector3(0f, -0.2f, 1f), Quaternion.identity, new Vector3(su ? 14.5f : 12.4f, 0.3f, 2.5f));
+                PlanePart(root, allyMaterial, new Vector3(0f, 0.2f, -4.6f), Quaternion.identity, new Vector3(4.6f, 0.2f, 1.3f));
+                PlanePart(root, allyMaterial, new Vector3(0f, 1.1f, -4.8f), Quaternion.identity, new Vector3(0.2f, 1.7f, 1.4f));
+                PlanePart(root, allyMaterial, new Vector3(0f, 0f, 5.1f), Quaternion.identity, new Vector3(1.7f, 1.7f, 0.9f));
+                if (!su)
+                {
+                    // the invasion stripes, white and black round the inner wings
+                    if (stripeWhite == null) { stripeWhite = new Material(Resources.Load<Material>("VehicleLit")); stripeWhite.SetColor("_BaseColor", new Color(0.8f, 0.8f, 0.76f)); stripeBlack = new Material(Resources.Load<Material>("VehicleLit")); stripeBlack.SetColor("_BaseColor", new Color(0.04f, 0.04f, 0.04f)); }
+                    foreach (var side in new[] { -1f, 1f }) for (int k = 0; k < 5; k++) PlanePart(root, k % 2 == 0 ? stripeWhite : stripeBlack, new Vector3(side * (1.9f + k * 0.46f), -0.18f, 1f), Quaternion.identity, new Vector3(0.46f, 0.32f, 2.52f));
+                }
+            }
+            var lamp = new GameObject("Exhaust").AddComponent<Light>(); lamp.transform.SetParent(root, false); lamp.transform.localPosition = new Vector3(0f, 0.2f, 4.6f);
+            lamp.type = LightType.Point; lamp.color = new Color(1f, 0.55f, 0.25f); lamp.range = 12f; lamp.intensity = 4f; lamp.shadows = LightShadows.None;
+            if (stukaGlow == null) { stukaGlow = new Material(shellTemplate); stukaGlow.SetTexture("_BaseMap", glowTex); stukaGlow.SetColor("_BaseColor", new Color(1f, 0.55f, 0.25f, 1f)); }
+            var g = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(g.GetComponent<Collider>()); g.name = "ExhaustGlow"; g.transform.SetParent(root, false); g.transform.localPosition = new Vector3(0f, 0.2f, 4.8f); g.transform.localScale = Vector3.one * 2.2f;
+            var gr = g.GetComponent<Renderer>(); gr.sharedMaterial = stukaGlow; gr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; glowQuad = g.transform;
+            return root;
         }
 
         // the transport that drops the crate: crosses the sky over the drop point and is gone
