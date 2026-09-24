@@ -46,6 +46,8 @@ namespace IronNight
         readonly List<Salvage> salvage = new List<Salvage>(); readonly List<Vector3> cratePos = new List<Vector3>(); Material salvageMaterial;
         class HeHole { public Vehicle v; public Vector3 local; public float left, tick; }
         readonly List<HeHole> holes = new List<HeHole>();
+        class Toss { public Transform t; public Vehicle owner; public Vector3 vel, spin; public Quaternion rest; public float jet, tick, h, restY; public bool bounced, down; }
+        readonly List<Toss> tosses = new List<Toss>(); float slowLeft;   // turrets in the air; real seconds of slow motion left
         Light flareLight, moon; float shake; int banked, nightTigers, nightPaks, nightCrates; bool nightRecorded, bossKilled;
         readonly List<Vehicle> platoon = new List<Vehicle>(); readonly List<Vehicle> foes = new List<Vehicle>();
         readonly List<Shell> shells = new List<Shell>(); readonly List<Wreck> wrecks = new List<Wreck>();
@@ -76,6 +78,7 @@ namespace IronNight
         static readonly bool debugGuns = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--guns") >= 0;   // test switch: a PaK and an 88 out of range ahead, to look at
         static readonly bool debugDrops = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--drops") >= 0;   // test switch: the first supply drop at 0:03
         static readonly bool debugHe = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--he") >= 0;   // test switch: the leader starts loaded with HE
+        static readonly bool debugCook = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--cookoff") >= 0;   // test switch: every kill cooks off, in slow motion
         static readonly bool debugKeil = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--keil") >= 0;   // test switch: a Panzerkeil at 0:04
         static readonly bool debugSalvage = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--salvage") >= 0;   // test switch: three crates ahead at 0:02, the racks nearly dry
         static readonly bool debugInfantry = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--infantry") >= 0;   // test switch: a squad at 0:04
@@ -91,7 +94,7 @@ namespace IronNight
 
         public void Build(Camera camera, Hud h, TouchStick s, Fx effects)
         {
-            cam = camera; hud = h; stick = s; fx = effects;
+            cam = camera; hud = h; stick = s; fx = effects; Time.timeScale = 1f;
             shellTemplate = Resources.Load<Material>("Additive"); glowTex = Lightswarm.ProceduralSprites.Glow(64, 0.3f).texture;
             route = PlayerPrefs.GetString("route", "open"); foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--route=")) route = arg.Substring(8);
             theatre = PlayerPrefs.GetString("theatre", "normandy"); foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--theatre=")) theatre = arg.Substring(10);   // test switch: --theatre=kursk
@@ -197,9 +200,10 @@ namespace IronNight
         void Update()
         {
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
+            if (slowLeft > 0f) { slowLeft -= Time.unscaledDeltaTime; Time.timeScale = slowLeft <= 0f ? 1f : slowLeft < 0.25f ? Mathf.Lerp(1f, 0.3f, slowLeft / 0.25f) : 0.3f; }
             fx.Tick(dt);
             var kb = Keyboard.current; if (kb != null && kb.escapeKey.wasPressedThisFrame) { if (phase == Phase.Play) Pause(); else if (phase == Phase.Pause) Resume(); }
-            if (phase != Phase.Play) { PlaceCamera(false); TickWrecks(dt); Sfx.Engine(0f); props.Tick(); return; }
+            if (phase != Phase.Play) { PlaceCamera(false); TickWrecks(dt); TickTosses(dt); Sfx.Engine(0f); props.Tick(); return; }
             t += dt;
             if (firstNight && hintIndex < hints.Length && t >= hintTimes[hintIndex]) { hud.Toast(hints[hintIndex], 3.5f); hintIndex++; }
             Lighting(Mathf.Clamp01((t - 255f) / 45f), dt);
@@ -309,7 +313,7 @@ namespace IronNight
             hud.Set(t, platoon.Count); hud.SetLeader(Mathf.CeilToInt(L.hp), Mathf.CeilToInt(Depot.LeaderHp)); hud.SetTally(kills, score);
             hud.ReloadArc(L.transform.position + Vector3.up * 0.2f, L.reloadLeft <= 0f ? 1f : 1f - L.reloadLeft / Mathf.Max(0.1f, L.spec.reload * L.reloadMul), cam);
             hud.Indicators(foes, cam);
-            TickObjective(dt); TickDrops(dt); TickSalvage(dt); TickHoles(dt); TickMortars(dt); TickStar(dt);
+            TickObjective(dt); TickDrops(dt); TickSalvage(dt); TickHoles(dt); TickTosses(dt); TickMortars(dt); TickStar(dt);
             if (ammoLeft > 0f) { ammoLeft -= dt; if (ammoLeft <= 0f) { ammoMul = 1f; hud.Toast("APCR spent"); } }
             hud.Radar(foes, platoon, L.transform.position, objective != null ? objective.pos : Vector3.zero, objective != null, cratePos);   // the commander's spotting shows them all: the markers are placed when it is called
             hud.HpBars(foes, cam, boss);
@@ -532,6 +536,7 @@ namespace IronNight
             fire.transform.position = v.transform.position + Vector3.up * 2.5f;
             wrecks.Add(new Wreck { v = v, fire = fire });
             if (!v.friendly) SpawnSalvage(v);
+            if (Random.value < CookOffChance(v)) CookOff(v);
             if (v.friendly) infantry.BailOut(v.transform.position, -v.Forward);
             if (v.friendly && v != Leader && recovery && recoverySpec == null) { recoverySpec = v.spec; recoveryLeft = 20f; hud.Toast("Recovery crew is on it · " + v.spec.name + " back in twenty seconds", 2.8f); }
             if (v.friendly)
@@ -549,8 +554,8 @@ namespace IronNight
                 hud.Popup(v.transform.position, "+" + worth * 50, new Color(0.95f, 0.66f, 0.23f)); shake = Mathf.Max(shake, Dist(v, Leader) < 25f ? 0.5f : 0.2f);
                 combo = Time.time - lastKill < 4f ? combo + 1 : 1; lastKill = Time.time;
                 if (combo >= 2) { int bonus = combo * 25; score += bonus; hud.Popup(v.transform.position + Vector3.up * 3f, "×" + combo + " +" + bonus, new Color(1f, 0.92f, 0.6f)); if (combo == 3) hud.Toast("Triple kill", 1.8f); else if (combo == 5) hud.Toast("Rampage", 1.8f); }
-                if (v == boss) { score += 1500; bossKilled = true; shake = 2f; hud.HideBoss(); hud.Toast("Tiger Ace destroyed · +1500"); }
-                if (v == ace) { score += 600; shake = Mathf.Max(shake, 1f); Depot.Tally("acesNamed", 1); nightAces++; hud.Popup(v.transform.position, "+600", new Color(1f, 0.8f, 0.4f)); hud.Toast(aceName + " is finished · +600", 3f); Radio("kill"); }
+                if (v == boss) { score += 1500; bossKilled = true; shake = 2f; SlowMo(0.8f); hud.HideBoss(); hud.Toast("Tiger Ace destroyed · +1500"); }
+                if (v == ace) { score += 600; shake = Mathf.Max(shake, 1f); SlowMo(0.7f); Depot.Tally("acesNamed", 1); nightAces++; hud.Popup(v.transform.position, "+600", new Color(1f, 0.8f, 0.4f)); hud.Toast(aceName + " is finished · +600", 3f); Radio("kill"); }
                 if (xp >= xpNeed) LevelUp(); else hud.SetLevel(level, (float)xp / xpNeed);
             }
         }
@@ -590,6 +595,11 @@ namespace IronNight
                 debugSquadSent = true; var L0 = Leader; var f0 = L0.Forward; var r0 = new Vector3(f0.z, 0f, -f0.x);
                 apRounds = 4; heRounds = 0; loadHe = false; hud.SetAmmo(apRounds, heRounds, loadHe);
                 DropCrate(props.PushOut(L0.transform.position + f0 * 9f, 1.4f), 5, 1); DropCrate(props.PushOut(L0.transform.position + f0 * 16f + r0 * 2.5f, 1.4f), 3, 0); DropCrate(props.PushOut(L0.transform.position + f0 * 23f - r0 * 2f, 1.4f), 2, 1);
+            }
+            if (debugCook && !debugSquadSent && t > 2f)   // two Panzer IVs on their last legs 20 m ahead, to watch them go up
+            {
+                debugSquadSent = true; var L0 = Leader; var f0 = L0.Forward; var r0 = new Vector3(f0.z, 0f, -f0.x);
+                foreach (var k in new[] { -5f, 5f }) { var e = Foe(VehicleSpec.PanzerIV, L0.transform.position + f0 * 20f + r0 * k, L0.yaw); e.hp = 0.5f; }
             }
             if (debugZoo && !debugSquadSent && t > 4f)
             {
@@ -1380,6 +1390,62 @@ namespace IronNight
                 fx.Ember(h.v.transform.TransformPoint(h.local), h.left / 6f);
             }
         }
+
+        /// <summary>How likely a kill is to set off its ammunition: the heavies carry more of it, the platoon's Shermans
+        /// were known for it (wet stowage halves it), the ace and the boss always go up.</summary>
+        float CookOffChance(Vehicle v)
+        {
+            if (v.spec.isGun || v.spec.casemate || v.spec.turretMesh == null) return 0f;
+            if (debugCook || v == boss || v == ace) return 1f;
+            return v.friendly ? (wetStowage ? 0.12f : 0.25f) : v.spec.hp >= 6f ? 0.35f : 0.28f;
+        }
+
+        /// <summary>The racks go up: the turret is thrown off to one side, turning over, and a jet of flame stands out of
+        /// the ring behind it.</summary>
+        void CookOff(Vehicle v)
+        {
+            var tr = v.BlowTurret(); if (tr == null) return;
+            var cmd = tr.Find("Commander"); if (cmd != null) Destroy(cmd.gameObject);
+            float h = 0.9f; var rs = tr.GetComponentsInChildren<Renderer>();
+            if (rs.Length > 0) { var b = rs[0].bounds; foreach (var r in rs) b.Encapsulate(r.bounds); h = Mathf.Clamp(b.max.y - tr.position.y, 0.5f, 1.6f); }
+            var right = new Vector3(v.Forward.z, 0f, -v.Forward.x); var away = (right * (Random.value < 0.5f ? -1f : 1f) + v.Forward * Random.Range(-0.6f, 0.6f)).normalized * Random.Range(2.4f, 3.6f);   // off the side, clear of the hull
+            tosses.Add(new Toss { t = tr, owner = v, h = h, vel = new Vector3(away.x, Random.Range(11f, 15f) * (v.spec.hp >= 6f ? 0.85f : 1f), away.z), spin = Random.onUnitSphere * Random.Range(200f, 460f), jet = 1.4f });
+            fx.Explosion(tr.position + Vector3.up); Sfx.Explosion(tr.position);
+            var L = Leader; shake = Mathf.Max(shake, L != null && Dist(v, L) < 30f ? 1f : 0.4f);
+            if (debugCook) SlowMo(0.6f);
+        }
+
+        void TickTosses(float dt)
+        {
+            for (int i = tosses.Count - 1; i >= 0; i--)
+            {
+                var s = tosses[i];
+                if (s.owner == null || s.t == null) { tosses.RemoveAt(i); continue; }
+                if (s.jet > 0f) { s.jet -= dt; s.tick -= dt; if (s.tick <= 0f) { s.tick = 0.035f; fx.Jet(s.owner.transform.position + Vector3.up * s.owner.spec.ringHeight, Mathf.Clamp01(s.jet / 1.4f)); } }
+                if (!s.down)
+                {
+                    s.vel += Vector3.down * 20f * dt; s.t.position += s.vel * dt;
+                    if (!s.bounced) s.t.Rotate(s.spin * dt, Space.World); else s.t.rotation = Quaternion.Slerp(s.t.rotation, s.rest, dt * 7f);
+                    if (s.t.position.y <= (s.bounced ? s.restY : 0.6f) && s.vel.y < 0f)
+                    {
+                        if (!s.bounced)
+                        {
+                            // the first strike: one bounce, then it settles the way it came down, on its ring or on its roof
+                            s.bounced = true; bool roof = s.t.up.y < -0.2f;
+                            s.rest = Quaternion.Euler(roof ? 180f + Random.Range(-8f, 8f) : Random.Range(-10f, 10f), s.t.eulerAngles.y, Random.Range(-10f, 10f)); s.restY = roof ? s.h - 0.05f : 0.05f;
+                            s.vel = new Vector3(s.vel.x * 0.35f, 3f, s.vel.z * 0.35f);
+                            if (s.t.position.y < s.restY) { var q = s.t.position; q.y = s.restY; s.t.position = q; }
+                            fx.Dust(s.t.position); Sfx.Hit(s.t.position); shake = Mathf.Max(shake, 0.3f);
+                        }
+                        else { s.down = true; var p = s.t.position; p.y = s.restY; s.t.position = p; s.t.rotation = s.rest; s.t.SetParent(s.owner.transform, true); fx.Dust(p); }   // goes with the wreck when it is cleared
+                    }
+                }
+                if (s.down && s.jet <= 0f) tosses.RemoveAt(i);
+            }
+        }
+
+        /// <summary>A moment held: the game at 30% for this many real seconds, easing back at the end.</summary>
+        void SlowMo(float seconds) { slowLeft = Mathf.Max(slowLeft, seconds); Time.timeScale = 0.3f; }
 
         void RemoveDrop(Drop d) { Destroy(d.crate.gameObject); Destroy(d.chute.gameObject); Destroy(d.lines.gameObject); if (d.marker != null) Destroy(d.marker.gameObject); Destroy(d.canopy); }
 

@@ -144,6 +144,17 @@ namespace IronNight
             if (Random.value < 0.3f) Spawn(smokeRagged, pos + Vector3.up * 0.6f, 0.8f + Random.value * 0.6f, new Color(0.12f, 0.11f, 0.1f, 0.5f), 1.8f + Random.value, new Vector3(Random.Range(-0.2f, 0.2f), 1.4f, Random.Range(-0.2f, 0.2f)), 1.8f, true);
         }
 
+        /// <summary>Ammunition cooking off: a column of flame straight up out of the turret ring, sparks thrown with it,
+        /// black smoke rolling off the top. k is how much is left burning, 1 at the start.</summary>
+        public void Jet(Vector3 pos, float k)
+        {
+            var f = Spawn(addFlame, pos + Vector3.up * (0.6f + Random.value * 0.8f), 1.8f + 2.4f * k, Warm(0.3f + Random.value * 0.5f), 0.22f + Random.value * 0.14f, Vector3.up * (9f + 9f * k), 0.35f);
+            f.aligned = true; f.axis = Vector3.up; f.stretch = 2.2f;
+            if (Random.value < 0.6f) { var s = Spawn(addSpark, pos + Vector3.up, 0.22f + Random.value * 0.25f, new Color(1f, 0.8f, 0.4f, 1f), 0.5f + Random.value * 0.4f, (Vector3.up * 2f + Random.insideUnitSphere).normalized * (10f + Random.value * 10f), 0f); s.gravity = true; }
+            if (Random.value < 0.25f) Spawn(smokeRagged, pos + Vector3.up * (3f + 2f * k), 2f + Random.value * 1.5f, new Color(0.1f, 0.09f, 0.08f, 0.7f), 2.5f + Random.value, Vector3.up * 3f, 2f, true);
+            if (Random.value < 0.3f) Flash(pos + Vector3.up * 2f, new Color(1f, 0.6f, 0.25f), 20f + 80f * k, 20f, 0.12f);
+        }
+
         /// <summary>A shell glancing off: a white flash and a handful of sparks thrown off the armour.</summary>
         public void Spark(Vector3 pos, Vector3 away)
         {

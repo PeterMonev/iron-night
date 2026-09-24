@@ -159,6 +159,14 @@ namespace IronNight
         /// <summary>The gun has just fired: the barrel slams back and the hull rocks on its springs.</summary>
         public void Recoil() { recoil = 1f; }
 
+        /// <summary>The racks went up: the turret comes off the ring, free of the hull, for the battle to throw. Null for
+        /// guns, casemates and anything without a turret.</summary>
+        public Transform BlowTurret()
+        {
+            if (turret == null || spec.isGun || spec.casemate || spec.turretMesh == null) return null;
+            var t = turret; turret = null; t.SetParent(null, true); return t;
+        }
+
         public void Apply()
         {
             transform.rotation = Quaternion.Euler(0f, yaw * Mathf.Rad2Deg, 0f);
