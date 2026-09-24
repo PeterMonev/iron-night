@@ -297,8 +297,8 @@ namespace IronNight
             TickShells(dt); if (phase != Phase.Play) return;                    // the leader may have just died
             TickWrecks(dt); TickSpawns(dt);
             KeepApart();
-            foreach (var v in platoon) { props.Ram(v.transform.position, v.spec.radius * 0.7f, v.Forward, dozer); v.transform.position = props.PushOut(v.transform.position, v.spec.radius * 0.7f); }
-            foreach (var e in foes) if (!e.spec.isGun) { props.Ram(e.transform.position, e.spec.radius * 0.7f, e.Forward, false); e.transform.position = props.PushOut(e.transform.position, e.spec.radius * 0.7f); }
+            foreach (var v in platoon) { Bog(v, props.Ram(v.transform.position, v.spec.radius * 0.7f, v.Forward, dozer), dt); v.transform.position = props.PushOut(v.transform.position, v.spec.radius * 0.7f); }
+            foreach (var e in foes) if (!e.spec.isGun) { Bog(e, props.Ram(e.transform.position, e.spec.radius * 0.7f, e.Forward, false), dt); e.transform.position = props.PushOut(e.transform.position, e.spec.radius * 0.7f); }
             foreach (var v in platoon) tracks.Mark(v); foreach (var e in foes) if (!e.spec.isGun) tracks.Mark(e);
             foreach (var v in platoon) Smoulder(v, dt); foreach (var e in foes) Smoulder(e, dt);
             props.platoon = L.transform.position; props.alert = false; props.Tick();
@@ -1475,6 +1475,15 @@ namespace IronNight
                 h.tick -= dt; if (h.tick > 0f) continue; h.tick = 0.12f;
                 fx.Ember(h.v.transform.TransformPoint(h.local), h.left / 6f);
             }
+        }
+
+        /// <summary>A hull slowed by what it has just gone through and by rubble under it; it picks up again over about
+        /// a second. The platoon's own crashes are heard, and the leader's are felt.</summary>
+        void Bog(Vehicle v, float keep, float dt)
+        {
+            v.bog = Mathf.MoveTowards(v.bog, 1f, dt * 0.9f);
+            if (keep < 1f) { v.bog = Mathf.Min(v.bog, keep); if (v.friendly) { Sfx.Crunch(v.transform.position); if (v == Leader) shake = Mathf.Max(shake, (1f - keep) * 0.45f); } }
+            v.bog = Mathf.Min(v.bog, props.Rough(v.transform.position));
         }
 
         /// <summary>How likely a kill is to set off its ammunition: the heavies carry more of it, the platoon's Shermans

@@ -743,9 +743,11 @@ namespace IronNight
         static Quaternion Fallen(Prop p) => Quaternion.AngleAxis(88f, Vector3.Cross(Vector3.up, FallDir(p))) * Quaternion.Euler(0f, p.yaw * Mathf.Rad2Deg, 0f);
 
         /// <summary>A hull against the country: trees and poles go over the way it drives, fences, carts and hay are
-        /// crushed; with a dozer blade the walls, sandbags and hedges give way too.</summary>
-        public void Ram(Vector3 pos, float radius, Vector3 forward, bool dozer)
+        /// crushed; with a dozer blade the walls, sandbags and hedges give way too. Returns the share of its speed the
+        /// hull keeps: 1 when it went through nothing.</summary>
+        public float Ram(Vector3 pos, float radius, Vector3 forward, bool dozer)
         {
+            float keep = 1f;
             for (int i = 0; i < active.Count; i++)
             {
                 var p = active[i]; if (p.radii.Length == 0 || p.drivable || p.state != 0) continue;
@@ -755,10 +757,45 @@ namespace IronNight
                 {
                     float min = p.radii[c] + radius * 0.97f; var cc = p.circleCenters[c];   // the hull is pushed back out every frame: only a hull driving in reaches this
                     if ((new Vector2(pos.x, pos.z) - cc).sqrMagnitude >= min * min) continue;
+                    keep = Mathf.Min(keep, Drag(p));
                     if (p.what == What.Hedge) Gap(p, new Vector3(cc.x, 0f, cc.y)); else if (kind == 1) Fall(p, forward); else Crush(p, false);
                     break;
                 }
             }
+            return keep;
+        }
+
+        /// <summary>How much of its speed a hull keeps going through a thing: a tree or a wall stops it hard, a fence
+        /// hardly, a telegraph pole not at all.</summary>
+        static float Drag(Prop p)
+        {
+            if (p.what == What.Hedge) return 0.35f;
+            if (p.what == What.Tree) return 0.45f;
+            switch (p.kind.mesh)
+            {
+                case "tree_oak": case "tree_poplar": case "spruce_snow": case "k_birches": return 0.45f;
+                case "deadtree": return 0.6f;
+                case "pole": case "signpost": return 0.85f;
+                case "wall_a": case "wall_b": return 0.4f;
+                case "well": return 0.5f;
+                case "sandbags": return 0.55f;
+                case "cart": return 0.65f;
+                case "k_well": return 0.7f;
+                case "k_wattle": case "gate": return 0.75f;
+                case "haystack": case "k_sheaves": case "barrels": return 0.8f;
+                default: return 0.9f;
+            }
+        }
+
+        /// <summary>Rubble under the tracks: a heap or a burnt-out husk is driven over, at half speed.</summary>
+        public float Rough(Vector3 pos)
+        {
+            foreach (var p in active)
+            {
+                if (!p.drivable || p.radii.Length == 0) continue; float reach = p.bound + 3f; if ((p.pos - pos).sqrMagnitude > reach * reach) continue;
+                for (int c = 0; c < p.radii.Length; c++) if ((new Vector2(pos.x, pos.z) - p.circleCenters[c]).sqrMagnitude < p.radii[c] * p.radii[c]) return 0.55f;
+            }
+            return 1f;
         }
 
         /// <summary>An explosion among the props: buildings and walls in reach lose hit points, trees go over away from

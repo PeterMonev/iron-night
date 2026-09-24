@@ -13,6 +13,7 @@ namespace IronNight
         public bool friendly;
         public float hp, yaw, turretYaw, reloadLeft, hitFlash, lastHit = -100f, mgTimer, mgSound, trackOut, fallBack; public int flank, fallenBack, sapperLeft; public bool unloaded, leaving, sapper; public Vector3 lastMine;   // trackOut: seconds left with a track knocked off
         public float speedMul = 1f, damageMul = 1f, rangeMul = 1f, reloadMul = 1f, turretMul = 1f;
+        public float bog = 1f;   // speed kept after going through something or over rubble; the battle lets it recover
         public bool dead;
         public Vehicle target;
 
@@ -133,7 +134,7 @@ namespace IronNight
             float turn = spec.turnRate * dt;
             yaw += Mathf.Clamp(diff, -turn, turn);
             float align = Mathf.Cos(diff);                           // no forward speed while turning around
-            float v = spec.speed * speedMul * Mathf.Clamp01(mag) * Mathf.Clamp01(align + 0.15f);
+            float v = spec.speed * speedMul * bog * Mathf.Clamp01(mag) * Mathf.Clamp01(align + 0.15f);
             transform.position += Forward * (v * dt);
         }
 
