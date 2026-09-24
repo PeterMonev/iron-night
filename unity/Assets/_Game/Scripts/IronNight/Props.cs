@@ -819,7 +819,9 @@ namespace IronNight
         /// <summary>A building coming down: it sinks into its own dust and a heap of rubble is left in its place.</summary>
         void Collapse(Prop p)
         {
-            p.state = 3; p.drivable = true; p.height = 1.2f; if (Burns(p.kind.mesh) || Random.value < 0.35f) p.burn = 18f + Random.value * 14f;
+            p.state = 3; if (Burns(p.kind.mesh) || Random.value < 0.35f) p.burn = 18f + Random.value * 14f;
+            if (prefabs.ContainsKey(p.kind.mesh + "_ruin")) { p.height = 2.2f; for (int c = 0; c < p.radii.Length; c++) p.radii[c] *= 0.75f; }   // a ruin with walls standing: tanks go round it, low shells stop in it
+            else { p.drivable = true; p.height = 1.2f; }   // a heap: driven over
             if (fx != null) fx.Collapse(p.pos, p.kind.length);
             Sfx.Explosion(p.pos);
             if (p.go != null) StartCoroutine(Sink(p, p.go)); 

@@ -1,0 +1,3 @@
+newmtl church_ruin
+Kd 1 1 1
+map_Kd church_ruin_tex.png
