@@ -1,0 +1,3 @@
+newmtl commander_su
+Kd 1 1 1
+map_Kd commander_su_tex.png

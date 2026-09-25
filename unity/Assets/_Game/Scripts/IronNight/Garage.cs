@@ -132,7 +132,7 @@ namespace IronNight
             if (spec == null || (shown != null && shownId == spec.id)) return;
             if (shown != null) Destroy(shown.gameObject);
             shown = Vehicle.Create(spec, true, Home, 0f); shown.transform.SetParent(stage, true); shownId = spec.id;
-            shown.turretYaw = 0.35f; shown.Apply(); shown.enabled = false; shown.KillRings(Career.Rings(spec.id)); ShowCrew(Depot.Nation);
+            shown.turretYaw = 0.35f; shown.Apply(); shown.enabled = false; shown.KillRings(Career.Rings(spec.id)); ShowCrew(System.Array.Exists(Depot.Leaders, x => x.id == spec.id && x.nation == "su") ? "su" : "us");
             if (parkedTank == null && parked != null)
             {
                 // one of the wingmen parked at the back, in the shadows
@@ -147,13 +147,20 @@ namespace IronNight
         {
             if (crewNation == nation) return; crewNation = nation;
             foreach (var f in crewFigures) Destroy(f); crewFigures.Clear();
-            Vector3[] at = { new Vector3(-3.3f, 0f, -3.6f), new Vector3(-2.0f, 0f, -4.5f), new Vector3(2.4f, 0f, -4.4f), new Vector3(3.6f, 0f, -3.4f) };
+            Vector3[] at = { new Vector3(-4.41f, 0f, -2.87f), new Vector3(-3.84f, 0f, -3.94f), new Vector3(-1.90f, 0f, -5.17f), new Vector3(-0.69f, 0f, -5.22f) };
+            float[] turn = { -12f, -6f, 6f, 12f };   // toward the tank: the left pair to the right of the picture, the right pair to the left
+            foreach (var a in System.Environment.GetCommandLineArgs())
+            {
+                var inv = System.Globalization.CultureInfo.InvariantCulture;
+                if (a.StartsWith("--crewat=")) { var p = a.Substring(9).Split(','); for (int k = 0; k < 4 && 2 * k + 1 < p.Length; k++) at[k] = new Vector3(float.Parse(p[2 * k], inv), 0f, float.Parse(p[2 * k + 1], inv)); }
+                if (a.StartsWith("--crewyaw=")) { var p = a.Substring(10).Split(','); for (int k = 0; k < 4 && k < p.Length; k++) turn[k] = float.Parse(p[k], inv); }
+            }
             var eye = titleCam != null ? titleCam.transform.localPosition : new Vector3(-9.6f, 3.4f, -15.2f);
             for (int i = 0; i < 4; i++)
             {
                 string id = "crew_" + nation + "_" + Crew.Roles[i]; var pf = Resources.Load<GameObject>("Props/" + id); if (pf == null) continue;
                 var go = Instantiate(pf, transform); go.name = id; go.transform.localPosition = at[i];
-                var look = eye - at[i]; look.y = 0f; go.transform.localRotation = Quaternion.LookRotation(look.normalized) * Quaternion.Euler(0f, (i < 2 ? 12f : -12f), 0f);   // to the camera, a little toward the tank
+                var look = eye - at[i]; look.y = 0f; go.transform.localRotation = Quaternion.LookRotation(look.normalized) * Quaternion.Euler(0f, turn[i], 0f);   // to the camera, a little toward the tank
                 var mat = new Material(Resources.Load<Material>("VehicleLit")); mat.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + id + "_tex")); mat.SetFloat("_Cull", 0f);
                 foreach (var r in go.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
                 crewFigures.Add(go);
@@ -161,8 +168,15 @@ namespace IronNight
         }
 
         public void SetActive(bool on) { cam.enabled = on; gameObject.SetActive(on || titleOn); }
-        /// <summary>The menu camera's framing: the tank in the middle of the screen for the title, high in the frame for the depot (a card fills the lower half).</summary>
-        public void Frame(bool depot) { titleCam.transform.LookAt(transform.position + (depot ? new Vector3(0.2f, -1.7f, 0.3f) : new Vector3(0.2f, 1.05f, 0.3f))); }
+        /// <summary>The menu camera's framing: the tank and its crew between the name and the tiles for the title, high in the frame for the depot (a card fills the lower half).</summary>
+        public void Frame(bool depot)
+        {
+            Vector3 at = depot ? new Vector3(-9.6f, 3.4f, -15.2f) : new Vector3(-13.03f, 4.22f, -20.63f), aim = depot ? new Vector3(0.2f, -1.7f, 0.3f) : new Vector3(0.2f, -1.3f, 0.3f);
+            foreach (var a in System.Environment.GetCommandLineArgs())
+                if (!depot && a.StartsWith("--titlecam=")) { var p = System.Array.ConvertAll(a.Substring(11).Split(','), s => float.Parse(s, System.Globalization.CultureInfo.InvariantCulture)); at = new Vector3(p[0], p[1], p[2]); aim = new Vector3(p[3], p[4], p[5]); }
+            float fit = Mathf.Max(1f, 0.5625f / Mathf.Max(0.1f, titleCam.aspect));   // narrower than 9:16: further back, the same width of the hangar in the picture
+            titleCam.transform.localPosition = aim + (at - aim) * fit; titleCam.transform.LookAt(transform.position + aim);
+        }
         /// <summary>The menu backdrop: the tank turning slowly under the roof lights.</summary>
         public void SetTitle(bool on) { titleOn = on; titleCam.enabled = on; if (on) gameObject.SetActive(true); else if (!cam.enabled) gameObject.SetActive(false); }
         public void Drag(float dx) { spinVel = dx * 0.35f; }

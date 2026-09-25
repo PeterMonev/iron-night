@@ -1,0 +1,3 @@
+newmtl tanker_us_run
+Kd 1 1 1
+map_Kd tanker_us_run_tex.png

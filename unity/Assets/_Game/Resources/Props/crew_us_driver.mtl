@@ -1,0 +1,3 @@
+newmtl crew_us_driver
+Kd 1 1 1
+map_Kd crew_us_driver_tex.png
