@@ -1325,7 +1325,7 @@ namespace IronNight
                 if (weather == Weather.Fog || weather == Weather.Rain || t < (debugRaid ? 3f : 150f)) return;
                 raidTimer -= dt; if (raidTimer > 0f && !(debugRaid && raidTimer > 140f)) return;
                 raidTimer = debugRaid ? 14f : 80f + Random.value * 40f;
-                float ang = Random.value * Mathf.PI * 2f; var dir = new Vector3(Mathf.Sin(ang), 0f, Mathf.Cos(ang));
+                float ang = Random.Range(-35f, 35f) * Mathf.Deg2Rad; var dir = new Vector3(Mathf.Cos(ang) * (Random.value < 0.5f ? -1f : 1f), 0f, Mathf.Sin(ang));   // across the screen: a dive from behind the camera would fill it
                 var aim = L.transform.position + L.Forward * 6f;   // where the leader is heading, near enough
                 raid = new Raid { a = aim - dir * 16f, b = aim + dir * 16f, dir = dir };
                 Sfx.Drone(aim + Vector3.up * 40f - dir * 60f); hud.Toast("Aircraft overhead · Stukas!", 3f); if (Random.value < 0.7f) Radio("hit");
@@ -1390,8 +1390,8 @@ namespace IronNight
         }
 
         /// <summary>Air support: on station from 1:00, one strike a minute. AIR arms it and a tap marks the target: yellow
-        /// smoke goes up on it, and a pair of Thunderbolts (Il-2s on the Eastern Front) comes in low over our own heads
-        /// along the line from the leader, guns walking up to the smoke, four rockets each into it, and climbs away.</summary>
+        /// smoke goes up on it, and a pair of Thunderbolts (Il-2s on the Eastern Front) comes in low across the field,
+        /// guns walking up to the smoke, four rockets each into it, and climbs away.</summary>
         void TickAir(float dt)
         {
             bool su = Depot.Nation == "su";
@@ -1415,18 +1415,18 @@ namespace IronNight
 
         void CallAir(Vector3 target)
         {
-            var L = Leader; var d = target - L.transform.position; d.y = 0f; if (d.sqrMagnitude < 1f) d = L.Forward;
-            target.y = 0f; airCool = 60f; strike = new AirStrike { target = target, dir = d.normalized };
+            float ang = Random.Range(-30f, 30f) * Mathf.Deg2Rad; var across = new Vector3(Mathf.Cos(ang) * (Random.value < 0.5f ? -1f : 1f), 0f, Mathf.Sin(ang));   // in from the side of the screen, seen side on
+            target.y = 0f; airCool = 60f; strike = new AirStrike { target = target, dir = across };
             hud.Toast(Depot.Nation == "su" ? "Shturmoviks inbound · yellow smoke" : "Thunderbolts inbound · yellow smoke", 2.6f); Sfx.Click(); Radio("start");
         }
 
-        /// <summary>A plane's run: a shallow dive from behind us to 24 m just short of the smoke, then climbing away past it.</summary>
+        /// <summary>A plane's run: a shallow dive in from the side to 18 m just short of the smoke, then climbing away past it.</summary>
         void FlyAlly(Transform p, Transform glow, AirStrike s, float tau, float off)
         {
             if (p == null) return;
             if (tau < 0f) { if (p.gameObject.activeSelf) p.gameObject.SetActive(false); return; }
             var side = new Vector3(s.dir.z, 0f, -s.dir.x) * off;
-            var p0 = s.target - s.dir * 150f + Vector3.up * 75f + side; var q = s.target - s.dir * 12f + Vector3.up * 24f + side;
+            var p0 = s.target - s.dir * 150f + Vector3.up * 70f + side; var q = s.target - s.dir * 12f + Vector3.up * 18f + side;
             Vector3 pos;
             if (tau < 1.6f) pos = Vector3.Lerp(p0, q, tau / 1.6f);
             else { float u = Mathf.Clamp01((tau - 1.6f) / 2.2f); var c = q + s.dir * 45f + Vector3.up * 1f; var e = s.target + s.dir * 160f + Vector3.up * 85f + side; pos = (1 - u) * (1 - u) * q + 2 * (1 - u) * u * c + u * u * e; }
