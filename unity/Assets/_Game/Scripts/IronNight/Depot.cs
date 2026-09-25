@@ -34,6 +34,7 @@ namespace IronNight
             if (PlayerPrefs.GetInt("depot.version", 0) < 2) { PlayerPrefs.SetString("depot.nation", "us"); PlayerPrefs.SetString("depot.camo", "olive"); PlayerPrefs.SetInt("depot.version", 2); PlayerPrefs.Save(); }
             if (PlayerPrefs.GetInt("depot.version", 0) < 3) { foreach (var k in new[] { "camp.night", "camp.kills", "camp.score", "camp.won", "camp.best" }) PlayerPrefs.DeleteKey(k); PlayerPrefs.DeleteKey("camp.platoon"); PlayerPrefs.DeleteKey("camp.leaderHp"); PlayerPrefs.SetInt("depot.version", 3); PlayerPrefs.Save(); }   // the campaign test runs wiped
             if (PlayerPrefs.GetInt("depot.version", 0) < 4) { foreach (var k in new[] { "camp.night", "camp.kills", "camp.score", "camp.platoon", "camp.leaderHp", "depot.leader.us", "depot.leader.su", "depot.commander.us", "depot.commander.su" }) PlayerPrefs.DeleteKey(k); PlayerPrefs.SetInt("depot.version", 4); PlayerPrefs.Save(); }   // the garage test runs wiped: back to the Sherman, no commander
+            if (PlayerPrefs.GetInt("depot.crewXpInit", 0) == 0) { PlayerPrefs.SetInt("depot.crewXp", PlayerPrefs.GetInt("depot.crewXp", 0) + 600); PlayerPrefs.SetInt("depot.crewXpInit", 1); PlayerPrefs.Save(); }   // once: crew experience to begin with
             Points = PlayerPrefs.GetInt("depot.points", 0);
             NightsFought = PlayerPrefs.GetInt("depot.nights", 0);
             BestKills = PlayerPrefs.GetInt("depot.bestKills", 0);
@@ -60,6 +61,24 @@ namespace IronNight
 
         public static void AddPoints(int points) { Load(); Points += points; Save(); }
         public static bool Spend(int cost) { Load(); if (cost < 0 || Points < cost) return false; Points -= cost; Save(); return true; }
+
+        // crew experience: the second currency, earned in the nights and from rewarded ads, spent on training the crew
+        public const int AdCrewXp = 250, AdsPerDay = 5, DailyTrainXp = 300;
+        static string LocalDay => System.DateTime.Now.ToString("yyyyMMdd");
+        public static int CrewXp { get { Load(); return PlayerPrefs.GetInt("depot.crewXp", 0); } }
+        public static void AddCrewXp(int xp) { Load(); PlayerPrefs.SetInt("depot.crewXp", Mathf.Max(0, CrewXp + xp)); PlayerPrefs.Save(); }
+        public static bool SpendCrewXp(int xp) { if (xp < 0 || CrewXp < xp) return false; AddCrewXp(-xp); return true; }
+        /// <summary>Rewarded ads for crew experience still to be watched today.</summary>
+        public static int AdsLeftToday => PlayerPrefs.GetString("depot.xpAdDay", "") == LocalDay ? Mathf.Max(0, AdsPerDay - PlayerPrefs.GetInt("depot.xpAds", 0)) : AdsPerDay;
+        public static bool WatchXpAd()
+        {
+            if (AdsLeftToday <= 0) return false;
+            int used = PlayerPrefs.GetString("depot.xpAdDay", "") == LocalDay ? PlayerPrefs.GetInt("depot.xpAds", 0) : 0;
+            PlayerPrefs.SetString("depot.xpAdDay", LocalDay); PlayerPrefs.SetInt("depot.xpAds", used + 1); AddCrewXp(AdCrewXp); return true;
+        }
+        /// <summary>The daily training ad on the title: once a day.</summary>
+        public static bool DailyTrainReady => PlayerPrefs.GetString("depot.trainDay", "") != LocalDay;
+        public static bool ClaimDailyTrain() { if (!DailyTrainReady) return false; PlayerPrefs.SetString("depot.trainDay", LocalDay); AddCrewXp(DailyTrainXp); return true; }
 
         // the daily supply drop: 300 points once a day, claimed on the title screen
         public const int DailyPoints = 300;

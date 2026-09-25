@@ -57,7 +57,7 @@ namespace IronNight
         bool daily; string dailyDay = "", rule = "";   // the daily challenge: its day and the rule of the night
         int crewSteady, crewEagle, crewSnap, crewHands, crewRacks, crewHe, crewFoot, crewMech, crewRough, crewBow, crewSignals, crewSpot;   // the levels of the crew's gifts (Crew)
         float AirCoolFull => 60f - 6f * crewSignals;
-        string leaderId = "", leaderName = "", careerLine = ""; int careerXp, careerKills; bool careerNight, careerDawn; float careerDamage = 1f, careerReload = 1f, careerSpeed = 1f;   // the leader's own tank   // an operation night: the operation and which of its nights (0: a free night)
+        string leaderId = "", leaderName = "", careerLine = ""; int careerXp, careerKills, crewXpBanked; bool careerNight, careerDawn; float careerDamage = 1f, careerReload = 1f, careerSpeed = 1f;   // the leader's own tank   // an operation night: the operation and which of its nights (0: a free night)
         int nightTracked, nightFocus, talliedTracked, nightLamps, talliedLamps, nightAces; bool litBySearchlight;
         bool crewCounted, crewLostTonight; int crewBefore;   // the crew's nights: counted at dawn, lost with the leader unless he is pulled back
         Vehicle focus; float focusLeft; Transform focusRing;   // the enemy the platoon was told to hit
@@ -1915,6 +1915,8 @@ namespace IronNight
                 Career.Add(leaderId, gain, Mathf.Max(0, kills - careerKills), !careerNight, dawn && !careerDawn, score);
                 careerXp = Mathf.Max(careerXp, xpNow); careerKills = kills; careerNight = true; if (dawn) careerDawn = true;
                 careerLine = "\n" + leaderName + " · +" + gain + " XP" + (Career.AnyUpgrade(leaderId) ? " · an upgrade is ready" : "");
+                int cxNow = Mathf.RoundToInt(score * 0.1f) + (dawn ? 100 : 0), cGain = Mathf.Max(0, cxNow - crewXpBanked); Depot.AddCrewXp(cGain); crewXpBanked = Mathf.Max(crewXpBanked, cxNow);   // the crew's share, in the second currency
+                if (crewXpBanked > 0) careerLine += "\nCrew · +" + crewXpBanked + " XP to train with";
             }
             var medals = Medals.Check();
             int bonus = 0; var lines = new System.Text.StringBuilder(); foreach (var o in done) { bonus += o.reward; lines.Append("\nOrder carried out · " + o.Title + " · +" + o.reward); }

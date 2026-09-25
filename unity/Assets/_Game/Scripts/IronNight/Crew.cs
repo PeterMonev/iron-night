@@ -5,7 +5,7 @@ namespace IronNight
     /// <summary>
     /// The leader's crew, seat by seat: gunner, loader, driver, radio operator. Each nation has three men for every seat,
     /// each with his own gift; the first of each serves from the start, the others are taken on for points. A man trains
-    /// through five levels, each making his gift stronger, and keeps them if he leaves the seat. The commander keeps his
+    /// through five levels with crew experience (Depot.CrewXp), each making his gift stronger, and keeps them if he leaves the seat. The commander keeps his
     /// own place (Depot.Commanders); the crew's nights together still count as they did (Depot.CrewNights).
     /// </summary>
     public static class Crew
@@ -92,10 +92,10 @@ namespace IronNight
             PlayerPrefs.SetString("crew.pick." + m.nation + "." + m.role, m.id); PlayerPrefs.Save(); return true;
         }
 
-        /// <summary>A level of training, for points.</summary>
+        /// <summary>A level of training, for crew experience.</summary>
         public static bool Train(Man m)
         {
-            int c = NextTrain(m); if (c <= 0 || !Owns(m) || !Depot.Spend(c)) return false;
+            int c = NextTrain(m); if (c <= 0 || !Owns(m) || !Depot.SpendCrewXp(c)) return false;
             PlayerPrefs.SetInt(K(m.id, "level"), Level(m) + 1); PlayerPrefs.Save(); return true;
         }
 
