@@ -19,18 +19,28 @@ namespace IronNight
         readonly List<Runner> runners = new List<Runner>();
 
         /// <summary>Two crewmen out of a knocked-out platoon tank, running for the rear; gone after eight seconds.</summary>
-        public void BailOut(Vector3 at, Vector3 rear)
+        /// <summary>A knocked-out tank's crew getting out and running: German tankers from theirs, our own men from ours
+        /// when there is a figure of them (Props/tanker_us_run, tanker_su_run) - and nobody rather than the wrong men.</summary>
+        public void BailOut(Vector3 at, Vector3 rear, string who, int count)
         {
-            if (figure == null) return;
-            for (int i = 0; i < 2; i++)
+            GameObject fig = figure; Material mat = skin; float yaw = SoldierYaw;
+            if (who != "de")
+            {
+                if (!tankers.TryGetValue(who, out var tk)) { tk = new Tanker { fig = Resources.Load<GameObject>("Props/tanker_" + who + "_run") }; if (tk.fig != null) { tk.mat = new Material(Resources.Load<Material>("VehicleLit")); tk.mat.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/tanker_" + who + "_run_tex")); tk.mat.SetFloat("_Cull", 0f); } tankers[who] = tk; }
+                fig = tk.fig; mat = tk.mat; yaw = 0f;   // exported facing +Z
+            }
+            if (fig == null) return;
+            for (int i = 0; i < count; i++)
             {
                 var go = new GameObject("Crewman"); var dir = (rear + new Vector3(Random.Range(-0.5f, 0.5f), 0f, Random.Range(-0.5f, 0.5f))).normalized;
                 go.transform.position = at + dir * 2.5f + new Vector3(Random.Range(-1.5f, 1.5f), 0f, 0f); go.transform.rotation = Quaternion.LookRotation(dir);
-                var fg = Instantiate(figure, go.transform); fg.transform.localRotation = Quaternion.Euler(0f, SoldierYaw, 0f); fg.transform.localScale = Vector3.one * 0.95f;
-                foreach (var rr in fg.GetComponentsInChildren<Renderer>()) { rr.sharedMaterial = skin; rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+                var fg = Instantiate(fig, go.transform); fg.transform.localRotation = Quaternion.Euler(0f, yaw, 0f); fg.transform.localScale = Vector3.one * 0.95f;
+                foreach (var rr in fg.GetComponentsInChildren<Renderer>()) { rr.sharedMaterial = mat; rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
                 runners.Add(new Runner { t = go.transform, dir = dir });
             }
         }
+        class Tanker { public GameObject fig; public Material mat; }
+        readonly Dictionary<string, Tanker> tankers = new Dictionary<string, Tanker>();
         const float SoldierYaw = -90f, SoldierBYaw = 0f; GameObject figureB; Material skinB;   // the figure's facing in its own mesh, corrected here if the export looks the wrong way
         readonly List<Soldier> fallen = new List<Soldier>();
         Material uniform, helmet, skin; GameObject figure;
@@ -101,13 +111,21 @@ namespace IronNight
             for (int i = fallen.Count - 1; i >= 0; i--) { var m = fallen[i]; m.deadAge += dt; if (m.deadAge > 25f) { Destroy(m.t.gameObject); fallen.RemoveAt(i); } }
         }
 
-        /// <summary>A man of ours standing where he is put (the crew waiting by their wreck); not a target, not a shooter.</summary>
-        public Transform Figure(Vector3 at, Vector3 facing)
+        /// <summary>A man of ours standing where he is put (the crew waiting by their wreck): one of the nation's tankers when
+        /// there is a figure of them, nobody rather than a German; not a target, not a shooter.</summary>
+        public Transform Figure(Vector3 at, Vector3 facing, string nation)
         {
             var go = new GameObject("Crewman"); go.transform.SetParent(transform, false); go.transform.position = at; go.transform.rotation = Quaternion.LookRotation(facing, Vector3.up);
-            if (figure != null) { var fg = Instantiate(figure, go.transform); fg.transform.localRotation = Quaternion.Euler(0f, SoldierYaw, 0f); fg.transform.localScale = Vector3.one * 0.95f; foreach (var rr in fg.GetComponentsInChildren<Renderer>()) { rr.sharedMaterial = skin; rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; } }
+            string id = "crew_" + nation + "_driver"; var pf = Resources.Load<GameObject>("Props/" + id); if (pf == null) { id = "tanker_" + nation + "_run"; pf = Resources.Load<GameObject>("Props/" + id); }
+            if (pf != null)
+            {
+                if (!figureMats.TryGetValue(id, out var mat)) { mat = new Material(Resources.Load<Material>("VehicleLit")); mat.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + id + "_tex")); mat.SetFloat("_Cull", 0f); figureMats[id] = mat; }
+                var fg = Instantiate(pf, go.transform); fg.transform.localScale = Vector3.one * 0.95f;   // exported facing +Z
+                foreach (var rr in fg.GetComponentsInChildren<Renderer>()) { rr.sharedMaterial = mat; rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+            }
             return go.transform;
         }
+        readonly Dictionary<string, Material> figureMats = new Dictionary<string, Material>();
 
         /// <summary>One kneeling man who stays put: the forward observer with his radio.</summary>
         public Soldier SpawnObserver(Vector3 at, Vector3 facing)

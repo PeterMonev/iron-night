@@ -132,11 +132,31 @@ namespace IronNight
             if (spec == null || (shown != null && shownId == spec.id)) return;
             if (shown != null) Destroy(shown.gameObject);
             shown = Vehicle.Create(spec, true, Home, 0f); shown.transform.SetParent(stage, true); shownId = spec.id;
-            shown.turretYaw = 0.35f; shown.Apply(); shown.enabled = false; shown.KillRings(Career.Rings(spec.id));
+            shown.turretYaw = 0.35f; shown.Apply(); shown.enabled = false; shown.KillRings(Career.Rings(spec.id)); ShowCrew(Depot.Nation);
             if (parkedTank == null && parked != null)
             {
                 // one of the wingmen parked at the back, in the shadows
                 var wing = VehicleSpec.ById(Depot.WingmanId); if (wing != null && VehicleSpec.Available(wing)) { parkedTank = Vehicle.Create(wing, false, parked.position, parked.eulerAngles.y * Mathf.Deg2Rad); parkedTank.transform.SetParent(parked, true); parkedTank.turretYaw = parkedTank.yaw + 0.5f; parkedTank.Apply(); parkedTank.enabled = false; }
+            }
+        }
+
+        readonly System.Collections.Generic.List<GameObject> crewFigures = new System.Collections.Generic.List<GameObject>(); string crewNation;
+        /// <summary>The leader's crew standing on the hangar floor in front of the turntable, turned to the camera, when there
+        /// are figures of them (Props/crew_us_gunner and the like, exported facing +Z).</summary>
+        public void ShowCrew(string nation)
+        {
+            if (crewNation == nation) return; crewNation = nation;
+            foreach (var f in crewFigures) Destroy(f); crewFigures.Clear();
+            Vector3[] at = { new Vector3(-3.3f, 0f, -3.6f), new Vector3(-2.0f, 0f, -4.5f), new Vector3(2.4f, 0f, -4.4f), new Vector3(3.6f, 0f, -3.4f) };
+            var eye = titleCam != null ? titleCam.transform.localPosition : new Vector3(-9.6f, 3.4f, -15.2f);
+            for (int i = 0; i < 4; i++)
+            {
+                string id = "crew_" + nation + "_" + Crew.Roles[i]; var pf = Resources.Load<GameObject>("Props/" + id); if (pf == null) continue;
+                var go = Instantiate(pf, transform); go.name = id; go.transform.localPosition = at[i];
+                var look = eye - at[i]; look.y = 0f; go.transform.localRotation = Quaternion.LookRotation(look.normalized) * Quaternion.Euler(0f, (i < 2 ? 12f : -12f), 0f);   // to the camera, a little toward the tank
+                var mat = new Material(Resources.Load<Material>("VehicleLit")); mat.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + id + "_tex")); mat.SetFloat("_Cull", 0f);
+                foreach (var r in go.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+                crewFigures.Add(go);
             }
         }
 

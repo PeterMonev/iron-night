@@ -55,6 +55,8 @@ namespace IronNight
         Formation formation = Formation.Wedge; Phase phase = Phase.Title; bool reserveGranted;
         Operations.Op op; Operations.Night opN; int opNight, wingmenLost; float goalsTick;
         bool daily; string dailyDay = "", rule = "";   // the daily challenge: its day and the rule of the night
+        int crewSteady, crewEagle, crewSnap, crewHands, crewRacks, crewHe, crewFoot, crewMech, crewRough, crewBow, crewSignals, crewSpot;   // the levels of the crew's gifts (Crew)
+        float AirCoolFull => 60f - 6f * crewSignals;
         string leaderId = "", leaderName = "", careerLine = ""; int careerXp, careerKills; bool careerNight, careerDawn; float careerDamage = 1f, careerReload = 1f, careerSpeed = 1f;   // the leader's own tank   // an operation night: the operation and which of its nights (0: a free night)
         int nightTracked, nightFocus, talliedTracked, nightLamps, talliedLamps, nightAces; bool litBySearchlight;
         bool crewCounted, crewLostTonight; int crewBefore;   // the crew's nights: counted at dawn, lost with the leader unless he is pulled back
@@ -134,9 +136,12 @@ namespace IronNight
             foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg == "--careertest") Career.Add(leaderSpec.id, 4000, 320, false, false, 0);   // test switch: a seasoned tank
             platoon.Add(Vehicle.Create(leaderSpec, true, startAt, 0f)); Leader.hp = Depot.LeaderHp;
             leaderId = leaderSpec.id; leaderName = leaderSpec.name; careerDamage = Career.DamageMul(leaderId); careerReload = Career.ReloadMul(leaderId); careerSpeed = Career.SpeedMul(leaderId); Leader.KillRings(Career.Rings(leaderId));
+            { var n = Depot.Nation; crewSteady = Crew.Gift(n, "steady"); crewEagle = Crew.Gift(n, "eagle"); crewSnap = Crew.Gift(n, "snap"); crewHands = Crew.Gift(n, "hands"); crewRacks = Crew.Gift(n, "racks"); crewHe = Crew.Gift(n, "he");
+              crewFoot = Crew.Gift(n, "foot"); crewMech = Crew.Gift(n, "mech"); crewRough = Crew.Gift(n, "rough"); crewBow = Crew.Gift(n, "bow"); crewSignals = Crew.Gift(n, "signals"); crewSpot = Crew.Gift(n, "spot");
+              heBurst = 5f + 0.4f * crewHe; hud.radarMul = 1f + 0.08f * crewSpot; }
             // the commander riding with the leader
             bonus = Depot.CommanderBonus; commander = System.Array.Find(Depot.Commanders, c => c.id == Depot.CommanderId && c.nation == Depot.Nation); if (bonus == "reload") reloadMul *= 0.85f; if (bonus == "speed") speedMul *= 1.12f; if (bonus == "armour") Leader.hp += 1f;
-            apMax += Depot.Level("ammo") * 6; heMax += Depot.Level("ammo") * 3; apRounds = apMax; heRounds = heMax; if (debugHe) { heMax = heRounds = 60; loadHe = true; }
+            apMax += Depot.Level("ammo") * 6 + 3 * crewRacks; heMax += Depot.Level("ammo") * 3 + crewRacks; apRounds = apMax; heRounds = heMax; if (debugHe) { heMax = heRounds = 60; loadHe = true; }
             if (rule == "short") { apRounds = Mathf.CeilToInt(apMax * 0.5f); heRounds = Mathf.CeilToInt(heMax * 0.5f); }   // half the racks
             hud.OnAmmo = () => { heAuto = false; loadHe = !loadHe; if (loadHe && heRounds <= 0) loadHe = false; else if (!loadHe && apRounds <= 0 && heRounds > 0) loadHe = true; Sfx.Click(); hud.SetAmmo(apRounds, heRounds, loadHe); };
             hud.OnAbility = UseAbility;
@@ -238,7 +243,7 @@ namespace IronNight
             TickAce(dt); TickWeatherTurn(dt); TickAir(dt);
             if (opNight > 0) { goalsTick -= dt; if (goalsTick <= 0f) { goalsTick = 0.5f; hud.SetGoals(GoalLine(opN.second) + "      " + GoalLine(opN.third)); } }
             bool fast = abilityLeft > 0f && bonus == "reload", hard = abilityLeft > 0f && bonus == "heavy", quick = abilityLeft > 0f && bonus == "speed";
-            foreach (var v in platoon) { if (v.trackOut > 0f) v.trackOut -= dt; v.speedMul = speedMul * (quick ? 1.6f : 1f); v.damageMul = damageMul * (hard ? 1.8f : 1f); v.rangeMul = rangeMul; v.reloadMul = reloadMul * (fast ? 0.45f : 1f) * (radioNet && v != Leader ? 0.75f : 1f); v.turretMul = turretMul; if (v == Leader) { v.speedMul *= careerSpeed; v.damageMul *= careerDamage; v.reloadMul *= careerReload; } }
+            foreach (var v in platoon) { if (v.trackOut > 0f) v.trackOut -= dt; v.speedMul = speedMul * (quick ? 1.6f : 1f); v.damageMul = damageMul * (hard ? 1.8f : 1f); v.rangeMul = rangeMul; v.reloadMul = reloadMul * (fast ? 0.45f : 1f) * (radioNet && v != Leader ? 0.75f : 1f); v.turretMul = turretMul; if (v == Leader) { v.speedMul *= careerSpeed * (1f + 0.03f * crewFoot); v.damageMul *= careerDamage * (1f + 0.03f * crewSteady); v.reloadMul *= careerReload * (1f - 0.03f * crewHands); v.rangeMul *= 1f + 0.03f * crewEagle; v.turretMul *= 1f + 0.08f * crewSnap; } }
 
             // a tap on an enemy: every gun onto it for eight seconds
             if (stick.ConsumeTap() && phase == Phase.Play)
@@ -529,7 +534,7 @@ namespace IronNight
         {
             if (v.dead || v.spec.isGun || v.trackOut > 0f || Random.value > 0.2f) return;
             var d = at - v.transform.position; d.y = 0f; if (Mathf.Abs(Vector3.Dot(d.normalized, v.Forward)) > 0.7f) return;   // from the side only
-            v.trackOut = 10f; fx.Spark(new Vector3(at.x, 0.6f, at.z), d.normalized); Sfx.Ricochet(at); if (!v.friendly) nightTracked++;
+            v.trackOut = v == Leader ? 10f * (1f - 0.15f * crewMech) : 10f; fx.Spark(new Vector3(at.x, 0.6f, at.z), d.normalized); Sfx.Ricochet(at); if (!v.friendly) nightTracked++;
             if (v.friendly) { hud.Toast((v == Leader ? "Track knocked off · " : v.spec.name + " tracked · ") + "10 s", 2.8f); if (v == Leader) Buzz(); }
             else hud.Popup(v.transform.position, "Tracked", new Color(1f, 0.8f, 0.4f));
         }
@@ -549,13 +554,18 @@ namespace IronNight
             wrecks.Add(new Wreck { v = v, fire = fire });
             if (!v.friendly) SpawnSalvage(v);
             if (Random.value < CookOffChance(v)) CookOff(v);
-            if (v.friendly) infantry.BailOut(v.transform.position, -v.Forward);
+            bool gotOut = v.friendly ? (v == Leader || Random.value < 0.5f) : !v.spec.isGun && !v.spec.transport && Random.value < 0.35f;
+            if (gotOut)
+            {
+                var away = Leader != null && v != Leader ? v.transform.position - Leader.transform.position : -v.Forward; away.y = 0f;   // ours to the rear, theirs away from us
+                infantry.BailOut(v.transform.position, v.friendly ? -v.Forward : away.normalized, v.friendly ? Depot.Nation : "de", v == Leader ? 3 : Random.Range(1, 4));
+            }
             if (v.friendly && v != Leader && recovery && recoverySpec == null) { recoverySpec = v.spec; recoveryLeft = 20f; hud.Toast("Recovery crew is on it · " + v.spec.name + " back in twenty seconds", 2.8f); }
             if (v.friendly)
             {
                 bool wasLeader = v == Leader; platoon.Remove(v);
                 if (wasLeader || platoon.Count == 0) { End(false); return; }
-                wingmenLost++; hud.Toast("Wingman lost");
+                wingmenLost++; hud.Toast(gotOut ? "Wingman lost · the crew got out" : "Wingman lost · no one got out");
             }
             else
             {
@@ -783,7 +793,7 @@ namespace IronNight
             {
                 switch (id)
                 {
-                    case "he": { int add = Mathf.Min(heMax + 8 - heRounds, 8 + heMax - heRounds); heMax += 8; heRounds = Mathf.Min(heMax, heRounds + 8); heBurst = 7f; hud.SetAmmo(apRounds, heRounds, loadHe); break; }
+                    case "he": { int add = Mathf.Min(heMax + 8 - heRounds, 8 + heMax - heRounds); heMax += 8; heRounds = Mathf.Min(heMax, heRounds + 8); heBurst = 7f + 0.4f * crewHe; hud.SetAmmo(apRounds, heRounds, loadHe); break; }
                     case "apcr": damageMul *= 1.5f; break;
                     case "rapid": reloadMul *= 0.8f; break;
                     case "radar": cardRange *= 1.15f; rangeMul *= 1.15f; break;
@@ -993,7 +1003,7 @@ namespace IronNight
                 objective.pos = props.PushOut(pos, 5f); pos = objective.pos; objective.marker.position = pos;
                 var w = props.Spawn("wreck", pos, Random.value * 360f); if (w != null) objective.props.Add(w);
                 var toL = L.transform.position - pos; toL.y = 0f; toL.Normalize(); var side = new Vector3(toL.z, 0f, -toL.x);
-                objective.figures.Add(infantry.Figure(pos + toL * 4f + side * 1.2f, toL)); objective.figures.Add(infantry.Figure(pos + toL * 4.5f - side * 1.4f, toL));
+                objective.figures.Add(infantry.Figure(pos + toL * 4f + side * 1.2f, toL, Depot.Nation)); objective.figures.Add(infantry.Figure(pos + toL * 4.5f - side * 1.4f, toL, Depot.Nation));
             }
             if (kind == "dump")
             {
@@ -1139,7 +1149,7 @@ namespace IronNight
                 {
                     // they run to the leader, patch him up and ride along
                     score += 400; objectivesReached++; Sfx.Pickup(); L.hp = Mathf.Min(Depot.LeaderHp + 1f, L.hp + 2f); Depot.Tally("rescued", 1);
-                    foreach (var f in objective.figures) { if (f == null) continue; var to = L.transform.position - f.position; to.y = 0f; infantry.BailOut(f.position, to.normalized); Destroy(f.gameObject); }
+                    foreach (var f in objective.figures) { if (f == null) continue; var to = L.transform.position - f.position; to.y = 0f; infantry.BailOut(f.position, to.normalized, Depot.Nation, 1); Destroy(f.gameObject); }
                     hud.Popup(objective.pos, "+400", new Color(0.4f, 0.9f, 0.6f)); hud.Toast("Crew picked up · the leader is patched up · +400", 2.8f); if (Random.value < 0.6f) Radio("kill");
                     Destroy(objective.marker.gameObject); objective = null; NextObjective(); return;
                 }
@@ -1419,7 +1429,7 @@ namespace IronNight
             if (debugAir && !airTested && t > 5f) { airTested = true; var L0 = Leader; CallAir(L0.transform.position + L0.Forward * 34f); }
             if (airCool > 0f) airCool = Mathf.Max(0f, airCool - dt);
             if (airArmed) { airArmedLeft -= dt; if (airArmedLeft <= 0f) { airArmed = false; hud.Toast("Air strike called off", 1.6f); } }
-            hud.SetAir(airUp, 1f - airCool / 60f, airArmed ? "MARK" : strike != null ? "INBOUND" : airCool > 0f ? Mathf.CeilToInt(airCool) + " s" : "READY", airArmed);
+            hud.SetAir(airUp, 1f - airCool / AirCoolFull, airArmed ? "MARK" : strike != null ? "INBOUND" : airCool > 0f ? Mathf.CeilToInt(airCool) + " s" : "READY", airArmed);
             TickRockets(dt);
             if (strike == null) return;
             var s = strike; s.t += dt;
@@ -1436,7 +1446,7 @@ namespace IronNight
         void CallAir(Vector3 target)
         {
             float ang = Random.Range(-30f, 30f) * Mathf.Deg2Rad; var across = new Vector3(Mathf.Cos(ang) * (Random.value < 0.5f ? -1f : 1f), 0f, Mathf.Sin(ang));   // in from the side of the screen, seen side on
-            target.y = 0f; airCool = 60f; strike = new AirStrike { target = target, dir = across };
+            target.y = 0f; airCool = AirCoolFull; strike = new AirStrike { target = target, dir = across };
             hud.Toast(Depot.Nation == "su" ? "Shturmoviks inbound · yellow smoke" : "Thunderbolts inbound · yellow smoke", 2.6f); Sfx.Click(); Radio("start");
         }
 
@@ -1627,9 +1637,11 @@ namespace IronNight
         /// a second. The platoon's own crashes are heard, and the leader's are felt.</summary>
         void Bog(Vehicle v, float keep, float dt)
         {
+            if (v == Leader && crewRough > 0) keep = 1f - (1f - keep) * (1f - 0.12f * crewRough);   // the rough rider
             v.bog = Mathf.MoveTowards(v.bog, 1f, dt * 0.9f);
             if (keep < 1f) { v.bog = Mathf.Min(v.bog, keep); if (v.friendly) { Sfx.Crunch(v.transform.position); if (v == Leader) shake = Mathf.Max(shake, (1f - keep) * 0.45f); } }
-            v.bog = Mathf.Min(v.bog, props.Rough(v.transform.position));
+            float rough = props.Rough(v.transform.position); if (v == Leader && crewRough > 0) rough = 1f - (1f - rough) * (1f - 0.12f * crewRough);
+            v.bog = Mathf.Min(v.bog, rough);
         }
 
         /// <summary>How likely a kill is to set off its ammunition: the heavies carry more of it, the platoon's Shermans
@@ -1790,14 +1802,14 @@ namespace IronNight
         void TickMg(Vehicle v, float dt)
         {
             v.mgTimer -= dt; v.mgSound -= dt; if (v.mgTimer > 0f) return;
-            var m = infantry.Nearest(v.transform.position, 24f); if (m == null) return;
+            var m = infantry.Nearest(v.transform.position, 24f + (v == Leader ? 2f * crewBow : 0f)); if (m == null) return;
             var to = m.pos - v.transform.position; to.y = 0f; to.Normalize();
             if (Vector3.Dot(to, v.GunDirection) < 0.5f && Vector3.Dot(to, v.Forward) < 0.7f) return;
             v.mgTimer = 0.1f;
             var from = v.transform.position + Vector3.up * 1.7f + v.GunDirection * 2f;
             fx.MgTracer(from, (to + Random.insideUnitSphere * 0.04f).normalized);
             if (v.mgSound <= 0f) { v.mgSound = 0.75f; Sfx.Mg(v.transform.position); }
-            if (Random.value < 0.33f) { infantry.Kill(m); InfantryKilled(1, m.pos); }
+            if (Random.value < 0.33f + (v == Leader ? 0.05f * crewBow : 0f)) { infantry.Kill(m); InfantryKilled(1, m.pos); }
         }
 
         void InfantryKilled(int n, Vector3 at)
@@ -1894,7 +1906,7 @@ namespace IronNight
             Depot.Tally("objectives", objectivesReached - talliedObjectives); talliedObjectives = objectivesReached;
             if (bossKilled && !talliedAce) { talliedAce = true; Depot.Tally("aces", 1); }
             if (dawn && !crewCounted) { crewCounted = true; Depot.CrewNights = Depot.CrewNights + 1; Depot.Tally("crewNights", 1); }
-            if (!dawn && !revived && !crewLostTonight) { crewLostTonight = true; crewBefore = Depot.CrewNights; Depot.CrewNights = 0; Depot.CrewGeneration = Depot.CrewGeneration + 1; }
+            if (!dawn && !revived && !crewLostTonight) { crewLostTonight = true; crewBefore = Depot.CrewNights; Depot.CrewNights = 0; }
             if (dawn) { Depot.Tally("dawns", 1); if (veteran) Depot.Tally("veteranDawns", 1); } Depot.Tally("tracked", nightTracked - talliedTracked); talliedTracked = nightTracked; Depot.Tally("lamps", nightLamps - talliedLamps); talliedLamps = nightLamps;
             if (kills >= 15 && shotsFired > 0 && shotsHit * 2 >= shotsFired) Depot.Tally("sharp", 1);
             if (!logged) { logged = true; Depot.LogNight(TheatreName, kills, t, score, dawn); }
@@ -1910,7 +1922,7 @@ namespace IronNight
             hud.SetEndPoints(earned + bonus);
             int m = Mathf.FloorToInt(t / 60f), s = Mathf.FloorToInt(t % 60f);
             int acc = shotsFired > 0 ? Mathf.RoundToInt(100f * shotsHit / shotsFired) : 0;
-            string crewLine = dawn ? $"\nThe crew's {Depot.CrewNights}{(Depot.CrewNights == 1 ? "st" : Depot.CrewNights == 2 ? "nd" : Depot.CrewNights == 3 ? "rd" : "th")} night together · {Depot.CrewName}" : crewLostTonight && crewBefore > 0 ? $"\nThe crew is lost with the tank · {crewBefore} nights together" : "";
+            string crewLine = dawn ? $"\nThe crew's {Depot.CrewNights}{(Depot.CrewNights == 1 ? "st" : Depot.CrewNights == 2 ? "nd" : Depot.CrewNights == 3 ? "rd" : "th")} night together · {Depot.CrewName}" : crewLostTonight && crewBefore > 0 ? $"\nThe crew got out, but {crewBefore} nights together are lost" : "";
             string statLine = $"{kills} enemy vehicles destroyed · {nightInfantry} infantry\n{m}:{s:00} held · level {level} · {objectivesReached} objectives\nGunnery {acc}% · Score {score * (doubled ? 2 : 1)}" + crewLine + careerLine + lines;
             if (daily) { DailyEnd(dawn, statLine, dawn ? !doubled : !revived, earned + bonus); return; }
             if (opNight > 0) { OperationEnd(dawn, dawn ? !doubled : !revived, earned + bonus, bonus); return; }
@@ -2017,7 +2029,7 @@ namespace IronNight
             if (t >= NightLength) { doubled = true; Depot.AddPoints(score); banked += score; hud.SetEndPoints(banked); hud.ShowEnd(true, $"{kills} enemy vehicles destroyed\nScore {score * 2} (doubled)", false); return; }
             revived = true;
             var L = Vehicle.Create(Wingman, true, platoon.Count > 0 ? platoon[0].transform.position - platoon[0].Forward * 8f : Vector3.zero, platoon.Count > 0 ? platoon[0].yaw : 0f);
-            if (crewLostTonight) { Depot.CrewNights = crewBefore; Depot.CrewGeneration = Depot.CrewGeneration - 1; crewLostTonight = false; }   // pulled out alive: the same men, their nights kept
+            if (crewLostTonight) { Depot.CrewNights = crewBefore; crewLostTonight = false; }   // pulled out alive: the same men, their nights kept
             L.hp = Depot.LeaderHp; platoon.Insert(0, L); leaderShield = 4f;
             hud.HideEnd(); phase = Phase.Play; stick.Blocked = false; hud.Toast("Field repair · back in the fight");
         }

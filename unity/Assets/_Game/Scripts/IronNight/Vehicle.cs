@@ -18,7 +18,7 @@ namespace IronNight
         public Vehicle target;
 
         Transform turret; Renderer[] renderers; Color[] baseColors; Transform muzzle, hullT, barrelT; Vector3 barrelHome; float hullYaw, recoil;
-        static Material starMaterial, crossMaterial, commanderMaterial; const float CommanderYaw = 0f;   // the figure's facing in its mesh, corrected here if it looks the wrong way
+        static Material starMaterial, crossMaterial, commanderMaterial, commanderMaterialSu; const float CommanderYaw = 0f;   // the figure's facing in its mesh, corrected here if it looks the wrong way
         public float smokeTimer;
         static Material vehicleTemplate, vehicleTemplateN, barrelMaterial; public static bool Wet;   // a rainy night: the armour shines
 
@@ -106,7 +106,8 @@ namespace IronNight
             // the commander in his hatch on the platoon's tanks
             if (friendly && turretMesh != null && !spec.crewed)
             {
-                var cmd = Resources.Load<GameObject>("Props/commander");
+                bool su = System.Array.Exists(Depot.Leaders, x => x.id == spec.id && x.nation == "su");
+                var cmdSu = su ? Resources.Load<GameObject>("Props/commander_su") : null; var cmd = cmdSu != null ? cmdSu : Resources.Load<GameObject>("Props/commander");
                 if (cmd != null)
                 {
                     var tb = LocalBounds(turretMesh, pivot); var c = Instantiate(cmd, pivot); c.name = "Commander";
@@ -115,7 +116,9 @@ namespace IronNight
                     float roof = measured ? RoofHeightAt(turretMesh, pivot, at.x, at.z) - 0.08f : RoofHeight(turretMesh, pivot) - 0.05f;   // in his cupola, at its own height
                     c.transform.localScale = Vector3.one * 0.55f; c.transform.localPosition = new Vector3(at.x, roof, at.z); c.transform.localRotation = Quaternion.Euler(0f, CommanderYaw, 0f);
                     if (commanderMaterial == null) { commanderMaterial = new Material(Resources.Load<Material>("VehicleLit")); commanderMaterial.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/commander_tex")); commanderMaterial.SetFloat("_Cull", 0f); }
-                    foreach (var r in c.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = commanderMaterial; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+                    if (cmdSu != null && commanderMaterialSu == null) { commanderMaterialSu = new Material(commanderMaterial); commanderMaterialSu.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/commander_su_tex")); }
+                    var cm = cmdSu != null ? commanderMaterialSu : commanderMaterial;
+                    foreach (var r in c.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = cm; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
                 }
             }
             renderers = GetComponentsInChildren<Renderer>();
