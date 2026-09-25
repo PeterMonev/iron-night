@@ -53,7 +53,8 @@ namespace IronNight
         readonly List<Shell> shells = new List<Shell>(); readonly List<Wreck> wrecks = new List<Wreck>();
         Material shellTemplate; Texture2D glowTex;
         Formation formation = Formation.Wedge; Phase phase = Phase.Title; bool reserveGranted;
-        Operations.Op op; Operations.Night opN; int opNight, wingmenLost; float goalsTick;   // an operation night: the operation and which of its nights (0: a free night)
+        Operations.Op op; Operations.Night opN; int opNight, wingmenLost; float goalsTick;
+        bool daily; string dailyDay = "", rule = "";   // the daily challenge: its day and the rule of the night   // an operation night: the operation and which of its nights (0: a free night)
         int nightTracked, nightFocus, talliedTracked, nightLamps, talliedLamps, nightAces; bool litBySearchlight;
         bool crewCounted, crewLostTonight; int crewBefore;   // the crew's nights: counted at dawn, lost with the leader unless he is pulled back
         Vehicle focus; float focusLeft; Transform focusRing;   // the enemy the platoon was told to hit
@@ -105,16 +106,24 @@ namespace IronNight
             // an operation night brings its own front and way in
             var launch = PlayerPrefs.GetString("op.launch", ""); PlayerPrefs.DeleteKey("op.launch"); foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--op=")) launch = arg.Substring(5);   // test switch: --op=cobra:3
             if (launch.Length > 0) { var lp = launch.Split(':'); op = Operations.ById(lp[0]); if (op != null && lp.Length > 1 && int.TryParse(lp[1], out opNight) && opNight >= 1 && opNight <= op.nights.Length) { opN = op.nights[opNight - 1]; theatre = op.theatre; route = opN.route; } else { op = null; opNight = 0; } }
+            var dl = PlayerPrefs.GetString("daily.launch", ""); PlayerPrefs.DeleteKey("daily.launch");
+            foreach (var arg in System.Environment.GetCommandLineArgs()) { if (arg == "--daily") dl = Daily.Today; else if (arg.StartsWith("--daily=")) dl = arg.Substring(8); }
+            if (opNight == 0 && dl.Length == 8)
+            {
+                daily = true; dailyDay = dl; rule = Daily.RuleOf(dl).id; foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--rule=")) rule = arg.Substring(7);
+                theatre = Daily.Theatre(dl); route = Daily.Route(dl); Random.InitState(Daily.Seed(dl));   // the same first throw of the dice for everyone
+            }
             builtRoute = route; Props.Route = route; routePay = route == "village" ? 1.2f : route == "bocage" ? 1.15f : 1.1f;   // the country is built for this way in
             PickWeather(); weatherTurn = NightLength * Random.Range(0.35f, 0.62f);
-            builtTheatre = theatre; Props.Theatre = theatre; if (theatre == "kursk") routePay *= 1.15f; if (opNight > 0) weatherTurn = 0f; string nation = theatre == "kursk" ? "su" : "us"; if (Depot.Nation != nation) Depot.Nation = nation;
+            builtTheatre = theatre; Props.Theatre = theatre; if (theatre == "kursk") routePay *= 1.15f; if (opNight > 0 || daily) weatherTurn = 0f; string nation = theatre == "kursk" ? "su" : "us"; if (Depot.Nation != nation) Depot.Nation = nation;
             BuildWorld();
             // the night always starts with the leader alone; the platoon grows from the salvaged crates to 3, a rewarded ad opens a 4th slot.
             // The depot's permanent upgrades set the starting numbers
             Depot.Load(); firstNight = Depot.NightsFought == 0;
-            reloadMul = Depot.ReloadMul; rangeMul = Depot.RangeMul * (Depot.CrewLevel >= 3 ? 1.05f : 1f); speedMul = Depot.SpeedMul; maxPlatoon = 3;
+            reloadMul = Depot.ReloadMul; rangeMul = Depot.RangeMul * (Depot.CrewLevel >= 3 ? 1.05f : 1f); speedMul = Depot.SpeedMul; maxPlatoon = rule == "alone" ? 1 : 3;
+            if (rule == "stukas") raidTimer = 5f; if (rule == "aces") aceTimer = 60f;
             if (weather == Weather.Fog) { rangeMul *= 0.8f; enemyRangeMul = 0.8f; } else if (weather == Weather.Overcast) enemyRangeMul = 0.9f; else if (weather == Weather.Rain) { speedMul *= 0.92f; enemyRangeMul = 0.95f; }
-            hud.SetConditions(TheatreName + (route == "village" ? " · village" : route == "bocage" ? (theatre == "kursk" ? " · tree belts" : " · bocage") : (theatre == "kursk" ? " · steppe" : " · open fields")), winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Overcast ? "a dark night, the enemy sees 10% less" : weather == Weather.Rain ? (winter ? "the platoon slows in the drifts, the enemy sees 5% less" : "mud slows the platoon, the enemy sees 5% less") : "");
+            hud.SetConditions((daily ? "Daily · " : "") + TheatreName + (route == "village" ? " · village" : route == "bocage" ? (theatre == "kursk" ? " · tree belts" : " · bocage") : (theatre == "kursk" ? " · steppe" : " · open fields")), winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Overcast ? "a dark night, the enemy sees 10% less" : weather == Weather.Rain ? (winter ? "the platoon slows in the drifts, the enemy sees 5% less" : "mud slows the platoon, the enemy sees 5% less") : "");
             hud.OnQuality = () => { LowQuality = !LowQuality; ApplyQuality(); hud.SetQualityLabel(!LowQuality); };
             if (veteran) hud.Toast("Veteran night · points ×1.5", 3f);
             hud.OnDaily = () => { Depot.ClaimDaily(); hud.ShowTitle(reserveGranted); };
@@ -125,6 +134,7 @@ namespace IronNight
             // the commander riding with the leader
             bonus = Depot.CommanderBonus; commander = System.Array.Find(Depot.Commanders, c => c.id == Depot.CommanderId && c.nation == Depot.Nation); if (bonus == "reload") reloadMul *= 0.85f; if (bonus == "speed") speedMul *= 1.12f; if (bonus == "armour") Leader.hp += 1f;
             apMax += Depot.Level("ammo") * 6; heMax += Depot.Level("ammo") * 3; apRounds = apMax; heRounds = heMax; if (debugHe) { heMax = heRounds = 60; loadHe = true; }
+            if (rule == "short") { apRounds = Mathf.CeilToInt(apMax * 0.5f); heRounds = Mathf.CeilToInt(heMax * 0.5f); }   // half the racks
             hud.OnAmmo = () => { heAuto = false; loadHe = !loadHe; if (loadHe && heRounds <= 0) loadHe = false; else if (!loadHe && apRounds <= 0 && heRounds > 0) loadHe = true; Sfx.Click(); hud.SetAmmo(apRounds, heRounds, loadHe); };
             hud.OnAbility = UseAbility;
             NextObjective();
@@ -138,6 +148,7 @@ namespace IronNight
             };
             hud.OnRoute = r => { route = r; PlayerPrefs.SetString("route", r); PlayerPrefs.Save(); };
             hud.OnTheatre = t => theatre = t;
+            hud.OnDailyChallenge = () => { PlayerPrefs.SetString("daily.launch", Daily.Today); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); };
             hud.OnAir = () => { if (!airUp || airCool > 0f || phase != Phase.Play || strike != null) return; airArmed = !airArmed; airArmedLeft = 8f; hud.Toast(airArmed ? "Tap the target" : "Air strike called off", 2f); Sfx.Click(); };
             hud.OnAd = OnAd; hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             hud.OnStart = () => hud.ShowRoutes(() =>
@@ -152,14 +163,15 @@ namespace IronNight
             hud.OnReserveAd = () => { reserveGranted = true; maxPlatoon = 4; hud.ShowTitle(true); };   // the ad is a mock: granted at once
             hud.OnPause = Pause; hud.OnResume = Resume; hud.OnSound = () => { Sfx.Muted = !Sfx.Muted; hud.ShowPause(!Sfx.Muted, !LowQuality); };
             hud.OnQuit = () => { Resume(); revived = true; End(false); };   // no rewarded repair after walking away
-            hud.OnRestart = () => { Time.timeScale = 1f; if (opNight > 0) { PlayerPrefs.SetString("op.launch", op.id + ":" + opNight); PlayerPrefs.Save(); } SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); };
+            hud.OnRestart = () => { Time.timeScale = 1f; if (opNight > 0) { PlayerPrefs.SetString("op.launch", op.id + ":" + opNight); PlayerPrefs.Save(); } if (daily) { PlayerPrefs.SetString("daily.launch", dailyDay); PlayerPrefs.Save(); } SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); };
             if (debugDawn) t = 250f; if (debugMid) { t = 100f; mortarTimer = 6f; starTimer = 9f; observerTimer = 4f; mineTimer = 6f; }
             hud.Set(t, platoon.Count); hud.SetLevel(level, 0f);
             PlaceCamera(true);
             stick.Blocked = true; hud.ShowTitle(false);
             foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); }
             hud.OnStart += () => Radio("start");
-            if (opNight == 0 && PlayerPrefs.GetInt("route.launch", 0) == 1) { PlayerPrefs.SetInt("route.launch", 0); PlayerPrefs.Save(); StartNight(); Radio("start"); }
+            if (opNight == 0 && !daily && PlayerPrefs.GetInt("route.launch", 0) == 1) { PlayerPrefs.SetInt("route.launch", 0); PlayerPrefs.Save(); StartNight(); Radio("start"); }
+            if (daily) { StartNight(); Radio("start"); var dr = Daily.RuleOf(dailyDay); hud.Briefing(Daily.Picture(dailyDay), "Daily challenge · " + dr.name, dr.line); }
             if (opNight > 0) { StartNight(); Radio("start"); hud.Briefing(Hud.UiSprite(opN.picture) != null ? opN.picture : op.cover, op.name + " · night " + opNight + " of " + op.nights.Length, opN.name + " · " + opN.second.text.ToLowerInvariant() + ", " + opN.third.text.ToLowerInvariant()); } Debug.Log("Iron Night: battle built, debugBoss=" + debugBoss + " args=" + string.Join(" ", System.Environment.GetCommandLineArgs()));
         }
 
@@ -168,7 +180,7 @@ namespace IronNight
             // the ground, the fields, lanes, hedges, farms and searchlight posts are Props, built cell by cell around the camera
             props = new GameObject("Props").AddComponent<Props>(); props.winter = winter; props.wet = weather == Weather.Rain && !winter; Vehicle.Wet = props.wet; props.Build(cam); props.fx = fx;
             tracks = new GameObject("Tracks").AddComponent<Tracks>(); tracks.Build();
-            infantry = new GameObject("Infantry").AddComponent<Infantry>(); infantry.Build(); veteran = Depot.Veteran;
+            infantry = new GameObject("Infantry").AddComponent<Infantry>(); infantry.Build(); veteran = Depot.Veteran || rule == "veteran";
 
             // night: moonlight with soft shadows, a cold ambient, fog swallowing the distance
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat; RenderSettings.ambientLight = sky.ambient;
@@ -559,6 +571,7 @@ namespace IronNight
 
         void Reinforce()
         {
+            if (rule == "alone") return;
             reinforcements++;
             var spec = Depot.Nation == "us" && (reinforcements % 3 == 0 || fireflyNext) ? VehicleSpec.Firefly : Wingman; fireflyNext = false;
             var L = Leader; var v = Vehicle.Create(spec, true, L.transform.position - L.Forward * 12f, L.yaw); v.hp += Depot.WingmanHpBonus + wingmanBonus;
@@ -615,7 +628,8 @@ namespace IronNight
                 float roll = Random.value;
                 float infantryShare = route == "village" ? 0.3f : route == "bocage" ? 0.34f : 0.14f, gunShare = route == "village" ? 0.62f : route == "bocage" ? 0.5f : 0.3f;
                 if (theatre == "kursk") gunShare = infantryShare + (gunShare - infantryShare) * 0.5f;   // the attacker does not dig in
-                if (t > (route == "open" ? 45f : 30f) && roll < infantryShare && infantry.squads.Count < (route == "open" ? 3 : 4))
+                if (rule == "hunters") { float gunPart = gunShare - infantryShare; infantryShare = Mathf.Min(0.6f, infantryShare * 2f); gunShare = infantryShare + gunPart * 0.7f; }
+                if (t > (rule == "hunters" ? 20f : route == "open" ? 45f : 30f) && roll < infantryShare && infantry.squads.Count < (route == "open" ? 3 : 4) + (rule == "hunters" ? 2 : 0))
                 {
                     if (Random.value < 0.5f)
                     {
@@ -659,6 +673,7 @@ namespace IronNight
                     if (spec == VehicleSpec.Tiger && t > (ks ? 90f : 150f) && Random.value < 0.5f) spec = VehicleSpec.Panther;
                     else if (spec == VehicleSpec.PanzerIV && t > 60f && Random.value < (ks ? 0.35f : 0.25f)) spec = VehicleSpec.StuG;
                     if (spec == VehicleSpec.StuG && !ks && Random.value < 0.5f && VehicleSpec.Available(VehicleSpec.Hetzer)) spec = VehicleSpec.Hetzer;   // the Hetzer is 1944
+                    if (rule == "tigers" && t > 15f && spec != VehicleSpec.Tiger && spec != VehicleSpec.Panther && Random.value < 0.5f) spec = t > 60f && Random.value < 0.4f && VehicleSpec.Available(VehicleSpec.Panther) ? VehicleSpec.Panther : VehicleSpec.Tiger;
                     var pos = L.transform.position + dir * Random.Range(44f, 52f);
                     Foe(spec, pos, Mathf.Atan2(-dir.x, -dir.z));
                     if (spec == VehicleSpec.Tiger) { hud.Toast("Tiger! " + Clock(pos), 2.8f); Radio("tiger"); } else if (spec == VehicleSpec.Panther) hud.Toast("Panther! " + Clock(pos), 2.8f);
@@ -757,6 +772,7 @@ namespace IronNight
             if (he) all.RemoveAll(c => c.id == "he"); if (gunners) all.RemoveAll(c => c.id == "gunners"); if (hasSmoke) all.RemoveAll(c => c.id == "smoke");
             foreach (var taken in new[] { wetStowage ? "wet" : null, sandbags ? "sandbags" : null, dozer ? "dozer" : null, canister ? "canister" : null, phosphorus ? "phos" : null, radioNet ? "radionet" : null, aceGunner ? "ace" : null, recovery ? "recovery" : null, wideTracks ? "widetracks" : null, spotterPlane ? "plane" : null }) if (taken != null) all.RemoveAll(c => c.id == taken);
             if (artyInterval > 0f && artyInterval <= 12f) all.RemoveAll(c => c.id == "arty");
+            if (rule == "alone") all.RemoveAll(c => c.id == "reinf" || c.id == "firefly" || c.id == "recovery" || c.id == "radionet" || c.id == "plates");   // nothing for wingmen that never come
             if (Depot.Nation != "us" || (!platoon.Exists(p => p != Leader && p.spec == VehicleSpec.Sherman) && platoon.Count >= maxPlatoon)) all.RemoveAll(c => c.id == "firefly");
             var pick = new List<Hud.Card>(); while (pick.Count < 3 && all.Count > 0) { int i = Random.Range(0, all.Count); pick.Add(all[i]); all.RemoveAt(i); }
             phase = Phase.LevelUp; stick.Blocked = true; Sfx.LevelUp();
@@ -813,6 +829,7 @@ namespace IronNight
         {
             float r = Random.value; weather = r < 0.45f ? Weather.Clear : r < 0.7f ? Weather.Overcast : r < 0.85f ? Weather.Fog : Weather.Rain;
             winter = theatre == "ardennes";
+            if (daily) { var w = Daily.Weather(dailyDay); weather = w == "fog" ? Weather.Fog : w == "rain" ? Weather.Rain : w == "overcast" ? Weather.Overcast : Weather.Clear; if (rule == "stukas") weather = Weather.Clear; }
             if (opNight > 0) weather = opN.weather == "fog" ? Weather.Fog : opN.weather == "rain" ? Weather.Rain : opN.weather == "overcast" ? Weather.Overcast : Weather.Clear;   // the night as it was briefed
             var args = System.Environment.GetCommandLineArgs();   // test switches: --fog, --rain, --overcast, --clear, --winter, --summer
             foreach (Weather w in System.Enum.GetValues(typeof(Weather))) if (System.Array.IndexOf(args, "--" + w.ToString().ToLowerInvariant()) >= 0) weather = w;
@@ -847,7 +864,7 @@ namespace IronNight
             if (props != null) { props.wet = wet; Vehicle.Wet = wet; if (wet) props.SetWet(0.5f); }
             if (weather == Weather.Rain) { if (rain == null) BuildRain(); else { rain.Play(); } } else if (rain != null) rain.Stop(true, ParticleSystemStopBehavior.StopEmitting);
             Sfx.Ambient(wet); LightShaft.boost = weather == Weather.Fog ? 1.8f : weather == Weather.Rain ? 1.3f : 1f;
-            hud.SetConditions(TheatreName + (route == "village" ? " · village" : route == "bocage" ? (theatre == "kursk" ? " · tree belts" : " · bocage") : (theatre == "kursk" ? " · steppe" : " · open fields")), winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Rain ? "the enemy shoots short" : weather == Weather.Overcast ? "a dark night, the enemy sees less" : "the moon is up: they see you");
+            hud.SetConditions((daily ? "Daily · " : "") + TheatreName + (route == "village" ? " · village" : route == "bocage" ? (theatre == "kursk" ? " · tree belts" : " · bocage") : (theatre == "kursk" ? " · steppe" : " · open fields")), winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Rain ? "the enemy shoots short" : weather == Weather.Overcast ? "a dark night, the enemy sees less" : "the moon is up: they see you");
         }
 
         /// <summary>Low quality for weak phones: no moon shadows, no post-processing, no rain or snow.</summary>
@@ -1022,8 +1039,8 @@ namespace IronNight
         void TickAce(float dt)
         {
             if (ace != null && !ace.dead) { hud.NamePlate(aceName, ace.transform.position + Vector3.up * 3.4f, cam, ace.hp / (ace.spec.hp * 1.7f)); return; }
-            if (ace != null && ace.dead) { hud.NamePlate(null, Vector3.zero, cam, 0f); ace = null; aceTimer = 95f + Random.value * 40f; }
-            if (t < 100f || boss != null) return;
+            if (ace != null && ace.dead) { hud.NamePlate(null, Vector3.zero, cam, 0f); ace = null; aceTimer = rule == "aces" ? 55f : 95f + Random.value * 40f; }
+            if (t < (rule == "aces" ? 60f : 100f) || boss != null) return;
             aceTimer -= dt; if (aceTimer > 0f) return;
             var L = Leader; var spec = Random.value < 0.5f ? VehicleSpec.Tiger : Random.value < 0.6f ? VehicleSpec.Panther : VehicleSpec.PanzerIV;
             if (!VehicleSpec.Available(spec)) spec = VehicleSpec.PanzerIV;
@@ -1322,9 +1339,9 @@ namespace IronNight
             var L = Leader; if (L == null) return;
             if (raid == null)
             {
-                if (weather == Weather.Fog || weather == Weather.Rain || t < (debugRaid ? 3f : 150f)) return;
+                if (weather == Weather.Fog || weather == Weather.Rain || t < (debugRaid ? 3f : rule == "stukas" ? 60f : 150f)) return;
                 raidTimer -= dt; if (raidTimer > 0f && !(debugRaid && raidTimer > 140f)) return;
-                raidTimer = debugRaid ? 14f : 80f + Random.value * 40f;
+                raidTimer = debugRaid ? 14f : rule == "stukas" ? 50f + Random.value * 20f : 80f + Random.value * 40f;
                 float ang = Random.Range(-35f, 35f) * Mathf.Deg2Rad; var dir = new Vector3(Mathf.Cos(ang) * (Random.value < 0.5f ? -1f : 1f), 0f, Mathf.Sin(ang));   // across the screen: a dive from behind the camera would fill it
                 var aim = L.transform.position + L.Forward * 6f;   // where the leader is heading, near enough
                 raid = new Raid { a = aim - dir * 16f, b = aim + dir * 16f, dir = dir };
@@ -1395,7 +1412,7 @@ namespace IronNight
         void TickAir(float dt)
         {
             bool su = Depot.Nation == "su";
-            if (!airUp && (t >= 60f || debugAir)) { airUp = true; if (!debugAir) hud.Toast(su ? "Shturmoviks on station · press AIR" : "Thunderbolts on station · press AIR", 3.2f); }
+            if (!airUp && rule != "noair" && (t >= 60f || debugAir)) { airUp = true; if (!debugAir) hud.Toast(su ? "Shturmoviks on station · press AIR" : "Thunderbolts on station · press AIR", 3.2f); }
             if (debugAir && !airTested && t > 5f) { airTested = true; var L0 = Leader; CallAir(L0.transform.position + L0.Forward * 34f); }
             if (airCool > 0f) airCool = Mathf.Max(0f, airCool - dt);
             if (airArmed) { airArmedLeft -= dt; if (airArmedLeft <= 0f) { airArmed = false; hud.Toast("Air strike called off", 1.6f); } }
@@ -1535,7 +1552,7 @@ namespace IronNight
         /// for the heavier kills and now and then an HE round.</summary>
         void SpawnSalvage(Vehicle v)
         {
-            int ap = v.spec.isGun ? 2 : v.spec.hp >= 6f ? 5 : v.spec.hp >= 3f ? 3 : 2;
+            int ap = v.spec.isGun ? 2 : v.spec.hp >= 6f ? 5 : v.spec.hp >= 3f ? 3 : 2; if (rule == "short") ap = Mathf.Max(1, ap - 1);
             DropCrate(props.PushOut(v.transform.position + new Vector3(Random.Range(-2.4f, 2.4f), 0f, Random.Range(-2.4f, 2.4f)), 1.4f), ap, Random.value < 0.3f ? 1 : 0);
         }
 
@@ -1886,9 +1903,25 @@ namespace IronNight
             int acc = shotsFired > 0 ? Mathf.RoundToInt(100f * shotsHit / shotsFired) : 0;
             string crewLine = dawn ? $"\nThe crew's {Depot.CrewNights}{(Depot.CrewNights == 1 ? "st" : Depot.CrewNights == 2 ? "nd" : Depot.CrewNights == 3 ? "rd" : "th")} night together · {Depot.CrewName}" : crewLostTonight && crewBefore > 0 ? $"\nThe crew is lost with the tank · {crewBefore} nights together" : "";
             string statLine = $"{kills} enemy vehicles destroyed · {nightInfantry} infantry\n{m}:{s:00} held · level {level} · {objectivesReached} objectives\nGunnery {acc}% · Score {score * (doubled ? 2 : 1)}" + crewLine + lines;
+            if (daily) { DailyEnd(dawn, statLine, dawn ? !doubled : !revived, earned + bonus); return; }
             if (opNight > 0) { OperationEnd(dawn, dawn ? !doubled : !revived, earned + bonus, bonus); return; }
             hud.ShowEnd(dawn, statLine + (endless ? "\nHeld into daylight · points ×1.5" : ""), dawn ? !doubled : !revived, endless && !dawn ? "DAYLIGHT · LEADER KNOCKED OUT" : null, endless && !dawn ? "The long night is over" : null);
             hud.ShowHold(dawn && !endless);
+        }
+
+        /// <summary>A daily challenge over: the night's own score (no ads, no multipliers) goes against the day's best, and
+        /// the first run of the day is paid for the days in a row. Again fights the same day once more.</summary>
+        void DailyEnd(bool dawn, string statLine, bool adAvailable, int points)
+        {
+            int before = Daily.Best(dailyDay), pay = Daily.Record(dailyDay, score);   // again after a revive: only the best moves, nothing is paid twice
+            var en = System.Globalization.CultureInfo.InvariantCulture;
+            var sb = new System.Text.StringBuilder(statLine);
+            sb.Append(score > before ? "\nA new best for the day · " + score.ToString("N0", en) : "\nThe day's best · " + before.ToString("N0", en));
+            if (pay > 0) sb.Append("\nDaily challenge · " + Daily.Streak + (Daily.Streak == 1 ? " day" : " days") + " in a row · +" + pay.ToString("N0", en));
+            hud.SetEndPoints(points + pay);
+            var dr = Daily.RuleOf(dailyDay);
+            hud.ShowEnd(dawn, sb.ToString(), adAvailable, "DAILY CHALLENGE · " + dr.name.ToUpperInvariant(), dawn ? "The line holds" : "Assault over", "Fight the day again");
+            hud.OnAgain = () => { PlayerPrefs.SetString("daily.launch", dailyDay); PlayerPrefs.Save(); SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); };
         }
 
         /// <summary>An operation night over. Its stars join the ones already won (each new one pays 300, the operation's

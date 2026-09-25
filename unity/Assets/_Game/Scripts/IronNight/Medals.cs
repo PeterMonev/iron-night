@@ -28,6 +28,7 @@ namespace IronNight
             new Medal { id = "veteran", name = "Old Guard", desc = "See the dawn on a veteran night.", test = () => Depot.Total("veteranDawns") >= 1 },
             new Medal { id = "fifty", name = "Iron Night", desc = "Fight fifty nights.", test = () => Depot.NightsFought >= 50 },
             new Medal { id = "campaigner", name = "Campaigner", desc = "Hold the last night of an operation until dawn.", test = () => Operations.Completed >= 1 },
+            new Medal { id = "regular", name = "Regular", desc = "Fight the daily challenge seven days in a row.", test = () => Daily.BestStreak >= 7 },
             new Medal { id = "distinguished", name = "Distinguished Unit", desc = "Win every star of an operation.", test = () => { foreach (var o in Operations.All) if (Operations.Stars(o) == o.nights.Length * 3) return true; return false; } },
             new Medal { id = "wrecker", name = "Track Wrecker", desc = "Throw twenty enemy tracks.", test = () => Depot.Total("tracked") >= 20 },
             new Medal { id = "daybreak", name = "Daybreak", desc = "Hold two minutes into daylight.", test = () => Depot.Total("daybreak") >= 1 },
