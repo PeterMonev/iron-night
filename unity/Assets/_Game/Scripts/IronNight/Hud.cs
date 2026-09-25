@@ -214,9 +214,8 @@ namespace IronNight
                 var fade = MakeImage(mask.transform, "Fade", new Vector2(0.5f, 0f), Vector2.zero, new Vector2(TW - 10f, 150), new Color(0.02f, 0.02f, 0.03f, 0.95f)); fade.sprite = Lightswarm.ProceduralSprites.GradientDown(64, 1.2f); fade.rectTransform.pivot = new Vector2(0.5f, 0f);
                 var edge = MakeImage(tile.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(TW, TH), new Color(1f, 1f, 1f, 0.16f)); edge.sprite = Outline(); edge.type = Image.Type.Sliced; edge.rectTransform.pivot = new Vector2(0.5f, 0.5f); if (i == 1) dailyEdge = edge;
                 var lt = tile.transform.Find("Label").GetComponent<Text>(); lt.text = Spaced(tileNames[i]); lt.alignment = TextAnchor.LowerCenter; lt.rectTransform.sizeDelta = new Vector2(TW, 230); lt.transform.SetAsLastSibling(); lt.font = BoldFont();
-                if (i == 2) continue;   // the depot says what it is
                 var cnt = MakeText(tile.transform, "Count", new Vector2(0.5f, 0f), new Vector2(0, 50), TextAnchor.LowerCenter, 20, OpAmber); cnt.rectTransform.sizeDelta = new Vector2(TW - 10f, 30); cnt.transform.SetAsLastSibling();
-                if (i == 0) { opsTile = tile; opsCount = cnt; } else if (i == 1) dailyCount = cnt; else ordersCount = cnt;
+                if (i == 0) { opsTile = tile; opsCount = cnt; } else if (i == 1) dailyCount = cnt; else if (i == 2) depotCount = cnt; else ordersCount = cnt;
             }
             // to battle: gold, a highlight along the top, a shadow under
             var start = MakePrimary(titleSheet.transform, "To battle", new Vector2(0.5f, 0f), new Vector2(0, 610), new Vector2(920, 160), 62, () => OnStart?.Invoke());
@@ -317,9 +316,9 @@ namespace IronNight
             MakeText(depotSheet.transform, "Hint", new Vector2(0.5f, 0f), new Vector2(0, 1062), TextAnchor.MiddleCenter, 22, dim).text = "drag the tank to turn it · tap a tank in the list to see it";
             var panel = MakeCard(depotSheet.transform, "Panel", new Vector2(0.5f, 0f), new Vector2(0, 40), new Vector2(1000, 1000), new Color(0.04f, 0.05f, 0.07f, 0.82f), 0.14f); panel.rectTransform.pivot = new Vector2(0.5f, 0f);
             { var seg = MakeCard(panel.transform, "Tabs", new Vector2(0.5f, 1f), new Vector2(0, -22), new Vector2(920, 84), new Color(0.03f, 0.04f, 0.05f, 0.9f), 0.1f); seg.rectTransform.pivot = new Vector2(0.5f, 1f);
-              depotTabs[0] = MakeButton(seg.transform, "Upgrades", new Vector2(0.5f, 0.5f), new Vector2(-302, 0), new Vector2(296, 70), 28, () => { depotTab = 0; RefreshDepot(); }).GetComponent<Button>();
-              depotTabs[1] = MakeButton(seg.transform, "Garage", new Vector2(0.5f, 0.5f), new Vector2(0, 0), new Vector2(296, 70), 28, () => { depotTab = 1; RefreshDepot(); }).GetComponent<Button>();
-              depotTabs[2] = MakeButton(seg.transform, "Crew", new Vector2(0.5f, 0.5f), new Vector2(302, 0), new Vector2(296, 70), 28, () => { depotTab = 2; RefreshDepot(); }).GetComponent<Button>();
+              depotTabs[0] = MakeButton(seg.transform, "Upgrades", new Vector2(0.5f, 0.5f), new Vector2(-302, 0), new Vector2(296, 70), 28, () => { depotTab = 0; dossierId = null; RefreshDepot(); }).GetComponent<Button>();
+              depotTabs[1] = MakeButton(seg.transform, "Garage", new Vector2(0.5f, 0.5f), new Vector2(0, 0), new Vector2(296, 70), 28, () => { depotTab = 1; dossierId = null; RefreshDepot(); }).GetComponent<Button>();
+              depotTabs[2] = MakeButton(seg.transform, "Crew", new Vector2(0.5f, 0.5f), new Vector2(302, 0), new Vector2(296, 70), 28, () => { depotTab = 2; dossierId = null; RefreshDepot(); }).GetComponent<Button>();
               foreach (var tb in depotTabs) { var lt = tb.transform.Find("Label").GetComponent<Text>(); lt.text = Spaced(lt.text.ToUpperInvariant()); } }
             // the rows scroll in a masked window inside the panel, under the tabs
             var viewport = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D), typeof(ScrollRect)); viewport.transform.SetParent(panel.transform, false);
@@ -345,6 +344,7 @@ namespace IronNight
               dailyCount.text = played ? "best " + Daily.Best(today).ToString("N0", En) : Daily.RuleOf(today).name.ToLowerInvariant();
               dailyEdge.color = played ? new Color(1f, 1f, 1f, 0.16f) : new Color(0.96f, 0.68f, 0.24f, 0.75f);
               var dp = UiSprite(Daily.Picture(today)); if (dp != null && dailyPic != null) { dailyPic.sprite = dp; float dc = Mathf.Max(216f / dp.rect.width, 240f / dp.rect.height); dailyPic.rectTransform.sizeDelta = new Vector2(dp.rect.width * dc, dp.rect.height * dc); } }
+            { bool ready = false; foreach (var lc in Depot.Leaders) if (Depot.OwnsLeader(lc) && Career.AnyUpgrade(lc.id)) ready = true; depotCount.text = ready ? "upgrade ready" : ""; }
             { opsCount.text = Operations.TotalStars + " / " + Operations.All.Length * 15 + " stars";
               var cs = UiSprite(Operations.Current.cover) ?? UiSprite("campaign_normandy"); if (cs != null && opsPic != null) { opsPic.sprite = cs; float cover = Mathf.Max(216f / cs.rect.width, 240f / cs.rect.height); opsPic.rectTransform.sizeDelta = new Vector2(cs.rect.width * cover, cs.rect.height * cover); } }
             titleStats.text = Depot.NightsFought == 0 ? "First night. Drag anywhere to drive; the turrets fire on their own." : $"Best {Depot.BestKills} kills · longest {m}:{s:00} · {Depot.CrewName}: {Depot.CrewBonusText}";
@@ -366,10 +366,12 @@ namespace IronNight
 
         /// <summary>Test switch --garage=id: straight into the garage tab with that tank on the turntable.</summary>
         public void ShowGarage(VehicleSpec spec) { depotTab = 1; ShowDepot(); if (garage != null) garage.Show(spec); }
+        /// <summary>Test switch --dossier=id: a tank's service record, the tank in the hangar.</summary>
+        public void ShowDossier(string id) { depotTab = 1; ShowDepot(); dossierId = id; if (garage != null) garage.Show(VehicleSpec.ById(id)); RefreshDepot(); }
 
         public void ShowDepot()
         {
-            Depot.Load(); titleSheet.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(true);
+            Depot.Load(); dossierId = null; titleSheet.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(true);
             if (garage != null) { garage.Show(VehicleSpec.ById(Depot.LeaderId)); garage.SetTitle(true); garage.Frame(true); depotBackdrop.texture = garage.TitleTexture; depotDrag.garage = garage; }
             RefreshDepot(); if (depotScroll != null) depotScroll.verticalNormalizedPosition = 1f;
         }
@@ -446,6 +448,7 @@ namespace IronNight
         void RefreshGarage()
         {
             var ink = new Color(0.93f, 0.91f, 0.86f); var dim = new Color(0.66f, 0.64f, 0.59f); var amber = new Color(0.95f, 0.66f, 0.23f); string nation = Depot.Nation; float y = 0f;
+            if (dossierId != null) { RefreshDossier(); return; }
             // the nation: two flags
             {
                 var row = MakeImage(depotRows, "Row nation", new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 210), new Color(0.08f, 0.09f, 0.1f, 0.96f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);
@@ -480,13 +483,92 @@ namespace IronNight
                 }
                 var name = MakeText(row.transform, "Name", new Vector2(0f, 1f), new Vector2(left, -16), TextAnchor.UpperLeft, 36, here ? ink : dim); name.text = c.name + (here ? "" : "  · coming"); name.font = BoldFont(); name.rectTransform.sizeDelta = new Vector2(560, 44);
                 var stats = MakeText(row.transform, "Stats", new Vector2(0f, 1f), new Vector2(left, -62), TextAnchor.UpperLeft, 22, amber); stats.text = $"speed {spec.speed:0}  ·  gun {spec.damage:0.#}  ·  reload {spec.reload:0.#} s\nrange {spec.range:0} m  ·  hits {spec.hp:0.#}"; stats.rectTransform.sizeDelta = new Vector2(450, 60);
-                var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(left, -124), TextAnchor.UpperLeft, 22, dim); desc.text = c.desc; desc.rectTransform.sizeDelta = new Vector2(440, 60);
+                var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(left, -124), TextAnchor.UpperLeft, 22, dim); desc.rectTransform.sizeDelta = new Vector2(440, 60);
+                desc.text = owned && here ? Career.Rank(c.id) + " · " + Career.Xp(c.id).ToString("N0", En) + " XP to spend\n" + StepLine(c.id) : c.desc;   // an owned tank's career, a new one's promise
                 if (garage != null && here) { var look = MakeButton(row.transform, "", new Vector2(0f, 0.5f), new Vector2(330, 0), new Vector2(660, 190), 10, () => garage.Show(spec)); look.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.01f); look.transform.SetAsFirstSibling(); }
                 var b = MakeButton(row.transform, chosen ? "Leading" : owned ? "Lead" : $"{c.cost} pts", new Vector2(1f, 0f), new Vector2(-120, 44), new Vector2(200, 64), 26, () => { if (Depot.PickLeader(c)) { if (garage != null) garage.Show(spec); RefreshDepot(); } });
                 b.GetComponent<Image>().color = chosen ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : can ? new Color(0.2f, 0.22f, 0.24f, 0.95f) : new Color(0.12f, 0.12f, 0.13f, 0.9f);
                 b.transform.Find("Label").GetComponent<Text>().color = chosen ? new Color(0.1f, 0.08f, 0.05f) : can ? ink : new Color(0.5f, 0.48f, 0.45f);
                 b.GetComponent<Button>().interactable = can && !chosen;
+                if (owned && here)
+                {
+                    // its service record: lit when a step can be bought; its stars in the corner
+                    bool ready = Career.AnyUpgrade(c.id);
+                    var up = MakeButton(row.transform, ready ? "Upgrade" : "Service", new Vector2(1f, 0f), new Vector2(-120, 118), new Vector2(200, 64), 26, () => { dossierId = c.id; if (garage != null) garage.Show(spec); RefreshDepot(); if (depotScroll != null) depotScroll.verticalNormalizedPosition = 1f; });
+                    up.GetComponent<Image>().color = ready ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : new Color(0.2f, 0.22f, 0.24f, 0.95f);
+                    up.transform.Find("Label").GetComponent<Text>().color = ready ? new Color(0.1f, 0.08f, 0.05f) : ink;
+                    int stars = Career.Stars(c.id);
+                    for (int s = 0; s < 4; s++) { var st = MakeImage(row.transform, "Star", new Vector2(1f, 1f), new Vector2(-118 - 26 * 1.5f + s * 26, -24), new Vector2(22, 22), s < stars ? amber : new Color(0.26f, 0.26f, 0.28f)); st.sprite = StarSprite(); st.rectTransform.pivot = new Vector2(0.5f, 0.5f); }
+                }
                 y -= 202f;
+            }
+        }
+
+        string dossierId;   // a tank's service record open in the garage tab
+
+        /// <summary>The three steps of a tank as pips: Gun ■■□ · Engine ■□□ · Armour □□□.</summary>
+        static string StepLine(string id)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var m in Career.Modules) { if (sb.Length > 0) sb.Append("  ·  "); sb.Append(m.name).Append(' '); int s = Career.Step(id, m.id); for (int k = 0; k < 3; k++) sb.Append(k < s ? "■" : "□"); }
+            return sb.ToString();
+        }
+
+        /// <summary>A tank's service record in the garage tab: its rank and the experience it has to spend, its gun, engine
+        /// and armour with what the next step does and costs, and its record. The tank itself stands in the hangar above,
+        /// with its kill rings on the barrel.</summary>
+        void RefreshDossier()
+        {
+            var ink = new Color(0.93f, 0.91f, 0.86f); var dim = new Color(0.66f, 0.64f, 0.59f); var amber = new Color(0.95f, 0.66f, 0.23f); var card = new Color(0.08f, 0.09f, 0.1f, 0.96f);
+            var c = System.Array.Find(Depot.Leaders, x => x.id == dossierId); if (c == null) { dossierId = null; RefreshGarage(); return; }
+            string id = c.id; float y = 0f;
+            // the head: back, the name, its stars and rank, the experience to spend and the way to the next rank
+            {
+                var row = MakeImage(depotRows, "Row head", new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 270), card); row.rectTransform.pivot = new Vector2(0.5f, 1f);
+                MakeGhost(row.transform, "BACK", new Vector2(0f, 1f), new Vector2(110, -48), new Vector2(170, 60), 22, () => { dossierId = null; RefreshDepot(); });
+                var nm = MakeText(row.transform, "Name", new Vector2(0f, 1f), new Vector2(30, -94), TextAnchor.UpperLeft, 66, ink); nm.text = c.name.ToUpperInvariant(); nm.font = DisplayFont(); nm.rectTransform.sizeDelta = new Vector2(600, 80); nm.horizontalOverflow = HorizontalWrapMode.Overflow;
+                int stars = Career.Stars(id);
+                for (int s = 0; s < 4; s++) { var st = MakeImage(row.transform, "Star", new Vector2(0f, 1f), new Vector2(46 + s * 36, -198), new Vector2(30, 30), s < stars ? amber : new Color(0.26f, 0.26f, 0.28f)); st.sprite = StarSprite(); st.rectTransform.pivot = new Vector2(0.5f, 0.5f); }
+                var rk = MakeText(row.transform, "Rank", new Vector2(0f, 1f), new Vector2(190, -184), TextAnchor.UpperLeft, 26, amber); rk.text = Spaced(Career.Rank(id).ToUpperInvariant()); rk.font = BoldFont(); rk.rectTransform.sizeDelta = new Vector2(300, 32);
+                var xp = MakeText(row.transform, "Xp", new Vector2(1f, 1f), new Vector2(-30, -60), TextAnchor.UpperRight, 84, amber); xp.text = Career.Xp(id).ToString("N0", En); xp.font = DisplayFont(); xp.rectTransform.sizeDelta = new Vector2(360, 96); xp.verticalOverflow = VerticalWrapMode.Overflow; xp.rectTransform.pivot = new Vector2(1f, 1f);
+                var xl = MakeText(row.transform, "XpLabel", new Vector2(1f, 1f), new Vector2(-30, -154), TextAnchor.UpperRight, 20, dim); xl.text = Spaced("XP TO SPEND"); xl.font = BoldFont(); xl.rectTransform.sizeDelta = new Vector2(360, 30); xl.rectTransform.pivot = new Vector2(1f, 1f);
+                int next = Career.NextRank(id), floor = Career.RankFloor(id), total = Career.TotalXp(id);
+                var bar = MakeImage(row.transform, "Bar", new Vector2(0f, 1f), new Vector2(30, -238), new Vector2(880, 8), new Color(0.18f, 0.18f, 0.2f)); bar.sprite = Rounded(); bar.type = Image.Type.Sliced; bar.rectTransform.pivot = new Vector2(0f, 0.5f);
+                float k = next > 0 ? Mathf.Clamp01((total - floor) / (float)(next - floor)) : 1f;
+                var fill = MakeImage(row.transform, "Fill", new Vector2(0f, 1f), new Vector2(30, -238), new Vector2(Mathf.Max(8f, 880f * k), 8), amber); fill.sprite = Rounded(); fill.type = Image.Type.Sliced; fill.rectTransform.pivot = new Vector2(0f, 0.5f);
+                var nx = MakeText(row.transform, "Next", new Vector2(1f, 1f), new Vector2(-30, -206), TextAnchor.UpperRight, 20, dim); nx.text = next > 0 ? total.ToString("N0", En) + " / " + next.ToString("N0", En) + " XP to the next star" : total.ToString("N0", En) + " XP · every star won"; nx.rectTransform.sizeDelta = new Vector2(560, 28); nx.rectTransform.pivot = new Vector2(1f, 1f);
+                y -= 282f;
+            }
+            // the three steps: gun, engine, armour
+            foreach (var m in Career.Modules)
+            {
+                var mod = m; int step = Career.Step(id, m.id), cost = Career.NextCost(id, m.id); bool can = Career.CanUpgrade(id, m.id), done = cost == 0;
+                var row = MakeImage(depotRows, "Row " + m.id, new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 244), card); row.rectTransform.pivot = new Vector2(0.5f, 1f);
+                var pic = UiSprite(m.picture); if (pic != null) { var art = MakeImage(row.transform, "Art", new Vector2(0f, 1f), new Vector2(18f, -18f), new Vector2(150f, 150f), Color.white); art.sprite = pic; }
+                var ti = MakeText(row.transform, "Title", new Vector2(0f, 1f), new Vector2(200, -18), TextAnchor.UpperLeft, 44, ink); ti.text = m.name; ti.font = BoldFont(); ti.rectTransform.sizeDelta = new Vector2(300, 56);
+                string[] roman = { "I", "II", "III" };
+                for (int s = 0; s < 3; s++) { var pip = MakeText(row.transform, "Step", new Vector2(1f, 1f), new Vector2(-210 + s * 80, -24), TextAnchor.UpperCenter, 34, s < step ? amber : new Color(0.3f, 0.3f, 0.32f)); pip.text = roman[s]; pip.font = DisplayFont(); pip.rectTransform.sizeDelta = new Vector2(70, 44); }
+                var now = MakeText(row.transform, "Now", new Vector2(0f, 1f), new Vector2(200, -80), TextAnchor.UpperLeft, 26, dim); now.text = step == 0 ? "Standard, as it left the factory" : "Now: " + m.steps[step - 1]; now.rectTransform.sizeDelta = new Vector2(710, 34);
+                var nxt = MakeText(row.transform, "Next", new Vector2(0f, 1f), new Vector2(200, -118), TextAnchor.UpperLeft, 26, done ? dim : amber); nxt.text = done ? "Every step fitted" : "Step " + roman[step] + ": " + m.steps[step]; nxt.rectTransform.sizeDelta = new Vector2(710, 34);
+                var b = MakeButton(row.transform, done ? "Complete" : "Upgrade · " + cost.ToString("N0", En) + " XP", new Vector2(1f, 0f), new Vector2(-190, 44), new Vector2(340, 72), 30, () => { if (Career.Upgrade(id, mod.id)) { Sfx.LevelUp(); RefreshDepot(); } });
+                b.GetComponent<Image>().color = can ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : new Color(0.2f, 0.2f, 0.22f, 0.9f);
+                b.transform.Find("Label").GetComponent<Text>().color = can ? new Color(0.1f, 0.08f, 0.05f) : new Color(0.55f, 0.53f, 0.5f);
+                b.GetComponent<Button>().interactable = can;
+                y -= 256f;
+            }
+            // its record, and the rings on its barrel
+            {
+                var row = MakeImage(depotRows, "Row record", new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 214), card); row.rectTransform.pivot = new Vector2(0.5f, 1f);
+                var ti = MakeText(row.transform, "Title", new Vector2(0f, 1f), new Vector2(30, -18), TextAnchor.UpperLeft, 44, ink); ti.text = "Service record"; ti.font = BoldFont(); ti.rectTransform.sizeDelta = new Vector2(600, 56);
+                var rec = MakeText(row.transform, "Record", new Vector2(0f, 1f), new Vector2(30, -80), TextAnchor.UpperLeft, 26, dim);
+                rec.text = Career.Nights(id) + (Career.Nights(id) == 1 ? " night" : " nights") + " · " + Career.Kills(id).ToString("N0", En) + " kills · " + Career.Dawns(id) + (Career.Dawns(id) == 1 ? " dawn" : " dawns") + " · best night " + Career.Best(id).ToString("N0", En);
+                rec.rectTransform.sizeDelta = new Vector2(880, 34);
+                int rings = Career.Rings(id), toNext = Career.KillsPerRing - Career.Kills(id) % Career.KillsPerRing;
+                var rg = MakeText(row.transform, "Rings", new Vector2(0f, 1f), new Vector2(30, -118), TextAnchor.UpperLeft, 26, amber); rg.text = (rings == 0 ? "No kill rings yet" : rings + (rings == 1 ? " kill ring" : " kill rings") + " on the barrel") + (rings < Career.MaxRings ? " · the next in " + toNext + " kills" : ""); rg.rectTransform.sizeDelta = new Vector2(560, 34);
+                bool chosen = Depot.LeaderId == id;
+                var lead = MakeButton(row.transform, chosen ? "Leading" : "Lead", new Vector2(1f, 0f), new Vector2(-190, 48), new Vector2(340, 80), 30, () => { if (Depot.PickLeader(c)) RefreshDepot(); });
+                lead.GetComponent<Image>().color = chosen ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : new Color(0.2f, 0.22f, 0.24f, 0.95f);
+                lead.transform.Find("Label").GetComponent<Text>().color = chosen ? new Color(0.1f, 0.08f, 0.05f) : ink; lead.GetComponent<Button>().interactable = !chosen;
             }
         }
 
@@ -633,7 +715,7 @@ namespace IronNight
         public void SetOrder(string text) { if (orderLabel != null) orderLabel.text = text; }
 
         // ---- the daily challenge: one night a day, the same for every commander
-        Text dailyCount, dailyClock; Image dailyPic, dailyEdge; GameObject dailySheet; Transform dailyBody;
+        Text dailyCount, dailyClock, depotCount; Image dailyPic, dailyEdge; GameObject dailySheet; Transform dailyBody;
         static readonly System.Globalization.CultureInfo En = System.Globalization.CultureInfo.InvariantCulture;
 
         /// <summary>The day's challenge: its picture, its rule and place, the time to the next one, the record so far and

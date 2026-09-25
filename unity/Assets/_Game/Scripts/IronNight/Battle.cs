@@ -54,7 +54,8 @@ namespace IronNight
         Material shellTemplate; Texture2D glowTex;
         Formation formation = Formation.Wedge; Phase phase = Phase.Title; bool reserveGranted;
         Operations.Op op; Operations.Night opN; int opNight, wingmenLost; float goalsTick;
-        bool daily; string dailyDay = "", rule = "";   // the daily challenge: its day and the rule of the night   // an operation night: the operation and which of its nights (0: a free night)
+        bool daily; string dailyDay = "", rule = "";   // the daily challenge: its day and the rule of the night
+        string leaderId = "", leaderName = "", careerLine = ""; int careerXp, careerKills; bool careerNight, careerDawn; float careerDamage = 1f, careerReload = 1f, careerSpeed = 1f;   // the leader's own tank   // an operation night: the operation and which of its nights (0: a free night)
         int nightTracked, nightFocus, talliedTracked, nightLamps, talliedLamps, nightAces; bool litBySearchlight;
         bool crewCounted, crewLostTonight; int crewBefore;   // the crew's nights: counted at dawn, lost with the leader unless he is pulled back
         Vehicle focus; float focusLeft; Transform focusRing;   // the enemy the platoon was told to hit
@@ -130,7 +131,9 @@ namespace IronNight
             var leaderSpec = VehicleSpec.ById(Depot.LeaderId); if (!VehicleSpec.Available(leaderSpec)) leaderSpec = VehicleSpec.ById(Depot.WingmanId);
             foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--tank=")) leaderSpec = VehicleSpec.ById(arg.Substring(7));   // test switch: --tank=is2
             var startAt = Vector3.zero; foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--at=")) { var xz = arg.Substring(5).Split(','); startAt = new Vector3(float.Parse(xz[0]), 0f, float.Parse(xz[1])); }   // test switch: --at=0,95
+            foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg == "--careertest") Career.Add(leaderSpec.id, 4000, 320, false, false, 0);   // test switch: a seasoned tank
             platoon.Add(Vehicle.Create(leaderSpec, true, startAt, 0f)); Leader.hp = Depot.LeaderHp;
+            leaderId = leaderSpec.id; leaderName = leaderSpec.name; careerDamage = Career.DamageMul(leaderId); careerReload = Career.ReloadMul(leaderId); careerSpeed = Career.SpeedMul(leaderId); Leader.KillRings(Career.Rings(leaderId));
             // the commander riding with the leader
             bonus = Depot.CommanderBonus; commander = System.Array.Find(Depot.Commanders, c => c.id == Depot.CommanderId && c.nation == Depot.Nation); if (bonus == "reload") reloadMul *= 0.85f; if (bonus == "speed") speedMul *= 1.12f; if (bonus == "armour") Leader.hp += 1f;
             apMax += Depot.Level("ammo") * 6; heMax += Depot.Level("ammo") * 3; apRounds = apMax; heRounds = heMax; if (debugHe) { heMax = heRounds = 60; loadHe = true; }
@@ -168,7 +171,7 @@ namespace IronNight
             hud.Set(t, platoon.Count); hud.SetLevel(level, 0f);
             PlaceCamera(true);
             stick.Blocked = true; hud.ShowTitle(false);
-            foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); }
+            foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); }
             hud.OnStart += () => Radio("start");
             if (opNight == 0 && !daily && PlayerPrefs.GetInt("route.launch", 0) == 1) { PlayerPrefs.SetInt("route.launch", 0); PlayerPrefs.Save(); StartNight(); Radio("start"); }
             if (daily) { StartNight(); Radio("start"); var dr = Daily.RuleOf(dailyDay); hud.Briefing(Daily.Picture(dailyDay), "Daily challenge · " + dr.name, dr.line); }
@@ -235,7 +238,7 @@ namespace IronNight
             TickAce(dt); TickWeatherTurn(dt); TickAir(dt);
             if (opNight > 0) { goalsTick -= dt; if (goalsTick <= 0f) { goalsTick = 0.5f; hud.SetGoals(GoalLine(opN.second) + "      " + GoalLine(opN.third)); } }
             bool fast = abilityLeft > 0f && bonus == "reload", hard = abilityLeft > 0f && bonus == "heavy", quick = abilityLeft > 0f && bonus == "speed";
-            foreach (var v in platoon) { if (v.trackOut > 0f) v.trackOut -= dt; v.speedMul = speedMul * (quick ? 1.6f : 1f); v.damageMul = damageMul * (hard ? 1.8f : 1f); v.rangeMul = rangeMul; v.reloadMul = reloadMul * (fast ? 0.45f : 1f) * (radioNet && v != Leader ? 0.75f : 1f); v.turretMul = turretMul; }
+            foreach (var v in platoon) { if (v.trackOut > 0f) v.trackOut -= dt; v.speedMul = speedMul * (quick ? 1.6f : 1f); v.damageMul = damageMul * (hard ? 1.8f : 1f); v.rangeMul = rangeMul; v.reloadMul = reloadMul * (fast ? 0.45f : 1f) * (radioNet && v != Leader ? 0.75f : 1f); v.turretMul = turretMul; if (v == Leader) { v.speedMul *= careerSpeed; v.damageMul *= careerDamage; v.reloadMul *= careerReload; } }
 
             // a tap on an enemy: every gun onto it for eight seconds
             if (stick.ConsumeTap() && phase == Phase.Play)
@@ -1895,6 +1898,12 @@ namespace IronNight
             if (dawn) { Depot.Tally("dawns", 1); if (veteran) Depot.Tally("veteranDawns", 1); } Depot.Tally("tracked", nightTracked - talliedTracked); talliedTracked = nightTracked; Depot.Tally("lamps", nightLamps - talliedLamps); talliedLamps = nightLamps;
             if (kills >= 15 && shotsFired > 0 && shotsHit * 2 >= shotsFired) Depot.Tally("sharp", 1);
             if (!logged) { logged = true; Depot.LogNight(TheatreName, kills, t, score, dawn); }
+            {   // the leader's tank: its share of the night (a night that ends twice adds only what is new)
+                int xpNow = Mathf.RoundToInt(score * 0.1f) + (dawn ? 100 : 0), gain = Mathf.Max(0, xpNow - careerXp);
+                Career.Add(leaderId, gain, Mathf.Max(0, kills - careerKills), !careerNight, dawn && !careerDawn, score);
+                careerXp = Mathf.Max(careerXp, xpNow); careerKills = kills; careerNight = true; if (dawn) careerDawn = true;
+                careerLine = "\n" + leaderName + " · +" + gain + " XP" + (Career.AnyUpgrade(leaderId) ? " · an upgrade is ready" : "");
+            }
             var medals = Medals.Check();
             int bonus = 0; var lines = new System.Text.StringBuilder(); foreach (var o in done) { bonus += o.reward; lines.Append("\nOrder carried out · " + o.Title + " · +" + o.reward); }
             foreach (var md in medals) { bonus += Medals.Reward; lines.Append("\nMedal · " + md.name + " · +" + Medals.Reward); }
@@ -1902,7 +1911,7 @@ namespace IronNight
             int m = Mathf.FloorToInt(t / 60f), s = Mathf.FloorToInt(t % 60f);
             int acc = shotsFired > 0 ? Mathf.RoundToInt(100f * shotsHit / shotsFired) : 0;
             string crewLine = dawn ? $"\nThe crew's {Depot.CrewNights}{(Depot.CrewNights == 1 ? "st" : Depot.CrewNights == 2 ? "nd" : Depot.CrewNights == 3 ? "rd" : "th")} night together · {Depot.CrewName}" : crewLostTonight && crewBefore > 0 ? $"\nThe crew is lost with the tank · {crewBefore} nights together" : "";
-            string statLine = $"{kills} enemy vehicles destroyed · {nightInfantry} infantry\n{m}:{s:00} held · level {level} · {objectivesReached} objectives\nGunnery {acc}% · Score {score * (doubled ? 2 : 1)}" + crewLine + lines;
+            string statLine = $"{kills} enemy vehicles destroyed · {nightInfantry} infantry\n{m}:{s:00} held · level {level} · {objectivesReached} objectives\nGunnery {acc}% · Score {score * (doubled ? 2 : 1)}" + crewLine + careerLine + lines;
             if (daily) { DailyEnd(dawn, statLine, dawn ? !doubled : !revived, earned + bonus); return; }
             if (opNight > 0) { OperationEnd(dawn, dawn ? !doubled : !revived, earned + bonus, bonus); return; }
             hud.ShowEnd(dawn, statLine + (endless ? "\nHeld into daylight · points ×1.5" : ""), dawn ? !doubled : !revived, endless && !dawn ? "DAYLIGHT · LEADER KNOCKED OUT" : null, endless && !dawn ? "The long night is over" : null);
@@ -1941,6 +1950,7 @@ namespace IronNight
             if (firstFinish) paid.Add($"{op.name} won +2000");
             if (honours > 0) paid.Add($"orders and medals +{honours}");
             if (paid.Count > 0) sb.Append("\n").Append(string.Join(" · ", paid));
+            sb.Append(careerLine);
             hud.SetEndPoints(points + pay);
             string again = !dawn ? "Fight the night again" : last ? "Back to base" : "Night " + (opNight + 1) + " · " + op.nights[opNight].name;
             hud.ShowEnd(dawn, sb.ToString(), adAvailable, op.name.ToUpperInvariant() + " · NIGHT " + opNight + " OF " + op.nights.Length, dawn ? (last ? op.name + " is won" : "The line holds") : "The night is lost", again);

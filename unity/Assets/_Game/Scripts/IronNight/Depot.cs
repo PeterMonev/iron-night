@@ -166,7 +166,7 @@ namespace IronNight
         }
 
         // what the upgrades mean in the fight
-        public static float LeaderHp => 8f + Level("armor") + (CrewLevel >= 2 ? 1f : 0f);
+        public static float LeaderHp => 8f + Level("armor") + (CrewLevel >= 2 ? 1f : 0f) + Career.ExtraHits(LeaderId);   // the tank's own armour steps too
         // the leader's crew: nights survived together, per nation; lost with the leader unless the field repair pulls them out
         public static int CrewNights { get { Load(); return PlayerPrefs.GetInt("crew.nights." + Nation, 0); } set { PlayerPrefs.SetInt("crew.nights." + Nation, Mathf.Max(0, value)); Save(); } }
         public static int CrewLevel => CrewNights >= 10 ? 3 : CrewNights >= 5 ? 2 : CrewNights >= 2 ? 1 : 0;

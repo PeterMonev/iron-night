@@ -160,6 +160,56 @@ namespace IronNight
         /// <summary>The gun has just fired: the barrel slams back and the hull rocks on its springs.</summary>
         public void Recoil() { recoil = 1f; }
 
+        static Material ringMaterial;
+        /// <summary>Kill rings painted round the barrel behind the muzzle, one for every fifty kills in this tank. Our own
+        /// barrel has a known radius; an artist's gun is measured from the turret mesh, back from the muzzle past any brake.</summary>
+        public void KillRings(int n)
+        {
+            if (n <= 0 || turret == null || spec.isGun) return;
+            if (ringMaterial == null) { ringMaterial = new Material(vehicleTemplate); ringMaterial.SetColor("_BaseColor", new Color(0.84f, 0.82f, 0.76f)); ringMaterial.SetFloat("_Smoothness", 0.25f); }
+            if (barrelT != null)
+            {
+                // our own barrel: rings in its frame, so they recoil with it (its local Y is the bore, +1 the muzzle)
+                float half = spec.gunLength * 0.5f;
+                for (int i = 0; i < n; i++) Ring(barrelT, new Vector3(0f, 1f - (0.3f + i * 0.075f) / half, 0f), Quaternion.identity, new Vector3(1.07f, 0.036f / spec.gunLength, 1.07f));
+                return;
+            }
+            var tm = turret.Find("TurretMesh"); if (tm == null) return;
+            // cut the mesh across the barrel at three places behind the muzzle: a long barrel has vertices only at its
+            // ends, but its triangles cross every cut, and where they cross is the barrel's surface
+            var m = spec.muzzle; var pts = new System.Collections.Generic.List<Vector3>(); float[] cuts = { m.z - 0.7f, m.z - 1.0f, m.z - 1.3f };
+            foreach (var mf in tm.GetComponentsInChildren<MeshFilter>())
+            {
+                if (mf.sharedMesh == null || !mf.sharedMesh.isReadable) continue;
+                var vs = mf.sharedMesh.vertices; var tris = mf.sharedMesh.triangles; var q = new Vector3[vs.Length];
+                for (int i = 0; i < vs.Length; i++) q[i] = turret.InverseTransformPoint(mf.transform.TransformPoint(vs[i]));
+                for (int t = 0; t < tris.Length; t += 3)
+                    for (int e = 0; e < 3; e++)
+                    {
+                        var a = q[tris[t + e]]; var b = q[tris[t + (e + 1) % 3]];
+                        foreach (var zc in cuts)
+                        {
+                            if ((a.z - zc) * (b.z - zc) >= 0f) continue;
+                            var p = Vector3.Lerp(a, b, (zc - a.z) / (b.z - a.z));
+                            if (new Vector2(p.x - m.x, p.y - m.y).sqrMagnitude < 0.04f) pts.Add(p);
+                        }
+                    }
+            }
+            if (pts.Count < 12) { Debug.Log("Iron Night: no barrel found for the kill rings on " + spec.id); return; }
+            var c = Vector2.zero; foreach (var p in pts) c += new Vector2(p.x, p.y); c /= pts.Count;   // the bore, as the barrel lies
+            var rs = new System.Collections.Generic.List<float>(); foreach (var p in pts) rs.Add(new Vector2(p.x - c.x, p.y - c.y).magnitude);
+            rs.Sort(); float r = rs[Mathf.FloorToInt(rs.Count * 0.85f)];
+            Debug.Log("Iron Night: kill rings " + n + " on " + spec.id + ", barrel radius " + r.ToString("0.000") + " from " + pts.Count + " points");
+            if (r < 0.03f || r > 0.13f) return;
+            for (int i = 0; i < n; i++) Ring(turret, new Vector3(c.x, c.y, m.z - 0.65f - i * 0.075f), Quaternion.Euler(90f, 0f, 0f), new Vector3(r * 2.14f, 0.018f, r * 2.14f));
+        }
+        static void Ring(Transform parent, Vector3 pos, Quaternion rot, Vector3 scale)
+        {
+            var g = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(g.GetComponent<Collider>()); g.name = "KillRing"; g.transform.SetParent(parent, false);
+            g.transform.localPosition = pos; g.transform.localRotation = rot; g.transform.localScale = scale;
+            var r = g.GetComponent<Renderer>(); r.sharedMaterial = ringMaterial; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+
         /// <summary>The racks went up: the turret comes off the ring, free of the hull, for the battle to throw. Null for
         /// guns, casemates and anything without a turret.</summary>
         public Transform BlowTurret()

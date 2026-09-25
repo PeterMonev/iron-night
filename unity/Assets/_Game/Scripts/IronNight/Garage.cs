@@ -132,7 +132,7 @@ namespace IronNight
             if (spec == null || (shown != null && shownId == spec.id)) return;
             if (shown != null) Destroy(shown.gameObject);
             shown = Vehicle.Create(spec, true, Home, 0f); shown.transform.SetParent(stage, true); shownId = spec.id;
-            shown.turretYaw = 0.35f; shown.Apply(); shown.enabled = false;
+            shown.turretYaw = 0.35f; shown.Apply(); shown.enabled = false; shown.KillRings(Career.Rings(spec.id));
             if (parkedTank == null && parked != null)
             {
                 // one of the wingmen parked at the back, in the shadows
