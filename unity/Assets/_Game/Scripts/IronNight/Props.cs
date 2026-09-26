@@ -91,7 +91,7 @@ namespace IronNight
             var lit = Resources.Load<Material>("VehicleLit"); var decal = Resources.Load<Material>("GroundDecal");
             foreach (var k in Kinds)
             {
-                if (k.mesh.StartsWith("k_") && !Kursk) continue;
+                if (k.mesh.StartsWith("k_") && !Kursk && k.mesh != "k_hedgehogs") continue;   // the hedgehogs are loaded on every front: a last stand digs them in anywhere
                 var pf = Resources.Load<GameObject>("Props/" + k.mesh); if (pf == null) continue;
                 prefabs[k.mesh] = pf;
                 var m = new Material(lit); m.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + k.mesh + "_tex")); m.SetColor("_BaseColor", Tint(k.mesh)); m.SetFloat("_Smoothness", 0.15f); m.SetFloat("_Cull", 0f);
@@ -167,6 +167,19 @@ namespace IronNight
             var f = new Vector2(Mathf.Sin(yaw), Mathf.Cos(yaw)); var r = new Vector2(f.y, -f.x);
             for (int c = 0; c < n; c++) { p.circleCenters[c] = new Vector2(pos.x, pos.z) + f * kind.circles[c * 3] + r * kind.circles[c * 3 + 1]; p.radii[c] = kind.circles[c * 3 + 2]; }
             list.Add(p); return p;
+        }
+
+        /// <summary>A model the player puts down (the last stand's sandbags and hedgehogs): into the cell it stands in,
+        /// solid like the rest, without the spacing the country's own props keep.</summary>
+        public void AddModel(string mesh, Vector3 pos, float yaw)
+        {
+            var kind = K(mesh); if (kind == null || !prefabs.ContainsKey(mesh)) return;
+            var list = CellProps(Mathf.RoundToInt(pos.x / Cell), Mathf.RoundToInt(pos.z / Cell));
+            var p = new Prop { what = What.Model, kind = kind, pos = pos, yaw = yaw, height = kind.height, bound = kind.length };
+            int n = kind.circles.Length / 3; p.circleCenters = new Vector2[n]; p.radii = new float[n];
+            var f = new Vector2(Mathf.Sin(yaw), Mathf.Cos(yaw)); var r = new Vector2(f.y, -f.x);
+            for (int c = 0; c < n; c++) { p.circleCenters[c] = new Vector2(pos.x, pos.z) + f * kind.circles[c * 3] + r * kind.circles[c * 3 + 1]; p.radii[c] = kind.circles[c * 3 + 2]; }
+            list.Add(p);
         }
 
         /// <summary>A hedgerow tree: the blob crown, cheap enough for a dozen a screen; the generated oak is for the few that stand alone.</summary>
