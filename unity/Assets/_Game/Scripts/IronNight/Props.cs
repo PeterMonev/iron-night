@@ -20,6 +20,7 @@ namespace IronNight
             public Vector2[] circleCenters = new Vector2[0]; public float[] radii = new float[0];
             public Vector3 a, b; public float[] gaps; public float clearA, clearB;              // hedges: the line and its openings
             public GameObject go; public Mesh mesh, leaves; public float az, el = 42f, track; public LightShaft shaft; public Transform yoke, drum, lamp; public float flakTimer = 4f; public int burst; public Light glow;
+            public Light spot; public Transform pool; public Vector3 poolAt, poolDir; public float poolLen, poolWid;   // a raid night's searchlight: its light, and its pool on the ground
             public int state; public float hp = -1f, fallYaw, burn; public bool drivable;   // 0 standing, 1 knocked over, 2 crushed, 3 ruined; a ruin is driven over
         }
 
@@ -127,13 +128,14 @@ namespace IronNight
         static int FieldType(int ix, int iz) => Rnd(ix, iz, 902) < 0.2f ? (int)(Hash(ix, iz, 903) % 4) : (int)(Hash(FloorDiv(ix, 2), FloorDiv(iz, 2), 901) % 4);
         static bool LaneX(int ix) => ix == 0 || Hash(ix, 1, 910) % 3 == 0;                    // a lane on the line x = ix*40+20
         static bool LaneZ(int iz) => Hash(1, iz, 911) % 4 == 0;                               // a lane on the line z = iz*40+20
+        public static bool SneakNight;   // a night raid: more searchlight posts, their beams on the ground
         public static string Route = "open";   // "village", "open" or "bocage": set before the night is built
         static float FarmChance => Route == "village" ? 0.17f : Route == "bocage" ? 0.08f : 0.07f;
         static float VillageChance => Route == "village" ? 0.24f : Route == "bocage" ? 0.03f : 0.04f;
         static float HedgeBias => (Route == "bocage" ? 1.45f : Route == "open" ? 0.5f : 0.85f) * (Kursk ? 0.6f : 1f);   // the steppe is open country
         static float TreeBias => Route == "bocage" ? 1.8f : Route == "open" ? 0.6f : 1f;
         static bool Farm(int ix, int iz) => (ix == 1 && iz == 1) || (!Start(ix, iz) && Rnd(ix, iz, 930) < FarmChance);
-        static bool Battery(int ix, int iz) => (ix == -1 && iz == 0) || (!Start(ix, iz) && !Farm(ix, iz) && Rnd(ix, iz, 940) < 0.16f);
+        static bool Battery(int ix, int iz) => (ix == -1 && iz == 0) || (!Start(ix, iz) && !Farm(ix, iz) && Rnd(ix, iz, 940) < (SneakNight ? 0.32f : 0.16f));
         static bool Village(int ix, int iz) => (ix == 0 && iz == 3) || (!Start(ix, iz) && !Farm(ix, iz) && !Battery(ix, iz) && Rnd(ix, iz, 1100) < VillageChance);
         static bool HedgeX(int ix, int iz) { if (LaneX(ix)) return false; if (Farm(ix, iz) || Farm(ix + 1, iz)) return true; return Rnd(ix, iz, 920) < Mathf.Min(0.97f, (FieldType(ix, iz) != FieldType(ix + 1, iz) ? 0.85f : 0.3f) * HedgeBias); }
         static bool HedgeZ(int ix, int iz) { if (LaneZ(iz)) return false; if (Farm(ix, iz) || Farm(ix, iz + 1)) return true; return Rnd(ix, iz, 921) < Mathf.Min(0.97f, (FieldType(ix, iz) != FieldType(ix, iz + 1) ? 0.85f : 0.3f) * HedgeBias); }
@@ -348,7 +350,7 @@ namespace IronNight
             }
             return false;
         }
-        void KillLamp(Prop p) { if (p.shaft != null) p.shaft.gameObject.SetActive(false); if (p.lamp != null) p.lamp.gameObject.SetActive(false); }
+        void KillLamp(Prop p) { if (p.shaft != null) p.shaft.gameObject.SetActive(false); if (p.lamp != null) p.lamp.gameObject.SetActive(false); if (p.spot != null) p.spot.enabled = false; if (p.pool != null) p.pool.gameObject.SetActive(false); p.poolLen = 0f; }
 
         /// <summary>Moves the grid to the cell under the camera and recolours it: a corner deep inside a field is that
         /// field, a corner near a boundary is a mix of the two, so the textures cross-fade over five metres or so.</summary>
@@ -414,13 +416,15 @@ namespace IronNight
                 // the beam wanders round the sky between 22 and 62 degrees up; the lamp glow faces the camera. Once the posts are
                 // alerted, one within 75 m swings down and follows the leader; the sweep is picked up again when he is gone
                 float ph = p.seed * 0.37f, az = time * 7f * (p.seed % 2 == 0 ? 1f : -1f) + ph * 57f, el = 42f + Mathf.Sin(time * 0.17f + ph) * 20f;
-                var toL = platoon - p.pos; float distL = new Vector2(toL.x, toL.z).magnitude; bool tracking = false;   // the AA posts keep to the sky: turning a Flak searchlight on tanks was a rare thing (Seelow, 1945), not a Normandy night
-                if (tracking) { az = Mathf.Atan2(toL.x, toL.z) * Mathf.Rad2Deg - p.yaw * Mathf.Rad2Deg; el = Mathf.Max(3f, Mathf.Atan2(2.4f, distL) * Mathf.Rad2Deg); p.track = Mathf.Min(1f, p.track + Time.deltaTime * 0.5f); }
+                var toL = platoon - p.pos; float distL = new Vector2(toL.x, toL.z).magnitude; bool tracking = SneakNight && alert && distL < 75f;   // the AA posts keep to the sky (turning a Flak searchlight on tanks was a rare thing, Seelow 1945); a raid night's posts sweep the ground, and once the alarm is up the near ones follow the leader
+                if (SneakNight && !tracking) { az = time * 11f * (p.seed % 2 == 0 ? 1f : -1f) + ph * 57f; el = -(4.5f + Mathf.Sin(time * 0.23f + ph) * 1.8f); }
+                if (tracking) { az = Mathf.Atan2(toL.x, toL.z) * Mathf.Rad2Deg - p.yaw * Mathf.Rad2Deg; el = SneakNight ? -Mathf.Atan2(1.4f, Mathf.Max(4f, distL)) * Mathf.Rad2Deg : Mathf.Max(3f, Mathf.Atan2(2.4f, distL) * Mathf.Rad2Deg); p.track = Mathf.Min(1f, p.track + Time.deltaTime * 0.5f); }
                 else p.track = Mathf.Max(0f, p.track - Time.deltaTime * 0.5f);
                 p.az = Mathf.MoveTowardsAngle(p.az, az, (tracking ? 30f : 90f) * Time.deltaTime); p.el = Mathf.MoveTowards(p.el, el, 25f * Time.deltaTime);
                 p.yoke.localRotation = Quaternion.Euler(0f, p.az, 0f); p.drum.localRotation = Quaternion.Euler(-p.el, 0f, 0f);
                 if (tracking && p.track >= 1f && Vector3.Angle(p.drum.forward, (platoon + Vector3.up - p.drum.position).normalized) < 5f) { litNow = true; litBy = p.pos; }
                 p.lamp.rotation = cam.rotation;
+                if (p.pool != null) Pool(p);
                 p.shaft.Set(p.drum.position + p.drum.forward * 0.6f, p.drum.forward);
                 // the post's gun fires a burst at the sky now and then: five tracers climbing along the beam
                 p.flakTimer -= Time.deltaTime;
@@ -543,7 +547,38 @@ namespace IronNight
             go.transform.position = p.pos; go.transform.rotation = Quaternion.Euler(0f, p.yaw * Mathf.Rad2Deg, 0f);
             p.yoke = go.transform.Find("Yoke"); p.drum = p.yoke.Find("Drum"); p.lamp = p.drum.Find("Lamp");
             var shaft = new GameObject("Beam"); shaft.transform.SetParent(transform, false); p.shaft = shaft.AddComponent<LightShaft>();
+            if (SneakNight)
+            {
+                var sl = new GameObject("Spot").AddComponent<Light>(); sl.type = LightType.Spot; sl.spotAngle = 12f; sl.innerSpotAngle = 5f; sl.range = 70f; sl.intensity = 90f; sl.color = new Color(0.85f, 0.9f, 1f); sl.shadows = LightShadows.None;
+                sl.transform.SetParent(p.drum, false); sl.transform.localPosition = new Vector3(0f, 0f, LampLensZ); p.spot = sl;
+                if (poolMaterial == null) { poolMaterial = new Material(Resources.Load<Material>("Additive")); poolMaterial.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.Glow(64, 0.35f).texture); poolMaterial.SetColor("_BaseColor", new Color(0.7f, 0.76f, 0.92f, 0.5f)); }
+                p.pool = Quad(go.transform, p.pos, 0f, 6f, 9f, poolMaterial, 0.06f).transform; p.pool.name = "Pool"; p.pool.gameObject.SetActive(false);
+            }
             p.go = go; if (deadLamps.Contains(p.seed)) KillLamp(p);
+        }
+        Material poolMaterial;
+
+        /// <summary>Where a raid night's beam meets the ground: the pool of light laid there, longer the flatter the beam.</summary>
+        void Pool(Prop p)
+        {
+            var f = p.drum.forward; if (f.y > -0.012f || deadLamps.Contains(p.seed)) { if (p.pool.gameObject.activeSelf) p.pool.gameObject.SetActive(false); p.poolLen = 0f; return; }
+            var o = p.drum.position; var hit = o + f * (o.y / -f.y); var h = new Vector3(f.x, 0f, f.z).normalized; float dist = new Vector2(hit.x - o.x, hit.z - o.z).magnitude;
+            p.poolAt = new Vector3(hit.x, 0f, hit.z); p.poolDir = h; p.poolWid = 5f + dist * 0.09f; p.poolLen = 8f + dist * 0.3f;
+            if (!p.pool.gameObject.activeSelf) p.pool.gameObject.SetActive(true);
+            p.pool.position = new Vector3(hit.x, 0.06f, hit.z); p.pool.rotation = Quaternion.Euler(90f, Mathf.Atan2(h.x, h.z) * Mathf.Rad2Deg, 0f); p.pool.localScale = new Vector3(p.poolWid, p.poolLen, 1f);
+        }
+
+        /// <summary>A raid night: whether a point is in one of the searchlights' pools of light.</summary>
+        public bool InBeam(Vector3 pos)
+        {
+            if (!SneakNight) return false;
+            foreach (var p in active)
+            {
+                if (p.what != What.Searchlight || p.poolLen <= 0f || deadLamps.Contains(p.seed)) continue;
+                var d = pos - p.poolAt; d.y = 0f; float a = Vector3.Dot(d, p.poolDir) / (p.poolLen * 0.5f), b = Vector3.Dot(d, new Vector3(p.poolDir.z, 0f, -p.poolDir.x)) / (p.poolWid * 0.5f);
+                if (a * a + b * b < 1f) return true;
+            }
+            return false;
         }
 
         /// <summary>The searchlight itself: a drum on a yoke on a pedestal on a four-wheel trailer, its face glowing.</summary>

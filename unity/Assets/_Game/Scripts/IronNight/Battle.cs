@@ -123,7 +123,10 @@ namespace IronNight
             // a convoy runs up the lane through the open fields of the chosen front, once its trucks are built
             var cl = PlayerPrefs.GetString("convoy.launch", ""); PlayerPrefs.DeleteKey("convoy.launch"); foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg == "--convoy") cl = theatre;   // test switch: --convoy
             if (opNight == 0 && !daily && !stand && cl.Length > 0 && ConvoyReady(cl)) { convoy = true; theatre = cl; route = "open"; }
-            builtRoute = route; Props.Route = route; routePay = stand ? 0.5f : convoy ? 0.9f : route == "village" ? 1.2f : route == "bocage" ? 1.15f : 1.1f;   // the country is built for this way in
+            // a night raid slips through the searchlight line on the chosen front
+            var nl = PlayerPrefs.GetString("sneak.launch", ""); PlayerPrefs.DeleteKey("sneak.launch"); foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg == "--nightraid") nl = theatre;   // test switch: --nightraid (--raid is the Stukas)
+            if (opNight == 0 && !daily && !stand && !convoy && nl.Length > 0) { sneak = true; theatre = nl; route = "open"; }
+            builtRoute = route; Props.Route = route; Props.SneakNight = sneak; routePay = stand ? 0.5f : convoy ? 0.9f : sneak ? 1f : route == "village" ? 1.2f : route == "bocage" ? 1.15f : 1.1f;   // the country is built for this way in
             PickWeather(); weatherTurn = NightLength * Random.Range(0.35f, 0.62f);
             builtTheatre = theatre; Props.Theatre = theatre; if (theatre == "kursk") routePay *= 1.15f; if (opNight > 0 || daily) weatherTurn = 0f; string nation = theatre == "kursk" ? "su" : "us"; if (Depot.Nation != nation) Depot.Nation = nation;
             BuildWorld();
@@ -133,7 +136,7 @@ namespace IronNight
             reloadMul = Depot.ReloadMul; rangeMul = Depot.RangeMul * (Depot.CrewLevel >= 3 ? 1.05f : 1f); speedMul = Depot.SpeedMul; maxPlatoon = rule == "alone" ? 1 : 3;
             if (rule == "stukas") raidTimer = 5f; if (rule == "aces") aceTimer = 60f;
             if (weather == Weather.Fog) { rangeMul *= 0.8f; enemyRangeMul = 0.8f; } else if (weather == Weather.Overcast) enemyRangeMul = 0.9f; else if (weather == Weather.Rain) { speedMul *= 0.92f; enemyRangeMul = 0.95f; }
-            hud.SetConditions((stand ? "Last stand · " : convoy ? "Convoy · " : daily ? "Daily · " : "") + TheatreName + (route == "village" ? " · village" : route == "bocage" ? (theatre == "kursk" ? " · tree belts" : " · bocage") : (theatre == "kursk" ? " · steppe" : " · open fields")), winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Overcast ? "a dark night, the enemy sees 10% less" : weather == Weather.Rain ? (winter ? "the platoon slows in the drifts, the enemy sees 5% less" : "mud slows the platoon, the enemy sees 5% less") : "");
+            hud.SetConditions((stand ? "Last stand · " : convoy ? "Convoy · " : sneak ? "Night raid · " : daily ? "Daily · " : "") + TheatreName + (route == "village" ? " · village" : route == "bocage" ? (theatre == "kursk" ? " · tree belts" : " · bocage") : (theatre == "kursk" ? " · steppe" : " · open fields")), winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Overcast ? "a dark night, the enemy sees 10% less" : weather == Weather.Rain ? (winter ? "the platoon slows in the drifts, the enemy sees 5% less" : "mud slows the platoon, the enemy sees 5% less") : "");
             hud.OnQuality = () => { LowQuality = !LowQuality; ApplyQuality(); hud.SetQualityLabel(!LowQuality); };
             if (veteran) hud.Toast("Veteran night · points ×1.5", 3f);
             hud.OnDaily = () => { Depot.ClaimDaily(); hud.ShowTitle(reserveGranted); };
@@ -173,6 +176,7 @@ namespace IronNight
                 else { PlayerPrefs.SetInt("route.launch", 1); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); }   // another way in: the country is built again
             });
             hud.garage = Garage.Build(); hud.garage.SetActive(false);
+            hud.OnSneak = th => { PlayerPrefs.SetString("sneak.launch", th); PlayerPrefs.SetString("theatre", th); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); };
             hud.OnConvoy = th => { PlayerPrefs.SetString("convoy.launch", th); PlayerPrefs.SetString("theatre", th); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); };
             hud.OnStand = th => { PlayerPrefs.SetString("stand.launch", th); PlayerPrefs.SetString("theatre", th); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); };
             hud.OnOperation = (id, n) => { PlayerPrefs.SetString("op.launch", id + ":" + n); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); };
@@ -181,7 +185,7 @@ namespace IronNight
             hud.OnReserveAd = () => { reserveGranted = true; maxPlatoon = 4; hud.ShowTitle(true); };   // the ad is a mock: granted at once
             hud.OnPause = Pause; hud.OnResume = Resume; hud.OnSound = () => { Sfx.Muted = !Sfx.Muted; hud.ShowPause(!Sfx.Muted, !LowQuality); };
             hud.OnQuit = () => { Resume(); revived = true; End(false); };   // no rewarded repair after walking away
-            hud.OnRestart = () => { Time.timeScale = 1f; if (stand) { PlayerPrefs.SetString("stand.launch", theatre); PlayerPrefs.Save(); } if (convoy) { PlayerPrefs.SetString("convoy.launch", theatre); PlayerPrefs.Save(); } if (opNight > 0) { PlayerPrefs.SetString("op.launch", op.id + ":" + opNight); PlayerPrefs.Save(); } if (daily) { PlayerPrefs.SetString("daily.launch", dailyDay); PlayerPrefs.Save(); } SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); };
+            hud.OnRestart = () => { Time.timeScale = 1f; if (stand) { PlayerPrefs.SetString("stand.launch", theatre); PlayerPrefs.Save(); } if (convoy) { PlayerPrefs.SetString("convoy.launch", theatre); PlayerPrefs.Save(); } if (sneak) { PlayerPrefs.SetString("sneak.launch", theatre); PlayerPrefs.Save(); } if (opNight > 0) { PlayerPrefs.SetString("op.launch", op.id + ":" + opNight); PlayerPrefs.Save(); } if (daily) { PlayerPrefs.SetString("daily.launch", dailyDay); PlayerPrefs.Save(); } SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); };
             if (debugDawn) t = 250f; if (debugMid) { t = 100f; mortarTimer = 6f; starTimer = 9f; observerTimer = 4f; mineTimer = 6f; }
             hud.Set(t, platoon.Count); hud.SetLevel(level, 0f);
             PlaceCamera(true);
@@ -189,6 +193,7 @@ namespace IronNight
             foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); }
             hud.OnStart += () => Radio("start");
             if (opNight == 0 && !daily && PlayerPrefs.GetInt("route.launch", 0) == 1) { PlayerPrefs.SetInt("route.launch", 0); PlayerPrefs.Save(); StartNight(); Radio("start"); }
+            if (sneak) { SneakBuild(); StartNight(); Radio("start"); string np = Hud.UiSprite("sneak_" + theatre) != null ? "sneak_" + theatre : theatre == "kursk" ? "route_kursk_belts" : "route_bocage"; hud.Briefing(np, "Night raid · " + TheatreName, "No lights, no shooting. Slip past the searchlights to the depot and blow it. A beam that finds you raises the alarm."); }
             if (convoy) { ConvoyBuild(); StartNight(); Radio("start"); string cp = Hud.UiSprite("convoy_" + theatre) != null ? "convoy_" + theatre : theatre == "kursk" ? "route_kursk_steppe" : "route_open"; hud.Briefing(cp, "Convoy · " + TheatreName, "Bring the five trucks up the road to the checkpoint. The enemy goes for the trucks."); }
             if (stand) { StandBuild(); StartNight(); Radio("start"); string sp = Hud.UiSprite("stand_" + theatre) != null ? "stand_" + theatre : theatre == "kursk" ? "route_kursk_village" : theatre == "ardennes" ? "campaign_ardennes" : "campaign_lastpush"; hud.Briefing(sp, "Last stand · " + TheatreName, "Hold the crossroads through ten waves. Between them, dig in: sandbags, hedgehogs, mines."); }
             if (daily) { StartNight(); Radio("start"); var dr = Daily.RuleOf(dailyDay); hud.Briefing(Daily.Picture(dailyDay), "Daily challenge · " + dr.name, dr.line); }
@@ -234,7 +239,7 @@ namespace IronNight
             if (phase != Phase.Play) { PlaceCamera(false); TickWrecks(dt); TickTosses(dt); Sfx.Engine(0f); props.Tick(); return; }
             t += dt;
             if (firstNight && hintIndex < hints.Length && t >= hintTimes[hintIndex]) { hud.Toast(hints[hintIndex], 3.5f); hintIndex++; }
-            Lighting(stand ? standDawn : convoy ? convoyDawn : Mathf.Clamp01((t - 255f) / 45f), dt);
+            Lighting(stand ? standDawn : convoy ? convoyDawn : sneak && sneakDone ? Mathf.Max(sneakDawn, Mathf.Clamp01((t - 255f) / 45f)) : Mathf.Clamp01((t - 255f) / 45f), dt);
             if (smokeLeft > 0f) smokeLeft -= dt; if (smokeCooldown > 0f) smokeCooldown -= dt;
             TickArtillery(dt);
             var L = Leader;
@@ -252,7 +257,7 @@ namespace IronNight
                 if (d.magnitude > 1.2f) v.Drive(Steer(v, new Vector2(d.x, d.z) * (Mathf.Clamp01(d.magnitude / 5f))), dt);
             }
             TickAbility(dt); TickCards(dt); if (phase != Phase.Play) return;
-            TickAce(dt); TickWeatherTurn(dt); TickAir(dt);
+            if (!sneak || sneakAlarm) TickAce(dt); TickWeatherTurn(dt); TickAir(dt);
             if (opNight > 0) { goalsTick -= dt; if (goalsTick <= 0f) { goalsTick = 0.5f; hud.SetGoals(GoalLine(opN.second) + "      " + GoalLine(opN.third)); } }
             bool fast = abilityLeft > 0f && bonus == "reload", hard = abilityLeft > 0f && bonus == "heavy", quick = abilityLeft > 0f && bonus == "speed";
             foreach (var v in platoon) { if (v.trackOut > 0f) v.trackOut -= dt; v.speedMul = speedMul * (quick ? 1.6f : 1f); v.damageMul = damageMul * (hard ? 1.8f : 1f); v.rangeMul = rangeMul; v.reloadMul = reloadMul * (fast ? 0.45f : 1f) * (radioNet && v != Leader ? 0.75f : 1f); v.turretMul = turretMul; if (v == Leader) { v.speedMul *= careerSpeed * (1f + 0.03f * crewFoot); v.damageMul *= careerDamage * (1f + 0.03f * crewSteady); v.reloadMul *= careerReload * (1f - 0.03f * crewHands); v.rangeMul *= 1f + 0.03f * crewEagle; v.turretMul *= 1f + 0.08f * crewSnap; } }
@@ -267,7 +272,7 @@ namespace IronNight
             }
             if (focus != null) { focusLeft -= dt; if (focus.dead || focusLeft <= 0f) { focus = null; if (focusRing != null) focusRing.gameObject.SetActive(false); } else focusRing.position = focus.transform.position; }
             if (pointLeft > 0f) { pointLeft -= dt; }
-            TickObserver(dt);
+            if (!sneak || sneakAlarm) TickObserver(dt);
             // turrets: nearest foe in range, else drift home
             float leaderTurret = L.turretYaw;
             foreach (var v in platoon)
@@ -291,14 +296,14 @@ namespace IronNight
                         if (v != L && Mathf.Abs(off) > 6f && (Slot(platoon.IndexOf(v)) - v.transform.position).magnitude <= 1.2f) v.yaw += Mathf.Sign(off) * v.spec.turnRate * 0.6f * dt;
                         v.turretYaw = v.yaw + Mathf.Clamp(off, -14f, 14f) * Mathf.Deg2Rad; on = on && Mathf.Abs(off) <= 14f;
                     }
-                    if (on && v.reloadLeft <= 0f && Dist(v, target) <= v.Range) { if (v != Leader || apRounds > 0 || heRounds > 0) Fire(v, target); else Dry(); }
+                    if (on && v.reloadLeft <= 0f && Dist(v, target) <= v.Range && SneakMayFire()) { if (v != Leader || apRounds > 0 || heRounds > 0) Fire(v, target); else Dry(); }
                 }
                 else v.IdleTurret(dt);
                 v.Apply();
             }
 
             Sfx.Turret(Mathf.Abs(Mathf.DeltaAngle(leaderTurret * Mathf.Rad2Deg, L.turretYaw * Mathf.Rad2Deg)) * Mathf.Deg2Rad / Mathf.Max(dt, 1e-4f));
-            foreach (var v in platoon) TickMg(v, dt);
+            if (!sneak || sneakAlarm) foreach (var v in platoon) TickMg(v, dt);
             infantry.Tick(dt, platoon, props, FireFaust);
             int crushed = infantry.Crush(platoon); if (crushed > 0) { InfantryKilled(crushed, L.transform.position); hud.Toast("Run down", 1.5f); }
 
@@ -307,7 +312,7 @@ namespace IronNight
             {
                 var e = foes[i]; e.reloadLeft -= dt; if (e.trackOut > 0f) e.trackOut -= dt;
                 var target = Nearest(platoon, e.transform.position, 1000f); if (convoy) target = ConvoyTarget(e, target); if (target == null) continue; e.rangeMul = enemyRangeMul * (lit ? 1.2f : 1f);
-                float dist = Dist(e, target);
+                float dist = Dist(e, target); if (SneakAsleep(e, dist, dt)) continue;
                 if (e.spec.transport) { TickTransport(e, target, dist, dt); continue; }
                 if (!e.spec.isGun && !e.spec.casemate && e.hp <= 1f && e.spec.hp >= 3f && e.fallBack <= 0f && e.fallenBack < 1 && dist < e.Range * 0.8f) { e.fallBack = 6f; e.fallenBack++; hud.Toast(e.spec.name + " falling back", 2f); }
                 if (e.fallBack > 0f)
@@ -335,14 +340,14 @@ namespace IronNight
             foreach (var e in foes) if (!e.spec.isGun) { Bog(e, props.Ram(e.transform.position, e.spec.radius * 0.7f, e.Forward, false), dt); e.transform.position = props.PushOut(e.transform.position, e.spec.radius * 0.7f); }
             foreach (var v in platoon) tracks.Mark(v); foreach (var e in foes) if (!e.spec.isGun) tracks.Mark(e);
             foreach (var v in platoon) Smoulder(v, dt); foreach (var e in foes) Smoulder(e, dt);
-            props.platoon = L.transform.position; props.alert = false; props.Tick();
+            props.platoon = L.transform.position; props.alert = sneak && sneakAlarm; props.Tick();
             flareLight.range = 34f + platoon.Count * 3f;
             Sfx.Engine(stick.Active ? stick.Direction.magnitude : 0f);
             PlaceCamera(false);
             hud.Set(t, platoon.Count); hud.SetLeader(Mathf.CeilToInt(L.hp), Mathf.CeilToInt(Depot.LeaderHp)); hud.SetTally(kills, score);
             hud.ReloadArc(L.transform.position + Vector3.up * 0.2f, L.reloadLeft <= 0f ? 1f : 1f - L.reloadLeft / Mathf.Max(0.1f, L.spec.reload * L.reloadMul), cam);
             hud.Indicators(foes, cam);
-            TickObjective(dt); TickDrops(dt); TickSalvage(dt); TickHoles(dt); TickTosses(dt); TickMortars(dt); TickStar(dt); TickRaid(dt);
+            TickObjective(dt); TickDrops(dt); TickSalvage(dt); TickHoles(dt); TickTosses(dt); if (!sneak || sneakAlarm) { TickMortars(dt); TickStar(dt); TickRaid(dt); }
             if (ammoLeft > 0f) { ammoLeft -= dt; if (ammoLeft <= 0f) { ammoMul = 1f; hud.Toast("APCR spent"); } }
             hud.Radar(foes, platoon, L.transform.position, objective != null ? objective.pos : Vector3.zero, objective != null, cratePos);   // the commander's spotting shows them all: the markers are placed when it is called
             hud.HpBars(foes, cam, boss);
@@ -350,7 +355,7 @@ namespace IronNight
             TickObjectiveLabel();
             if (firstNight) Tutorial(dt);
             TickMines(dt);
-            if (!stand && !convoy && t >= NightLength && !endless) { Radio("dawn"); End(true); }
+            if (!stand && !convoy && t >= NightLength && !endless) { if (sneak && !sneakDone) End(false); else { Radio("dawn"); End(true); } }   // a raid is lost at dawn with its depot standing
             if (endless && !daybreak && t >= NightLength + 120f) { daybreak = true; Depot.Tally("daybreak", 1); hud.Toast("Two minutes into daylight · Daybreak", 3f); }
         }
 
@@ -373,7 +378,7 @@ namespace IronNight
             var fire = new GameObject("DumpFire").AddComponent<Light>(); fire.type = LightType.Point; fire.color = new Color(1f, 0.55f, 0.2f); fire.range = 26f; fire.intensity = 14f; fire.shadows = LightShadows.None; fire.transform.position = pos + Vector3.up * 3f; dumpFires.Add(fire);
             InfantryKilled(infantry.Blast(pos, 9f), pos); foreach (var e in foes.ToArray()) { var d = e.transform.position - pos; d.y = 0f; if (d.magnitude < 9f && !e.dead) Damage(e, 2f, pos); }
             hud.Popup(pos, "+500", new Color(1f, 0.6f, 0.3f)); hud.Toast("Fuel dump destroyed · +500", 2.6f);
-            Destroy(objective.marker.gameObject); objective = null; pointLeft = 0f; NextObjective();
+            Destroy(objective.marker.gameObject); objective = null; pointLeft = 0f; if (sneak) SneakDone(); else NextObjective();
         }
         readonly List<Light> dumpFires = new List<Light>();
 
@@ -417,7 +422,7 @@ namespace IronNight
         void TickMines(float dt)
         {
             var L = Leader;
-            if (!stand && !convoy && t > 120f) { mineTimer -= dt; if (mineTimer <= 0f && mines.Count < 12) {
+            if (!stand && !convoy && !sneak && t > 120f) { mineTimer -= dt; if (mineTimer <= 0f && mines.Count < 12) {
                 mineTimer = 60f + Random.value * 30f; var side = new Vector3(L.Forward.z, 0f, -L.Forward.x) * (Random.value < 0.5f ? 1f : -1f); var start = L.transform.position + L.Forward * 44f + side * 34f;
                 if (VehicleSpec.Available(VehicleSpec.Halftrack)) { var ht = Foe(VehicleSpec.Halftrack, props.PushOut(start, 2f), Mathf.Atan2(-side.x, -side.z)); ht.sapper = true; ht.unloaded = true; ht.sapperLeft = 5; ht.lastMine = ht.transform.position; hud.Toast("Sapper half-track, " + Clock(start) + " · it is laying mines · kill it", 3.2f); }
                 else { for (int i = -2; i <= 2; i++) LayMine(props.PushOut(start - side * 34f + side * (i * 4f), 1f)); hud.Toast("Sappers laid mines ahead, " + Clock(start) + " · shoot them or go round", 3.2f); }
@@ -479,6 +484,7 @@ namespace IronNight
         void Fire(Vehicle v, Vehicle target) => Fire(v);
         void Fire(Vehicle v)
         {
+            if (v.friendly) SneakShot();   // a shot of ours before the alarm is heard
             v.reloadLeft = v.spec.reload * v.reloadMul * (v.friendly ? 1f : Mathf.Lerp(1.9f, 1.1f, t / 120f) * (firstNight ? 1.3f : 1f)); v.Recoil();
             var scatter = (v.friendly ? 1.5f * scatterMul : 4f * (smokeLeft > 0f ? 3f : 1f) * (lit ? 0.5f : 1f)) * Mathf.Deg2Rad * Random.Range(-1f, 1f);
             bool leaderShot = v == Leader, heShot = he || (leaderShot && loadHe);
@@ -624,6 +630,7 @@ namespace IronNight
         {
             if (stand) { TickStand(dt); return; }
             if (convoy) { TickConvoy(dt); return; }
+            if (sneak) { if (!sneakAlarm) { TickSneakQuiet(dt); return; } TickSneakLoud(dt); if (sneakDone) return; }
             spawnTimer -= dt;
             float interval = Mathf.Lerp(8f, 2.8f, t / 240f) * (firstNight ? 1.25f : 1f) * (opNight > 0 ? 1f - 0.06f * (opNight - 1) : 1f);
             if (debugInfantry && !debugSquadSent && t > 4f) { debugSquadSent = true; var L0 = Leader; infantry.Spawn(L0.transform.position + L0.Forward * 30f, -L0.Forward); hud.Toast("Infantry! Panzerfausts, 12 o'clock", 2.8f); }
@@ -897,7 +904,7 @@ namespace IronNight
             if (props != null) { props.wet = wet; Vehicle.Wet = wet; if (wet) props.SetWet(0.5f); }
             if (weather == Weather.Rain) { if (rain == null) BuildRain(); else { rain.Play(); } } else if (rain != null) rain.Stop(true, ParticleSystemStopBehavior.StopEmitting);
             Sfx.Ambient(wet); LightShaft.boost = weather == Weather.Fog ? 1.8f : weather == Weather.Rain ? 1.3f : 1f;
-            hud.SetConditions((stand ? "Last stand · " : convoy ? "Convoy · " : daily ? "Daily · " : "") + TheatreName + (route == "village" ? " · village" : route == "bocage" ? (theatre == "kursk" ? " · tree belts" : " · bocage") : (theatre == "kursk" ? " · steppe" : " · open fields")), winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Rain ? "the enemy shoots short" : weather == Weather.Overcast ? "a dark night, the enemy sees less" : "the moon is up: they see you");
+            hud.SetConditions((stand ? "Last stand · " : convoy ? "Convoy · " : sneak ? "Night raid · " : daily ? "Daily · " : "") + TheatreName + (route == "village" ? " · village" : route == "bocage" ? (theatre == "kursk" ? " · tree belts" : " · bocage") : (theatre == "kursk" ? " · steppe" : " · open fields")), winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Rain ? "the enemy shoots short" : weather == Weather.Overcast ? "a dark night, the enemy sees less" : "the moon is up: they see you");
         }
 
         /// <summary>Low quality for weak phones: no moon shadows, no post-processing, no rain or snow.</summary>
@@ -997,7 +1004,7 @@ namespace IronNight
         /// smoke and a light. Reaching it is worth 300 and the next one is set.</summary>
         void NextObjective()
         {
-            if (stand || convoy) return;   // the crossroads, or the convoy, is the objective
+            if (stand || convoy || sneak) return;   // the crossroads, the convoy or the depot is the objective
             var L = Leader; float ang = (Random.value - 0.5f) * 80f * Mathf.Deg2Rad, dist = debugDump ? 19f : debugCrew ? 16f : 110f + Random.value * 60f;
             var pos = L.transform.position + new Vector3(Mathf.Sin(ang), 0f, Mathf.Cos(ang)) * dist;
             bool hold = objectivesReached > 0 && Random.value < 0.5f;
@@ -1466,6 +1473,7 @@ namespace IronNight
 
         void CallAir(Vector3 target)
         {
+            RaiseAlarm("The air strike woke them");
             float ang = Random.Range(-30f, 30f) * Mathf.Deg2Rad; var across = new Vector3(Mathf.Cos(ang) * (Random.value < 0.5f ? -1f : 1f), 0f, Mathf.Sin(ang));   // in from the side of the screen, seen side on
             target.y = 0f; airCool = AirCoolFull; strike = new AirStrike { target = target, dir = across };
             hud.Toast(Depot.Nation == "su" ? "Shturmoviks inbound · yellow smoke" : "Thunderbolts inbound · yellow smoke", 2.6f); Sfx.Click(); Radio("start");
@@ -1843,6 +1851,7 @@ namespace IronNight
         /// <summary>A Panzerfaust: a slow rocket from the man's shoulder, two hits when it lands, never a ricochet.</summary>
         void FireFaust(Infantry.Soldier m, Vehicle target)
         {
+            RaiseAlarm("Tank hunters opened fire");
             var from = m.pos + Vector3.up * 1.4f; var dir = target.transform.position - m.pos; dir.y = 0f; dir.Normalize();
             dir = Quaternion.Euler(0f, Random.Range(-3f, 3f), 0f) * dir;
             var vis = fx.Tracer(new Color(1f, 0.8f, 0.6f, 1f), new Color(1f, 0.5f, 0.3f, 0.6f)); vis.position = from; vis.rotation = Quaternion.LookRotation(cam.transform.forward, dir);
@@ -1949,6 +1958,7 @@ namespace IronNight
             string statLine = $"{kills} enemy vehicles destroyed · {nightInfantry} infantry\n{m}:{s:00} held · level {level} · {objectivesReached} objectives\nGunnery {acc}% · Score {score * (doubled ? 2 : 1)}" + crewLine + careerLine + lines;
             if (stand) { StandEnd(dawn, statLine); return; }
             if (convoy) { ConvoyEnd(dawn, statLine); return; }
+            if (sneak) { SneakEnd(dawn, statLine); return; }
             if (daily) { DailyEnd(dawn, statLine, dawn ? !doubled : !revived, earned + bonus); return; }
             if (opNight > 0) { OperationEnd(dawn, dawn ? !doubled : !revived, earned + bonus, bonus); return; }
             hud.ShowEnd(dawn, statLine + (endless ? "\nHeld into daylight · points ×1.5" : ""), dawn ? !doubled : !revived, endless && !dawn ? "DAYLIGHT · LEADER KNOCKED OUT" : null, endless && !dawn ? "The long night is over" : null);
