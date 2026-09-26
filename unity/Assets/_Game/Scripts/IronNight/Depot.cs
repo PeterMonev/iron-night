@@ -80,6 +80,38 @@ namespace IronNight
         public static bool DailyTrainReady => PlayerPrefs.GetString("depot.trainDay", "") != LocalDay;
         public static bool ClaimDailyTrain() { if (!DailyTrainReady) return false; PlayerPrefs.SetString("depot.trainDay", LocalDay); AddCrewXp(DailyTrainXp); return true; }
 
+        // gold: the third currency. Bought in the shop with real money (Store), a little of it from rewarded ads; spent on
+        // premium service, exchanged for points or crew experience, or paid for a field repair instead of watching an ad
+        public const int GoldPerAd = 5, GoldAdsPerDay = 3, GoldRepair = 20, ExchangeGold = 100, ExchangeGives = 2500;
+        public static int Gold { get { Load(); return PlayerPrefs.GetInt("depot.gold", 0); } }
+        public static void AddGold(int gold) { Load(); PlayerPrefs.SetInt("depot.gold", Mathf.Max(0, Gold + gold)); PlayerPrefs.Save(); }
+        public static bool SpendGold(int gold) { if (gold < 0 || Gold < gold) return false; AddGold(-gold); return true; }
+        /// <summary>Rewarded ads for gold still to be watched today.</summary>
+        public static int GoldAdsLeft => PlayerPrefs.GetString("depot.goldAdDay", "") == LocalDay ? Mathf.Max(0, GoldAdsPerDay - PlayerPrefs.GetInt("depot.goldAds", 0)) : GoldAdsPerDay;
+        public static bool GoldAdWatched()
+        {
+            if (GoldAdsLeft <= 0) return false;
+            int used = PlayerPrefs.GetString("depot.goldAdDay", "") == LocalDay ? PlayerPrefs.GetInt("depot.goldAds", 0) : 0;
+            PlayerPrefs.SetString("depot.goldAdDay", LocalDay); PlayerPrefs.SetInt("depot.goldAds", used + 1); AddGold(GoldPerAd); return true;
+        }
+        /// <summary>Gold for points or for crew experience, a hundred at a time.</summary>
+        public static bool Exchange(bool crew) { if (!SpendGold(ExchangeGold)) return false; if (crew) AddCrewXp(ExchangeGives); else AddPoints(ExchangeGives); return true; }
+
+        // premium service: half as much again of everything a night pays (points, crew and tank experience) while it runs
+        public class PremiumOffer { public int days, gold; }
+        public static readonly PremiumOffer[] PremiumOffers = { new PremiumOffer { days = 1, gold = 60 }, new PremiumOffer { days = 7, gold = 300 }, new PremiumOffer { days = 30, gold = 900 } };
+        public const float PremiumMul = 1.5f;
+        public static System.DateTime PremiumUntil => long.TryParse(PlayerPrefs.GetString("depot.premiumUntil", ""), out var ticks) ? new System.DateTime(ticks, System.DateTimeKind.Utc) : System.DateTime.MinValue;
+        public static bool Premium => PremiumUntil > System.DateTime.UtcNow;
+        /// <summary>Premium days bought with gold, added to whatever is left.</summary>
+        public static bool BuyPremium(PremiumOffer o)
+        {
+            if (!SpendGold(o.gold)) return false;
+            var from = Premium ? PremiumUntil : System.DateTime.UtcNow; PlayerPrefs.SetString("depot.premiumUntil", from.AddDays(o.days).Ticks.ToString()); PlayerPrefs.Save(); return true;
+        }
+        /// <summary>Premium time left, short: "6 d 23 h", "4 h 12 min".</summary>
+        public static string PremiumLeft { get { var left = PremiumUntil - System.DateTime.UtcNow; return left.TotalDays >= 1 ? (int)left.TotalDays + " d " + left.Hours + " h" : left.TotalHours >= 1 ? (int)left.TotalHours + " h " + left.Minutes + " min" : Mathf.Max(1, left.Minutes) + " min"; } }
+
         // the daily supply drop: 300 points once a day, claimed on the title screen
         public const int DailyPoints = 300;
         public static bool DailyReady => PlayerPrefs.GetString("depot.daily", "") != System.DateTime.Now.ToString("yyyyMMdd");

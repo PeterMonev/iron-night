@@ -59,7 +59,7 @@ namespace IronNight
         float AirCoolFull => 60f - 6f * crewSignals;
         string leaderId = "", leaderName = "", careerLine = ""; int careerXp, careerKills, crewXpBanked; bool careerNight, careerDawn; float careerDamage = 1f, careerReload = 1f, careerSpeed = 1f;   // the leader's own tank   // an operation night: the operation and which of its nights (0: a free night)
         int nightTracked, nightFocus, talliedTracked, nightLamps, talliedLamps, nightAces; bool litBySearchlight;
-        bool crewCounted, crewLostTonight; int crewBefore;   // the crew's nights: counted at dawn, lost with the leader unless he is pulled back
+        bool crewCounted, crewLostTonight, premiumNight; int crewBefore;   // the crew's nights: counted at dawn, lost with the leader unless he is pulled back
         Vehicle focus; float focusLeft; Transform focusRing;   // the enemy the platoon was told to hit
         float pointLeft; Vector3 point;                      // a spot the platoon was told to shell (the fuel dump)
         readonly List<Mine> mines = new List<Mine>(); float mineTimer = 130f; static Material mineMaterial;
@@ -132,7 +132,7 @@ namespace IronNight
             BuildWorld();
             // the night always starts with the leader alone; the platoon grows from the salvaged crates to 3, a rewarded ad opens a 4th slot.
             // The depot's permanent upgrades set the starting numbers
-            Depot.Load(); firstNight = Depot.NightsFought == 0;
+            Depot.Load(); firstNight = Depot.NightsFought == 0; premiumNight = Depot.Premium;
             reloadMul = Depot.ReloadMul; rangeMul = Depot.RangeMul * (Depot.CrewLevel >= 3 ? 1.05f : 1f); speedMul = Depot.SpeedMul; maxPlatoon = rule == "alone" ? 1 : 3;
             if (rule == "stukas") raidTimer = 5f; if (rule == "aces") aceTimer = 60f;
             if (weather == Weather.Fog) { rangeMul *= 0.8f; enemyRangeMul = 0.8f; } else if (weather == Weather.Overcast) enemyRangeMul = 0.9f; else if (weather == Weather.Rain) { speedMul *= 0.92f; enemyRangeMul = 0.95f; }
@@ -169,7 +169,9 @@ namespace IronNight
             hud.OnTheatre = t => theatre = t;
             hud.OnDailyChallenge = () => { PlayerPrefs.SetString("daily.launch", Daily.Today); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); };
             hud.OnAir = () => { if (!airUp || airCool > 0f || phase != Phase.Play || strike != null) return; airArmed = !airArmed; airArmedLeft = 8f; hud.Toast(airArmed ? "Tap the target" : "Air strike called off", 2f); Sfx.Click(); };
-            hud.OnAd = OnAd; hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            hud.OnAd = () => { if (phase == Phase.End) Ads.Rewarded("end", EndReward); };
+            hud.OnGoldAd = () => { if (phase != Phase.End) return; if (Depot.SpendGold(Depot.GoldRepair)) EndReward(); else hud.ShowShop(); };   // not enough gold: the shop
+            hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             hud.OnStart = () => hud.ShowRoutes(() =>
             {
                 if (route == builtRoute && theatre == builtTheatre) StartCoroutine(Curtained(StartNight));
@@ -182,7 +184,7 @@ namespace IronNight
             hud.OnOperation = (id, n) => { PlayerPrefs.SetString("op.launch", id + ":" + n); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); };
             hud.OnDepot = () => { stick.Blocked = true; StartCoroutine(Curtained(hud.ShowDepot)); }; hud.OnHold = HoldOn;
             hud.OnBack = () => { if (phase == Phase.End) SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); else StartCoroutine(Curtained(() => hud.ShowTitle(reserveGranted))); };
-            hud.OnReserveAd = () => { reserveGranted = true; maxPlatoon = 4; hud.ShowTitle(true); };   // the ad is a mock: granted at once
+            hud.OnReserveAd = () => Ads.Rewarded("reserve", () => { reserveGranted = true; maxPlatoon = 4; hud.ShowTitle(true); });
             hud.OnPause = Pause; hud.OnResume = Resume; hud.OnSound = () => { Sfx.Muted = !Sfx.Muted; hud.ShowPause(!Sfx.Muted, !LowQuality); };
             hud.OnQuit = () => { Resume(); revived = true; End(false); };   // no rewarded repair after walking away
             hud.OnRestart = () => { Time.timeScale = 1f; if (stand) { PlayerPrefs.SetString("stand.launch", theatre); PlayerPrefs.Save(); } if (convoy) { PlayerPrefs.SetString("convoy.launch", theatre); PlayerPrefs.Save(); } if (sneak) { PlayerPrefs.SetString("sneak.launch", theatre); PlayerPrefs.Save(); } if (opNight > 0) { PlayerPrefs.SetString("op.launch", op.id + ":" + opNight); PlayerPrefs.Save(); } if (daily) { PlayerPrefs.SetString("daily.launch", dailyDay); PlayerPrefs.Save(); } SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); };
@@ -190,7 +192,7 @@ namespace IronNight
             hud.Set(t, platoon.Count); hud.SetLevel(level, 0f);
             PlaceCamera(true);
             stick.Blocked = true; hud.ShowTitle(false);
-            foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); }
+            foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); } else if (arg == "--shop") hud.ShowShop();
             hud.OnStart += () => Radio("start");
             if (opNight == 0 && !daily && PlayerPrefs.GetInt("route.launch", 0) == 1) { PlayerPrefs.SetInt("route.launch", 0); PlayerPrefs.Save(); StartNight(); Radio("start"); }
             if (sneak) { SneakBuild(); StartNight(); Radio("start"); string np = Hud.UiSprite("sneak_" + theatre) != null ? "sneak_" + theatre : theatre == "kursk" ? "route_kursk_belts" : "route_bocage"; hud.Briefing(np, "Night raid · " + TheatreName, "No lights, no shooting. Slip past the searchlights to the depot and blow it. A beam that finds you raises the alarm."); }
@@ -1931,7 +1933,7 @@ namespace IronNight
         {
             if (phase == Phase.End) return;
             phase = Phase.End; stick.Blocked = true; EndOrbit();
-            int earned = Mathf.RoundToInt(score * (veteran ? 1.5f : 1f) * (endless ? 1.5f : 1f) * routePay) * (doubled ? 2 : 1) + (dawn || endless ? 500 : 0);
+            int earned = Mathf.RoundToInt(score * (veteran ? 1.5f : 1f) * (endless ? 1.5f : 1f) * routePay * (premiumNight ? Depot.PremiumMul : 1f)) * (doubled ? 2 : 1) + (dawn || endless ? 500 : 0);
             Depot.AddPoints(earned - banked); banked = earned;                       // a revived night banks only what is new
             if (!nightRecorded) { Depot.RecordNight(kills, t); nightRecorded = true; }
             var done = Missions.Report(new Missions.Night { kills = kills, tigers = nightTigers, paks = nightPaks, crates = nightCrates, level = level, time = t, boss = bossKilled, objectives = objectivesReached, infantry = nightInfantry, tracked = nightTracked, focus = nightFocus, lamps = nightLamps, campaign = opNight == 5 && dawn ? 1 : 0 });
@@ -1945,12 +1947,13 @@ namespace IronNight
             if (kills >= 15 && shotsFired > 0 && shotsHit * 2 >= shotsFired) Depot.Tally("sharp", 1);
             if (!logged) { logged = true; Depot.LogNight(TheatreName, kills, t, score, dawn); }
             {   // the leader's tank: its share of the night (a night that ends twice adds only what is new)
-                int xpNow = Mathf.RoundToInt(score * (stand ? 0.05f : 0.1f)) + (dawn ? 100 : 0), gain = Mathf.Max(0, xpNow - careerXp);
+                int xpNow = Mathf.RoundToInt((score * (stand ? 0.05f : 0.1f) + (dawn ? 100 : 0)) * (premiumNight ? Depot.PremiumMul : 1f)), gain = Mathf.Max(0, xpNow - careerXp);
                 Career.Add(leaderId, gain, Mathf.Max(0, kills - careerKills), !careerNight, dawn && !careerDawn, score);
                 careerXp = Mathf.Max(careerXp, xpNow); careerKills = kills; careerNight = true; if (dawn) careerDawn = true;
                 careerLine = "\n" + leaderName + " · +" + gain + " XP" + (Career.AnyUpgrade(leaderId) ? " · an upgrade is ready" : "");
-                int cxNow = Mathf.RoundToInt(score * (stand ? 0.05f : 0.1f)) + (dawn ? 100 : 0), cGain = Mathf.Max(0, cxNow - crewXpBanked); Depot.AddCrewXp(cGain); crewXpBanked = Mathf.Max(crewXpBanked, cxNow);   // the crew's share, in the second currency
+                int cxNow = Mathf.RoundToInt((score * (stand ? 0.05f : 0.1f) + (dawn ? 100 : 0)) * (premiumNight ? Depot.PremiumMul : 1f)), cGain = Mathf.Max(0, cxNow - crewXpBanked); Depot.AddCrewXp(cGain); crewXpBanked = Mathf.Max(crewXpBanked, cxNow);   // the crew's share, in the second currency
                 if (crewXpBanked > 0) careerLine += "\nCrew · +" + crewXpBanked + " XP to train with";
+                if (premiumNight) careerLine += "\nPremium service · +50% on all of it";
             }
             var medals = Medals.Check();
             int bonus = 0; var lines = new System.Text.StringBuilder(); foreach (var o in done) { bonus += o.reward; lines.Append("\nOrder carried out · " + o.Title + " · +" + o.reward); }
@@ -2060,11 +2063,11 @@ namespace IronNight
             if (line != null) hud.Toast(line, 3f);
         }
 
-        void OnAd()
+        /// <summary>The end sheet's reward, for an ad watched or gold paid: at dawn the score doubles, a knocked-out leader
+        /// is repaired and the night goes on.</summary>
+        void EndReward()
         {
-            // the rewarded video is a mock here: the reward is granted after a moment
             if (phase != Phase.End) return;
-            hud.SetAdNote("30 s ad · mock, skipping…");
             if (t >= NightLength) { doubled = true; Depot.AddPoints(score); banked += score; hud.SetEndPoints(banked); hud.ShowEnd(true, $"{kills} enemy vehicles destroyed\nScore {score * 2} (doubled)", false); return; }
             revived = true;
             var L = Vehicle.Create(Wingman, true, platoon.Count > 0 ? platoon[0].transform.position - platoon[0].Forward * 8f : Vector3.zero, platoon.Count > 0 ? platoon[0].yaw : 0f);
