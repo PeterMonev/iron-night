@@ -1118,7 +1118,7 @@ namespace IronNight
                 briefingTitle = MakeText(card.transform, "Title", new Vector2(0f, 1f), new Vector2(230, -22), TextAnchor.UpperLeft, 40, new Color(0.96f, 0.68f, 0.24f)); briefingTitle.font = BoldFont(); briefingTitle.rectTransform.sizeDelta = new Vector2(690, 50);
                 briefingText = MakeText(card.transform, "Text", new Vector2(0f, 1f), new Vector2(230, -76), TextAnchor.UpperLeft, 27, new Color(0.9f, 0.88f, 0.84f)); briefingText.rectTransform.sizeDelta = new Vector2(690, 110);
             }
-            var sp = UiSprite(picture); briefingPic.sprite = sp; briefingPic.enabled = sp != null; briefingTitle.text = title; briefingText.text = text; briefing.SetActive(true); briefingLeft = 4.5f;
+            var sp = UiSprite(picture); briefingPic.sprite = sp; briefingPic.enabled = sp != null; if (sp != null) { float cover = Mathf.Max(200f / sp.rect.width, 200f / sp.rect.height); briefingPic.rectTransform.sizeDelta = new Vector2(sp.rect.width * cover, sp.rect.height * cover); }   // a wide picture fills the square, cut at the sides briefingTitle.text = title; briefingText.text = text; briefing.SetActive(true); briefingLeft = 4.5f;
         }
 
         public void Popup(Vector3 world, string text, Color color)
