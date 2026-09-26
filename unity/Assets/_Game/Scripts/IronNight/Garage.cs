@@ -155,7 +155,7 @@ namespace IronNight
                 if (a.StartsWith("--crewat=")) { var p = a.Substring(9).Split(','); for (int k = 0; k < 4 && 2 * k + 1 < p.Length; k++) at[k] = new Vector3(float.Parse(p[2 * k], inv), 0f, float.Parse(p[2 * k + 1], inv)); }
                 if (a.StartsWith("--crewyaw=")) { var p = a.Substring(10).Split(','); for (int k = 0; k < 4 && k < p.Length; k++) turn[k] = float.Parse(p[k], inv); }
             }
-            var eye = titleCam != null ? titleCam.transform.localPosition : new Vector3(-9.6f, 3.4f, -15.2f);
+            var eye = titleCam != null ? titleCam.transform.localPosition : new Vector3(-9.6f, 3.4f, -15.2f); var idle = new CrewIdle[4];
             for (int i = 0; i < 4; i++)
             {
                 string id = "crew_" + nation + "_" + Crew.Roles[i]; var pf = Resources.Load<GameObject>("Props/" + id); if (pf == null) continue;
@@ -163,9 +163,11 @@ namespace IronNight
                 var look = eye - at[i]; look.y = 0f; go.transform.localRotation = Quaternion.LookRotation(look.normalized) * Quaternion.Euler(0f, turn[i], 0f);   // to the camera, a little toward the tank
                 var mat = new Material(Resources.Load<Material>("VehicleLit")); mat.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + id + "_tex")); mat.SetFloat("_Cull", 0f);
                 foreach (var r in go.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
-                CrewIdle.Bring(go, i + (nation == "su" ? 4 : 0), Crew.Roles[i] == "radio" ? 0.5f : 1f);   // at ease, not statues; the radio operators hold a handset to the ear
+                idle[i] = CrewIdle.Bring(go, i + (nation == "su" ? 4 : 0), Crew.Roles[i] == "radio" ? 0.5f : 1f);   // at ease, not statues; the radio operators hold a handset to the ear
                 crewFigures.Add(go);
             }
+            for (int p = 0; p < 4; p += 2)   // the pairs: the left man looks to his left for the right one, who looks to his right
+                if (idle[p] != null && idle[p + 1] != null) { idle[p].partner = idle[p + 1]; idle[p].partnerSide = -1f; idle[p + 1].partner = idle[p]; idle[p + 1].partnerSide = 1f; }
         }
 
         public void SetActive(bool on) { cam.enabled = on; gameObject.SetActive(on || titleOn); }
