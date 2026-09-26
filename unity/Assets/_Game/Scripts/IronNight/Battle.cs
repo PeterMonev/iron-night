@@ -30,7 +30,7 @@ namespace IronNight
         class Drop { public Vector3 pos; public float height, age, lift, top; public int kind; public Transform crate, chute, marker; public LineRenderer lines; public Mesh canopy; public Vector3[] rest; }   // lift: the crate origin above its base; top: where the shrouds tie
         class Mortar { public Vector3 at; public float timer; public Transform ring; public bool bomb; }   // bomb: a dive bomber's, heavier
         class Star { public Vector3 pos; public float height, life, puff; public Transform flare, chute; public Light light; }
-        enum Phase { Title, Play, LevelUp, Pause, End }
+        enum Phase { Title, Intro, Play, LevelUp, Pause, End }
 
         static readonly float NightLength = NightArg();   // five minutes of darkness, dawn at 5:00 (--night=30 for tests)
         static float NightArg() { foreach (var a in System.Environment.GetCommandLineArgs()) if (a.StartsWith("--night=")) return float.Parse(a.Substring(8)); return 300f; }
@@ -222,7 +222,9 @@ namespace IronNight
 
         void PlaceCamera(bool snap)
         {
-            var L = Leader; if (L == null) return;
+            var L = Leader; if (L != null && camShot != CamShot.Orbit) leaderAt = L.transform.position;
+            if (TickShot(L)) return;   // a shot of the camera's own (Cine): the opening, a killcam, the orbit behind the end sheet
+            if (L == null) return;
             var want = L.transform.position + new Vector3(0f, 52f, -42.5f);   // a little higher than before: more field in view, same 48-degree tilt
             cam.transform.position = snap ? want : Vector3.Lerp(cam.transform.position, want, 1f - Mathf.Exp(-Time.deltaTime * 4f));
             cam.transform.LookAt(cam.transform.position + new Vector3(0f, -44f, 40f));
@@ -256,7 +258,7 @@ namespace IronNight
                 var d = slot - v.transform.position; d.y = 0f;
                 if (d.magnitude > 1.2f) v.Drive(Steer(v, new Vector2(d.x, d.z) * (Mathf.Clamp01(d.magnitude / 5f))), dt);
             }
-            TickAbility(dt); TickCards(dt); if (phase != Phase.Play) return;
+            TickAbility(dt); TickCards(dt); if (levelWaiting && camShot != CamShot.Kill) { levelWaiting = false; if (xp >= xpNeed) LevelUp(); } if (phase != Phase.Play) return;
             if (!sneak || sneakAlarm) TickAce(dt); TickWeatherTurn(dt); TickAir(dt);
             if (opNight > 0) { goalsTick -= dt; if (goalsTick <= 0f) { goalsTick = 0.5f; hud.SetGoals(GoalLine(opN.second) + "      " + GoalLine(opN.third)); } }
             bool fast = abilityLeft > 0f && bonus == "reload", hard = abilityLeft > 0f && bonus == "heavy", quick = abilityLeft > 0f && bonus == "speed";
@@ -602,6 +604,7 @@ namespace IronNight
                 if (combo >= 2) { int bonus = combo * 25; score += bonus; hud.Popup(v.transform.position + Vector3.up * 3f, "×" + combo + " +" + bonus, new Color(1f, 0.92f, 0.6f)); if (combo == 3) hud.Toast("Triple kill", 1.8f); else if (combo == 5) hud.Toast("Rampage", 1.8f); }
                 if (v == boss) { score += 1500; bossKilled = true; shake = 2f; SlowMo(0.8f); hud.HideBoss(); hud.Toast("Tiger Ace destroyed · +1500"); }
                 if (v == ace) { score += 600; shake = Mathf.Max(shake, 1f); SlowMo(0.7f); Depot.Tally("acesNamed", 1); nightAces++; hud.Popup(v.transform.position, "+600", new Color(1f, 0.8f, 0.4f)); hud.Toast(aceName + " is finished · +600", 3f); Radio("kill"); }
+                Killcam(v, worth * 50 + (v == boss ? 1500 : 0) + (v == ace ? 600 : 0));
                 if (xp >= xpNeed) LevelUp(); else hud.SetLevel(level, (float)xp / xpNeed);
             }
         }
@@ -783,6 +786,7 @@ namespace IronNight
 
         void LevelUp()
         {
+            if (camShot == CamShot.Kill) { levelWaiting = true; return; }   // the cards come after the killcam
             xp -= xpNeed; level++; xpNeed = 6 + level * 3; hud.SetLevel(level, (float)xp / xpNeed);
             var all = new List<Hud.Card>
             {
@@ -1859,7 +1863,7 @@ namespace IronNight
             fx.MuzzleFlash(from, dir); Sfx.Faust(from);
         }
 
-        void StartNight() { hud.HideTitle(); phase = Phase.Play; stick.Blocked = false; if (objective != null) Brief(objective.kind); }
+        void StartNight() { hud.HideTitle(); if (!IntroShot()) Begin(); }   // the opening shot first (Cine), then the play
 
         /// <summary>A change of screen behind the black: down, swap, up.</summary>
         System.Collections.IEnumerator Curtained(System.Action swap)
@@ -1926,7 +1930,7 @@ namespace IronNight
         void End(bool dawn)
         {
             if (phase == Phase.End) return;
-            phase = Phase.End; stick.Blocked = true;
+            phase = Phase.End; stick.Blocked = true; EndOrbit();
             int earned = Mathf.RoundToInt(score * (veteran ? 1.5f : 1f) * (endless ? 1.5f : 1f) * routePay) * (doubled ? 2 : 1) + (dawn || endless ? 500 : 0);
             Depot.AddPoints(earned - banked); banked = earned;                       // a revived night banks only what is new
             if (!nightRecorded) { Depot.RecordNight(kills, t); nightRecorded = true; }

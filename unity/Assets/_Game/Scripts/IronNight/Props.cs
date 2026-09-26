@@ -715,6 +715,25 @@ namespace IronNight
             return true;
         }
 
+        /// <summary>True when nothing solid stands on the line between two points: the camera's view of a tank. Hedges
+        /// count three metres high, trees by their crowns (five metres round, up to twelve), low walls and gates two and a half.</summary>
+        public bool SightClear(Vector3 from, Vector3 to)
+        {
+            for (int i = 0; i <= 12; i++)
+            {
+                var q = Vector3.Lerp(from, to, i / 13f);
+                foreach (var p in active)
+                {
+                    if (p.radii.Length == 0 || p.drivable) continue;
+                    bool tree = p.what == What.Tree || (p.kind != null && (p.kind.mesh.StartsWith("tree_") || p.kind.mesh.StartsWith("spruce")));
+                    float h = tree ? 12f : p.what == What.Hedge ? 3.2f : p.height > 0f ? p.height : 2.5f, crown = p.what == What.Tree ? 5f : p.kind != null ? Mathf.Max(3f, p.kind.length * 0.5f) : 3f; if (q.y > h) continue;
+                    float dx = p.pos.x - q.x, dz = p.pos.z - q.z, reach = p.bound + 4f; if (dx * dx + dz * dz > reach * reach) continue;
+                    for (int c = 0; c < p.radii.Length; c++) { float rad = tree && q.y > 2f ? Mathf.Max(p.radii[c], crown) : p.radii[c]; if ((new Vector2(q.x, q.z) - p.circleCenters[c]).sqrMagnitude < rad * rad) return false; }
+                }
+            }
+            return true;
+        }
+
         /// <summary>Sandbag positions ahead of a point: where an anti-tank gun would dig in.</summary>
         public List<Vector3> Nests(Vector3 from, Vector3 dir, float min, float max)
         {

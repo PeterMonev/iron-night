@@ -69,7 +69,7 @@ namespace IronNight
             if (!FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>())
                 new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(UnityEngine.InputSystem.UI.InputSystemUIInputModule));
 
-            var hg = new GameObject("PlayHud", typeof(RectTransform)); hg.transform.SetParent(canvasGo.transform, false); Stretch(hg); hudGroup = hg;
+            var hg = new GameObject("PlayHud", typeof(RectTransform)); hg.transform.SetParent(canvasGo.transform, false); Stretch(hg); hudGroup = hg; hudFade = hg.AddComponent<CanvasGroup>();
             var t = hg.transform; canvasRect = canvasGo.GetComponent<RectTransform>();
             var fl = new GameObject("HitFlash", typeof(RectTransform), typeof(Image)); fl.transform.SetParent(t, false); Stretch(fl); flash = fl.GetComponent<Image>(); flash.color = new Color(0.8f, 0.1f, 0.05f, 0f); flash.raycastTarget = false;
             var ink = new Color(0.93f, 0.91f, 0.86f); var amber = new Color(0.95f, 0.66f, 0.23f); var dim = new Color(0.66f, 0.64f, 0.59f);
@@ -119,8 +119,8 @@ namespace IronNight
             cardRoot = cards.transform; sheet.SetActive(false);
 
             // end sheet
-            endSheet = new GameObject("End", typeof(RectTransform), typeof(Image)); endSheet.transform.SetParent(t, false);
-            Stretch(endSheet); endSheet.GetComponent<Image>().color = new Color(0.02f, 0.03f, 0.04f, 0.84f);
+            endSheet = new GameObject("End", typeof(RectTransform), typeof(Image)); endSheet.transform.SetParent(canvasGo.transform, false);   // over the HUD, not in it: the HUD steps aside behind the end
+            Stretch(endSheet); { var es = endSheet.GetComponent<Image>(); es.sprite = Scrim(); es.color = new Color(0.02f, 0.03f, 0.04f, 0.88f); }   // clear at the top, where the camera circles the leader
             endEyebrow = MakeText(endSheet.transform, "Eyebrow", new Vector2(0.5f, 0.5f), new Vector2(0, 520), TextAnchor.MiddleCenter, 30, dim);
             endTitle = MakeText(endSheet.transform, "Title", new Vector2(0.5f, 0.5f), new Vector2(0, 430), TextAnchor.MiddleCenter, 110, ink);
             stats = MakeText(endSheet.transform, "Stats", new Vector2(0.5f, 0.5f), new Vector2(0, 272), TextAnchor.MiddleCenter, 40, dim); stats.rectTransform.sizeDelta = new Vector2(940, 236); stats.resizeTextForBestFit = true; stats.resizeTextMinSize = 22; stats.resizeTextMaxSize = 40;   // clear of the title above and the points below
@@ -339,6 +339,22 @@ namespace IronNight
             depotRows = rows.transform; depotScroll = viewport.GetComponent<ScrollRect>(); depotScroll.content = rrt; depotScroll.viewport = vrt; depotScroll.horizontal = false; depotScroll.vertical = true;
             depotScroll.movementType = ScrollRect.MovementType.Clamped; depotScroll.scrollSensitivity = 40f; depotScroll.inertia = true; depotScroll.decelerationRate = 0.12f;
             depotSheet.SetActive(false);
+            // the cinema: black bars that slide over the top and bottom, and a card of words, while the camera has a shot
+            {
+                var ci = new GameObject("Cinema", typeof(RectTransform)); ci.transform.SetParent(canvasGo.transform, false); Stretch(ci); ci.transform.SetSiblingIndex(hudGroup.transform.GetSiblingIndex() + 1);
+                barTop = MakeImage(ci.transform, "BarTop", new Vector2(0.5f, 1f), new Vector2(0f, BarH), new Vector2(4000f, BarH), Color.black).rectTransform;
+                barBottom = MakeImage(ci.transform, "BarBottom", new Vector2(0.5f, 0f), new Vector2(0f, -BarH), new Vector2(4000f, BarH), Color.black).rectTransform;
+                var cc = new GameObject("Card", typeof(RectTransform), typeof(CanvasGroup)); cc.transform.SetParent(ci.transform, false);
+                cineCard = cc.GetComponent<RectTransform>(); cineCard.anchorMin = cineCard.anchorMax = new Vector2(0.5f, 0.5f); cineCard.sizeDelta = new Vector2(1000f, 420f);
+                cineFade = cc.GetComponent<CanvasGroup>(); cineFade.alpha = 0f; cineFade.blocksRaycasts = cineFade.interactable = false;
+                var shade = MakeImage(cc.transform, "Shade", new Vector2(0.5f, 0.5f), new Vector2(0f, -10f), new Vector2(1500f, 560f), new Color(0f, 0f, 0f, 0.6f)); shade.sprite = Lightswarm.ProceduralSprites.Glow(64, 0.3f);   // a soft dark behind the words, for a bright fire under them
+                cineEyebrow = MakeText(cc.transform, "Eyebrow", new Vector2(0.5f, 0.5f), new Vector2(0f, 128f), TextAnchor.MiddleCenter, 30, amber); cineEyebrow.font = BoldFont(); cineEyebrow.rectTransform.sizeDelta = new Vector2(1060f, 50f); cineEyebrow.horizontalOverflow = HorizontalWrapMode.Overflow;
+                cineTitle = MakeText(cc.transform, "Title", new Vector2(0.5f, 0.5f), Vector2.zero, TextAnchor.MiddleCenter, 210, ink); cineTitle.font = DisplayFont(); cineTitle.rectTransform.sizeDelta = new Vector2(1000f, 250f);
+                cineTitle.resizeTextForBestFit = true; cineTitle.resizeTextMinSize = 70; cineTitle.resizeTextMaxSize = 210;
+                cineRule = MakeImage(cc.transform, "Rule", new Vector2(0.5f, 0.5f), new Vector2(0f, -112f), new Vector2(0f, 3f), amber);
+                cineSub = MakeText(cc.transform, "Sub", new Vector2(0.5f, 0.5f), new Vector2(0f, -156f), TextAnchor.MiddleCenter, 32, new Color(0.85f, 0.83f, 0.78f)); cineSub.rectTransform.sizeDelta = new Vector2(1060f, 56f); cineSub.horizontalOverflow = HorizontalWrapMode.Overflow;
+                cineSkip = MakeText(barBottom, "Skip", new Vector2(0.5f, 0.5f), Vector2.zero, TextAnchor.MiddleCenter, 24, dim); cineSkip.text = Spaced("TAP TO SKIP"); cineSkip.rectTransform.sizeDelta = new Vector2(600f, 40f); cineSkip.gameObject.SetActive(false);
+            }
             { curtain = MakeImage(canvasGo.transform, "Curtain", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(4000, 4000), new Color(0.01f, 0.01f, 0.015f, 1f)); curtain.transform.SetAsLastSibling(); Curtain(0f); }
         }
 
@@ -1180,6 +1196,37 @@ namespace IronNight
         }
         public void HideEnd() { endSheet.SetActive(false); }
 
+        /// <summary>A shot of the camera's own: the black bars in or out, the play HUD shown or stepped aside (now: at
+        /// once, for behind the curtain).</summary>
+        public void Cinema(bool bars, bool hudOn, bool now = false) { barsWant = bars ? 1f : 0f; hudWant = hudOn ? 1f : 0f; if (now) { barsAt = barsWant; hudFade.alpha = hudWant; } }
+        /// <summary>Words over a shot: an eyebrow, a big title, a line under it. The opening's sit high and drift; the
+        /// killcam's sit low and punch in.</summary>
+        public void CineCard(string eyebrow, string title, string sub, float delay, float life, bool low)
+        {
+            cineEyebrow.text = Spaced(eyebrow); cineTitle.text = title; cineSub.text = low ? sub : Spaced(sub);
+            cineCard.anchoredPosition = new Vector2(0f, low ? -540f : 470f); cineTitle.resizeTextMaxSize = low ? 150 : 210;
+            cineSub.font = low ? BoldFont() : DefaultFont(); cineSub.fontSize = low ? 44 : 32; cineSub.color = low ? new Color(0.96f, 0.68f, 0.24f) : new Color(0.85f, 0.83f, 0.78f);
+            cardLow = low; cardDelay = delay; cardLife = life; cardAge = 0f; cineFade.alpha = 0f;
+        }
+        /// <summary>The words cut short: they fade out from where they are.</summary>
+        public void CineCardOut() { float a = cardAge - cardDelay; if (a <= 0f) cardAge = cardDelay + cardLife; else cardLife = Mathf.Min(cardLife, a + 0.5f * cineFade.alpha); }
+        public void CineSkip(bool on) { cineSkip.gameObject.SetActive(on); }
+        void TickCinema(float dt)
+        {
+            barsAt = Mathf.MoveTowards(barsAt, barsWant, dt * 2.2f); float bk = barsAt * barsAt * (3f - 2f * barsAt);
+            barTop.anchoredPosition = new Vector2(0f, BarH * (1f - bk)); barBottom.anchoredPosition = new Vector2(0f, -BarH * (1f - bk));
+            float hw = sheet.activeSelf ? 1f : hudWant; hudFade.alpha = Mathf.MoveTowards(hudFade.alpha, hw, dt * 3f); hudFade.blocksRaycasts = hw > 0.5f;   // the level-up sheet lives in the HUD: never hidden
+            if (cineSkip.gameObject.activeSelf) { var sc = cineSkip.color; sc.a = bk * (0.5f + 0.2f * Mathf.Sin(Time.unscaledTime * 3f)); cineSkip.color = sc; }
+            if (cardAge < cardDelay + cardLife)
+            {
+                cardAge += dt; float a = cardAge - cardDelay;
+                cineFade.alpha = a <= 0f ? 0f : Mathf.Clamp01(Mathf.Min(a / 0.6f, (cardLife - a) / 0.5f));
+                float sc = cardLow ? (a < 0.25f ? Mathf.Lerp(1.12f, 1f, Mathf.Clamp01(a / 0.25f)) : 1f + (a - 0.25f) * 0.01f) : 0.985f + 0.012f * Mathf.Max(0f, a);
+                cineCard.localScale = new Vector3(sc, sc, 1f); cineRule.rectTransform.sizeDelta = new Vector2(180f * Mathf.SmoothStep(0f, 1f, (a - 0.15f) / 0.8f), 3f);
+            }
+            else if (cineFade.alpha > 0f) cineFade.alpha = 0f;
+        }
+
         Image[] endStars;
         /// <summary>An operation night's three stars over the end sheet, the ones won lighting up one after another.</summary>
         public void ShowStars(bool[] got)
@@ -1310,9 +1357,9 @@ namespace IronNight
         {
             fpsAccum += Time.unscaledDeltaTime; fpsFrames++; fpsTimer += Time.unscaledDeltaTime;
             if (fpsTimer >= 0.5f) { float f = fpsFrames / fpsAccum; fps.text = $"{f:0} fps"; fpsAccum = 0; fpsFrames = 0; fpsTimer = 0; if (f < 38f && hudGroup.activeSelf) slowFor += 0.5f; else slowFor = 0f; if (slowFor >= 5f && !slowOffered && PlayerPrefs.GetInt("quality", 1) != 0) { slowOffered = true; Toast("Stuttering? Pause · Quality: low turns off shadows and rain", 5f); } }
-            if (toastLeft > 0f) { toastLeft -= Time.unscaledDeltaTime; if (toastLeft <= 0f) toast.text = ""; }
-            if (briefingLeft > 0f) { briefingLeft -= Time.unscaledDeltaTime; if (briefingLeft <= 0f && briefing != null) briefing.SetActive(false); }
-            TickNumbers(Time.unscaledDeltaTime); CurtainTick(Time.unscaledDeltaTime);
+            if (toastLeft > 0f && hudFade.alpha > 0.95f) { toastLeft -= Time.unscaledDeltaTime; if (toastLeft <= 0f) toast.text = ""; }
+            if (briefingLeft > 0f && hudFade.alpha > 0.95f) { briefingLeft -= Time.unscaledDeltaTime; if (briefingLeft <= 0f && briefing != null) briefing.SetActive(false); }
+            TickNumbers(Time.unscaledDeltaTime); CurtainTick(Time.unscaledDeltaTime); TickCinema(Mathf.Min(Time.unscaledDeltaTime, 0.05f));
             if (titleSheet != null && titleSheet.activeSelf) for (int i = 0; i < embers.Count; i++)
             {
                 var e = embers[i]; float ph = emberPhase[i]; var p = e.anchoredPosition; p.y += (18f + 10f * Mathf.Sin(ph)) * Time.unscaledDeltaTime; p.x += Mathf.Sin(Time.unscaledTime * 0.7f + ph) * 12f * Time.unscaledDeltaTime;
@@ -1337,6 +1384,9 @@ namespace IronNight
         static Font DisplayFont() { if (displayFont == null) displayFont = Resources.Load<Font>("Fonts/BebasNeue-Regular") ?? BoldFont(); return displayFont; }
         static Sprite roundSprite, outlineSprite, shadowSprite, scrimSprite;
         Image curtain; float curtainWant, curtainAt = 1f;   // the black that screens change behind
+        // the cinema: its bars and card of words, the play HUD's fade, and where each of them is going
+        RectTransform barTop, barBottom, cineCard; CanvasGroup hudFade, cineFade; Text cineEyebrow, cineTitle, cineSub, cineSkip; Image cineRule;
+        float barsWant, barsAt, hudWant = 1f, cardAge = 99f, cardLife, cardDelay; bool cardLow; const float BarH = 230f;
         readonly List<Ticker> tickers = new List<Ticker>();
         class Ticker { public Text text; public string prefix, suffix; public float shown, want; }
 
@@ -1368,6 +1418,14 @@ namespace IronNight
         static Sprite Rounded() => roundSprite ??= Lightswarm.ProceduralSprites.RoundedRect(24, 96);
         static Sprite Outline() => outlineSprite ??= Lightswarm.ProceduralSprites.RoundedOutline(24, 96, 2f);
         static Sprite Shadow() => shadowSprite ??= Lightswarm.ProceduralSprites.SoftShadow(24, 28, 160);
+        /// <summary>A tall fade for the end sheet: solid below, clearing over the top quarter where the camera circles the leader.</summary>
+        static Sprite Scrim()
+        {
+            if (scrimSprite != null) return scrimSprite;
+            var tex = new Texture2D(2, 256, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+            for (int y = 0; y < 256; y++) { float a = Mathf.Lerp(1f, 0.15f, Mathf.SmoothStep(0f, 1f, (y / 255f - 0.7f) / 0.2f)); tex.SetPixel(0, y, new Color(1f, 1f, 1f, a)); tex.SetPixel(1, y, new Color(1f, 1f, 1f, a)); }
+            tex.Apply(); return scrimSprite = Sprite.Create(tex, new Rect(0f, 0f, 2f, 256f), new Vector2(0.5f, 0.5f));
+        }
         /// <summary>Letters spaced out with hair spaces: the small caps eyebrows and button labels.</summary>
         static string Spaced(string s) { var sb = new System.Text.StringBuilder(); foreach (var ch in s) { sb.Append(ch); if (ch != ' ') sb.Append('\u200A'); } return sb.ToString(); }
         /// <summary>A rounded translucent panel with a faint edge.</summary>
