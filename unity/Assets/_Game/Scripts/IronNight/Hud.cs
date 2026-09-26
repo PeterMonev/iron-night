@@ -598,6 +598,13 @@ namespace IronNight
             y -= 124f;
         }
 
+        /// <summary>The amber ACE tag on an ace's picture, its top left corner at the given place.</summary>
+        void AceTag(Transform parent, Vector2 at)
+        {
+            var tag = MakeImage(parent, "Ace", new Vector2(0f, 1f), at, new Vector2(92, 34), new Color(0.95f, 0.66f, 0.23f, 0.96f)); tag.sprite = Rounded(); tag.type = Image.Type.Sliced; tag.rectTransform.pivot = new Vector2(0f, 1f);
+            var tt = MakeText(tag.transform, "Text", new Vector2(0.5f, 0.5f), Vector2.zero, TextAnchor.MiddleCenter, 20, new Color(0.1f, 0.08f, 0.05f)); tt.text = Spaced("ACE"); tt.font = BoldFont(); tt.rectTransform.pivot = new Vector2(0.5f, 0.5f); tt.rectTransform.sizeDelta = new Vector2(92, 34);
+        }
+
         string crewRole;   // a seat's roster open in the crew tab
         static string Pips(int n, int max) { var sb = new System.Text.StringBuilder(); for (int k = 0; k < max; k++) sb.Append(k < n ? "■" : "□"); return sb.ToString(); }
 
@@ -617,16 +624,17 @@ namespace IronNight
             XpStrip(ref y);
             foreach (var m in Crew.Men)
             {
-                if (m.nation != nation || m.role != role) continue; var man = m;
+                if (m.nation != nation || m.role != role || !Crew.Seen(m)) continue; var man = m;
                 bool owned = Crew.Owns(m), seated = Crew.InSeat(m); int lvl = Crew.Level(m), train = Crew.NextTrain(m);
                 var row = MakeImage(depotRows, "Row " + m.id, new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 300), card); row.rectTransform.pivot = new Vector2(0.5f, 1f);
                 if (seated) { var frame = MakeImage(row.transform, "Seat", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(940, 300), new Color(0.95f, 0.66f, 0.23f, 0.55f)); frame.sprite = Outline(); frame.type = Image.Type.Sliced; frame.rectTransform.pivot = new Vector2(0.5f, 0.5f); }
                 var pmask = new GameObject("Mask", typeof(RectTransform), typeof(RectMask2D)); pmask.transform.SetParent(row.transform, false); var pm = pmask.GetComponent<RectTransform>(); pm.anchorMin = pm.anchorMax = new Vector2(0f, 1f); pm.pivot = new Vector2(0f, 1f); pm.sizeDelta = new Vector2(220, 272); pm.anchoredPosition = new Vector2(14, -14);
                 var pic = MakeImage(pmask.transform, "Pic", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300, 300), owned ? Color.white : new Color(0.55f, 0.55f, 0.58f)); pic.rectTransform.pivot = new Vector2(0.5f, 0.5f); pic.sprite = UiSprite(Crew.Portrait(m)); pic.preserveAspect = true;
+                if (Crew.Ace(m)) AceTag(row.transform, new Vector2(24, -244));
                 var nm = MakeText(row.transform, "Name", new Vector2(0f, 1f), new Vector2(262, -20), TextAnchor.UpperLeft, 38, ink); nm.text = m.name; nm.font = BoldFont(); nm.rectTransform.sizeDelta = new Vector2(660, 48);
-                var gf = MakeText(row.transform, "Gift", new Vector2(0f, 1f), new Vector2(262, -70), TextAnchor.UpperLeft, 28, amber); gf.text = m.gift + "   " + Pips(lvl, Crew.MaxLevel); gf.rectTransform.sizeDelta = new Vector2(660, 38);
-                var now = MakeText(row.transform, "Now", new Vector2(0f, 1f), new Vector2(262, -112), TextAnchor.UpperLeft, 24, dim); now.text = "Level " + lvl + ": " + Crew.Effect(m.perk, lvl); now.rectTransform.sizeDelta = new Vector2(660, 34);
-                var nx = MakeText(row.transform, "Next", new Vector2(0f, 1f), new Vector2(262, -146), TextAnchor.UpperLeft, 24, lvl < Crew.MaxLevel ? ink : dim); nx.text = lvl < Crew.MaxLevel ? "Level " + (lvl + 1) + ": " + Crew.Effect(m.perk, lvl + 1) : "Fully trained"; nx.rectTransform.sizeDelta = new Vector2(660, 34);
+                var gf = MakeText(row.transform, "Gift", new Vector2(0f, 1f), new Vector2(262, -70), TextAnchor.UpperLeft, 28, amber); gf.text = Crew.GiftName(m) + "   " + Pips(lvl, Crew.MaxLevel); gf.rectTransform.sizeDelta = new Vector2(660, 38);
+                var now = MakeText(row.transform, "Now", new Vector2(0f, 1f), new Vector2(262, -112), TextAnchor.UpperLeft, 24, dim); now.text = "Level " + lvl + ": " + Crew.EffectOf(m, lvl); now.rectTransform.sizeDelta = new Vector2(660, 34);
+                var nx = MakeText(row.transform, "Next", new Vector2(0f, 1f), new Vector2(262, -146), TextAnchor.UpperLeft, 24, lvl < Crew.MaxLevel ? ink : dim); nx.text = lvl < Crew.MaxLevel ? "Level " + (lvl + 1) + ": " + Crew.EffectOf(m, lvl + 1) : "Fully trained"; nx.rectTransform.sizeDelta = new Vector2(660, 34);
                 // the seat: assign, or hire first
                 bool canSeat = !seated && (owned || Depot.Points >= m.cost);
                 var sb = MakeButton(row.transform, seated ? "In the seat" : owned ? "Assign" : "Hire · " + m.cost.ToString("N0", En), new Vector2(1f, 0f), new Vector2(-170, 48), new Vector2(300, 72), 28, () => { if (Crew.Pick(man)) { Sfx.Pickup(); RefreshDepot(); } });
@@ -668,7 +676,7 @@ namespace IronNight
                 var fade = MakeImage(mask.transform, "Fade", new Vector2(0.5f, 0f), Vector2.zero, new Vector2(440, 120), new Color(0.06f, 0.07f, 0.08f, 0.95f)); fade.sprite = Lightswarm.ProceduralSprites.GradientDown(64, 1.2f); fade.rectTransform.pivot = new Vector2(0.5f, 0f);
                 var role = MakeText(tile.transform, "Role", new Vector2(0.5f, 0f), new Vector2(0, 100), TextAnchor.LowerCenter, 22, amber); role.text = Spaced(Crew.RoleName(man.role).ToUpperInvariant()); role.font = BoldFont(); role.rectTransform.sizeDelta = new Vector2(440, 30);
                 var name = MakeText(tile.transform, "Name", new Vector2(0.5f, 0f), new Vector2(0, 58), TextAnchor.LowerCenter, 28, ink); name.text = man.name; name.rectTransform.sizeDelta = new Vector2(440, 40);
-                var gift = MakeText(tile.transform, "Gift", new Vector2(0.5f, 0f), new Vector2(0, 20), TextAnchor.LowerCenter, 22, dim); gift.text = man.gift + "   " + Pips(Crew.Level(man), Crew.MaxLevel); gift.rectTransform.sizeDelta = new Vector2(440, 32);
+                var gift = MakeText(tile.transform, "Gift", new Vector2(0.5f, 0f), new Vector2(0, 20), TextAnchor.LowerCenter, 22, dim); gift.text = Crew.GiftName(man) + "   " + Pips(Crew.Level(man), Crew.MaxLevel); if (Crew.Ace(man)) { gift.fontSize = 20; AceTag(tile.transform, new Vector2(18, -16)); } gift.rectTransform.sizeDelta = new Vector2(440, 32);
             }
             y -= 812f;
             // the commanders: three portraits
