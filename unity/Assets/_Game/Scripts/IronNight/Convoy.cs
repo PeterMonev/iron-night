@@ -76,7 +76,7 @@ namespace IronNight
             convoyAmbush -= dt; if (convoyAmbush <= 0f) { convoyAmbush = Random.Range(24f, 30f); ConvoyAmbush(lead); }
             if (togo <= 0f)
             {
-                trucksThrough = TrucksLeft(); int bonus = 600 * trucksThrough; score += bonus; convoyDone = true; ConvoyRecord(trucksThrough);
+                trucksThrough = TrucksLeft(); int bonus = 600 * trucksThrough; score += bonus; convoyDone = true; ConvoyRecord(trucksThrough); Depot.Tally("convoyTrucks", trucksThrough);
                 hud.Popup(lead.transform.position, "+" + bonus, new Color(0.6f, 1f, 0.6f)); hud.Toast("The convoy is through · " + trucksThrough + " of " + ConvoyTrucks + " trucks · +" + bonus, 3.6f); Sfx.Pickup();
             }
         }

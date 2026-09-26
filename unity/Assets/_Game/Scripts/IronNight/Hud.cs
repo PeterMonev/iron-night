@@ -205,7 +205,7 @@ namespace IronNight
               var st = MakeImage(xpc.transform, "Star", new Vector2(0f, 0.5f), new Vector2(18, 0), new Vector2(30, 30), XpBlue); st.sprite = StarSprite(); st.rectTransform.pivot = new Vector2(0f, 0.5f);
               xpLine = MakeText(xpc.transform, "Text", new Vector2(0f, 0.5f), new Vector2(60, 0), TextAnchor.MiddleLeft, 28, XpBlue); xpLine.rectTransform.pivot = new Vector2(0f, 0.5f); xpLine.rectTransform.sizeDelta = new Vector2(200, 60); xpLine.font = BoldFont(); }
             goldLine = GoldPill(titleSheet.transform, new Vector2(-50, -218), 330f, true);
-            BuildCrateButton();
+            BuildCrateButton(); BuildBondsButton();
             // the name
             var eyebrow = MakeText(titleSheet.transform, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -190), TextAnchor.MiddleCenter, 26, new Color(0.96f, 0.68f, 0.24f)); eyebrow.text = Spaced("WWII · NIGHT ASSAULT"); eyebrow.font = BoldFont();
             var big = MakeText(titleSheet.transform, "Name", new Vector2(0.5f, 1f), new Vector2(0, -300), TextAnchor.MiddleCenter, 170, ink); big.text = "IRON NIGHT"; big.font = DisplayFont(); big.rectTransform.sizeDelta = new Vector2(1040, 240); big.verticalOverflow = VerticalWrapMode.Overflow; big.horizontalOverflow = HorizontalWrapMode.Overflow;
@@ -443,10 +443,12 @@ namespace IronNight
                 var row = MakeImage(depotRows, "Row camo", new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 230), new Color(0.08f, 0.09f, 0.1f, 0.96f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);
                 var title = MakeText(row.transform, "Title", new Vector2(0f, 1f), new Vector2(30, -20), TextAnchor.UpperLeft, 44, new Color(0.93f, 0.91f, 0.86f)); title.text = "Camouflage"; title.rectTransform.sizeDelta = new Vector2(600, 60);
                 var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(30, -80), TextAnchor.UpperLeft, 28, new Color(0.66f, 0.64f, 0.59f)); desc.text = "The platoon's paint. Bought once, kept for good."; desc.rectTransform.sizeDelta = new Vector2(880, 80);
-                for (int k = 0; k < Depot.Camos.Length; k++)
+                var shown = new List<Depot.Camo>(); foreach (var cc in Depot.Camos) if (cc.cost >= 0 || Depot.OwnsCamo(cc)) shown.Add(cc);   // a season's camouflage shows once it is won
+                float cw = Mathf.Min(210f, 900f / shown.Count - 10f);
+                for (int k = 0; k < shown.Count; k++)
                 {
-                    var c = Depot.Camos[k]; bool owned = Depot.OwnsCamo(c), chosen = Depot.CamoId == c.id, can = owned || Depot.Points >= c.cost;
-                    var b = MakeButton(row.transform, owned ? c.name : $"{c.name} · {c.cost}", new Vector2(0f, 0f), new Vector2(130 + k * 225, 50), new Vector2(210, 80), 26, () => { if (Depot.PickCamo(c)) RefreshDepot(); });
+                    var c = shown[k]; bool owned = Depot.OwnsCamo(c), chosen = Depot.CamoId == c.id, can = owned || Depot.Points >= c.cost;
+                    var b = MakeButton(row.transform, owned ? c.name : $"{c.name} · {c.cost}", new Vector2(0f, 0f), new Vector2(20f + cw * 0.5f + k * (cw + 10f), 50), new Vector2(cw, 80), cw < 180f ? 21 : 26, () => { if (Depot.PickCamo(c)) RefreshDepot(); });
                     b.GetComponent<Image>().color = chosen ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : can ? new Color(0.2f, 0.22f, 0.24f, 0.95f) : new Color(0.12f, 0.12f, 0.13f, 0.9f);
                     b.transform.Find("Label").GetComponent<Text>().color = chosen ? new Color(0.1f, 0.08f, 0.05f) : can ? new Color(0.93f, 0.91f, 0.86f) : new Color(0.5f, 0.48f, 0.45f);
                     b.GetComponent<Button>().interactable = can && !chosen;

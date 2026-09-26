@@ -59,7 +59,7 @@ namespace IronNight
         float AirCoolFull => 60f - 6f * crewSignals;
         string leaderId = "", leaderName = "", careerLine = ""; int careerXp, careerKills, crewXpBanked; bool careerNight, careerDawn; float careerDamage = 1f, careerReload = 1f, careerSpeed = 1f;   // the leader's own tank   // an operation night: the operation and which of its nights (0: a free night)
         int nightTracked, nightFocus, talliedTracked, nightLamps, talliedLamps, nightAces; bool litBySearchlight;
-        bool crewCounted, crewLostTonight, premiumNight, bossCrate, dawnRolled; int crewBefore;   // the crew's nights: counted at dawn, lost with the leader unless he is pulled back
+        bool crewCounted, crewLostTonight, premiumNight, bossCrate, dawnRolled; int crewBefore, starsBanked;   // the crew's nights: counted at dawn, lost with the leader unless he is pulled back
         Vehicle focus; float focusLeft; Transform focusRing;   // the enemy the platoon was told to hit
         float pointLeft; Vector3 point;                      // a spot the platoon was told to shell (the fuel dump)
         readonly List<Mine> mines = new List<Mine>(); float mineTimer = 130f; static Material mineMaterial;
@@ -192,7 +192,7 @@ namespace IronNight
             hud.Set(t, platoon.Count); hud.SetLevel(level, 0f);
             PlaceCamera(true);
             stick.Blocked = true; hud.ShowTitle(false);
-            foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); } else if (arg == "--shop") hud.ShowShop(); else if (arg == "--mail") hud.TestMail(); else if (arg == "--qm") hud.TestQuartermaster(); else if (arg == "--opencrate") hud.TestCrate();
+            foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); } else if (arg == "--shop") hud.ShowShop(); else if (arg == "--mail") hud.TestMail(); else if (arg == "--qm") hud.TestQuartermaster(); else if (arg == "--opencrate") hud.TestCrate(); else if (arg.StartsWith("--bondstars=")) Bonds.TestStars(int.Parse(arg.Substring(12))); else if (arg == "--bonds") hud.ShowBonds();
             hud.OnStart += () => Radio("start");
             if (opNight == 0 && !daily && PlayerPrefs.GetInt("route.launch", 0) == 1) { PlayerPrefs.SetInt("route.launch", 0); PlayerPrefs.Save(); StartNight(); Radio("start"); }
             if (sneak) { SneakBuild(); StartNight(); Radio("start"); string np = Hud.UiSprite("sneak_" + theatre) != null ? "sneak_" + theatre : theatre == "kursk" ? "route_kursk_belts" : "route_bocage"; hud.Briefing(np, "Night raid · " + TheatreName, "No lights, no shooting. Slip past the searchlights to the depot and blow it. A beam that finds you raises the alarm."); }
@@ -200,7 +200,7 @@ namespace IronNight
             if (stand) { StandBuild(); StartNight(); Radio("start"); string sp = Hud.UiSprite("stand_" + theatre) != null ? "stand_" + theatre : theatre == "kursk" ? "route_kursk_village" : theatre == "ardennes" ? "campaign_ardennes" : "campaign_lastpush"; hud.Briefing(sp, "Last stand · " + TheatreName, "Hold the crossroads through ten waves. Between them, dig in: sandbags, hedgehogs, mines."); }
             if (daily) { StartNight(); Radio("start"); var dr = Daily.RuleOf(dailyDay); hud.Briefing(Daily.Picture(dailyDay), "Daily challenge · " + dr.name, dr.line); }
             if (opNight > 0) { StartNight(); Radio("start"); hud.Briefing(Hud.UiSprite(opN.picture) != null ? opN.picture : op.cover, op.name + " · night " + opNight + " of " + op.nights.Length, opN.name + " · " + opN.second.text.ToLowerInvariant() + ", " + opN.third.text.ToLowerInvariant()); } Debug.Log("Iron Night: battle built, debugBoss=" + debugBoss + " args=" + string.Join(" ", System.Environment.GetCommandLineArgs()));
-            if (phase == Phase.Title && System.Array.FindIndex(System.Environment.GetCommandLineArgs(), a => a.StartsWith("--garage") || a.StartsWith("--dossier") || a == "--shop" || a == "--mail" || a == "--qm" || a == "--opencrate" || a == "--noWelcome") < 0) hud.WelcomeBack();   // mail call and the quartermaster, on the first title of a session
+            if (phase == Phase.Title && System.Array.FindIndex(System.Environment.GetCommandLineArgs(), a => a.StartsWith("--garage") || a.StartsWith("--dossier") || a == "--shop" || a == "--mail" || a == "--qm" || a == "--opencrate" || a == "--bonds" || a == "--noWelcome") < 0) hud.WelcomeBack();   // mail call and the quartermaster, on the first title of a session
         }
 
         void BuildWorld()
@@ -1961,6 +1961,11 @@ namespace IronNight
             foreach (var md in medals) { bonus += Medals.Reward; lines.Append("\nMedal · " + md.name + " · +" + Medals.Reward); }
             // crates: one for the boss, and a one-in-four chance at dawn (each only once, however often the night ends)
             if (bossKilled && !bossCrate) { bossCrate = true; Rewards.AddCrates("supply", 1); lines.Append("\nSupply crate · for the boss · open it on the title"); }
+            {   // war bonds: the night's stars (only what is new if the night ends twice), the week's orders done, the tier
+                int tierWas = Bonds.Tier, stars = Bonds.NightStars(dawn, bossKilled || nightAces > 0); Bonds.AddStars(Mathf.Max(0, stars - starsBanked)); starsBanked = Mathf.Max(starsBanked, stars);
+                foreach (var o in Bonds.ClaimOrders()) lines.Append("\nWeekly order done · " + o);
+                lines.Append("\nWar bonds · +" + starsBanked + " stars · " + (Bonds.Tier > tierWas ? "tier " + Bonds.Tier + " reached" : "tier " + Bonds.Tier));
+            }
             if (dawn && !dawnRolled) { dawnRolled = true; if (Random.value < 0.25f) { Rewards.AddCrates("supply", 1); lines.Append("\nSupply crate · found at dawn · open it on the title"); } }
             hud.SetEndPoints(earned + bonus);
             int m = Mathf.FloorToInt(t / 60f), s = Mathf.FloorToInt(t % 60f);

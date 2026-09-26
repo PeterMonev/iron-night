@@ -29,7 +29,7 @@ namespace IronNight
             volume.isGlobal = true; volume.profile = Resources.Load<VolumeProfile>("BattleProfile");
 
             var hud = new GameObject("Hud").AddComponent<Hud>(); hud.Build();
-            Ads.Start(); Store.Start();   // consent and AdMob, Google Play and its prices: once, whatever the scene reloads
+            Ads.Start(); Store.Start(); { var over = Bonds.EnsureSeason(); if (over != null) Ads.Say(over); }   // consent and AdMob, Google Play and its prices: once, whatever the scene reloads
             var stick = new GameObject("Stick").AddComponent<TouchStick>(); stick.Build(hud.Canvas); hud.HandTo(stick);
             Sfx.Build(cam);
             var fx = new GameObject("Fx").AddComponent<Fx>(); fx.Build(cam);

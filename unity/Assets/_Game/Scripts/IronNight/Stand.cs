@@ -105,7 +105,7 @@ namespace IronNight
         /// the tenth, dawn.</summary>
         void StandCleared()
         {
-            int bonus = 150 * standWave; score += bonus; standSupply += 2; StandRecord(standWave);
+            int bonus = 150 * standWave; score += bonus; standSupply += 2; StandRecord(standWave); Depot.Tally("standWaves", 1);
             apRounds = Mathf.Min(apMax, apRounds + Mathf.CeilToInt(apMax * 0.5f)); heRounds = Mathf.Min(heMax, heRounds + Mathf.CeilToInt(heMax * 0.5f)); hud.SetAmmo(apRounds, heRounds, loadHe);
             foreach (var v in platoon) v.hp = v == Leader ? Mathf.Min(Depot.LeaderHp, v.hp + 1f) : Mathf.Min(v.spec.hp + Depot.WingmanHpBonus + wingmanBonus, v.hp + 1f);
             hud.SetLeader(Mathf.CeilToInt(Leader.hp), Mathf.CeilToInt(Depot.LeaderHp)); hud.Popup(Leader.transform.position, "+" + bonus, new Color(1f, 0.75f, 0.35f)); Sfx.Pickup();

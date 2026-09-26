@@ -27,7 +27,7 @@ namespace IronNight
             for (int y = 0; y < N; y++) for (int x = 0; x < N; x++) { float u = Mathf.Abs((x + 0.5f) / N * 2f - 1f), v = Mathf.Abs((y + 0.5f) / N * 2f - 1f), d = Mathf.Pow(Mathf.Pow(u, 4f) + Mathf.Pow(v, 4f), 0.25f); tex.SetPixel(x, y, new Color(1f, 1f, 1f, Mathf.SmoothStep(0f, 1f, (d - 0.6f) / 0.38f))); }
             tex.Apply(); return vignette = Sprite.Create(tex, new Rect(0, 0, N, N), new Vector2(0.5f, 0.5f), 100f);
         }
-        static Color CamoColor(string id) => id == "winter" ? new Color(0.86f, 0.88f, 0.9f) : id == "desert" ? new Color(0.78f, 0.66f, 0.44f) : id == "night" ? new Color(0.22f, 0.26f, 0.35f) : new Color(0.34f, 0.37f, 0.22f);
+        static Color CamoColor(string id) => id == "winter" ? new Color(0.86f, 0.88f, 0.9f) : id == "desert" ? new Color(0.78f, 0.66f, 0.44f) : id == "night" ? new Color(0.22f, 0.26f, 0.35f) : id == "hedgerow" ? new Color(0.3f, 0.4f, 0.18f) : id == "whitewash" ? new Color(0.94f, 0.95f, 0.96f) : id == "steppe" ? new Color(0.72f, 0.58f, 0.32f) : new Color(0.34f, 0.37f, 0.22f);
 
         /// <summary>The sheet, fresh: a dark backdrop over everything but the curtain, and an empty body.</summary>
         Transform RewardSheet(float dim)
@@ -69,6 +69,7 @@ namespace IronNight
                 lb.text = p >= 50 ? "Quartermaster · +" + p.ToString("N0", En) + " ready" : "Quartermaster · gathering";
                 dailyBtn.GetComponent<Image>().color = p >= 50 ? QmGreen : new Color(0.06f, 0.07f, 0.09f, 0.55f); dailyBtn.SetActive(true);
             }
+            RefreshBondsButton();
             if (crateBtn == null) return;
             int n = Rewards.CratesTotal; bool free = n == 0 && Rewards.FreeCrateReady;
             var sp = CrateStage.Picture(n > 0 ? Rewards.NextCrate : "supply"); if (sp != null) cratePic.sprite = sp;

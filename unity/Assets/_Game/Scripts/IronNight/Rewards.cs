@@ -88,7 +88,7 @@ namespace IronNight
         public static List<Loot> Open(string kind)
         {
             if (Crates(kind) <= 0) return null;
-            AddCrates(kind, -1);
+            AddCrates(kind, -1); Depot.Tally("cratesOpened", 1);
             var list = new List<Loot>(); bool officer = kind == "officer";
             list.Add(new Loot { kind = "points", amount = Round(officer ? Random.Range(1200, 2500) : Random.Range(250, 700), 50) });
             list.Add(new Loot { kind = "xp", amount = Round(officer ? Random.Range(600, 1200) : Random.Range(150, 400), 25) });

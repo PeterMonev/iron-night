@@ -104,7 +104,7 @@ namespace IronNight
         /// <summary>The depot blown: its bonus, the unseen one on top, the record.</summary>
         void SneakDone()
         {
-            sneakDone = true; int bonus = 1500 + (sneakUnseen ? 1500 : 0); score += bonus; SneakRecord(sneakUnseen ? 2 : 1);
+            sneakDone = true; int bonus = 1500 + (sneakUnseen ? 1500 : 0); score += bonus; SneakRecord(sneakUnseen ? 2 : 1); Depot.Tally("sneakDepots", 1);
             hud.Toast(sneakUnseen ? "Depot destroyed unseen · +" + bonus : "Depot destroyed · +" + bonus, 3.4f); Sfx.Pickup();
         }
 

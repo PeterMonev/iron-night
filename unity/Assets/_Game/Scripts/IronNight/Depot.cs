@@ -131,6 +131,10 @@ namespace IronNight
             new Camo { id = "winter", name = "Winter", tint = new Color(1.3f, 1.32f, 1.42f), cost = 800 },
             new Camo { id = "desert", name = "Desert", tint = new Color(1.25f, 1.15f, 0.88f), cost = 800 },
             new Camo { id = "night", name = "Night", tint = new Color(0.62f, 0.68f, 0.85f), cost = 1500 },
+            // the war bonds seasons' own: never sold, only won at the top of a season
+            new Camo { id = "hedgerow", name = "Hedgerow", tint = new Color(0.9f, 1.06f, 0.78f), cost = -1 },
+            new Camo { id = "whitewash", name = "Whitewash", tint = new Color(1.62f, 1.62f, 1.66f), cost = -1 },
+            new Camo { id = "steppe", name = "Steppe", tint = new Color(1.32f, 1.12f, 0.76f), cost = -1 },
         };
         public static string CamoId { get { Load(); return PlayerPrefs.GetString("depot.camo", "olive"); } }
 
@@ -211,7 +215,7 @@ namespace IronNight
         public static bool PickCamo(Camo c)
         {
             Load();
-            if (!OwnsCamo(c)) { if (Points < c.cost) return false; Points -= c.cost; PlayerPrefs.SetInt("depot.camo." + c.id, 1); }
+            if (!OwnsCamo(c)) { if (c.cost < 0 || Points < c.cost) return false; Points -= c.cost; PlayerPrefs.SetInt("depot.camo." + c.id, 1); }   // a season's camouflage is won, never bought
             PlayerPrefs.SetString("depot.camo", c.id); Save(); return true;
         }
 

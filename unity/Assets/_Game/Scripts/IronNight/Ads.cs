@@ -32,6 +32,9 @@ namespace IronNight
             Runner.Get().Play(placement, ok => { Playing = false; if (ok) onReward?.Invoke(); else Runner.Get().Say("No ad to show right now · try again in a minute"); });
         }
 
+        /// <summary>A line over everything for a few seconds ("no ad", a season over).</summary>
+        public static void Say(string line) => Runner.Get().Say(line);
+
         /// <summary>True where the player must be able to change their ad consent later (the EU): the settings show a button.</summary>
         public static bool PrivacyChoices
         {
