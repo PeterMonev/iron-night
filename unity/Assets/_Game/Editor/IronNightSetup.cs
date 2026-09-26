@@ -204,7 +204,7 @@ namespace IronNight.EditorTools
                 var imp = AssetImporter.GetAtPath(path) as ModelImporter; if (imp == null) continue;
                 imp.materialImportMode = ModelImporterMaterialImportMode.None;
                 imp.importNormals = System.Text.RegularExpressions.Regex.IsMatch(path, @"_m\d+\.obj$") ? ModelImporterNormals.Import : ModelImporterNormals.Calculate; imp.normalSmoothingAngle = 60f;   // an artist's model brings its own normals
-                imp.meshCompression = ModelImporterMeshCompression.Medium; imp.isReadable = path.Contains("_turret");   // the turrets are read at runtime for the roof height (the commander stands on it)
+                imp.meshCompression = ModelImporterMeshCompression.Medium; imp.isReadable = path.Contains("_turret") || path.Contains("/crew_") || path.Contains("/commander");   // the turrets are read at runtime for the roof height (the commander stands on it); the crew and the commanders for their idle moves (CrewIdle)
                 imp.SaveAndReimport();
             }
             foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { "Assets/_Game/Resources/Models", "Assets/_Game/Resources/Textures", "Assets/_Game/Resources/Props" }))

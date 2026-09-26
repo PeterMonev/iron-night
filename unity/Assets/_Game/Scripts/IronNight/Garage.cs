@@ -132,7 +132,7 @@ namespace IronNight
             if (spec == null || (shown != null && shownId == spec.id)) return;
             if (shown != null) Destroy(shown.gameObject);
             shown = Vehicle.Create(spec, true, Home, 0f); shown.transform.SetParent(stage, true); shownId = spec.id;
-            shown.turretYaw = 0.35f; shown.Apply(); shown.enabled = false; shown.KillRings(Career.Rings(spec.id)); ShowCrew(System.Array.Exists(Depot.Leaders, x => x.id == spec.id && x.nation == "su") ? "su" : "us");
+            shown.turretYaw = 0.35f; shown.Apply(); shown.enabled = false; shown.KillRings(Career.Rings(spec.id)); foreach (var t in shown.GetComponentsInChildren<Transform>()) if (t.name == "Commander") CrewIdle.Bring(t.gameObject, 9, 0.8f); ShowCrew(System.Array.Exists(Depot.Leaders, x => x.id == spec.id && x.nation == "su") ? "su" : "us");
             if (parkedTank == null && parked != null)
             {
                 // one of the wingmen parked at the back, in the shadows
@@ -163,6 +163,7 @@ namespace IronNight
                 var look = eye - at[i]; look.y = 0f; go.transform.localRotation = Quaternion.LookRotation(look.normalized) * Quaternion.Euler(0f, turn[i], 0f);   // to the camera, a little toward the tank
                 var mat = new Material(Resources.Load<Material>("VehicleLit")); mat.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + id + "_tex")); mat.SetFloat("_Cull", 0f);
                 foreach (var r in go.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+                CrewIdle.Bring(go, i + (nation == "su" ? 4 : 0), Crew.Roles[i] == "radio" ? 0.5f : 1f);   // at ease, not statues; the radio operators hold a handset to the ear
                 crewFigures.Add(go);
             }
         }
