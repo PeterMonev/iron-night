@@ -45,7 +45,7 @@ namespace IronNight
         public class Card { public string id, title, desc; public bool rare; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain, OnStart, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder, OnAir, OnDailyChallenge, OnStandReady; public System.Action<string> OnRoute, OnTheatre, OnStand, OnStandItem; public System.Action<string, int> OnOperation; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[3]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], routePays = new Text[3], theatreLabels = new Text[3]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, airBtn, routeSheet, trainBtn; Text xpLine, depotXp; static readonly Color XpBlue = new Color(0.56f, 0.76f, 0.98f), XpDeep = new Color(0.22f, 0.43f, 0.74f, 0.96f); Text airLabel; Image airFill; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
+        public System.Action OnAd, OnAgain, OnStart, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder, OnAir, OnDailyChallenge, OnStandReady; public System.Action<string> OnRoute, OnTheatre, OnStand, OnStandItem, OnConvoy; public System.Action<string, int> OnOperation; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[3]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], routePays = new Text[3], theatreLabels = new Text[3]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, airBtn, routeSheet, trainBtn; Text xpLine, depotXp; static readonly Color XpBlue = new Color(0.56f, 0.76f, 0.98f), XpDeep = new Color(0.22f, 0.43f, 0.74f, 0.96f); Text airLabel; Image airFill; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
 
         Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, stats, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel, setSound, setQuality, setVibe, setMusic, rankLine, pointsLine, ordersCount; GameObject settingsSheet, ordersSheet; RawImage titleBackdrop, depotBackdrop; GarageDrag depotDrag; readonly List<RectTransform> embers = new List<RectTransform>(); readonly List<float> emberPhase = new List<float>(); GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
@@ -993,22 +993,32 @@ namespace IronNight
                     var py = MakeText(card.transform, "Pay", new Vector2(1f, 0f), new Vector2(-30, 154), TextAnchor.LowerRight, 30, new Color(0.96f, 0.68f, 0.24f)); routePays[i] = py; py.font = BoldFont(); py.rectTransform.pivot = new Vector2(1f, 0f); py.rectTransform.sizeDelta = new Vector2(260, 44);
                     var ln = MakeText(card.transform, "Line", new Vector2(0f, 0f), new Vector2(30, 24), TextAnchor.UpperLeft, 26, new Color(0.78f, 0.76f, 0.72f)); routeLines[i] = ln; ln.rectTransform.pivot = new Vector2(0f, 0f); ln.rectTransform.sizeDelta = new Vector2(880, 118);
                 }
-                {   // the last stand: a slim card under the three, the picture behind the words
-                    var card = MakeButton(routeSheet.transform, "", new Vector2(0.5f, 1f), new Vector2(0, -1790 - 100), new Vector2(940, 200), 20, () => { routeSheet.SetActive(false); OnStand?.Invoke(sheetTheatre); });
-                    card.GetComponent<Image>().color = new Color(0.08f, 0.06f, 0.04f, 1f);
-                    var mask = new GameObject("Mask", typeof(RectTransform), typeof(RectMask2D)); mask.transform.SetParent(card.transform, false); var mkrt = mask.GetComponent<RectTransform>(); mkrt.anchorMin = mkrt.anchorMax = new Vector2(0.5f, 0.5f); mkrt.pivot = new Vector2(0.5f, 0.5f); mkrt.sizeDelta = new Vector2(924, 184);
-                    standPic = MakeImage(mask.transform, "Pic", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(924, 924), new Color(0.8f, 0.8f, 0.8f)); standPic.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-                    var shade = MakeImage(mask.transform, "Shade", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(924, 184), new Color(0.03f, 0.03f, 0.04f, 0.62f)); shade.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-                    var edge = MakeImage(card.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(940, 200), new Color(0.96f, 0.68f, 0.24f, 0.6f)); edge.sprite = Outline(); edge.type = Image.Type.Sliced; edge.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-                    var ey2 = MakeText(card.transform, "Eyebrow", new Vector2(0f, 1f), new Vector2(30, -18), TextAnchor.UpperLeft, 22, new Color(0.96f, 0.68f, 0.24f)); ey2.text = Spaced("LAST STAND"); ey2.font = BoldFont(); ey2.rectTransform.sizeDelta = new Vector2(600, 34);
-                    var nm2 = MakeText(card.transform, "Name", new Vector2(0f, 1f), new Vector2(30, -48), TextAnchor.UpperLeft, 40, new Color(0.96f, 0.94f, 0.9f)); nm2.text = "Hold the crossroads"; nm2.font = BoldFont(); nm2.rectTransform.sizeDelta = new Vector2(880, 50);
-                    var ln2 = MakeText(card.transform, "Line", new Vector2(0f, 1f), new Vector2(30, -104), TextAnchor.UpperLeft, 23, new Color(0.8f, 0.78f, 0.74f)); ln2.text = "Ten waves, each heavier than the last. Between them, dig in: sandbags, hedgehogs and mines."; ln2.rectTransform.sizeDelta = new Vector2(610, 64);
-                    standBestText = MakeText(card.transform, "Best", new Vector2(1f, 0f), new Vector2(-30, 16), TextAnchor.LowerRight, 26, new Color(0.96f, 0.68f, 0.24f)); standBestText.font = BoldFont(); standBestText.rectTransform.sizeDelta = new Vector2(270, 40);
-                }
+                // the two modes under the three ways in, side by side: the last stand and the convoy
+                ModeCard(-239f, "LAST STAND", "Hold the crossroads", "Ten waves, heavier each time; dig in between them.", () => { routeSheet.SetActive(false); OnStand?.Invoke(sheetTheatre); }, out standPic, out standBestText);
+                ModeCard(239f, "CONVOY", "Bring the trucks through", "Five trucks, 900 m of road and ambushes.", () => { if (!Battle.ConvoyReady(sheetTheatre)) return; routeSheet.SetActive(false); OnConvoy?.Invoke(sheetTheatre); }, out convoyPic, out convoyBestText);
             }
             sheetTheatre = PlayerPrefs.GetString("theatre", "normandy"); if (!Depot.TheatreOpen(sheetTheatre)) sheetTheatre = "normandy"; FillRoutes();
             routeSheet.transform.SetAsLastSibling(); if (curtain != null) curtain.transform.SetAsLastSibling(); routeSheet.SetActive(true);
         }
+
+        /// <summary>A half-width card for a mode under the three ways in: the picture behind the words, an amber edge,
+        /// the best on this front at the bottom right.</summary>
+        void ModeCard(float x, string eyebrow, string name, string line, System.Action go, out Image pic, out Text best)
+        {
+            var card = MakeButton(routeSheet.transform, "", new Vector2(0.5f, 1f), new Vector2(x, -1890), new Vector2(462, 200), 20, go);
+            card.GetComponent<Image>().color = new Color(0.08f, 0.06f, 0.04f, 1f);
+            var mask = new GameObject("Mask", typeof(RectTransform), typeof(RectMask2D)); mask.transform.SetParent(card.transform, false); var mkrt = mask.GetComponent<RectTransform>(); mkrt.anchorMin = mkrt.anchorMax = new Vector2(0.5f, 0.5f); mkrt.pivot = new Vector2(0.5f, 0.5f); mkrt.sizeDelta = new Vector2(450, 188);
+            pic = MakeImage(mask.transform, "Pic", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(450, 450), new Color(0.8f, 0.8f, 0.8f)); pic.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            var shade = MakeImage(mask.transform, "Shade", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(450, 188), new Color(0.03f, 0.03f, 0.04f, 0.6f)); shade.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            var edge = MakeImage(card.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(462, 200), new Color(0.96f, 0.68f, 0.24f, 0.6f)); edge.sprite = Outline(); edge.type = Image.Type.Sliced; edge.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            var ey = MakeText(card.transform, "Eyebrow", new Vector2(0f, 1f), new Vector2(20, -16), TextAnchor.UpperLeft, 20, new Color(0.96f, 0.68f, 0.24f)); ey.text = Spaced(eyebrow); ey.font = BoldFont(); ey.rectTransform.sizeDelta = new Vector2(420, 30);
+            var nm = MakeText(card.transform, "Name", new Vector2(0f, 1f), new Vector2(20, -44), TextAnchor.UpperLeft, 30, new Color(0.96f, 0.94f, 0.9f)); nm.text = name; nm.font = BoldFont(); nm.rectTransform.sizeDelta = new Vector2(430, 40);
+            var ln = MakeText(card.transform, "Line", new Vector2(0f, 1f), new Vector2(20, -88), TextAnchor.UpperLeft, 21, new Color(0.8f, 0.78f, 0.74f)); ln.text = line; ln.rectTransform.sizeDelta = new Vector2(420, 56);
+            best = MakeText(card.transform, "Best", new Vector2(1f, 0f), new Vector2(-18, 12), TextAnchor.LowerRight, 22, new Color(0.96f, 0.68f, 0.24f)); best.font = BoldFont(); best.rectTransform.sizeDelta = new Vector2(320, 34);
+        }
+
+        /// <summary>A picture filling a mode card's window, cut at the edges.</summary>
+        static void Cover(Image pic, Sprite sp) { if (sp == null) return; pic.sprite = sp; float c = Mathf.Max(450f / sp.rect.width, 188f / sp.rect.height); pic.rectTransform.sizeDelta = new Vector2(sp.rect.width * c, sp.rect.height * c); }
 
         /// <summary>The three ways in of the chosen front, and the front tabs lit, dimmed or closed.</summary>
         void FillRoutes()
@@ -1023,8 +1033,10 @@ namespace IronNight
             if (standBestText != null)
             {
                 int best = Battle.StandBest(sheetTheatre); standBestText.text = best > 0 ? "best: wave " + best + " of " + Battle.StandWaves : "not held yet";
-                var sp = UiSprite("stand_" + sheetTheatre) ?? UiSprite(sheetTheatre == "kursk" ? "route_kursk_village" : sheetTheatre == "ardennes" ? "campaign_ardennes" : "campaign_lastpush");
-                if (sp != null) { standPic.sprite = sp; float cover = Mathf.Max(924f / sp.rect.width, 184f / sp.rect.height); standPic.rectTransform.sizeDelta = new Vector2(sp.rect.width * cover, sp.rect.height * cover); }
+                Cover(standPic, UiSprite("stand_" + sheetTheatre) ?? UiSprite(sheetTheatre == "kursk" ? "route_kursk_village" : sheetTheatre == "ardennes" ? "campaign_ardennes" : "campaign_lastpush"));
+                bool ready = Battle.ConvoyReady(sheetTheatre); int cb = Battle.ConvoyBest(sheetTheatre);
+                convoyBestText.text = !ready ? "the trucks are coming" : cb > 0 ? "best: " + cb + " of " + Battle.ConvoyTrucks + " through" : "not run yet";
+                Cover(convoyPic, UiSprite("convoy_" + sheetTheatre) ?? UiSprite(sheetTheatre == "kursk" ? "route_kursk_steppe" : "route_open")); convoyPic.color = ready ? new Color(0.8f, 0.8f, 0.8f) : new Color(0.3f, 0.3f, 0.32f);
             }
             for (int i = 0; i < 3; i++) { routePics[i].sprite = UiSprite(pics[i]); routeNames[i].text = names[i]; routeLines[i].text = lines[i]; routePays[i].text = pays[i]; }
             string[] th = { "normandy", "ardennes", "kursk" }; string[] label = { "NORMANDY", "ARDENNES", "KURSK" }; string[] shut = { "", "after 1 night", "after 1 dawn" };
@@ -1118,7 +1130,8 @@ namespace IronNight
                 briefingTitle = MakeText(card.transform, "Title", new Vector2(0f, 1f), new Vector2(230, -22), TextAnchor.UpperLeft, 40, new Color(0.96f, 0.68f, 0.24f)); briefingTitle.font = BoldFont(); briefingTitle.rectTransform.sizeDelta = new Vector2(690, 50);
                 briefingText = MakeText(card.transform, "Text", new Vector2(0f, 1f), new Vector2(230, -76), TextAnchor.UpperLeft, 27, new Color(0.9f, 0.88f, 0.84f)); briefingText.rectTransform.sizeDelta = new Vector2(690, 110);
             }
-            var sp = UiSprite(picture); briefingPic.sprite = sp; briefingPic.enabled = sp != null; if (sp != null) { float cover = Mathf.Max(200f / sp.rect.width, 200f / sp.rect.height); briefingPic.rectTransform.sizeDelta = new Vector2(sp.rect.width * cover, sp.rect.height * cover); }   // a wide picture fills the square, cut at the sides briefingTitle.text = title; briefingText.text = text; briefing.SetActive(true); briefingLeft = 4.5f;
+            var sp = UiSprite(picture); briefingPic.sprite = sp; briefingPic.enabled = sp != null; if (sp != null) { float cover = Mathf.Max(200f / sp.rect.width, 200f / sp.rect.height); briefingPic.rectTransform.sizeDelta = new Vector2(sp.rect.width * cover, sp.rect.height * cover); }
+            briefingTitle.text = title; briefingText.text = text; briefing.SetActive(true); briefingLeft = 4.5f;   // a wide picture fills the square above, cut at the sides
         }
 
         public void Popup(Vector3 world, string text, Color color)
@@ -1188,7 +1201,7 @@ namespace IronNight
             }
         }
 
-        Text standBestText; Image standPic;   // the last stand's card on the way-in sheet
+        Text standBestText, convoyBestText; Image standPic, convoyPic;   // the mode cards on the way-in sheet
         GameObject standKit, standReady; Text standSupplyText; readonly Dictionary<string, Image> standItems = new Dictionary<string, Image>(); readonly Dictionary<string, Text> standCosts = new Dictionary<string, Text>();
         /// <summary>The last stand's kit in the fight: shown for a stand, gone at its end.</summary>
         public void ShowStandKit(bool on)

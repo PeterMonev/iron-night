@@ -174,6 +174,18 @@ namespace IronNight
             speed = 15f, turnRate = 2.8f, turretRate = 2.8f, reload = 999f, damage = 0f, range = 0f, hp = 1f, radius = 1.4f, transport = true
         };
 
+        // the convoy's trucks: no gun, soft skinned, their markings in their own texture
+        public static readonly VehicleSpec Gmc = new VehicleSpec
+        {
+            id = "gmc", name = "GMC truck", hullMesh = "gmc_hull", turretMesh = null, texture = "gmc", painted = true, forward = 1f, ringHeight = 0f,
+            gunLength = 0f, speed = 6f, turnRate = 1.6f, turretRate = 1f, reload = 999f, damage = 0f, range = 0f, hp = 4f, radius = 2f
+        };
+        public static readonly VehicleSpec Studebaker = new VehicleSpec
+        {
+            id = "studebaker", name = "Studebaker truck", hullMesh = "studebaker_hull", turretMesh = null, texture = "studebaker", painted = true, forward = 1f, ringHeight = 0f,
+            gunLength = 0f, speed = 6f, turnRate = 1.6f, turretRate = 1f, reload = 999f, damage = 0f, range = 0f, hp = 4f, radius = 2f
+        };
+
         /// <summary>A spec whose models are in the build; the batch still baking is not.</summary>
         public static bool Available(VehicleSpec s) => Resources.Load<GameObject>("Models/" + s.hullMesh) != null || Vehicle.HasParts(s.hullMesh);   // one mesh, or an artist's model in parts
 
@@ -182,7 +194,7 @@ namespace IronNight
             switch (id) { case "firefly": return Firefly; case "pz4": return PanzerIV; case "tiger": return Tiger; case "pak40": return Pak40; case "flak88": return Flak88; case "panther": return Panther; case "stug": return StuG; case "halftrack": return Halftrack;
                 case "easy8": return Easy8; case "hellcat": return Hellcat; case "chaffee": return Chaffee; case "pershing": return Pershing; case "m10": return M10;
                 case "t34_85": return T34_85; case "kv85": return KV85; case "su100": return SU100; case "is2": return IS2;
-                case "hetzer": return Hetzer; case "kingtiger": return KingTiger; case "nebelwerfer": return Nebelwerfer; case "flak38": return Flak38; case "kubelwagen": return Kubelwagen; default: return Sherman; }
+                case "hetzer": return Hetzer; case "kingtiger": return KingTiger; case "nebelwerfer": return Nebelwerfer; case "flak38": return Flak38; case "kubelwagen": return Kubelwagen; case "gmc": return Gmc; case "studebaker": return Studebaker; default: return Sherman; }
         }
     }
 
