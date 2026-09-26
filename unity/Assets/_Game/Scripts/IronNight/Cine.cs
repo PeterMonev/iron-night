@@ -55,6 +55,7 @@ namespace IronNight
             string place = title != front ? front : theatre == "kursk" ? "SOVIET UNION" : winter ? "BELGIUM" : "FRANCE";
             string when = theatre == "kursk" ? "JULY 1943" : winter ? "DECEMBER 1944" : "JULY 1944";
             string way = route == "village" ? "VILLAGE" : route == "bocage" ? (theatre == "kursk" ? "TREE BELTS" : "BOCAGE") : (theatre == "kursk" ? "STEPPE" : "OPEN FIELDS");
+            if (mapSector != null) { eyebrow = "ROAD TO BERLIN" + (Campaign.Counter == mapSector ? " · COUNTERATTACK" : ""); title = mapSector.name.ToUpperInvariant(); place = mapSector.country; when = mapSector.when; }   // a war map sector: its own name and date
             string sky = weather == Weather.Fog ? " · FOG" : weather == Weather.Rain ? (winter ? " · SNOW" : " · RAIN") : "";
             sub = place + " · " + when + " · " + way + sky;
         }

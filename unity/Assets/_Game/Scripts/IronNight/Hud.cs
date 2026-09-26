@@ -214,8 +214,8 @@ namespace IronNight
             // tonight
             conditions = MakeChip(titleSheet.transform, "Conditions", new Vector2(0.5f, 0f), new Vector2(0, 1060), 640f, new Color(0.96f, 0.68f, 0.24f), new Color(0.06f, 0.07f, 0.09f, 0.7f));
             // four tiles with pictures: the operations, the daily challenge, the depot, the standing orders
-            string[] tileNames = { "OPERATIONS", "DAILY", "DEPOT", "ORDERS" }; string[] tilePics = { "campaign_normandy", Daily.Picture(Daily.Today), "card_crews", "card_reinf" };
-            System.Action[] tileActs = { () => ShowOperations(), () => ShowDaily(), () => OnDepot?.Invoke(), () => ShowOrders() };
+            string[] tileNames = { "WAR MAP", "DAILY", "DEPOT", "ORDERS" }; string[] tilePics = { "campaign_normandy", Daily.Picture(Daily.Today), "card_crews", "card_reinf" };
+            System.Action[] tileActs = { () => ShowMap(), () => ShowDaily(), () => OnDepot?.Invoke(), () => ShowOrders() };
             const float TW = 226f, TH = 250f;
             for (int i = 0; i < 4; i++)
             {
@@ -383,8 +383,8 @@ namespace IronNight
               dailyEdge.color = played ? new Color(1f, 1f, 1f, 0.16f) : new Color(0.96f, 0.68f, 0.24f, 0.75f);
               var dp = UiSprite(Daily.Picture(today)); if (dp != null && dailyPic != null) { dailyPic.sprite = dp; float dc = Mathf.Max(216f / dp.rect.width, 240f / dp.rect.height); dailyPic.rectTransform.sizeDelta = new Vector2(dp.rect.width * dc, dp.rect.height * dc); } }
             { bool ready = false; foreach (var lc in Depot.Leaders) if (Depot.OwnsLeader(lc) && Career.AnyUpgrade(lc.id)) ready = true; depotCount.text = ready ? "upgrade ready" : ""; }
-            { opsCount.text = Operations.TotalStars + " / " + Operations.All.Length * 15 + " stars";
-              var cs = UiSprite(Operations.Current.cover) ?? UiSprite("campaign_normandy"); if (cs != null && opsPic != null) { opsPic.sprite = cs; float cover = Mathf.Max(216f / cs.rect.width, 240f / cs.rect.height); opsPic.rectTransform.sizeDelta = new Vector2(cs.rect.width * cover, cs.rect.height * cover); } }
+            { RefreshMapTile();   // the first tile is the war map now, the operations are on it
+              var cs = UiSprite("map_europe") ?? UiSprite(Operations.Current.cover) ?? UiSprite("campaign_normandy"); if (cs != null && opsPic != null) { opsPic.sprite = cs; float cover = Mathf.Max(216f / cs.rect.width, 240f / cs.rect.height); opsPic.rectTransform.sizeDelta = new Vector2(cs.rect.width * cover, cs.rect.height * cover); } }
             titleStats.text = Depot.NightsFought == 0 ? "First night. Drag anywhere to drive; the turrets fire on their own." : $"Best {Depot.BestKills} kills · longest {m}:{s:00} · {Depot.CrewName}: {Depot.CrewBonusText}";
             reserveBtn.SetActive(!reserveGranted); reserveNote.text = reserveGranted ? "Reserve tank granted:\nthe platoon can grow to 4 tonight." : "";
             Missions.Load(); foreach (Transform c in missionRoot) Destroy(c.gameObject); if (ordersCount != null) ordersCount.text = Missions.Active.Count + " standing";
@@ -754,7 +754,7 @@ namespace IronNight
                 d.Normalize(); float k = Mathf.Min(hw / Mathf.Max(0.001f, Mathf.Abs(d.x)), hh / Mathf.Max(0.001f, Mathf.Abs(d.y)));
                 Image a;
                 if (used < arrows.Count) a = arrows[used];
-                else { a = MakeImage(canvas.transform, "Arrow", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(54, 54), new Color(0.95f, 0.3f, 0.25f, 0.9f)); a.sprite = arrowSprite; a.rectTransform.pivot = new Vector2(0.5f, 0.5f); arrows.Add(a); }
+                else { a = MakeImage(hudGroup.transform, "Arrow", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(54, 54), new Color(0.95f, 0.3f, 0.25f, 0.9f)); a.sprite = arrowSprite; a.rectTransform.pivot = new Vector2(0.5f, 0.5f); arrows.Add(a); }
                 a.enabled = true; a.rectTransform.anchoredPosition = d * k; a.rectTransform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg - 90f); used++;
             }
             for (int i = used; i < arrows.Count; i++) arrows[i].enabled = false;
@@ -1374,7 +1374,7 @@ namespace IronNight
             if (fpsTimer >= 0.5f) { float f = fpsFrames / fpsAccum; fps.text = $"{f:0} fps"; fpsAccum = 0; fpsFrames = 0; fpsTimer = 0; if (f < 38f && hudGroup.activeSelf) slowFor += 0.5f; else slowFor = 0f; if (slowFor >= 5f && !slowOffered && PlayerPrefs.GetInt("quality", 1) != 0) { slowOffered = true; Toast("Stuttering? Pause · Quality: low turns off shadows and rain", 5f); } }
             if (toastLeft > 0f && hudFade.alpha > 0.95f) { toastLeft -= Time.unscaledDeltaTime; if (toastLeft <= 0f) toast.text = ""; }
             if (briefingLeft > 0f && hudFade.alpha > 0.95f) { briefingLeft -= Time.unscaledDeltaTime; if (briefingLeft <= 0f && briefing != null) briefing.SetActive(false); }
-            TickNumbers(Time.unscaledDeltaTime); CurtainTick(Time.unscaledDeltaTime); TickCinema(Mathf.Min(Time.unscaledDeltaTime, 0.05f)); TickRewards(Mathf.Min(Time.unscaledDeltaTime, 0.05f));
+            TickNumbers(Time.unscaledDeltaTime); CurtainTick(Time.unscaledDeltaTime); TickCinema(Mathf.Min(Time.unscaledDeltaTime, 0.05f)); TickRewards(Mathf.Min(Time.unscaledDeltaTime, 0.05f)); TickMap();
             if (titleSheet != null && titleSheet.activeSelf) for (int i = 0; i < embers.Count; i++)
             {
                 var e = embers[i]; float ph = emberPhase[i]; var p = e.anchoredPosition; p.y += (18f + 10f * Mathf.Sin(ph)) * Time.unscaledDeltaTime; p.x += Mathf.Sin(Time.unscaledTime * 0.7f + ph) * 12f * Time.unscaledDeltaTime;
