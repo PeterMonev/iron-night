@@ -637,7 +637,7 @@ namespace IronNight
                 var nx = MakeText(row.transform, "Next", new Vector2(0f, 1f), new Vector2(262, -146), TextAnchor.UpperLeft, 24, lvl < Crew.MaxLevel ? ink : dim); nx.text = lvl < Crew.MaxLevel ? "Level " + (lvl + 1) + ": " + Crew.EffectOf(m, lvl + 1) : "Fully trained"; nx.rectTransform.sizeDelta = new Vector2(660, 34);
                 // the seat: assign, or hire first
                 bool canSeat = !seated && (owned || Depot.Points >= m.cost);
-                var sb = MakeButton(row.transform, seated ? "In the seat" : owned ? "Assign" : "Hire · " + m.cost.ToString("N0", En), new Vector2(1f, 0f), new Vector2(-170, 48), new Vector2(300, 72), 28, () => { if (Crew.Pick(man)) { Sfx.Pickup(); RefreshDepot(); } });
+                var sb = MakeButton(row.transform, seated ? "In the seat" : owned ? "Assign" : "Hire · " + m.cost.ToString("N0", En), new Vector2(1f, 0f), new Vector2(-170, 48), new Vector2(300, 72), 28, () => { if (Crew.Pick(man)) { Sfx.Pickup(); RefreshDepot(); if (garage != null) garage.RefreshCrew(); } });
                 sb.GetComponent<Image>().color = seated ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : canSeat ? new Color(0.2f, 0.22f, 0.24f, 0.95f) : new Color(0.12f, 0.12f, 0.13f, 0.9f);
                 sb.transform.Find("Label").GetComponent<Text>().color = seated ? new Color(0.1f, 0.08f, 0.05f) : canSeat ? ink : new Color(0.5f, 0.48f, 0.45f); sb.GetComponent<Button>().interactable = canSeat;
                 // training: only for a man on the books

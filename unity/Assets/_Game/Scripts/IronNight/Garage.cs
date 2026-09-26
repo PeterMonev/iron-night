@@ -143,6 +143,9 @@ namespace IronNight
         readonly System.Collections.Generic.List<GameObject> crewFigures = new System.Collections.Generic.List<GameObject>(); string crewNation;
         /// <summary>The leader's crew standing on the hangar floor in front of the turntable, turned to the camera, when there
         /// are figures of them (Props/crew_us_gunner and the like, exported facing +Z).</summary>
+        /// <summary>The figures again after a change of crew: a woman taking a seat stands there herself.</summary>
+        public void RefreshCrew() { var n = crewNation; crewNation = null; if (n != null) ShowCrew(n); }
+
         public void ShowCrew(string nation)
         {
             if (crewNation == nation) return; crewNation = nation;
@@ -158,7 +161,8 @@ namespace IronNight
             var eye = titleCam != null ? titleCam.transform.localPosition : new Vector3(-9.6f, 3.4f, -15.2f); var idle = new CrewIdle[4];
             for (int i = 0; i < 4; i++)
             {
-                string id = "crew_" + nation + "_" + Crew.Roles[i]; var pf = Resources.Load<GameObject>("Props/" + id); if (pf == null) continue;
+                var man = Crew.Chosen(nation, Crew.Roles[i]); string id = "crew_" + man.id; var pf = Resources.Load<GameObject>("Props/" + id);   // the one in the seat, when there is a figure of her or him
+                if (pf == null) { id = "crew_" + nation + "_" + Crew.Roles[i]; pf = Resources.Load<GameObject>("Props/" + id); } if (pf == null) continue;
                 var go = Instantiate(pf, transform); go.name = id; go.transform.localPosition = at[i];
                 var look = eye - at[i]; look.y = 0f; go.transform.localRotation = Quaternion.LookRotation(look.normalized) * Quaternion.Euler(0f, turn[i], 0f);   // to the camera, a little toward the tank
                 var mat = new Material(Resources.Load<Material>("VehicleLit")); mat.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + id + "_tex")); mat.SetFloat("_Cull", 0f);
