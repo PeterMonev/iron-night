@@ -279,6 +279,7 @@ namespace IronNight
                 "Sound effects: Pixabay (Pixabay Content License) and Mixkit (Mixkit License), authors listed in the game's SOURCES.\n" +
                 "Menu march: Sousa's 'The U.S. Field Artillery', United States Marine Band - public domain.\n" +
                 "Made with Unity.\n\nProgress is kept on this device only. No account, no personal data.";
+            adChoices = MakeGhost(settingsSheet.transform, "Ad privacy choices", new Vector2(0.5f, 0f), new Vector2(0, 290), new Vector2(880, 100), 32, () => Ads.ShowPrivacyChoices()); adChoices.SetActive(false);   // Europe: the ad consent can be changed at any time
             MakeButton(settingsSheet.transform, "Privacy policy", new Vector2(0.5f, 0f), new Vector2(-230, 150), new Vector2(420, 130), 34, () => Application.OpenURL("https://petermonev.github.io/iron-night/privacy.html"));
             MakeButton(settingsSheet.transform, "Back", new Vector2(0.5f, 0f), new Vector2(230, 150), new Vector2(420, 130), 40, () => settingsSheet.SetActive(false));
             settingsSheet.SetActive(false);
@@ -1356,7 +1357,8 @@ namespace IronNight
         public void ShowPause(bool soundOn, bool highQuality) { soundLabel.text = soundOn ? "Sound: on" : "Sound: off"; qualityLabel.text = highQuality ? "Quality: high" : "Quality: low"; pauseSheet.SetActive(true); }
         public void HidePause() { pauseSheet.SetActive(false); }
         public void SetQualityLabel(bool high) { qualityLabel.text = high ? "Quality: high" : "Quality: low"; }
-        void ShowSettings() { RefreshSettings(); settingsSheet.SetActive(true); }
+        void ShowSettings() { RefreshSettings(); if (adChoices != null) adChoices.SetActive(Ads.PrivacyChoices); settingsSheet.SetActive(true); }
+        GameObject adChoices;
         void RefreshSettings()
         {
             setSound.text = PlayerPrefs.GetInt("sound", 1) == 1 ? "Sound: on" : "Sound: off"; setMusic.text = Sfx.MusicOff ? "Music: off" : "Music: on"; setQuality.text = PlayerPrefs.GetInt("quality", 1) == 1 ? "Quality: high" : "Quality: low"; setVibe.text = PlayerPrefs.GetInt("vibe", 1) == 1 ? "Vibration: on" : "Vibration: off";

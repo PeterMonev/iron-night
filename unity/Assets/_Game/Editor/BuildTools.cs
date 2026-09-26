@@ -24,6 +24,7 @@ namespace IronNight.EditorTools
         [MenuItem("Iron Night/Build Android APK")]
         public static void Android()
         {
+            AdsSetup.Setup();   // the AdMob app id the plugin writes into the manifest
             EditorUserBuildSettings.buildAppBundle = false;
             var report = BuildPipeline.BuildPlayer(Scenes, "../builds/android/IronNight.apk", BuildTarget.Android, BuildOptions.None);
             Debug.Log($"Iron Night: Android build {report.summary.result} ({report.summary.totalErrors} errors)");
