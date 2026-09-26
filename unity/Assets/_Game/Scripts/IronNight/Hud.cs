@@ -205,6 +205,7 @@ namespace IronNight
               var st = MakeImage(xpc.transform, "Star", new Vector2(0f, 0.5f), new Vector2(18, 0), new Vector2(30, 30), XpBlue); st.sprite = StarSprite(); st.rectTransform.pivot = new Vector2(0f, 0.5f);
               xpLine = MakeText(xpc.transform, "Text", new Vector2(0f, 0.5f), new Vector2(60, 0), TextAnchor.MiddleLeft, 28, XpBlue); xpLine.rectTransform.pivot = new Vector2(0f, 0.5f); xpLine.rectTransform.sizeDelta = new Vector2(200, 60); xpLine.font = BoldFont(); }
             goldLine = GoldPill(titleSheet.transform, new Vector2(-50, -218), 330f, true);
+            BuildCrateButton();
             // the name
             var eyebrow = MakeText(titleSheet.transform, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -190), TextAnchor.MiddleCenter, 26, new Color(0.96f, 0.68f, 0.24f)); eyebrow.text = Spaced("WWII · NIGHT ASSAULT"); eyebrow.font = BoldFont();
             var big = MakeText(titleSheet.transform, "Name", new Vector2(0.5f, 1f), new Vector2(0, -300), TextAnchor.MiddleCenter, 170, ink); big.text = "IRON NIGHT"; big.font = DisplayFont(); big.rectTransform.sizeDelta = new Vector2(1040, 240); big.verticalOverflow = VerticalWrapMode.Overflow; big.horizontalOverflow = HorizontalWrapMode.Overflow;
@@ -237,7 +238,7 @@ namespace IronNight
               var sh = start.AddComponent<Sheen>(); sh.band = band.rectTransform; sh.width = 920f;
               var hi = MakeImage(start.transform, "Highlight", new Vector2(0.5f, 1f), new Vector2(0, -6), new Vector2(860, 3), new Color(1f, 0.93f, 0.7f, 0.8f)); hi.rectTransform.pivot = new Vector2(0.5f, 1f);
               var lbl = start.transform.Find("Label").GetComponent<Text>(); lbl.font = DisplayFont(); lbl.fontSize = 72; lbl.text = "TO  BATTLE"; lbl.transform.SetAsLastSibling(); }
-            dailyBtn = MakeGhost(titleSheet.transform, "Daily supply drop · +" + Depot.DailyPoints + " points", new Vector2(0.5f, 0f), new Vector2(-235, 470), new Vector2(450, 70), 24, () => OnDaily?.Invoke(), 0.1f);
+            dailyBtn = MakeGhost(titleSheet.transform, "Quartermaster", new Vector2(0.5f, 0f), new Vector2(-235, 470), new Vector2(450, 70), 24, () => ShowQuartermaster(), 0.1f);   // the daily gift is mail call now
             dailyBtn.GetComponent<Image>().color = new Color(0.16f, 0.36f, 0.22f, 0.92f);
             reserveBtn = MakeGhost(titleSheet.transform, "4th tank tonight · watch an ad", new Vector2(0.5f, 0f), new Vector2(235, 470), new Vector2(450, 70), 24, () => OnReserveAd?.Invoke(), 0.12f);
             trainBtn = MakeGhost(titleSheet.transform, "Daily training · watch an ad · +" + Depot.DailyTrainXp + " crew XP", new Vector2(0.5f, 0f), new Vector2(0, 392), new Vector2(920, 64), 24, () => { if (Depot.DailyTrainReady) Ads.Rewarded("train", () => { if (Depot.ClaimDailyTrain()) { Sfx.Pickup(); trainBtn.SetActive(false); titleStats.rectTransform.anchoredPosition = new Vector2(0, 350); Tick(xpLine, Depot.CrewXp, "", " XP"); } }); }, 0.12f);
@@ -373,7 +374,7 @@ namespace IronNight
         {
             if (garage != null) { garage.SetActive(false); garage.Show(VehicleSpec.ById(Depot.LeaderId)); garage.SetTitle(true); garage.Frame(false); titleBackdrop.texture = garage.TitleTexture; }
             Sfx.Music(true);
-            Depot.Load(); Medals.Check(); hudGroup.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(false); dailyBtn.SetActive(Depot.DailyReady);
+            Depot.Load(); Medals.Check(); hudGroup.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(false); RefreshRewardButtons();
             rankLine.text = Depot.Rank.ToUpperInvariant() + "\n" + (Depot.NightsFought == 0 ? "first night" : Depot.NightsFought + " nights · " + Depot.CrewName.ToLowerInvariant() + " · " + Depot.CrewNights + " together"); Tick(pointsLine, Depot.Points); Tick(xpLine, Depot.CrewXp, "", " XP"); Tick(goldLine, Depot.Gold); trainBtn.SetActive(Depot.DailyTrainReady); titleStats.rectTransform.anchoredPosition = new Vector2(0, Depot.DailyTrainReady ? 300 : 350);
             int m = Mathf.FloorToInt(Depot.BestTime / 60f), s = Mathf.FloorToInt(Depot.BestTime % 60f);
             { var sheet = Resources.Load<Texture2D>("UI/rank_insignia"); if (sheet != null && rankBadge != null) { int cell = Depot.RankIndex; rankBadge.sprite = UiSprite("rank_insignia", new Rect(cell * sheet.width / 6f, 0f, sheet.width / 6f, sheet.height)); rankBadge.enabled = Depot.NightsFought > 0; } }
@@ -398,7 +399,7 @@ namespace IronNight
             }
             titleSheet.SetActive(true);
         }
-        public void HideTitle() { titleSheet.SetActive(false); depotSheet.SetActive(false); hudGroup.SetActive(true); Sfx.Music(false); if (garage != null) { garage.SetTitle(false); garage.SetActive(false); } }
+        public void HideTitle() { titleSheet.SetActive(false); if (rewardSheet != null && rewardSheet.activeSelf) CloseRewards(); depotSheet.SetActive(false); hudGroup.SetActive(true); Sfx.Music(false); if (garage != null) { garage.SetTitle(false); garage.SetActive(false); } }
         void ShowOrders() { ordersSheet.SetActive(true); }
 
         /// <summary>Test switch --garage=id: straight into the garage tab with that tank on the turntable.</summary>
@@ -1371,7 +1372,7 @@ namespace IronNight
             if (fpsTimer >= 0.5f) { float f = fpsFrames / fpsAccum; fps.text = $"{f:0} fps"; fpsAccum = 0; fpsFrames = 0; fpsTimer = 0; if (f < 38f && hudGroup.activeSelf) slowFor += 0.5f; else slowFor = 0f; if (slowFor >= 5f && !slowOffered && PlayerPrefs.GetInt("quality", 1) != 0) { slowOffered = true; Toast("Stuttering? Pause · Quality: low turns off shadows and rain", 5f); } }
             if (toastLeft > 0f && hudFade.alpha > 0.95f) { toastLeft -= Time.unscaledDeltaTime; if (toastLeft <= 0f) toast.text = ""; }
             if (briefingLeft > 0f && hudFade.alpha > 0.95f) { briefingLeft -= Time.unscaledDeltaTime; if (briefingLeft <= 0f && briefing != null) briefing.SetActive(false); }
-            TickNumbers(Time.unscaledDeltaTime); CurtainTick(Time.unscaledDeltaTime); TickCinema(Mathf.Min(Time.unscaledDeltaTime, 0.05f));
+            TickNumbers(Time.unscaledDeltaTime); CurtainTick(Time.unscaledDeltaTime); TickCinema(Mathf.Min(Time.unscaledDeltaTime, 0.05f)); TickRewards(Mathf.Min(Time.unscaledDeltaTime, 0.05f));
             if (titleSheet != null && titleSheet.activeSelf) for (int i = 0; i < embers.Count; i++)
             {
                 var e = embers[i]; float ph = emberPhase[i]; var p = e.anchoredPosition; p.y += (18f + 10f * Mathf.Sin(ph)) * Time.unscaledDeltaTime; p.x += Mathf.Sin(Time.unscaledTime * 0.7f + ph) * 12f * Time.unscaledDeltaTime;

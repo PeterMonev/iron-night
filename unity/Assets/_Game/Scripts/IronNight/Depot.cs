@@ -104,11 +104,9 @@ namespace IronNight
         public static System.DateTime PremiumUntil => long.TryParse(PlayerPrefs.GetString("depot.premiumUntil", ""), out var ticks) ? new System.DateTime(ticks, System.DateTimeKind.Utc) : System.DateTime.MinValue;
         public static bool Premium => PremiumUntil > System.DateTime.UtcNow;
         /// <summary>Premium days bought with gold, added to whatever is left.</summary>
-        public static bool BuyPremium(PremiumOffer o)
-        {
-            if (!SpendGold(o.gold)) return false;
-            var from = Premium ? PremiumUntil : System.DateTime.UtcNow; PlayerPrefs.SetString("depot.premiumUntil", from.AddDays(o.days).Ticks.ToString()); PlayerPrefs.Save(); return true;
-        }
+        public static bool BuyPremium(PremiumOffer o) { if (!SpendGold(o.gold)) return false; AddPremiumDays(o.days); return true; }
+        /// <summary>Premium days added to whatever is left (bought, or out of a crate).</summary>
+        public static void AddPremiumDays(int days) { var from = Premium ? PremiumUntil : System.DateTime.UtcNow; PlayerPrefs.SetString("depot.premiumUntil", from.AddDays(days).Ticks.ToString()); PlayerPrefs.Save(); }
         /// <summary>Premium time left, short: "6 d 23 h", "4 h 12 min".</summary>
         public static string PremiumLeft { get { var left = PremiumUntil - System.DateTime.UtcNow; return left.TotalDays >= 1 ? (int)left.TotalDays + " d " + left.Hours + " h" : left.TotalHours >= 1 ? (int)left.TotalHours + " h " + left.Minutes + " min" : Mathf.Max(1, left.Minutes) + " min"; } }
 
