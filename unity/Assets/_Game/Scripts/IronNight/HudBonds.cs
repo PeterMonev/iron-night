@@ -104,7 +104,8 @@ namespace IronNight
 
             // the week's orders
             {
-                var wh = MakeText(b, "Weekly", new Vector2(0.5f, 1f), new Vector2(0, -1360), TextAnchor.MiddleCenter, 24, OpDim); wh.text = Spaced("WEEKLY ORDERS") + "  ·  new orders in " + Bonds.WeekLeft; wh.font = BoldFont(); wh.rectTransform.sizeDelta = new Vector2(1000, 40);
+                MakeGhost(b, "STANDING ORDERS", new Vector2(0.5f, 1f), new Vector2(370f, -1378f), new Vector2(260f, 52f), 18, ShowOrders);
+                var wh = MakeText(b, "Weekly", new Vector2(0.5f, 1f), new Vector2(-130, -1360), TextAnchor.MiddleCenter, 24, OpDim); wh.text = Spaced("WEEKLY ORDERS") + "  ·  new orders in " + Bonds.WeekLeft; wh.font = BoldFont(); wh.rectTransform.sizeDelta = new Vector2(1000, 40);
                 var orders = Bonds.WeekOrders;
                 for (int i = 0; i < orders.Length; i++)
                 {

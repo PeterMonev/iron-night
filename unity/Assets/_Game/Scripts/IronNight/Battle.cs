@@ -68,8 +68,10 @@ namespace IronNight
         float t, spawnTimer = 6f, leaderShield; int level = 1, xp, xpNeed = 6, score, kills, maxPlatoon = 4, reinforcements;
         bool wave1, wave2, wave3, wave4, revived, doubled, bossSpawned; Vehicle boss;
         Vehicle ace; string aceName; float aceTimer = 105f, weatherTurn;
+        Nemesis.Ace nem; int nemWingmen; bool nemLeader, nemReported, nemEscaped; float aceHpMax = 1f;   // the night's ace from the roster, and what he does
         string theatre = "normandy", builtTheatre = "normandy";   // the map: it also decides the nation
         string TheatreName => theatre == "kursk" ? "Kursk" : winter ? "Ardennes" : "Normandy";
+        string NightPlace => mapSector != null ? mapSector.name : TheatreName;   // where an ace is said to have been met
         string route = "open", builtRoute = "open"; float routePay = 1.1f;   // the way in the player chose, the one the country was built for, and what it pays
         enum Order { Follow, Hold, Advance } Order order = Order.Follow; Vector3[] holdAt = new Vector3[8];   // what the wingmen were told   // a named enemy of the night, and the hour the weather turns
         static readonly string[] AceNames = { "Hptm. Keller", "Ofw. Brandt", "Ltn. Hoffmann", "Fw. Ziegler", "Hptm. Vogel", "Ofw. Reinhardt", "Ltn. Stahl", "Fw. Neumann" };
@@ -89,6 +91,7 @@ namespace IronNight
         static readonly bool debugKeil = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--keil") >= 0;   // test switch: a Panzerkeil at 0:04
         static readonly bool debugSalvage = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--salvage") >= 0;   // test switch: three crates ahead at 0:02, the racks nearly dry
         static readonly bool debugInfantry = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--infantry") >= 0;   // test switch: a squad at 0:04
+        static readonly bool debugAce = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--ace") >= 0;   // test switch: the night's ace at 0:04
         static readonly bool debugWeak = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "--weak") >= 0;   // test switch: every enemy goes down to one shell
         bool debugSquadSent;
         float damageMul = 1f, reloadMul = 1f, rangeMul = 1f, speedMul = 1f, scatterMul = 1f, turretMul = 1f; float heBurst = 5f; bool he, gunners, hasSmoke, fireflyNext, firstNight; string bonus = "";
@@ -137,7 +140,7 @@ namespace IronNight
             // The depot's permanent upgrades set the starting numbers
             Depot.Load(); firstNight = Depot.NightsFought == 0; premiumNight = Depot.Premium;
             reloadMul = Depot.ReloadMul; rangeMul = Depot.RangeMul * (Depot.CrewLevel >= 3 ? 1.05f : 1f); speedMul = Depot.SpeedMul; maxPlatoon = rule == "alone" ? 1 : 3;
-            if (rule == "stukas") raidTimer = 5f; if (rule == "aces") aceTimer = 60f;
+            if (rule == "stukas") raidTimer = 5f; if (rule == "aces") aceTimer = 60f; if (debugAce) { aceTimer = 0.5f; Nemesis.PreferOld = true; }
             if (weather == Weather.Fog) { rangeMul *= 0.8f; enemyRangeMul = 0.8f; } else if (weather == Weather.Overcast) enemyRangeMul = 0.9f; else if (weather == Weather.Rain) { speedMul *= 0.92f; enemyRangeMul = 0.95f; }
             hud.SetConditions((stand ? "Last stand · " : convoy ? "Convoy · " : sneak ? "Night raid · " : daily ? "Daily · " : "") + TheatreName + (route == "village" ? " · village" : route == "bocage" ? (theatre == "kursk" ? " · tree belts" : " · bocage") : (theatre == "kursk" ? " · steppe" : " · open fields")), winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Overcast ? "a dark night, the enemy sees 10% less" : weather == Weather.Rain ? (winter ? "the platoon slows in the drifts, the enemy sees 5% less" : "mud slows the platoon, the enemy sees 5% less") : "");
             hud.OnQuality = () => { LowQuality = !LowQuality; ApplyQuality(); hud.SetQualityLabel(!LowQuality); };
@@ -196,7 +199,7 @@ namespace IronNight
             hud.Set(t, platoon.Count); hud.SetLevel(level, 0f);
             PlaceCamera(true);
             stick.Blocked = true; hud.ShowTitle(false);
-            foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); } else if (arg == "--shop") hud.ShowShop(); else if (arg == "--mail") hud.TestMail(); else if (arg == "--qm") hud.TestQuartermaster(); else if (arg == "--opencrate") hud.TestCrate(); else if (arg.StartsWith("--bondstars=")) Bonds.TestStars(int.Parse(arg.Substring(12))); else if (arg == "--bonds") hud.ShowBonds();
+            foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); } else if (arg == "--shop") hud.ShowShop(); else if (arg == "--mail") hud.TestMail(); else if (arg == "--qm") hud.TestQuartermaster(); else if (arg == "--opencrate") hud.TestCrate(); else if (arg.StartsWith("--bondstars=")) Bonds.TestStars(int.Parse(arg.Substring(12))); else if (arg == "--bonds") hud.ShowBonds(); else if (arg == "--wanted") { Nemesis.TestSeed(); hud.ShowWanted(); }
             hud.OnStart += () => Radio("start");
             if (opNight == 0 && !daily && PlayerPrefs.GetInt("route.launch", 0) == 1) { PlayerPrefs.SetInt("route.launch", 0); PlayerPrefs.Save(); StartNight(); Radio("start"); }
             if (sneak) { SneakBuild(); StartNight(); Radio("start"); string np = Hud.UiSprite("sneak_" + theatre) != null ? "sneak_" + theatre : theatre == "kursk" ? "route_kursk_belts" : "route_bocage"; hud.Briefing(np, "Night raid · " + TheatreName, "No lights, no shooting. Slip past the searchlights to the depot and blow it. A beam that finds you raises the alarm."); }
@@ -207,7 +210,7 @@ namespace IronNight
             if (opNight > 0) { StartNight(); Radio("start"); hud.Briefing(Hud.UiSprite(opN.picture) != null ? opN.picture : op.cover, op.name + " · night " + opNight + " of " + op.nights.Length, opN.name + " · " + opN.second.text.ToLowerInvariant() + ", " + opN.third.text.ToLowerInvariant()); } Debug.Log("Iron Night: battle built, debugBoss=" + debugBoss + " args=" + string.Join(" ", System.Environment.GetCommandLineArgs()));
             if (phase == Phase.Title && PlayerPrefs.GetInt("map.open", 0) == 1) { PlayerPrefs.DeleteKey("map.open"); hud.ShowMap(); }   // back from a war map night: straight to the map
             else if (phase == Phase.Title && System.Array.Exists(System.Environment.GetCommandLineArgs(), a => a == "--map")) hud.ShowMap();   // test switch: --map
-            if (phase == Phase.Title && System.Array.FindIndex(System.Environment.GetCommandLineArgs(), a => a.StartsWith("--garage") || a.StartsWith("--dossier") || a == "--shop" || a == "--mail" || a == "--qm" || a == "--opencrate" || a == "--bonds" || a == "--map" || a == "--noWelcome") < 0) hud.WelcomeBack();   // mail call and the quartermaster, on the first title of a session
+            if (phase == Phase.Title && System.Array.FindIndex(System.Environment.GetCommandLineArgs(), a => a.StartsWith("--garage") || a.StartsWith("--dossier") || a == "--shop" || a == "--mail" || a == "--qm" || a == "--opencrate" || a == "--bonds" || a == "--map" || a == "--wanted" || a == "--noWelcome") < 0) hud.WelcomeBack();   // mail call and the quartermaster, on the first title of a session
         }
 
         void BuildWorld()
@@ -579,6 +582,7 @@ namespace IronNight
             if (v.friendly && v == Leader && leaderShield > 0f) return;
             if (v == Leader && wetStowage && !savedTonight && v.hp - dmg <= 0f) { savedTonight = true; v.hp = 1f; leaderShield = 2.5f; hud.Flash(); shake = Mathf.Max(shake, 0.9f); hud.Toast("The wet racks held · the leader is alive on one", 3.2f); Sfx.Ricochet(v.transform.position); if (Random.value < 0.7f) Radio("hit"); return; }
             if (!v.friendly && bonus == "heavy" && v.spec.hp >= 6f) dmg *= 1.5f;
+            if (v == ace && nem != null && nem.studied) dmg *= 1.3f;   // his tactics studied
             v.Hit(dmg); Sfx.Hit(v.transform.position);
             if (v.friendly && v == Leader) { hud.Flash(); shake = Mathf.Max(shake, 0.8f); Buzz(); }
             if (v.hp > 0f) { if (v == Leader) { hud.Toast("Leader hit"); if (Random.value < 0.4f) Radio("hit"); if (hasSmoke && smokeCooldown <= 0f) PopSmoke(); } return; }
@@ -599,6 +603,7 @@ namespace IronNight
             if (v.friendly && v != Leader && recovery && recoverySpec == null) { recoverySpec = v.spec; recoveryLeft = 20f; hud.Toast("Recovery crew is on it · " + v.spec.name + " back in twenty seconds", 2.8f); }
             if (v.friendly)
             {
+                if (ace != null && !ace.dead && Dist(ace, v) < ace.Range * 1.3f) { if (v == Leader) nemLeader = true; else nemWingmen++; }   // the ace close by: it goes on his account
                 bool wasLeader = v == Leader; platoon.Remove(v);
                 if (wasLeader || platoon.Count == 0) { End(false); return; }
                 wingmenLost++; hud.Toast(gotOut ? "Wingman lost · the crew got out" : "Wingman lost · no one got out");
@@ -613,7 +618,7 @@ namespace IronNight
                 combo = Time.time - lastKill < 4f ? combo + 1 : 1; lastKill = Time.time;
                 if (combo >= 2) { int bonus = combo * 25; score += bonus; hud.Popup(v.transform.position + Vector3.up * 3f, "×" + combo + " +" + bonus, new Color(1f, 0.92f, 0.6f)); if (combo == 3) hud.Toast("Triple kill", 1.8f); else if (combo == 5) hud.Toast("Rampage", 1.8f); }
                 if (v == boss) { score += 1500; bossKilled = true; shake = 2f; SlowMo(0.8f); hud.HideBoss(); hud.Toast("Tiger Ace destroyed · +1500"); }
-                if (v == ace) { score += 600; shake = Mathf.Max(shake, 1f); SlowMo(0.7f); Depot.Tally("acesNamed", 1); nightAces++; hud.Popup(v.transform.position, "+600", new Color(1f, 0.8f, 0.4f)); hud.Toast(aceName + " is finished · +600", 3f); Radio("kill"); }
+                if (v == ace) { score += 600; shake = Mathf.Max(shake, 1f); SlowMo(0.7f); Depot.Tally("acesNamed", 1); nightAces++; hud.Popup(v.transform.position, "+600", new Color(1f, 0.8f, 0.4f)); if (nem != null && !nemReported) { nemReported = true; nemEscaped = Nemesis.Knocked(nem, NightPlace); } hud.Toast(nemEscaped ? nem.Title + " bailed out of the burning tank · he will be back" : aceName + " is finished · +600", 3f); Radio("kill"); }
                 Killcam(v, worth * 50 + (v == boss ? 1500 : 0) + (v == ace ? 600 : 0));
                 if (xp >= xpNeed) LevelUp(); else hud.SetLevel(level, (float)xp / xpNeed);
             }
@@ -1094,16 +1099,16 @@ namespace IronNight
         /// him pays 600 and goes into the tally. His name rides over his turret while he lives.</summary>
         void TickAce(float dt)
         {
-            if (ace != null && !ace.dead) { hud.NamePlate(aceName, ace.transform.position + Vector3.up * 3.4f, cam, ace.hp / (ace.spec.hp * 1.7f)); return; }
+            if (ace != null && !ace.dead) { hud.NamePlate(aceName, ace.transform.position + Vector3.up * 3.4f, cam, ace.hp / aceHpMax); return; }
             if (ace != null && ace.dead) { hud.NamePlate(null, Vector3.zero, cam, 0f); ace = null; aceTimer = rule == "aces" ? 55f : 95f + Random.value * 40f; }
-            if (t < (rule == "aces" ? 60f : 100f) || boss != null) return;
+            if (t < (rule == "aces" ? 60f : debugAce ? 4f : 100f) || boss != null) return;
             aceTimer -= dt; if (aceTimer > 0f) return;
-            var L = Leader; var spec = Random.value < 0.5f ? VehicleSpec.Tiger : Random.value < 0.6f ? VehicleSpec.Panther : VehicleSpec.PanzerIV;
-            if (!VehicleSpec.Available(spec)) spec = VehicleSpec.PanzerIV;
+            var L = Leader; nem = Nemesis.Pick(); var spec = Nemesis.Tank(nem); nemWingmen = 0; nemLeader = false; nemReported = false; nemEscaped = false;
             float a = (Random.value - 0.5f) * 1.2f; var at = L.transform.position + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * 62f;
             ace = Foe(spec, props.PushOut(at, 3f), Mathf.Atan2(L.transform.position.x - at.x, L.transform.position.z - at.z));
-            ace.hp *= 1.7f; aceName = AceNames[Random.Range(0, AceNames.Length)] + " · " + spec.name;
-            hud.Toast(aceName + " · an ace is on the field, " + Clock(at), 3.4f); Sfx.Whistle(at); if (Random.value < 0.7f) Radio("hit");
+            ace.hp *= Nemesis.HpMul(nem); aceHpMax = ace.hp; aceName = nem.Title + " · " + spec.name; bool back = nem.met > 0; Nemesis.Met(nem, NightPlace);
+            hud.Toast(back ? nem.Title + (string.IsNullOrEmpty(nem.nick) ? "" : ", " + nem.nick + ",") + " is back · " + Clock(at) : aceName + " · an ace is on the field, " + Clock(at), 3.4f); Sfx.Whistle(at); if (Random.value < 0.7f) Radio("hit");
+            if (back) NemesisCam(ace, nem);   // an old enemy: the camera goes to him
             fx.Marker(at, new Color(1f, 0.3f, 0.25f), 7f, true);
         }
 
@@ -1974,6 +1979,7 @@ namespace IronNight
                 foreach (var o in Bonds.ClaimOrders()) lines.Append("\nWeekly order done · " + o);
                 lines.Append("\nWar bonds · +" + starsBanked + " stars · " + (Bonds.Tier > tierWas ? "tier " + Bonds.Tier + " reached" : "tier " + Bonds.Tier));
             }
+            if (nem != null && ace != null && !ace.dead && !nemReported) { nemReported = true; lines.Append("\n" + Nemesis.Survived(nem, NightPlace, nemWingmen, nemLeader)); }   // the ace still out there
             if (dawn && !dawnRolled) { dawnRolled = true; if (Random.value < 0.25f) { Rewards.AddCrates("supply", 1); lines.Append("\nSupply crate · found at dawn · open it on the title"); } }
             hud.SetEndPoints(earned + bonus);
             int m = Mathf.FloorToInt(t / 60f), s = Mathf.FloorToInt(t % 60f);

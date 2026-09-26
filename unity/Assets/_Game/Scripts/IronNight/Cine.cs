@@ -14,7 +14,7 @@ namespace IronNight
     {
         enum CamShot { None, Intro, Kill, Orbit }
         CamShot camShot; float shotT, shotLen, shotIn, shotYaw, shotSpin, shotLift, backLeft, backLen, killRest, introSide, introHigh; bool introBegun, levelWaiting;
-        Vector3 shotAt, leaderAt, fromPos; Quaternion fromRot; float fromFov;
+        Vector3 shotAt, leaderAt, fromPos; Quaternion fromRot; float fromFov; Vehicle shotFollow;   // a moving tank the shot keeps in the middle (an ace arriving)
         const float Fov = 50f, IntroLen = 5.6f, IntroCrane = 2.9f, KillLen = 2.6f;
         static readonly Quaternion TopRot = Quaternion.LookRotation(new Vector3(0f, -44f, 40f));
         static readonly Vector2[] IntroSpots = { new Vector2(1.3f, 3.4f), new Vector2(-1.8f, 3.4f), new Vector2(4f, 3.8f), new Vector2(-4f, 3.8f), new Vector2(1.2f, 7f) };   // across and up from behind the leader, tried in turn until the view is clear
@@ -80,7 +80,21 @@ namespace IronNight
             StartShot(CamShot.Kill, KillLen, 0.4f); SlowMo(KillLen - 0.3f); stick.Blocked = true; killRest = 35f;
             string eyebrow = v == boss ? "BOSS · KNOCKED OUT" : v == ace ? "ACE · KNOCKED OUT" : "KNOCKED OUT", title = v.spec.name.ToUpperInvariant(), sub = "+" + points.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
             if (v == ace && aceName != null) { var parts = aceName.Split(new[] { " · " }, System.StringSplitOptions.None); title = parts[0].ToUpperInvariant(); sub = v.spec.name.ToUpperInvariant() + " · " + sub; }
+            if (v == ace && nem != null) { eyebrow = nem.met > 1 ? "NEMESIS · KNOCKED OUT" : "ACE · KNOCKED OUT"; sub = nemEscaped ? "HE BAILED OUT · HE WILL BE BACK" : "BOUNTY +" + Nemesis.BountyPoints(nem).ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + (Nemesis.BountyGold(nem) > 0 ? " · +" + Nemesis.BountyGold(nem) + " GOLD" : ""); }
             hud.Cinema(true, false); hud.CineCard(eyebrow, title, sub, 0.2f, KillLen - 0.1f, true); hud.Toast("", 0.01f);   // the caption says it: no toast after
+        }
+
+        /// <summary>An old enemy back on the field: the camera goes to him for a moment, his name and what they call him
+        /// under it. No slow motion: the night goes on.</summary>
+        void NemesisCam(Vehicle v, Nemesis.Ace a)
+        {
+            if (phase != Phase.Play || camShot != CamShot.None || backLeft > 0f || v == null) return;
+            shotAt = v.transform.position; var L = Leader; var to = L != null ? L.transform.position - shotAt : v.Forward; float face = Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg;
+            shotYaw = face + 40f; shotSpin = 26f; shotLift = 0f; var aim = shotAt + Vector3.up * 1.6f; bool found = false;
+            foreach (var c in new[] { 40f, -40f, 100f, -100f }) { float spin = c > 0f ? 26f : -26f; if (SweepClear(face + c, spin * KillLen, aim, true)) { shotYaw = face + c; shotSpin = spin; found = true; break; } }
+            if (!found) shotLift = 8f;
+            StartShot(CamShot.Kill, KillLen, 0.45f); shotFollow = v; stick.Blocked = true;
+            hud.Cinema(true, false); hud.CineCard(a.met > 2 ? "HE IS BACK · MET " + a.met + " TIMES" : "HE IS BACK", a.Title.ToUpperInvariant(), (string.IsNullOrEmpty(a.nick) ? Nemesis.Tank(a).name : a.nick).ToUpperInvariant(), 0.2f, KillLen - 0.1f, true);
         }
 
         /// <summary>Whether the camera's swing, from a bearing through so many degrees, keeps a clear view of the aim and
@@ -131,7 +145,7 @@ namespace IronNight
 
         void StartShot(CamShot s, float len, float swoop)
         {
-            camShot = s; shotT = 0f; shotLen = len; shotIn = swoop; backLeft = 0f;
+            camShot = s; shotT = 0f; shotLen = len; shotIn = swoop; backLeft = 0f; shotFollow = null;
             fromPos = cam.transform.position; fromRot = cam.transform.rotation; fromFov = cam.fieldOfView;
         }
 
@@ -174,6 +188,7 @@ namespace IronNight
             if (camShot == CamShot.Intro) IntroPose(L, out p, out r, out fov);
             else if (camShot == CamShot.Kill)
             {
+                if (shotFollow != null && !shotFollow.dead) shotAt = Vector3.Lerp(shotAt, shotFollow.transform.position, 1f - Mathf.Exp(-dt * 6f));
                 p = KillSpot(shotYaw + shotSpin * shotT, Mathf.Clamp01(shotT / KillLen));
                 r = Quaternion.LookRotation(shotAt + Vector3.up * 1.6f - p); fov = 50f;
             }

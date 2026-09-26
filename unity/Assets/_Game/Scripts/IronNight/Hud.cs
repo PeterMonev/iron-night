@@ -214,8 +214,8 @@ namespace IronNight
             // tonight
             conditions = MakeChip(titleSheet.transform, "Conditions", new Vector2(0.5f, 0f), new Vector2(0, 1060), 640f, new Color(0.96f, 0.68f, 0.24f), new Color(0.06f, 0.07f, 0.09f, 0.7f));
             // four tiles with pictures: the operations, the daily challenge, the depot, the standing orders
-            string[] tileNames = { "WAR MAP", "DAILY", "DEPOT", "ORDERS" }; string[] tilePics = { "campaign_normandy", Daily.Picture(Daily.Today), "card_crews", "card_reinf" };
-            System.Action[] tileActs = { () => ShowMap(), () => ShowDaily(), () => OnDepot?.Invoke(), () => ShowOrders() };
+            string[] tileNames = { "WAR MAP", "DAILY", "DEPOT", "WANTED" }; string[] tilePics = { "campaign_normandy", Daily.Picture(Daily.Today), "card_crews", "card_reinf" };
+            System.Action[] tileActs = { () => ShowMap(), () => ShowDaily(), () => OnDepot?.Invoke(), () => ShowWanted() };
             const float TW = 226f, TH = 250f;
             for (int i = 0; i < 4; i++)
             {
@@ -223,7 +223,7 @@ namespace IronNight
                 var mask = new GameObject("Mask", typeof(RectTransform), typeof(RectMask2D)); mask.transform.SetParent(tile.transform, false); var mkrt = mask.GetComponent<RectTransform>(); mkrt.anchorMin = mkrt.anchorMax = new Vector2(0.5f, 0.5f); mkrt.sizeDelta = new Vector2(TW - 10f, TH - 10f); mkrt.anchoredPosition = Vector2.zero;
                 var pic = MakeImage(mask.transform, "Pic", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(TW - 10f, TH - 10f), new Color(0.85f, 0.85f, 0.85f, 1f)); pic.rectTransform.pivot = new Vector2(0.5f, 0.5f); var sp = UiSprite(tilePics[i]);
                 if (sp != null) { pic.sprite = sp; float cover = Mathf.Max((TW - 10f) / sp.rect.width, (TH - 10f) / sp.rect.height); pic.rectTransform.sizeDelta = new Vector2(sp.rect.width * cover, sp.rect.height * cover); }
-                if (i == 0) opsPic = pic; else if (i == 1) dailyPic = pic;
+                if (i == 0) opsPic = pic; else if (i == 1) dailyPic = pic; else if (i == 3) wantedPic = pic;
                 var fade = MakeImage(mask.transform, "Fade", new Vector2(0.5f, 0f), Vector2.zero, new Vector2(TW - 10f, 150), new Color(0.02f, 0.02f, 0.03f, 0.95f)); fade.sprite = Lightswarm.ProceduralSprites.GradientDown(64, 1.2f); fade.rectTransform.pivot = new Vector2(0.5f, 0f);
                 var edge = MakeImage(tile.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(TW, TH), new Color(1f, 1f, 1f, 0.16f)); edge.sprite = Outline(); edge.type = Image.Type.Sliced; edge.rectTransform.pivot = new Vector2(0.5f, 0.5f); if (i == 1) dailyEdge = edge;
                 var lt = tile.transform.Find("Label").GetComponent<Text>(); lt.text = Spaced(tileNames[i]); lt.alignment = TextAnchor.LowerCenter; lt.rectTransform.sizeDelta = new Vector2(TW, 230); lt.transform.SetAsLastSibling(); lt.font = BoldFont();
@@ -387,7 +387,7 @@ namespace IronNight
               var cs = UiSprite("map_europe") ?? UiSprite(Operations.Current.cover) ?? UiSprite("campaign_normandy"); if (cs != null && opsPic != null) { opsPic.sprite = cs; float cover = Mathf.Max(216f / cs.rect.width, 240f / cs.rect.height); opsPic.rectTransform.sizeDelta = new Vector2(cs.rect.width * cover, cs.rect.height * cover); } }
             titleStats.text = Depot.NightsFought == 0 ? "First night. Drag anywhere to drive; the turrets fire on their own." : $"Best {Depot.BestKills} kills · longest {m}:{s:00} · {Depot.CrewName}: {Depot.CrewBonusText}";
             reserveBtn.SetActive(!reserveGranted); reserveNote.text = reserveGranted ? "Reserve tank granted:\nthe platoon can grow to 4 tonight." : "";
-            Missions.Load(); foreach (Transform c in missionRoot) Destroy(c.gameObject); if (ordersCount != null) ordersCount.text = Missions.Active.Count + " standing";
+            Missions.Load(); foreach (Transform c in missionRoot) Destroy(c.gameObject); RefreshWantedTile();   // the fourth tile is the most wanted now, the standing orders are beside the weekly ones
             for (int i = 0; i < Missions.Active.Count; i++)
             {
                 var o = Missions.Active[i]; float y = -i * 72f;
@@ -400,7 +400,7 @@ namespace IronNight
             titleSheet.SetActive(true);
         }
         public void HideTitle() { titleSheet.SetActive(false); if (rewardSheet != null && rewardSheet.activeSelf) CloseRewards(); depotSheet.SetActive(false); hudGroup.SetActive(true); Sfx.Music(false); if (garage != null) { garage.SetTitle(false); garage.SetActive(false); } }
-        void ShowOrders() { ordersSheet.SetActive(true); }
+        void ShowOrders() { ordersSheet.transform.SetAsLastSibling(); if (curtain != null) curtain.transform.SetAsLastSibling(); ordersSheet.SetActive(true); }   // over whatever sheet asked for it
 
         /// <summary>Test switch --garage=id: straight into the garage tab with that tank on the turntable.</summary>
         public void ShowGarage(VehicleSpec spec) { depotTab = 1; ShowDepot(); if (garage != null) garage.Show(spec); }
