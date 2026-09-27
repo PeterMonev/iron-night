@@ -1072,7 +1072,7 @@ namespace IronNight
                 // the three modes under the three ways in, side by side: the last stand, the convoy, the night raid
                 ModeCard(-317f, "LAST STAND", "Hold the crossroads", "Ten waves; dig in between them.", () => { routeSheet.SetActive(false); OnStand?.Invoke(sheetTheatre); }, out standPic, out standBestText);
                 ModeCard(0f, "CONVOY", "Bring the trucks through", "Five trucks, 900 m of ambushes.", () => { if (!Battle.ConvoyReady(sheetTheatre)) return; routeSheet.SetActive(false); OnConvoy?.Invoke(sheetTheatre); }, out convoyPic, out convoyBestText);
-                ModeCard(317f, "NIGHT RAID", "Blow the depot", "No lights; past the searchlights.", () => { routeSheet.SetActive(false); OnSneak?.Invoke(sheetTheatre); }, out sneakPic, out sneakBestText);
+                ModeCard(317f, "NIGHT RAID", "Blow the depot", "No lights; mind the flares.", () => { routeSheet.SetActive(false); OnSneak?.Invoke(sheetTheatre); }, out sneakPic, out sneakBestText);
             }
             sheetTheatre = PlayerPrefs.GetString("theatre", "normandy"); if (!Depot.TheatreOpen(sheetTheatre)) sheetTheatre = "normandy"; FillRoutes();
             routeSheet.transform.SetAsLastSibling(); if (curtain != null) curtain.transform.SetAsLastSibling(); routeSheet.SetActive(true);

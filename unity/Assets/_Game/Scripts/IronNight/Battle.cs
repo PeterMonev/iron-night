@@ -58,7 +58,7 @@ namespace IronNight
         int crewSteady, crewEagle, crewSnap, crewHands, crewRacks, crewHe, crewFoot, crewMech, crewRough, crewBow, crewSignals, crewSpot;   // the levels of the crew's gifts (Crew)
         float AirCoolFull => 60f - 6f * crewSignals;
         string leaderId = "", leaderName = "", careerLine = ""; int careerXp, careerKills, crewXpBanked; bool careerNight, careerDawn; float careerDamage = 1f, careerReload = 1f, careerSpeed = 1f;   // the leader's own tank   // an operation night: the operation and which of its nights (0: a free night)
-        int nightTracked, nightFocus, talliedTracked, nightLamps, talliedLamps, nightAces; bool litBySearchlight;
+        int nightTracked, nightFocus, talliedTracked, nightLamps, talliedLamps, nightAces;
         bool crewCounted, crewLostTonight, premiumNight, bossCrate, dawnRolled; int crewBefore, starsBanked;   // the crew's nights: counted at dawn, lost with the leader unless he is pulled back
         Vehicle focus; float focusLeft; Transform focusRing;   // the enemy the platoon was told to hit
         float pointLeft; Vector3 point;                      // a spot the platoon was told to shell (the fuel dump)
@@ -202,7 +202,7 @@ namespace IronNight
             foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); } else if (arg == "--shop") hud.ShowShop(); else if (arg == "--mail") hud.TestMail(); else if (arg == "--qm") hud.TestQuartermaster(); else if (arg == "--opencrate") hud.TestCrate(); else if (arg.StartsWith("--bondstars=")) Bonds.TestStars(int.Parse(arg.Substring(12))); else if (arg == "--bonds") hud.ShowBonds(); else if (arg == "--wanted") { Nemesis.TestSeed(); hud.ShowWanted(); } else if (arg == "--crewtab") { stick.Blocked = true; hud.ShowCrewTab(); } else if (arg.StartsWith("--sheet=")) hud.TestSheet(arg.Substring(8)); else if (arg == "--mapseed" || arg == "--mapfall") Campaign.TestSeed(arg == "--mapfall");
             hud.OnStart += () => Radio("start");
             if (opNight == 0 && !daily && PlayerPrefs.GetInt("route.launch", 0) == 1) { PlayerPrefs.SetInt("route.launch", 0); PlayerPrefs.Save(); StartNight(); Radio("start"); }
-            if (sneak) { SneakBuild(); StartNight(); Radio("start"); string np = Hud.UiSprite("sneak_" + theatre) != null ? "sneak_" + theatre : theatre == "kursk" ? "route_kursk_belts" : "route_bocage"; hud.Briefing(np, "Night raid · " + TheatreName, "No lights, no shooting. Slip past the searchlights to the depot and blow it. A beam that finds you raises the alarm."); }
+            if (sneak) { SneakBuild(); StartNight(); Radio("start"); string np = Hud.UiSprite("sneak_" + theatre) != null ? "sneak_" + theatre : theatre == "kursk" ? "route_kursk_belts" : "route_bocage"; hud.Briefing(np, "Night raid · " + TheatreName, "No lights, no shooting. Slip through to the depot and blow it. The sentries send up flares: in their light, stand still or get out of it. They see what moves."); }
             if (convoy) { ConvoyBuild(); StartNight(); Radio("start"); string cp = Hud.UiSprite("convoy_" + theatre) != null ? "convoy_" + theatre : theatre == "kursk" ? "route_kursk_steppe" : "route_open"; hud.Briefing(cp, "Convoy · " + TheatreName, "Bring the five trucks up the road to the checkpoint. The enemy goes for the trucks."); }
             if (stand) { StandBuild(); StartNight(); Radio("start"); string sp = Hud.UiSprite("stand_" + theatre) != null ? "stand_" + theatre : theatre == "kursk" ? "route_kursk_village" : theatre == "ardennes" ? "campaign_ardennes" : "campaign_lastpush"; hud.Briefing(sp, "Last stand · " + TheatreName, "Hold the crossroads through ten waves. Between them, dig in: sandbags, hedgehogs, mines."); }
             if (daily) { StartNight(); Radio("start"); var dr = Daily.RuleOf(dailyDay); hud.Briefing(Daily.Picture(dailyDay), "Daily challenge · " + dr.name, dr.line); }
@@ -228,6 +228,8 @@ namespace IronNight
             if (weather == Weather.Rain) { BuildRain(); if (!winter) props.SetWet(0.5f); } Sfx.Ambient(weather == Weather.Rain && !winter);
             ApplyQuality();
             moonGo.transform.rotation = Quaternion.Euler(52f, -35f, 0f);
+            // the night sky: the stars and the Milky Way turning round the pole, the moon where its light comes from, clouds by the weather
+            { var sh = Resources.Load<Shader>("Shaders/NightSky"); if (sh != null) { skyMaterial = new Material(sh); RenderSettings.skybox = skyMaterial; cam.clearFlags = CameraClearFlags.Skybox; SetSky(0f, 0f, 0f); } }
             // the flare light over the platoon: warm, follows the leader, grows with the platoon
             var fl = new GameObject("FlareLight"); flareLight = fl.AddComponent<Light>();
             flareLight.type = LightType.Point; flareLight.color = new Color(1f, 0.72f, 0.4f); flareLight.intensity = 18f; flareLight.range = 40f; flareLight.shadows = LightShadows.None;
@@ -355,7 +357,7 @@ namespace IronNight
             foreach (var e in foes) if (!e.spec.isGun) { Bog(e, props.Ram(e.transform.position, e.spec.radius * 0.7f, e.Forward, false), dt); e.transform.position = props.PushOut(e.transform.position, e.spec.radius * 0.7f); }
             foreach (var v in platoon) tracks.Mark(v); foreach (var e in foes) if (!e.spec.isGun) tracks.Mark(e);
             foreach (var v in platoon) Smoulder(v, dt); foreach (var e in foes) Smoulder(e, dt);
-            props.platoon = L.transform.position; props.alert = sneak && sneakAlarm; props.Tick();
+            props.platoon = L.transform.position; props.Tick();
             flareLight.range = 34f + platoon.Count * 3f;
             Sfx.Engine(stick.Active ? stick.Direction.magnitude : 0f);
             PlaceCamera(false);
@@ -924,6 +926,7 @@ namespace IronNight
             if (props != null) { props.wet = wet; Vehicle.Wet = wet; if (wet) props.SetWet(0.5f); }
             if (weather == Weather.Rain) { if (rain == null) BuildRain(); else { rain.Play(); } } else if (rain != null) rain.Stop(true, ParticleSystemStopBehavior.StopEmitting);
             Sfx.Ambient(wet); LightShaft.boost = weather == Weather.Fog ? 1.8f : weather == Weather.Rain ? 1.3f : 1f;
+            SetSky(0f, 0f, 0f);
             hud.SetConditions((stand ? "Last stand · " : convoy ? "Convoy · " : sneak ? "Night raid · " : daily ? "Daily · " : "") + TheatreName + (route == "village" ? " · village" : route == "bocage" ? (theatre == "kursk" ? " · tree belts" : " · bocage") : (theatre == "kursk" ? " · steppe" : " · open fields")), winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Rain ? "the enemy shoots short" : weather == Weather.Overcast ? "a dark night, the enemy sees less" : "the moon is up: they see you");
         }
 
@@ -940,6 +943,7 @@ namespace IronNight
         /// (k runs 0..1), then the flicker of a barrage somewhere over the horizon.</summary>
         void Lighting(float k, float dt)
         {
+            if (skyMaterial != null) skyMaterial.SetFloat("_Turn", t / Mathf.Max(1f, NightLength) * 2.1f);   // the stars wheel round the pole through the night
             rumbleTimer -= dt;
             if (rumbleTimer <= 0f) { rumbleTimer = 9f + Random.value * 18f; flicker = 0.35f; Sfx.Rumble(); }
             if (weather == Weather.Rain && !winter) { lightningTimer -= dt; if (lightningTimer <= 0f) { lightningTimer = 14f + Random.value * 30f; lightning = 1f; thunderIn = 0.8f + Random.value * 1.6f; } }
@@ -952,6 +956,29 @@ namespace IronNight
             RenderSettings.fogColor = Color.Lerp(sky.fog, new Color(0.3f, 0.26f, 0.28f), e); RenderSettings.fogDensity = Mathf.Lerp(sky.fogDensity, Mathf.Min(sky.fogDensity, 0.004f), e);
             moon.color = Color.Lerp(sky.moonColor, new Color(1f, 0.82f, 0.62f), e); moon.intensity = Mathf.Lerp(sky.moonIntensity, 3.6f, e);
             moon.transform.rotation = Quaternion.Euler(Mathf.Lerp(52f, 22f, e), Mathf.Lerp(-35f, -80f, e), 0f);
+            SetSky(e, flicker, lightning);
+        }
+
+        Material skyMaterial;
+        /// <summary>The sky's look for the weather and the hour: how many stars, how much cloud, the moon where the light
+        /// comes from, the horizon in the fog's own colour, dawn coming up (0..1), a barrage flickering on the horizon
+        /// (flash) and lightning in the clouds (bolt).</summary>
+        void SetSky(float dawn, float flash, float bolt)
+        {
+            if (skyMaterial == null || moon == null) return;
+            float stars = weather == Weather.Clear ? 1f : weather == Weather.Fog ? 0.7f : weather == Weather.Overcast ? 0.55f : 0.4f;
+            float clouds = weather == Weather.Clear ? 0.12f : weather == Weather.Fog ? 0.3f : weather == Weather.Overcast ? 0.72f : 0.86f;
+            float moonK = weather == Weather.Clear ? 1f : weather == Weather.Fog ? 0.7f : weather == Weather.Overcast ? 0.45f : 0.3f;
+            if (theatre == "kursk") stars = Mathf.Min(1f, stars * 1.1f);   // the open steppe
+            var fog = RenderSettings.fogColor;
+            skyMaterial.SetColor("_Horizon", fog);
+            skyMaterial.SetColor("_Zenith", Color.Lerp(new Color(fog.r * 0.3f + 0.006f, fog.g * 0.3f + 0.01f, fog.b * 0.35f + 0.03f), new Color(0.16f, 0.2f, 0.34f), dawn));   // night blue, not black
+            skyMaterial.SetColor("_Glow", new Color(0.09f, 0.04f, 0.018f) * (1f + flash * 6f));
+            skyMaterial.SetColor("_CloudColor", Color.Lerp(new Color(fog.r * 0.9f + 0.006f, fog.g * 0.9f + 0.007f, fog.b * 0.9f + 0.01f), new Color(0.36f, 0.3f, 0.33f), dawn) + new Color(0.45f, 0.5f, 0.65f) * (bolt * bolt));
+            skyMaterial.SetVector("_MoonDir", -moon.transform.forward);
+            skyMaterial.SetFloat("_Stars", stars * (1f - dawn));
+            skyMaterial.SetFloat("_Clouds", clouds);
+            skyMaterial.SetFloat("_Moon", moonK * (1f - 0.7f * dawn));
         }
 
         /// <summary>Rain: thin pale streaks falling through a 70 m box over the platoon, stretched by their speed.</summary>
@@ -1375,14 +1402,12 @@ namespace IronNight
         void TickStarBody(float dt)
         {
             var L = Leader;
-            if (props.Lit && !litBySearchlight) { litBySearchlight = true; hud.Toast("Caught in the searchlight · drive out or shoot the lamp", 3f); }
-            if (!props.Lit) litBySearchlight = false;
-            if (star == null) { lit = props.Lit; return; }
+            if (star == null) { lit = false; return; }
             star.life -= dt; star.height = Mathf.Max(6f, star.height - 1.7f * dt); star.pos += new Vector3(0.5f, 0f, 0.3f) * dt;
             var at = star.pos + Vector3.up * star.height; star.flare.position = at; star.flare.GetChild(0).rotation = cam.transform.rotation; star.chute.position = at + Vector3.up * 3f; star.light.transform.position = at;
             float burn = Mathf.Clamp01(star.life / 3f) * (0.85f + 0.15f * Mathf.PerlinNoise(Time.time * 9f, 0.5f)); star.light.intensity = 70f * burn; star.flare.GetChild(0).localScale = Vector3.one * (7f * (0.5f + 0.5f * burn));
             star.puff -= dt; if (star.puff <= 0f) { star.puff = 0.25f; fx.Signal(at, new Color(0.8f, 0.8f, 0.8f, 0.5f)); }
-            var d = L.transform.position - star.pos; d.y = 0f; lit = (star.life > 0f && d.magnitude < 40f) || props.Lit;
+            var d = L.transform.position - star.pos; d.y = 0f; lit = star.life > 0f && d.magnitude < 40f;
             if (star.life <= 0f) { fx.Release(star.flare); Destroy(star.chute.gameObject); Destroy(star.light.gameObject); star = null; lit = false; }
         }
 

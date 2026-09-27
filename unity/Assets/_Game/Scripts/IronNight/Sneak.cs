@@ -5,19 +5,21 @@ using UnityEngine.SceneManagement;
 namespace IronNight
 {
     /// <summary>
-    /// The night raid: no lights and no shooting, the platoon slips through the searchlight line to a depot some 500 m
-    /// ahead and blows it. The searchlights sweep the ground in slow circles; a pool of light resting on a tank for half a
-    /// second raises the alarm, as does coming within 18 m of a sentry (an anti-tank gun and a tank at every post beyond
-    /// 70 m of the start) or 24 m of a patrol, a shot fired, a tank hunter's Panzerfaust. Until then the enemy sleeps and our guns hold their
-    /// fire unless told (a tap on an enemy is the order to open up - and the alarm). After the alarm the night is an
-    /// ordinary one: flares, the near searchlights on the leader, the enemy from all sides. The depot blown: 1500, and
-    /// 1500 more when it was reached unseen. Dawn with the depot standing is a failure. The best on each front is kept.
+    /// The night raid: no lights and no shooting, the platoon slips through the flak's line to a depot some 500 m ahead
+    /// and blows it. The flak's searchlights keep to the sky, looking for aircraft; the sentries send up a flare over the
+    /// fields ahead now and then, and a tank seen moving in its light for over half a second raises the alarm (one
+    /// standing still passes for a wreck), as does coming within 18 m of a sentry (an anti-tank gun and a tank at every
+    /// post beyond 70 m of the start) or 24 m of a patrol, a shot fired, a tank hunter's Panzerfaust. Until then the enemy
+    /// sleeps and our guns hold their fire unless told (a tap on an enemy is the order to open up - and the alarm). After
+    /// the alarm the night is an ordinary one: flares, the enemy from all sides. The depot blown: 1500, and 1500 more
+    /// when it was reached unseen. Dawn with the depot standing is a failure. The best on each front is kept.
     /// </summary>
     public partial class Battle
     {
         class SneakPatrol { public Vector3 a, b; public bool toB = true; }
         bool sneak, sneakAlarm, sneakDone, sneakUnseen = true; float sneakSeen, sneakDawn, sneakPatrol = 25f, sneakWarned; Vector3 sneakDepot;
         readonly HashSet<long> sneakManned = new HashSet<long>(); readonly Dictionary<Vehicle, SneakPatrol> sneakPatrols = new Dictionary<Vehicle, SneakPatrol>();
+        float sneakFlare = 10f; readonly Dictionary<Vehicle, Vector3> sneakLast = new Dictionary<Vehicle, Vector3>();   // the next flare, and where each of ours was a frame ago
         const float SneakDistance = 520f;
         /// <summary>The best raid on a front: 0 none, 1 the depot destroyed, 2 destroyed unseen.</summary>
         public static int SneakBest(string theatre) => PlayerPrefs.GetInt("sneak.best." + theatre, 0);
@@ -33,15 +35,30 @@ namespace IronNight
             flareLight.enabled = false;
         }
 
-        /// <summary>Before the alarm: the beams watched, the posts ahead manned as the platoon nears them, patrols crossing.</summary>
+        /// <summary>Before the alarm: the flares going up ahead, the posts ahead manned as the platoon nears them, patrols crossing.</summary>
         void TickSneakQuiet(float dt)
         {
             var L = Leader;
-            bool inLight = false; foreach (var v in platoon) if (props.InBeam(v.transform.position)) { inLight = true; break; }
+            // now and then a sentry sends up a flare over the fields ahead: whatever moves in its light is seen, a tank
+            // standing still passes for a wreck
+            sneakFlare -= dt;
+            if (star == null && sneakFlare <= 0f)
+            {
+                sneakFlare = Random.Range(12f, 20f); var f = L.Forward; var across = new Vector3(f.z, 0f, -f.x);
+                HangStar(L.transform.position + f * Random.Range(34f, 64f) + across * Random.Range(-28f, 28f), "A flare goes up ahead · stand still in its light, they see what moves");
+            }
+            if (star != null) TickStarBody(dt);
+            bool inLight = false;
+            foreach (var v in platoon)
+            {
+                var at = v.transform.position; bool moved = sneakLast.TryGetValue(v, out var was) && (at - was).sqrMagnitude > (1.2f * dt) * (1.2f * dt); sneakLast[v] = at;
+                if (star == null || star.life < 0.5f || !moved) continue;
+                var off = at - star.pos; off.y = 0f; if (off.magnitude < 30f) inLight = true;
+            }
             if (inLight)
             {
-                sneakSeen += dt; if (Time.time > sneakWarned) { sneakWarned = Time.time + 1.5f; hud.Toast("In the light! Out of the beam", 1.2f); }
-                if (sneakSeen >= 0.5f) { RaiseAlarm("Caught in a searchlight"); return; }
+                sneakSeen += dt; if (Time.time > sneakWarned) { sneakWarned = Time.time + 1.5f; hud.Toast("Moving in the light! Stop, or get out of it", 1.2f); }
+                if (sneakSeen >= 0.6f) { RaiseAlarm("Seen moving under a flare"); return; }
             }
             else sneakSeen = Mathf.Max(0f, sneakSeen - dt);
             // each post ahead gets its guard when the platoon comes within 110 m: an anti-tank gun and a tank, asleep
@@ -79,7 +96,7 @@ namespace IronNight
             e.Apply(); return true;
         }
 
-        /// <summary>The alarm: flares over the platoon, the searchlights on it, the ordinary night from now on. Shells into
+        /// <summary>The alarm: a flare over the platoon, the ordinary night from now on. Shells into
         /// the depot raise it too, but the depot was still reached unseen.</summary>
         void RaiseAlarm(string why, bool atDepot = false)
         {
