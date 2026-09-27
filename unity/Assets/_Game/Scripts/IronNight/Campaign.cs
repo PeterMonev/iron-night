@@ -16,41 +16,41 @@ namespace IronNight
         public class Sector
         {
             public string id, name, road, when, theatre, route, weather, crate, country;
-            public float x, y;            // on the map picture, in pixels of a 1536 x 1024 image from its top left
+            public float x, y;            // on the painted map (Resources/UI/map_europe, 1536 x 1024), in pixels from its top left
             public int depth;             // how far along its road
             public bool veteran;          // the last sectors: the enemy takes half again as many hits
             public string[] after;        // what must be taken first
         }
 
         static Sector S(string id, string name, string road, int depth, string when, string theatre, string route, string weather, float x, float y, string after, string crate = null, bool veteran = false)
-            => new Sector { id = id, name = name, road = road, depth = depth, when = when, theatre = theatre, route = route, weather = weather, x = x, y = y, after = after == null ? new string[0] : after.Split(','), crate = crate, veteran = veteran, country = theatre == "kursk" ? (x < 700f ? "GERMANY" : x < 1000f ? "POLAND" : "SOVIET UNION") : x < 300f ? "FRANCE" : x < 335f ? "BELGIUM" : "GERMANY" };   // for the opening titles
+            => new Sector { id = id, name = name, road = road, depth = depth, when = when, theatre = theatre, route = route, weather = weather, x = x, y = y, after = after == null ? new string[0] : after.Split(','), crate = crate, veteran = veteran, country = theatre == "kursk" ? (x < 720f ? "GERMANY" : x < 1000f ? "POLAND" : "SOVIET UNION") : x < 320f ? "FRANCE" : x < 360f ? "BELGIUM" : "GERMANY" };   // for the opening titles
 
         public static readonly Sector[] All =
         {
             // the western road: American tanks
-            S("omaha", "Omaha Beach", "west", 0, "JUNE 1944", "normandy", "open", "overcast", 79f, 571f, null),
-            S("saintlo", "Saint-Lô", "west", 1, "JULY 1944", "normandy", "bocage", "fog", 98f, 612f, "omaha"),
-            S("falaise", "Falaise", "west", 2, "AUGUST 1944", "normandy", "bocage", "clear", 142f, 640f, "saintlo"),
-            S("paris", "Paris", "west", 3, "AUGUST 1944", "normandy", "village", "clear", 200f, 618f, "falaise", "supply"),
-            S("reims", "Reims", "west", 4, "AUGUST 1944", "normandy", "open", "rain", 263f, 581f, "paris"),
-            S("bastogne", "Bastogne", "west", 5, "DECEMBER 1944", "ardennes", "village", "fog", 327f, 512f, "reims"),
-            S("aachen", "Aachen", "west", 6, "OCTOBER 1944", "normandy", "village", "rain", 340f, 439f, "bastogne"),
-            S("hurtgen", "Hürtgen Forest", "west", 7, "NOVEMBER 1944", "ardennes", "bocage", "fog", 374f, 481f, "aachen"),
-            S("remagen", "Remagen", "west", 8, "MARCH 1945", "normandy", "open", "overcast", 404f, 432f, "hurtgen", "supply"),
-            S("ruhr", "The Ruhr", "west", 9, "APRIL 1945", "normandy", "village", "rain", 400f, 371f, "remagen", null, true),
-            S("magdeburg", "Magdeburg", "west", 10, "APRIL 1945", "normandy", "open", "clear", 548f, 315f, "ruhr", null, true),
+            S("omaha", "Omaha Beach", "west", 0, "JUNE 1944", "normandy", "open", "overcast", 165f, 462f, null),
+            S("saintlo", "Saint-Lô", "west", 1, "JULY 1944", "normandy", "bocage", "fog", 150f, 492f, "omaha"),
+            S("falaise", "Falaise", "west", 2, "AUGUST 1944", "normandy", "bocage", "clear", 195f, 502f, "saintlo"),
+            S("paris", "Paris", "west", 3, "AUGUST 1944", "normandy", "village", "clear", 232f, 530f, "falaise", "supply"),
+            S("reims", "Reims", "west", 4, "AUGUST 1944", "normandy", "open", "rain", 300f, 495f, "paris"),
+            S("bastogne", "Bastogne", "west", 5, "DECEMBER 1944", "ardennes", "village", "fog", 345f, 468f, "reims"),
+            S("aachen", "Aachen", "west", 6, "OCTOBER 1944", "normandy", "village", "rain", 382f, 415f, "bastogne"),
+            S("hurtgen", "Hürtgen Forest", "west", 7, "NOVEMBER 1944", "ardennes", "bocage", "fog", 408f, 446f, "aachen"),
+            S("remagen", "Remagen", "west", 8, "MARCH 1945", "normandy", "open", "overcast", 438f, 475f, "hurtgen", "supply"),
+            S("ruhr", "The Ruhr", "west", 9, "APRIL 1945", "normandy", "village", "rain", 420f, 385f, "remagen", null, true),
+            S("magdeburg", "Magdeburg", "west", 10, "APRIL 1945", "normandy", "open", "clear", 548f, 405f, "ruhr", null, true),
             // the eastern road: Soviet tanks
-            S("kursk", "Kursk", "east", 0, "JULY 1943", "kursk", "open", "clear", 1468f, 351f, null),
-            S("prokhorovka", "Prokhorovka", "east", 1, "JULY 1943", "kursk", "open", "overcast", 1479f, 416f, "kursk"),
-            S("kharkov", "Kharkov", "east", 2, "AUGUST 1943", "kursk", "village", "clear", 1470f, 513f, "prokhorovka"),
-            S("kiev", "Kiev", "east", 3, "NOVEMBER 1943", "kursk", "bocage", "rain", 1256f, 470f, "kharkov", "supply"),
-            S("korsun", "Korsun", "east", 4, "FEBRUARY 1944", "kursk", "bocage", "fog", 1283f, 566f, "kiev"),
-            S("lvov", "Lvov", "east", 5, "JULY 1944", "kursk", "village", "overcast", 1013f, 527f, "korsun"),
-            S("warsaw", "Warsaw", "east", 6, "JANUARY 1945", "kursk", "village", "fog", 900f, 304f, "lvov", "supply"),
-            S("poznan", "Poznań", "east", 7, "FEBRUARY 1945", "kursk", "village", "overcast", 747f, 288f, "warsaw", null, true),
-            S("seelow", "Seelow Heights", "east", 8, "APRIL 1945", "kursk", "bocage", "fog", 681f, 250f, "poznan", null, true),
+            S("kursk", "Kursk", "east", 0, "JULY 1943", "kursk", "open", "clear", 1470f, 310f, null),
+            S("prokhorovka", "Prokhorovka", "east", 1, "JULY 1943", "kursk", "open", "overcast", 1478f, 380f, "kursk"),
+            S("kharkov", "Kharkov", "east", 2, "AUGUST 1943", "kursk", "village", "clear", 1462f, 462f, "prokhorovka"),
+            S("kiev", "Kiev", "east", 3, "NOVEMBER 1943", "kursk", "bocage", "rain", 1352f, 490f, "kharkov", "supply"),
+            S("korsun", "Korsun", "east", 4, "FEBRUARY 1944", "kursk", "bocage", "fog", 1320f, 585f, "kiev"),
+            S("lvov", "Lvov", "east", 5, "JULY 1944", "kursk", "village", "overcast", 1010f, 545f, "korsun"),
+            S("warsaw", "Warsaw", "east", 6, "JANUARY 1945", "kursk", "village", "fog", 900f, 438f, "lvov", "supply"),
+            S("poznan", "Poznań", "east", 7, "FEBRUARY 1945", "kursk", "village", "overcast", 795f, 390f, "warsaw", null, true),
+            S("seelow", "Seelow Heights", "east", 8, "APRIL 1945", "kursk", "bocage", "fog", 688f, 372f, "poznan", null, true),
             // where the roads meet
-            S("berlin", "Berlin", "both", 11, "APRIL 1945", "kursk", "village", "overcast", 614f, 277f, "magdeburg,seelow", "officer", true),
+            S("berlin", "Berlin", "both", 11, "APRIL 1945", "kursk", "village", "overcast", 632f, 368f, "magdeburg,seelow", "officer", true),
         };
         public static readonly int WestCount = 11, EastCount = 9;
         public static Sector ById(string id) { foreach (var s in All) if (s.id == id) return s; return null; }

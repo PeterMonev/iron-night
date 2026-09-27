@@ -404,6 +404,8 @@ namespace IronNight
 
         /// <summary>Test switch --garage=id: straight into the garage tab with that tank on the turntable.</summary>
         public void ShowGarage(VehicleSpec spec) { depotTab = 1; ShowDepot(); if (garage != null) garage.Show(spec); }
+        /// <summary>Test switch --crewtab: straight into the depot's crew tab.</summary>
+        public void ShowCrewTab() { depotTab = 2; ShowDepot(); }
         /// <summary>Test switch --dossier=id: a tank's service record, the tank in the hangar.</summary>
         public void ShowDossier(string id) { depotTab = 1; ShowDepot(); dossierId = id; if (garage != null) garage.Show(VehicleSpec.ById(id)); RefreshDepot(); }
 
