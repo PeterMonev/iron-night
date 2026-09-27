@@ -24,10 +24,10 @@ namespace IronNight
 
         static readonly System.Globalization.CultureInfo En = System.Globalization.CultureInfo.InvariantCulture;
         /// <summary>Today, in UTC: the whole world changes challenge at the same moment.</summary>
-        public static string Today => System.DateTime.UtcNow.ToString("yyyyMMdd", En);
-        public static string DaysAgo(int n) => System.DateTime.UtcNow.Date.AddDays(-n).ToString("yyyyMMdd", En);
+        public static string Today => GameClock.UtcNow.ToString("yyyyMMdd", En);
+        public static string DaysAgo(int n) => GameClock.UtcNow.Date.AddDays(-n).ToString("yyyyMMdd", En);
         static System.DateTime Date(string day) => System.DateTime.ParseExact(day, "yyyyMMdd", En);
-        public static System.TimeSpan Left => System.DateTime.UtcNow.Date.AddDays(1) - System.DateTime.UtcNow;
+        public static System.TimeSpan Left => GameClock.UtcNow.Date.AddDays(1) - GameClock.UtcNow;
         public static string Heading(string day) => Date(day).ToString("dddd d MMMM", En).ToUpperInvariant();
 
         /// <summary>The day's number: the same on every phone, whatever it runs.</summary>

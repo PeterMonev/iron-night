@@ -72,7 +72,7 @@ namespace IronNight
             bool escape = a.level >= 2 && Random.value < 0.2f + 0.06f * a.level;
             Depot.AddPoints(BountyPoints(a)); Depot.AddGold(BountyGold(a));
             if (escape) { a.escapes++; a.scars++; a.level = Mathf.Min(5, a.level + 1); a.nick = "the Phoenix"; a.place = place; a.studied = false; Save(); return true; }
-            a.dead = true; a.killedAt = place; a.killedOn = System.DateTime.Now.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+            a.dead = true; a.killedAt = place; a.killedOn = GameClock.Now.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
             a.trophy = Trophies[Random.Range(0, Trophies.Length)]; a.studied = false; Save(); return false;
         }
 
@@ -97,7 +97,7 @@ namespace IronNight
             Data.aces.Add(new Ace { name = "Keller", portrait = 0, level = 3, met = 3, leaders = 1, wingmen = 2, nick = "the Butcher of Paris", place = "Paris" });
             Data.aces.Add(new Ace { name = "Brandt", portrait = 1, level = 2, met = 2, wingmen = 3, nick = "the Hunter of Normandy", place = "Normandy" });
             Data.aces.Add(new Ace { name = "Hoffmann", portrait = 2, level = 1, met = 1, place = "Kursk" });
-            Data.aces.Add(new Ace { name = "Stahl", portrait = 6, level = 2, met = 2, dead = true, nick = "the Ghost of Bastogne", killedAt = "Bastogne", killedOn = System.DateTime.Now.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture), trophy = "binoculars" });
+            Data.aces.Add(new Ace { name = "Stahl", portrait = 6, level = 2, met = 2, dead = true, nick = "the Ghost of Bastogne", killedAt = "Bastogne", killedOn = GameClock.Now.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture), trophy = "binoculars" });
             Save();
         }
 

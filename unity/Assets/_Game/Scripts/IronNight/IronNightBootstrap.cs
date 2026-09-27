@@ -16,6 +16,7 @@ namespace IronNight
             Application.targetFrameRate = 60;
             Application.runInBackground = true;
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
+            Battle.QaStart();   // the self-test, when the build was started with --qa=seconds
 
             var cam = Camera.main;
             if (cam == null) cam = new GameObject("Main Camera", typeof(Camera)) { tag = "MainCamera" }.GetComponent<Camera>();

@@ -22,6 +22,7 @@ namespace IronNight
             public GameObject go; public Mesh mesh, leaves; public float az, el = 42f, track; public LightShaft shaft; public Transform yoke, drum, lamp; public float flakTimer = 4f; public int burst; public Light glow;
             public Light spot; public Transform pool; public Vector3 poolAt, poolDir; public float poolLen, poolWid;   // a raid night's searchlight: its light, and its pool on the ground
             public int state; public float hp = -1f, fallYaw, burn; public bool drivable;   // 0 standing, 1 knocked over, 2 crushed, 3 ruined; a ruin is driven over
+            public List<Vector3> trodden;   // hedges: where hulls went through, as (along the line, half the width pressed flat, the side it lies to)
         }
 
         // circles: triples (offsetAlong, offsetSide, radius) in metres, along the prop's own forward axis
@@ -114,6 +115,7 @@ namespace IronNight
             // the blobs under the leaves go dark: they are the shadowed inside of the bush
             hedgeMaterial.SetColor("_BaseColor", winter ? new Color(0.72f, 0.78f, 0.82f) : new Color(0.55f, 0.62f, 0.5f)); canopyMaterial.SetColor("_BaseColor", winter ? new Color(0.72f, 0.78f, 0.82f) : new Color(0.52f, 0.6f, 0.48f));
             lampTemplate = LampTemplate();
+            { string hm = Kursk ? "k_wattle" : "hedge"; if (prefabs.ContainsKey(hm) && PlayerPrefs.GetInt("quality", 1) != 0) Slices(hm, out _); }   // the hedge cut into its slices now, while the night loads
         }
 
         // ---- the layout: pure functions of the cell coordinates ----
@@ -207,9 +209,7 @@ namespace IronNight
             var gaps = new List<float> { len * (0.25f + Rnd(ix, iz, 960 + salt) * 0.5f) };
             if (Rnd(ix, iz, 962 + salt) < 0.4f) gaps.Add(len * (0.15f + Rnd(ix, iz, 964 + salt) * 0.7f));
             var p = new Prop { what = What.Hedge, pos = (a + b) * 0.5f, yaw = Mathf.Atan2(dir.x, dir.z), size = len, bound = len * 0.5f + 3f, seed = (int)(Hash(ix, iz, 966 + salt) & 0x7fffffff), a = a, b = b, gaps = gaps.ToArray(), clearA = clearA, clearB = clearB };
-            var centers = new List<Vector2>(); var radii = new List<float>();
-            for (float u = 1.25f; u < len; u += 2.5f) if (!Open(p, u)) { var c = a + dir * u; centers.Add(new Vector2(c.x, c.z)); radii.Add(1.6f); }
-            p.circleCenters = centers.ToArray(); p.radii = radii.ToArray();
+            HedgeCircles(p);
             list.Add(p);
             if (Rnd(ix, iz, 968 + salt) < Mathf.Min(0.95f, 0.55f * TreeBias))
             {
@@ -223,6 +223,29 @@ namespace IronNight
             if (u < hedge.clearA || u > hedge.size - hedge.clearB) return true;
             foreach (var g in hedge.gaps) if (Mathf.Abs(u - g) < 5f) return true;
             return false;
+        }
+
+        /// <summary>How far down a hedge is pressed at a point along it: 1 flat where a hull went through, easing off
+        /// over a metre at the edges of its track, 0 standing; and the side it lies to.</summary>
+        static float Crush(Prop hedge, float u, out float side)
+        {
+            side = 0f; float c = 0f; if (hedge.trodden == null) return 0f;
+            foreach (var t in hedge.trodden) { float k = 1f - Mathf.Clamp01((Mathf.Abs(u - t.x) - t.y) / 0.9f); if (k > c) { c = k; side = t.z; } }
+            return c * c * (3f - 2f * c);
+        }
+
+        /// <summary>The hedge's footprint: a circle every 2.5 m but for its gates and where hulls have pressed it down,
+        /// wide enough there for the hull that did it.</summary>
+        static void HedgeCircles(Prop h)
+        {
+            var dir = (h.b - h.a).normalized; var centers = new List<Vector2>(); var radii = new List<float>();
+            for (float u = 1.25f; u < h.size; u += 2.5f)
+            {
+                if (Open(h, u)) continue; bool down = false;
+                if (h.trodden != null) foreach (var t in h.trodden) if (Mathf.Abs(u - t.x) < t.y + 1.4f) { down = true; break; }
+                if (!down) { var c = h.a + dir * u; centers.Add(new Vector2(c.x, c.z)); radii.Add(1.6f); }
+            }
+            h.circleCenters = centers.ToArray(); h.radii = radii.ToArray();
         }
 
         /// <summary>House, barn and hay around a trodden yard, the way farms sit in the corner of their fields.</summary>
@@ -490,11 +513,12 @@ namespace IronNight
             var parts = new List<CombineInstance>();
             for (float u = 0.7f; u < p.size - 0.5f; u += 1.1f)
             {
-                if (Open(p, u)) continue;
+                if (Open(p, u)) continue; float crush = Crush(p, u, out float lean);   // pressed down where a hull went through
                 for (int row = -1; row <= 1; row += 2)
                 {
                     float sx = 1.3f + (float)rng.NextDouble() * 0.6f, sy = 0.85f + (float)rng.NextDouble() * 0.4f, sz = sx * (0.8f + (float)rng.NextDouble() * 0.3f);
-                    var local = p.a - p.pos + dir * (u + ((float)rng.NextDouble() - 0.5f) * 0.5f) + side * (row * 0.5f + ((float)rng.NextDouble() - 0.5f) * 0.3f) + Vector3.up * (0.45f * sy);
+                    sy *= 1f - 0.7f * crush; sx *= 1f + 0.2f * crush;
+                    var local = p.a - p.pos + dir * (u + ((float)rng.NextDouble() - 0.5f) * 0.5f) + side * (row * 0.5f + lean * crush * 0.5f + ((float)rng.NextDouble() - 0.5f) * 0.3f) + Vector3.up * (0.45f * sy);
                     parts.Add(new CombineInstance { mesh = blobs[rng.Next(blobs.Length)], transform = Matrix4x4.TRS(local, Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f), new Vector3(sx, sy, sz)) });
                 }
             }
@@ -513,9 +537,12 @@ namespace IronNight
             for (float u = 0f; u + Section * 0.6f < p.size; u += Section)
             {
                 float mid = u + Section * 0.5f; if (Open(p, u + 0.8f) || Open(p, mid) || Open(p, u + Section - 0.8f)) continue;
-                var sec = Instantiate(prefabs[hm], go.transform); sec.transform.position = p.a + dir * mid; sec.transform.rotation = Quaternion.Euler(0f, yawDeg + (rng.Next(2) == 0 ? 0f : 180f), 0f);
-                sec.transform.localScale = new Vector3(1f, 0.85f + (float)rng.NextDouble() * 0.3f, 1f);
-                foreach (var r in sec.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = materials[hm]; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+                var rot = Quaternion.Euler(0f, yawDeg + (rng.Next(2) == 0 ? 0f : 180f), 0f); var scale = new Vector3(1f, 0.85f + (float)rng.NextDouble() * 0.3f, 1f);
+                bool pressed = false; if (p.trodden != null) foreach (var t in p.trodden) if (Mathf.Abs(t.x - mid) < Section * 0.5f + t.y + 0.9f) pressed = true;
+                var sec = pressed ? SlicedSection(hm, go.transform) : Instantiate(prefabs[hm], go.transform);   // where a hull went through, the section is built of its slices
+                sec.transform.SetPositionAndRotation(p.a + dir * mid, rot); sec.transform.localScale = scale;
+                if (pressed) LaySlices(p, sec.transform);
+                else foreach (var r in sec.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = materials[hm]; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
             }
             p.go = go;
         }
@@ -789,7 +816,7 @@ namespace IronNight
 
 
         /// <summary>How a prop gives way: 0 never, 1 it goes over (trees, poles), 2 any tank crushes it, 3 explosions bring
-        /// it down, 4 explosions or a dozer blade.</summary>
+        /// it down, 4 explosions or a dozer blade (a hedge also gives under any hull, pressed down: see Trample).</summary>
         static int BreakKind(Prop p)
         {
             if (p.what == What.Tree) return 1;
@@ -810,8 +837,8 @@ namespace IronNight
         static Quaternion Fallen(Prop p) => Quaternion.AngleAxis(88f, Vector3.Cross(Vector3.up, FallDir(p))) * Quaternion.Euler(0f, p.yaw * Mathf.Rad2Deg, 0f);
 
         /// <summary>A hull against the country: trees and poles go over the way it drives, fences, carts and hay are
-        /// crushed; with a dozer blade the walls, sandbags and hedges give way too. Returns the share of its speed the
-        /// hull keeps: 1 when it went through nothing.</summary>
+        /// crushed, a hedge is shouldered through and pressed down; with a dozer blade the walls and sandbags give way too
+        /// and a hedge is cleared away. Returns the share of its speed the hull keeps: 1 when it went through nothing.</summary>
         public float Ram(Vector3 pos, float radius, Vector3 forward, bool dozer)
         {
             float keep = 1f;
@@ -819,13 +846,14 @@ namespace IronNight
             {
                 var p = active[i]; if (p.radii.Length == 0 || p.drivable || p.state != 0) continue;
                 float reach = p.bound + radius + 1f; if ((p.pos - pos).sqrMagnitude > reach * reach) continue;
-                int kind = BreakKind(p); if (kind == 0 || kind == 3 || (kind == 4 && !dozer)) continue;
+                int kind = BreakKind(p); bool hedge = p.what == What.Hedge; if (kind == 0 || kind == 3 || (kind == 4 && !dozer && !hedge)) continue;
                 for (int c = 0; c < p.radii.Length; c++)
                 {
                     float min = p.radii[c] + radius * 0.97f; var cc = p.circleCenters[c];   // the hull is pushed back out every frame: only a hull driving in reaches this
                     if ((new Vector2(pos.x, pos.z) - cc).sqrMagnitude >= min * min) continue;
-                    keep = Mathf.Min(keep, Drag(p));
-                    if (p.what == What.Hedge) Gap(p, new Vector3(cc.x, 0f, cc.y)); else if (kind == 1) Fall(p, forward); else Crush(p, false);
+                    keep = Mathf.Min(keep, hedge && dozer ? 0.8f : Drag(p));
+                    if (hedge) { if (dozer) Gap(p, new Vector3(cc.x, 0f, cc.y)); else Trample(p, pos, forward, radius * 1.15f); }
+                    else if (kind == 1) Fall(p, forward); else Crush(p, false);
                     break;
                 }
             }
@@ -836,7 +864,7 @@ namespace IronNight
         /// hardly, a telegraph pole not at all.</summary>
         static float Drag(Prop p)
         {
-            if (p.what == What.Hedge) return 0.35f;
+            if (p.what == What.Hedge) return Kursk ? 0.72f : 0.58f;   // bushes and wattle give: a hull shoulders through
             if (p.what == What.Tree) return 0.45f;
             switch (p.kind.mesh)
             {
@@ -854,11 +882,19 @@ namespace IronNight
             }
         }
 
-        /// <summary>Rubble under the tracks: a heap or a burnt-out husk is driven over, at half speed.</summary>
+        /// <summary>Rubble under the tracks: a heap or a burnt-out husk is driven over, at half speed; a pressed-down
+        /// hedge is crossed at four fifths.</summary>
         public float Rough(Vector3 pos)
         {
             foreach (var p in active)
             {
+                if (p.what == What.Hedge)
+                {
+                    if (p.trodden == null) continue;
+                    var dir = (p.b - p.a).normalized; var off = pos - p.a; off.y = 0f; float u = Vector3.Dot(off, dir);
+                    if (u > 0f && u < p.size && (off - dir * u).sqrMagnitude < 1.8f * 1.8f && Crush(p, u, out _) > 0.5f) return 0.8f;
+                    continue;
+                }
                 if (!p.drivable || p.radii.Length == 0) continue; float reach = p.bound + 3f; if ((p.pos - pos).sqrMagnitude > reach * reach) continue;
                 for (int c = 0; c < p.radii.Length; c++) if ((new Vector2(pos.x, pos.z) - p.circleCenters[c]).sqrMagnitude < p.radii[c] * p.radii[c]) return 0.55f;
             }
@@ -960,11 +996,116 @@ namespace IronNight
             var dir = (h.b - h.a).normalized; float u = Vector3.Dot(at - h.a, dir); if (u < 0f || u > h.size) return;
             foreach (var g in h.gaps) if (Mathf.Abs(g - u) < 4f) return;
             var list = new List<float>(h.gaps) { u }; h.gaps = list.ToArray();
-            var centers = new List<Vector2>(); var radii = new List<float>();
-            for (float s = 1.25f; s < h.size; s += 2.5f) if (!Open(h, s)) { var c = h.a + dir * s; centers.Add(new Vector2(c.x, c.z)); radii.Add(1.6f); }
-            h.circleCenters = centers.ToArray(); h.radii = radii.ToArray();
+            HedgeCircles(h);
             if (fx != null) { fx.Dust(h.a + dir * u); fx.Dust(h.a + dir * (u + 2f)); }
             if (h.go != null) { Unload(h); Spawn(h); }
+        }
+
+        /// <summary>A hull shouldering through a hedge: the bushes under it go down, as wide as the hull and no wider,
+        /// pressed flat the way it is going, and stay down for the night; torn sprigs fly up ahead, the bushes rustle and
+        /// crack. half is half the width pressed flat.</summary>
+        void Trample(Prop h, Vector3 hull, Vector3 forward, float half)
+        {
+            var dir = (h.b - h.a).normalized; float u = Mathf.Clamp(Vector3.Dot(hull - h.a, dir), 0f, h.size);
+            if (h.trodden != null) foreach (var t in h.trodden) if (Mathf.Abs(u - t.x) < 0.5f) return;
+            var sideW = new Vector3(dir.z, 0f, -dir.x); float down = Vector3.Dot(forward, sideW) >= 0f ? 1f : -1f;
+            if (h.trodden == null) h.trodden = new List<Vector3>();
+            h.trodden.Add(new Vector3(u, half, down)); HedgeCircles(h);
+            var at = h.a + dir * u;
+            if (fx != null) fx.Leaves(new Vector3(at.x, 1f, at.z), forward, winter ? new Color(0.62f, 0.6f, 0.58f) : Kursk ? new Color(0.78f, 0.66f, 0.46f) : new Color(0.72f, 0.8f, 0.62f));
+            Sfx.Brush(at); if (Battle.QaOn) Battle.QaNote("hedge", at);
+            if (h.go == null) return;
+            string hm = Kursk ? "k_wattle" : "hedge";
+            if (!prefabs.ContainsKey(hm) || PlayerPrefs.GetInt("quality", 1) == 0) { Unload(h); Spawn(h); return; }   // the blob hedge of the low setting is built again, pressed
+            float reach = (hm == "hedge" ? 7.6f : 5.8f) * 0.5f + half + 0.9f; var hit = new List<Transform>();
+            foreach (Transform sec in h.go.transform) if (Mathf.Abs(Vector3.Dot(sec.position - h.a, dir) - u) < reach) hit.Add(sec);
+            foreach (var whole in hit)
+            {
+                var sec = whole;
+                if (sec.childCount == 0 || sec.GetChild(0).name != "Slice")   // still in one piece: cut into its slices, laid exactly where it stood
+                {
+                    var cut = SlicedSection(hm, h.go.transform).transform; cut.SetPositionAndRotation(sec.position, sec.rotation); cut.localScale = sec.localScale; Destroy(sec.gameObject); sec = cut;
+                }
+                StartCoroutine(PressSlices(h, sec));
+            }
+        }
+
+        const int SliceCount = 8;
+        static readonly Dictionary<string, Mesh[]> slices = new Dictionary<string, Mesh[]>(); static readonly Dictionary<string, float[]> sliceAt = new Dictionary<string, float[]>();
+
+        /// <summary>The hedge model cut crosswise into eight slices, each its own mesh standing on its own base, so that a
+        /// hull presses down only the ones under it. Cut once and shared by every hedge.</summary>
+        Mesh[] Slices(string hm, out float[] at)
+        {
+            if (slices.TryGetValue(hm, out var s) && s[0] != null) { at = sliceAt[hm]; return s; }
+            var mf = prefabs[hm].GetComponentInChildren<MeshFilter>(); var src = mf.sharedMesh;
+            var toRoot = prefabs[hm].transform.worldToLocalMatrix * mf.transform.localToWorldMatrix;
+            var v = src.vertices; var n = src.normals; var uv = src.uv; bool hasN = n.Length == v.Length, hasUv = uv.Length == v.Length;
+            float z0 = float.MaxValue, z1 = float.MinValue;
+            for (int i = 0; i < v.Length; i++) { v[i] = toRoot.MultiplyPoint3x4(v[i]); if (hasN) n[i] = toRoot.MultiplyVector(n[i]).normalized; z0 = Mathf.Min(z0, v[i].z); z1 = Mathf.Max(z1, v[i].z); }
+            float w = (z1 - z0) / SliceCount; var tris = new List<int>[SliceCount]; for (int k = 0; k < SliceCount; k++) tris[k] = new List<int>();
+            for (int sm = 0; sm < src.subMeshCount; sm++)
+            {
+                var t = src.GetTriangles(sm);
+                for (int i = 0; i + 2 < t.Length; i += 3) { int k = Mathf.Clamp((int)(((v[t[i]].z + v[t[i + 1]].z + v[t[i + 2]].z) / 3f - z0) / w), 0, SliceCount - 1); tris[k].Add(t[i]); tris[k].Add(t[i + 1]); tris[k].Add(t[i + 2]); }
+            }
+            s = new Mesh[SliceCount]; at = new float[SliceCount];
+            for (int k = 0; k < SliceCount; k++)
+            {
+                float zc = z0 + (k + 0.5f) * w; at[k] = zc; var map = new Dictionary<int, int>(); var sv = new List<Vector3>(); var sn = new List<Vector3>(); var suv = new List<Vector2>(); var st = new List<int>();
+                foreach (int i in tris[k])
+                {
+                    if (!map.TryGetValue(i, out int j)) { j = sv.Count; map[i] = j; sv.Add(v[i] - new Vector3(0f, 0f, zc)); if (hasN) sn.Add(n[i]); if (hasUv) suv.Add(uv[i]); }
+                    st.Add(j);
+                }
+                var m = new Mesh { name = hm + " slice " + k, indexFormat = sv.Count > 65000 ? UnityEngine.Rendering.IndexFormat.UInt32 : UnityEngine.Rendering.IndexFormat.UInt16 };
+                m.SetVertices(sv); if (hasN) m.SetNormals(sn); if (hasUv) m.SetUVs(0, suv); m.SetTriangles(st, 0); m.RecalculateBounds(); m.UploadMeshData(true);
+                s[k] = m;
+            }
+            slices[hm] = s; sliceAt[hm] = at; return s;
+        }
+
+        /// <summary>A hedge section built of its slices, each where it sits in the whole model.</summary>
+        GameObject SlicedSection(string hm, Transform parent)
+        {
+            var ms = Slices(hm, out var at); var sec = new GameObject("Section"); sec.transform.SetParent(parent, false);
+            for (int k = 0; k < ms.Length; k++)
+            {
+                var sl = new GameObject("Slice"); sl.transform.SetParent(sec.transform, false); sl.transform.localPosition = new Vector3(0f, 0f, at[k]);
+                sl.AddComponent<MeshFilter>().sharedMesh = ms[k]; var r = sl.AddComponent<MeshRenderer>(); r.sharedMaterial = materials[hm]; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            }
+            return sec;
+        }
+
+        /// <summary>How a slice lies where the hedge is pressed down: squashed, spread a little and leaning away from the
+        /// hull, in the section's own axes (a section may stand turned end for end).</summary>
+        static void SlicePose(Prop h, Transform sec, Transform sl, out Vector3 pos, out Quaternion rot, out Vector3 scale)
+        {
+            var dir = (h.b - h.a).normalized; float c = Crush(h, Vector3.Dot(sl.position - h.a, dir), out float lean);
+            float s = sec.InverseTransformDirection(new Vector3(dir.z, 0f, -dir.x) * lean).x >= 0f ? 1f : -1f;
+            pos = new Vector3(s * 0.45f * c, 0f, sl.localPosition.z); rot = Quaternion.Euler(0f, 0f, -s * 22f * c); scale = new Vector3(1f + 0.25f * c, 1f - 0.7f * c, 1f);
+        }
+
+        /// <summary>A section's slices laid as far down as the hedge is pressed, at once: a section coming back into view.</summary>
+        static void LaySlices(Prop h, Transform sec)
+        {
+            foreach (Transform sl in sec) { SlicePose(h, sec, sl, out var p, out var r, out var s); sl.localPosition = p; sl.localRotation = r; sl.localScale = s; }
+        }
+
+        /// <summary>The slices under a hull going down, in a third of a second.</summary>
+        System.Collections.IEnumerator PressSlices(Prop h, Transform sec)
+        {
+            int n = sec.childCount; var p0 = new Vector3[n]; var r0 = new Quaternion[n]; var s0 = new Vector3[n]; var p1 = new Vector3[n]; var r1 = new Quaternion[n]; var s1 = new Vector3[n];
+            for (int i = 0; i < n; i++) { var sl = sec.GetChild(i); p0[i] = sl.localPosition; r0[i] = sl.localRotation; s0[i] = sl.localScale; SlicePose(h, sec, sl, out p1[i], out r1[i], out s1[i]); }
+            for (float a = 0f; a < 1f; a += Time.deltaTime / 0.35f)
+            {
+                if (sec == null) yield break;   // its cell was unloaded: it is laid pressed when it comes back
+                float e = 1f - (1f - a) * (1f - a) * (1f - a);
+                for (int i = 0; i < n; i++) { var sl = sec.GetChild(i); sl.localPosition = Vector3.Lerp(p0[i], p1[i], e); sl.localRotation = Quaternion.Slerp(r0[i], r1[i], e); sl.localScale = Vector3.Lerp(s0[i], s1[i], e); }
+                yield return null;
+            }
+            if (sec == null) yield break;
+            for (int i = 0; i < n; i++) { var sl = sec.GetChild(i); sl.localPosition = p1[i]; sl.localRotation = r1[i]; sl.localScale = s1[i]; }
         }
 
         Material Sooty(string mesh)

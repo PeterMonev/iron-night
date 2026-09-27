@@ -12,7 +12,7 @@ namespace IronNight
     /// </summary>
     public static class Rewards
     {
-        static System.DateTime Now => System.DateTime.UtcNow;
+        static System.DateTime Now => GameClock.UtcNow;
         static System.DateTime Ticks(string key) => long.TryParse(PlayerPrefs.GetString(key, ""), out var t) ? new System.DateTime(t, System.DateTimeKind.Utc) : System.DateTime.MinValue;
         static void SetTicks(string key, System.DateTime at) { PlayerPrefs.SetString(key, at.Ticks.ToString()); PlayerPrefs.Save(); }
 
@@ -46,7 +46,7 @@ namespace IronNight
             new Gift { kind = "xp", amount = 400 },
             new Gift { kind = "officer", amount = 1 },
         };
-        static string Day(int back) => System.DateTime.Now.AddDays(-back).ToString("yyyyMMdd");
+        static string Day(int back) => GameClock.Now.AddDays(-back).ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture);
         /// <summary>Days of the row already collected (0..7) as the calendar shows them today.</summary>
         public static int MailDone
         {

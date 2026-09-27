@@ -64,7 +64,7 @@ namespace IronNight
 
         // crew experience: the second currency, earned in the nights and from rewarded ads, spent on training the crew
         public const int AdCrewXp = 250, AdsPerDay = 5, DailyTrainXp = 300;
-        static string LocalDay => System.DateTime.Now.ToString("yyyyMMdd");
+        static string LocalDay => GameClock.Now.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture);
         public static int CrewXp { get { Load(); return PlayerPrefs.GetInt("depot.crewXp", 0); } }
         public static void AddCrewXp(int xp) { Load(); PlayerPrefs.SetInt("depot.crewXp", Mathf.Max(0, CrewXp + xp)); PlayerPrefs.Save(); }
         public static bool SpendCrewXp(int xp) { if (xp < 0 || CrewXp < xp) return false; AddCrewXp(-xp); return true; }
@@ -102,18 +102,18 @@ namespace IronNight
         public static readonly PremiumOffer[] PremiumOffers = { new PremiumOffer { days = 1, gold = 60 }, new PremiumOffer { days = 7, gold = 300 }, new PremiumOffer { days = 30, gold = 900 } };
         public const float PremiumMul = 1.5f;
         public static System.DateTime PremiumUntil => long.TryParse(PlayerPrefs.GetString("depot.premiumUntil", ""), out var ticks) ? new System.DateTime(ticks, System.DateTimeKind.Utc) : System.DateTime.MinValue;
-        public static bool Premium => PremiumUntil > System.DateTime.UtcNow;
+        public static bool Premium => PremiumUntil > GameClock.UtcNow;
         /// <summary>Premium days bought with gold, added to whatever is left.</summary>
         public static bool BuyPremium(PremiumOffer o) { if (!SpendGold(o.gold)) return false; AddPremiumDays(o.days); return true; }
         /// <summary>Premium days added to whatever is left (bought, or out of a crate).</summary>
-        public static void AddPremiumDays(int days) { var from = Premium ? PremiumUntil : System.DateTime.UtcNow; PlayerPrefs.SetString("depot.premiumUntil", from.AddDays(days).Ticks.ToString()); PlayerPrefs.Save(); }
+        public static void AddPremiumDays(int days) { var from = Premium ? PremiumUntil : GameClock.UtcNow; PlayerPrefs.SetString("depot.premiumUntil", from.AddDays(days).Ticks.ToString()); PlayerPrefs.Save(); }
         /// <summary>Premium time left, short: "6 d 23 h", "4 h 12 min".</summary>
-        public static string PremiumLeft { get { var left = PremiumUntil - System.DateTime.UtcNow; return left.TotalDays >= 1 ? (int)left.TotalDays + " d " + left.Hours + " h" : left.TotalHours >= 1 ? (int)left.TotalHours + " h " + left.Minutes + " min" : Mathf.Max(1, left.Minutes) + " min"; } }
+        public static string PremiumLeft { get { var left = PremiumUntil - GameClock.UtcNow; return left.TotalDays >= 1 ? (int)left.TotalDays + " d " + left.Hours + " h" : left.TotalHours >= 1 ? (int)left.TotalHours + " h " + left.Minutes + " min" : Mathf.Max(1, left.Minutes) + " min"; } }
 
         // the daily supply drop: 300 points once a day, claimed on the title screen
         public const int DailyPoints = 300;
-        public static bool DailyReady => PlayerPrefs.GetString("depot.daily", "") != System.DateTime.Now.ToString("yyyyMMdd");
-        public static void ClaimDaily() { if (!DailyReady) return; PlayerPrefs.SetString("depot.daily", System.DateTime.Now.ToString("yyyyMMdd")); AddPoints(DailyPoints); }
+        public static bool DailyReady => PlayerPrefs.GetString("depot.daily", "") != GameClock.Now.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture);
+        public static void ClaimDaily() { if (!DailyReady) return; PlayerPrefs.SetString("depot.daily", GameClock.Now.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture)); AddPoints(DailyPoints); }
 
         /// <summary>Called once per night, at its end, with what the player did; the points go in through AddPoints.</summary>
         public static void RecordNight(int kills, float seconds)
@@ -200,7 +200,7 @@ namespace IronNight
         /// <summary>The last ten nights, newest first: date, sector, kills, time, score, dawn.</summary>
         public static void LogNight(string sector, int kills, float seconds, int score, bool dawn)
         {
-            var lines = new List<string> { System.DateTime.Now.ToString("dd MMM") + "|" + sector + "|" + kills + "|" + Mathf.FloorToInt(seconds / 60f) + ":" + (Mathf.FloorToInt(seconds % 60f)).ToString("00") + "|" + score + "|" + (dawn ? "1" : "0") };
+            var lines = new List<string> { GameClock.Now.ToString("dd MMM", System.Globalization.CultureInfo.InvariantCulture) + "|" + sector + "|" + kills + "|" + Mathf.FloorToInt(seconds / 60f) + ":" + (Mathf.FloorToInt(seconds % 60f)).ToString("00") + "|" + score + "|" + (dawn ? "1" : "0") };
             for (int i = 0; i < 9; i++) { var s = PlayerPrefs.GetString("log." + i, ""); if (s != "") lines.Add(s); }
             for (int i = 0; i < lines.Count && i < 10; i++) PlayerPrefs.SetString("log." + i, lines[i]);
             PlayerPrefs.Save();

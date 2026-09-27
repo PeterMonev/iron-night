@@ -98,7 +98,7 @@ namespace IronNight
         VehicleSpec Wingman => VehicleSpec.ById(Depot.WingmanId);
         float artyInterval, artyTimer, smokeLeft, smokeCooldown; int wingmanBonus, hintIndex; readonly List<ArtyShell> arty = new List<ArtyShell>();
         static readonly float[] steerAngles = { 0f, 35f, -35f, 70f, -70f, 110f, -110f };
-        static readonly string[] hints = { "Drag anywhere to drive", "The turrets aim and fire on their own", "Wrecks leave ammunition: drive over the crates", "Hedges stop tanks: gates and lanes lead through", "Farm buildings stop shells: use them as cover" };
+        static readonly string[] hints = { "Drag anywhere to drive", "The turrets aim and fire on their own", "Wrecks leave ammunition: drive over the crates", "Hedges slow you, they do not stop you: shoulder through", "Farm buildings stop shells: use them as cover" };
         static readonly float[] hintTimes = { 0.5f, 6f, 16f, 30f, 50f };
 
         Vehicle Leader => platoon.Count > 0 ? platoon[0] : null;
@@ -199,7 +199,7 @@ namespace IronNight
             hud.Set(t, platoon.Count); hud.SetLevel(level, 0f);
             PlaceCamera(true);
             stick.Blocked = true; hud.ShowTitle(false);
-            foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); } else if (arg == "--shop") hud.ShowShop(); else if (arg == "--mail") hud.TestMail(); else if (arg == "--qm") hud.TestQuartermaster(); else if (arg == "--opencrate") hud.TestCrate(); else if (arg.StartsWith("--bondstars=")) Bonds.TestStars(int.Parse(arg.Substring(12))); else if (arg == "--bonds") hud.ShowBonds(); else if (arg == "--wanted") { Nemesis.TestSeed(); hud.ShowWanted(); } else if (arg == "--crewtab") { stick.Blocked = true; hud.ShowCrewTab(); }
+            foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); } else if (arg == "--shop") hud.ShowShop(); else if (arg == "--mail") hud.TestMail(); else if (arg == "--qm") hud.TestQuartermaster(); else if (arg == "--opencrate") hud.TestCrate(); else if (arg.StartsWith("--bondstars=")) Bonds.TestStars(int.Parse(arg.Substring(12))); else if (arg == "--bonds") hud.ShowBonds(); else if (arg == "--wanted") { Nemesis.TestSeed(); hud.ShowWanted(); } else if (arg == "--crewtab") { stick.Blocked = true; hud.ShowCrewTab(); } else if (arg.StartsWith("--sheet=")) hud.TestSheet(arg.Substring(8)); else if (arg == "--mapseed" || arg == "--mapfall") Campaign.TestSeed(arg == "--mapfall");
             hud.OnStart += () => Radio("start");
             if (opNight == 0 && !daily && PlayerPrefs.GetInt("route.launch", 0) == 1) { PlayerPrefs.SetInt("route.launch", 0); PlayerPrefs.Save(); StartNight(); Radio("start"); }
             if (sneak) { SneakBuild(); StartNight(); Radio("start"); string np = Hud.UiSprite("sneak_" + theatre) != null ? "sneak_" + theatre : theatre == "kursk" ? "route_kursk_belts" : "route_bocage"; hud.Briefing(np, "Night raid · " + TheatreName, "No lights, no shooting. Slip past the searchlights to the depot and blow it. A beam that finds you raises the alarm."); }
@@ -210,7 +210,7 @@ namespace IronNight
             if (opNight > 0) { StartNight(); Radio("start"); hud.Briefing(Hud.UiSprite(opN.picture) != null ? opN.picture : op.cover, op.name + " · night " + opNight + " of " + op.nights.Length, opN.name + " · " + opN.second.text.ToLowerInvariant() + ", " + opN.third.text.ToLowerInvariant()); } Debug.Log("Iron Night: battle built, debugBoss=" + debugBoss + " args=" + string.Join(" ", System.Environment.GetCommandLineArgs()));
             if (phase == Phase.Title && PlayerPrefs.GetInt("map.open", 0) == 1) { PlayerPrefs.DeleteKey("map.open"); hud.ShowMap(); }   // back from a war map night: straight to the map
             else if (phase == Phase.Title && System.Array.Exists(System.Environment.GetCommandLineArgs(), a => a == "--map")) hud.ShowMap();   // test switch: --map
-            if (phase == Phase.Title && System.Array.FindIndex(System.Environment.GetCommandLineArgs(), a => a.StartsWith("--garage") || a.StartsWith("--dossier") || a == "--shop" || a == "--mail" || a == "--qm" || a == "--opencrate" || a == "--bonds" || a == "--map" || a == "--wanted" || a == "--crewtab" || a == "--noWelcome") < 0) hud.WelcomeBack();   // mail call and the quartermaster, on the first title of a session
+            if (phase == Phase.Title && System.Array.FindIndex(System.Environment.GetCommandLineArgs(), a => a.StartsWith("--garage") || a.StartsWith("--dossier") || a == "--shop" || a == "--mail" || a == "--qm" || a == "--opencrate" || a == "--bonds" || a == "--map" || a == "--wanted" || a == "--crewtab" || a.StartsWith("--sheet=") || a == "--noWelcome") < 0) hud.WelcomeBack();   // mail call and the quartermaster, on the first title of a session
         }
 
         void BuildWorld()
@@ -553,7 +553,7 @@ namespace IronNight
                     if (s.friendly && phosphorus && !hit.friendly) { burn[hit] = 6f; if (!burning.Contains(hit)) burning.Add(hit); }
                     Damage(hit, dmg, s.pos);
                     TrackHit(hit, s.pos);
-                    if (s.he) { float r = heBurst; foreach (var v in hitList) if (v != hit && !v.dead && Dist(v, hit) < r) Damage(v, s.dmg * 0.5f, v.transform.position); if (s.friendly) InfantryKilled(infantry.Blast(s.pos, r), s.pos); Hole(hit, s.pos); props.Blast(s.pos, r * 0.5f, 0.8f); }
+                    if (s.he) { float r = heBurst; foreach (var v in hitList.ToArray()) if (v != hit && !v.dead && Dist(v, hit) < r) Damage(v, s.dmg * 0.5f, v.transform.position); if (s.friendly) InfantryKilled(infantry.Blast(s.pos, r), s.pos); Hole(hit, s.pos); props.Blast(s.pos, r * 0.5f, 0.8f); }
                     else fx.Hit(new Vector3(s.pos.x, 1.6f, s.pos.z), 1f);
                 }
                 if (s.bounced) s.vel += Vector3.down * (30f * dt);
@@ -961,7 +961,7 @@ namespace IronNight
             var main = rain.main; main.startSpeed = winter ? 3f : 40f; main.startLifetime = winter ? 14f : 1.1f; main.startSize = winter ? 0.28f : 0.07f; main.maxParticles = 2000; main.simulationSpace = ParticleSystemSimulationSpace.World; main.gravityModifier = winter ? 0.08f : 1.5f;
             main.startColor = winter ? new Color(0.9f, 0.92f, 0.98f, 0.7f) : new Color(0.7f, 0.75f, 0.85f, 0.45f);
             var em = rain.emission; em.rateOverTime = winter ? 400f : 3600f;
-            { var vel = rain.velocityOverLifetime; vel.enabled = true; vel.x = winter ? new ParticleSystem.MinMaxCurve(0.4f, 2.2f) : new ParticleSystem.MinMaxCurve(5f, 7f); vel.z = new ParticleSystem.MinMaxCurve(-1.2f, 1.2f); }   // a wind from the west
+            { var vel = rain.velocityOverLifetime; vel.enabled = true; vel.x = winter ? new ParticleSystem.MinMaxCurve(0.4f, 2.2f) : new ParticleSystem.MinMaxCurve(5f, 7f); vel.y = new ParticleSystem.MinMaxCurve(0f, 0f); vel.z = new ParticleSystem.MinMaxCurve(-1.2f, 1.2f); }   // a wind from the west (the three curves in one mode, or Unity takes none of them)
             var sh = rain.shape; sh.shapeType = ParticleSystemShapeType.Box; sh.scale = new Vector3(130f, 1f, 170f); sh.rotation = new Vector3(90f, 0f, 0f);
             var r = go.GetComponent<ParticleSystemRenderer>(); if (winter) r.renderMode = ParticleSystemRenderMode.Billboard; else { r.renderMode = ParticleSystemRenderMode.Stretch; r.lengthScale = 22f; r.velocityScale = 0f; }
             var m = new Material(Resources.Load<Material>("Additive")); m.SetTexture("_BaseMap", glowTex); m.SetColor("_BaseColor", new Color(0.5f, 0.55f, 0.65f, 0.35f)); r.sharedMaterial = m;
@@ -1985,7 +1985,8 @@ namespace IronNight
             int m = Mathf.FloorToInt(t / 60f), s = Mathf.FloorToInt(t % 60f);
             int acc = shotsFired > 0 ? Mathf.RoundToInt(100f * shotsHit / shotsFired) : 0;
             string crewLine = dawn ? $"\nThe crew's {Depot.CrewNights}{(Depot.CrewNights == 1 ? "st" : Depot.CrewNights == 2 ? "nd" : Depot.CrewNights == 3 ? "rd" : "th")} night together · {Depot.CrewName}" : crewLostTonight && crewBefore > 0 ? $"\nThe crew got out, but {crewBefore} nights together are lost" : "";
-            string statLine = $"{kills} enemy vehicles destroyed · {nightInfantry} infantry\n{m}:{s:00} held · level {level} · {objectivesReached} objectives\nGunnery {acc}% · Score {score * (doubled ? 2 : 1)}" + crewLine + careerLine + lines;
+            hud.SetEndNumbers(kills, $"{m}:{s:00}", acc, score * (doubled ? 2 : 1), nightInfantry + " infantry · level " + level + " · " + objectivesReached + (objectivesReached == 1 ? " objective" : " objectives"));
+            string statLine = crewLine + careerLine + lines;
             if (stand) { StandEnd(dawn, statLine); return; }
             if (convoy) { ConvoyEnd(dawn, statLine); return; }
             if (sneak) { SneakEnd(dawn, statLine); return; }
@@ -2022,7 +2023,6 @@ namespace IronNight
             var sb = new System.Text.StringBuilder();
             sb.Append(opN.second.text).Append(" · ").Append(Progress(opN.second));
             sb.Append("\n").Append(opN.third.text).Append(" · ").Append(Progress(opN.third));
-            sb.Append($"\n{kills} vehicles · {Mathf.FloorToInt(t / 60f)}:{Mathf.FloorToInt(t % 60f):00} held · score {score * (doubled ? 2 : 1)}");
             var paid = new System.Collections.Generic.List<string>();
             if (fresh > 0) paid.Add($"{fresh} new star{(fresh > 1 ? "s" : "")} +{fresh * 300}");
             if (firstFinish) paid.Add($"{op.name} won +2000");
@@ -2092,7 +2092,7 @@ namespace IronNight
         void EndReward()
         {
             if (phase != Phase.End) return;
-            if (t >= NightLength) { doubled = true; Depot.AddPoints(score); banked += score; hud.SetEndPoints(banked); hud.ShowEnd(true, $"{kills} enemy vehicles destroyed\nScore {score * 2} (doubled)", false); return; }
+            if (t >= NightLength) { doubled = true; Depot.AddPoints(score); banked += score; hud.SetEndPoints(banked); hud.EndDoubled(score * 2); return; }
             revived = true;
             var L = Vehicle.Create(Wingman, true, platoon.Count > 0 ? platoon[0].transform.position - platoon[0].Forward * 8f : Vector3.zero, platoon.Count > 0 ? platoon[0].yaw : 0f);
             if (crewLostTonight) { Depot.CrewNights = crewBefore; crewLostTonight = false; }   // pulled out alive: the same men, their nights kept

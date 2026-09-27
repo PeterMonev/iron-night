@@ -13,7 +13,7 @@ namespace IronNight
     {
         const int Rate = 44100;
         static Sfx instance;
-        AudioClip shot, shotHeavy, shotFar, hit, explosion, artillery, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, front, whistle, rumble, ricochet, ricochet2, flak, reload, turretLoop, mg, faust, stuka, drone, crunch, fighter;
+        AudioClip shot, shotHeavy, shotFar, hit, explosion, artillery, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, front, whistle, rumble, ricochet, ricochet2, flak, reload, turretLoop, mg, faust, stuka, drone, crunch, brush, fighter;
         readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, turret, ambient, frontLine, ui; Transform listener;
 
         public static void Build(Camera cam)
@@ -237,6 +237,21 @@ namespace IronNight
             Dsp.Add(mix, crack, 0.9f); Dsp.Normalize(mix, 0.8f); return mix;
         }
 
+        /// <summary>A hull shoving through a hedge: a rush of leaves that swells and dies away, twigs snapping in it, and
+        /// the soft push of the bank under the tracks.</summary>
+        static float[] MakeBrush()
+        {
+            const float len = 0.9f; int n = Dsp.N(len); var mix = new float[n];
+            var rush = Dsp.Noise(n); Dsp.Bandpass(rush, 3200f, 0.6f); Dsp.Env(rush, t => Mathf.Sin(Mathf.Clamp01(t / len) * Mathf.PI) * Mathf.Exp(-t * 1.5f)); Dsp.Add(mix, rush, 0.8f);
+            var hiss = Dsp.Noise(n); Dsp.Highpass(hiss, 5500f); Dsp.Env(hiss, t => Mathf.Exp(-t * 5f) * Mathf.Clamp01(t * 30f)); Dsp.Add(mix, hiss, 0.35f);
+            var snaps = Dsp.Noise(n); Dsp.Bandpass(snaps, 2400f, 1.4f); var spikes = new float[n]; var r = new System.Random(11);
+            for (int k = 0; k < 9; k++) { int at = r.Next(n * 4 / 5); float g = 0.5f + (float)r.NextDouble() * 0.5f; for (int i = 0; i < 180 && at + i < n; i++) spikes[at + i] += g * Mathf.Exp(-i / 35f); }   // the twigs, one after another
+            for (int i = 0; i < n; i++) snaps[i] *= spikes[i];
+            Dsp.Add(mix, snaps, 0.9f);
+            var push = Dsp.Sine(n, t => 48f - 12f * t); Dsp.Env(push, t => Mathf.Exp(-t * 7f)); Dsp.Add(mix, push, 0.5f);
+            Dsp.Normalize(mix, 0.75f); return mix;
+        }
+
         /// <summary>Aero engines somewhere overhead in the dark: a low, beating drone that swells and hangs.</summary>
         static float[] MakeDrone()
         {
@@ -303,7 +318,7 @@ namespace IronNight
             mg = Load("mg", () => Gun(0f, 0.3f, false)); faust = Load("faust", () => Gun(0.2f, 0.8f, false));
             explosion = Load("explosion", MakeExplosion); artillery = Load("artillery", MakeExplosion); hit = Load("hit", ArmourHit); ricochet = Load("ricochet", MakeRicochet); ricochet2 = Resources.Load<AudioClip>("Audio/ricochet2");
             engineLoop = Load("engine", MakeEngine); tracksLoop = Load("tracks", Tracks);
-            whistle = Load("whistle", MakeWhistle); stuka = Load("stuka", MakeStukaDive); drone = Load("drone", MakeDrone); crunch = Load("crunch", MakeCrunch); fighter = Load("fighter", MakeFighterPass); rumble = Load("shotFar", MakeRumble); wind = Load("wind", Wind); rain = Load("rain", Rain); front = Resources.Load<AudioClip>("Audio/front");
+            whistle = Load("whistle", MakeWhistle); stuka = Load("stuka", MakeStukaDive); drone = Load("drone", MakeDrone); crunch = Load("crunch", MakeCrunch); brush = Load("brush", MakeBrush); fighter = Load("fighter", MakeFighterPass); rumble = Load("shotFar", MakeRumble); wind = Load("wind", Wind); rain = Load("rain", Rain); front = Resources.Load<AudioClip>("Audio/front");
             pickup = Load("pickup", () => Radio(new[] { 880f, 1320f }, 0.12f)); levelUp = Load("levelUp", () => Radio(new[] { 523f, 659f, 784f }, 0.2f)); click = Load("click", MakeClick);
 
             for (int i = 0; i < 12; i++) { var s = NewSource("Voice " + i); s.spatialBlend = 0.75f; s.rolloffMode = AudioRolloffMode.Linear; s.minDistance = 12f; s.maxDistance = 140f; pool.Add(s); }
@@ -342,6 +357,7 @@ namespace IronNight
         public static void StukaDive(Vector3 pos) { if (instance) instance.PlayAt(instance.stuka, pos, 1f, Random.Range(0.97f, 1.03f)); }
         public static void FighterPass(Vector3 pos) { if (instance) instance.PlayAt(instance.fighter, pos, 1f, Random.Range(0.96f, 1.04f)); }
         public static void Crunch(Vector3 pos) { if (instance) instance.PlayAt(instance.crunch, pos, 0.55f, Random.Range(0.85f, 1.15f)); }
+        public static void Brush(Vector3 pos) { if (instance) instance.PlayAt(instance.brush, pos, 0.7f, Random.Range(0.88f, 1.12f)); }
         public static void Drone(Vector3 pos) { if (instance) instance.PlayAt(instance.drone, pos, 0.9f, 1f); }
         public static void Whistle(Vector3 pos) { if (instance) instance.PlayAt(instance.whistle, pos, 0.7f, Random.Range(0.95f, 1.05f)); }
         public static void Mg(Vector3 pos) { if (instance) instance.PlayAt(instance.mg, pos, 0.55f, Random.Range(0.95f, 1.05f)); }

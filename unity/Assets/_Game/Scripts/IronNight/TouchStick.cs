@@ -18,6 +18,9 @@ namespace IronNight
         public readonly System.Collections.Generic.List<RectTransform> Blockers = new System.Collections.Generic.List<RectTransform>();   // buttons the thumb may press without driving
         public Vector2 TapAt { get; private set; } public bool Tapped { get; private set; }   // a press released within 0.25 s and 18 px: a tap, held until ConsumeTap
         public bool ConsumeTap() { bool t = Tapped; Tapped = false; return t; }
+        /// <summary>The self-test's autopilot: while set, it drives instead of the thumb (zero: hands off).</summary>
+        public static Vector2? Pilot;
+        public void FakeTap(Vector2 screen) { Tapped = true; TapAt = screen; }
         float pressTime; Vector2 pressAt; bool moved;
 
         Image ring, knob; RectTransform canvasRect; Vector2 origin; bool keyboard;
@@ -35,6 +38,7 @@ namespace IronNight
 
         void Update()
         {
+            if (Pilot.HasValue) { bool on = !Blocked && Pilot.Value.sqrMagnitude > 0.0001f; Active = on; Direction = on ? Vector2.ClampMagnitude(Pilot.Value, 1f) : Vector2.zero; return; }
             bool pressed = false; Vector2 pos = Vector2.zero;
             var touch = Touchscreen.current;
             if (touch != null)

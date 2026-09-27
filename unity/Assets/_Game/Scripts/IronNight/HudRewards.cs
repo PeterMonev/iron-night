@@ -55,7 +55,7 @@ namespace IronNight
 
         // test switches, each opening its screen straight away: --mail, --qm (five hours gathered), --opencrate (a crate, tapped by itself)
         public void TestMail() { welcomed = true; ShowMail(); }
-        public void TestQuartermaster() { welcomed = true; PlayerPrefs.SetString("qm.since", System.DateTime.UtcNow.AddHours(-5).Ticks.ToString()); ShowQuartermaster(); }
+        public void TestQuartermaster() { welcomed = true; PlayerPrefs.SetString("qm.since", GameClock.UtcNow.AddHours(-5).Ticks.ToString()); ShowQuartermaster(); }
         public void TestCrate() { welcomed = true; if (Rewards.CratesTotal == 0) Rewards.AddCrates("supply", 1); autoTap = true; ShowCrate(Rewards.NextCrate); }
         bool autoTap;
 

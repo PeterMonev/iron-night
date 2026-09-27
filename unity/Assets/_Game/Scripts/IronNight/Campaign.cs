@@ -75,7 +75,7 @@ namespace IronNight
         }
 
         // ---- counterattacks ----
-        static System.DateTime Now => System.DateTime.UtcNow;
+        static System.DateTime Now => GameClock.UtcNow;
         static System.DateTime Ticks(string key) => long.TryParse(PlayerPrefs.GetString(key, ""), out var t) ? new System.DateTime(t, System.DateTimeKind.Utc) : System.DateTime.MinValue;
         static void SetTicks(string key, System.DateTime at) => PlayerPrefs.SetString(key, at.Ticks.ToString());
         public const float CounterHours = 24f, CounterEvery = 36f;
@@ -101,6 +101,16 @@ namespace IronNight
             var hit = fronts[Random.Range(0, fronts.Count)];
             PlayerPrefs.SetString("map.counter", hit.id); SetTicks("map.counterUntil", Now.AddHours(CounterHours)); PlayerPrefs.Save();
             return "Counterattack at " + hit.name + " · beat it off within a day";
+        }
+
+        /// <summary>Test switches --mapseed (the western road taken to Falaise, a counterattack due now) and --mapfall (one
+        /// under way at Falaise whose day is up): the war moving on without waiting a day and a half for it.</summary>
+        public static void TestSeed(bool fall)
+        {
+            foreach (var id in new[] { "omaha", "saintlo", "falaise" }) PlayerPrefs.SetInt("map.taken." + id, 1);
+            if (fall) { PlayerPrefs.SetString("map.counter", "falaise"); SetTicks("map.counterUntil", Now.AddHours(-1)); }
+            else { PlayerPrefs.DeleteKey("map.counter"); SetTicks("map.counterNext", Now.AddMinutes(-1)); }
+            PlayerPrefs.Save();
         }
 
         /// <summary>A night in the sector held until dawn: the sector taken (or held against the counterattack) and paid

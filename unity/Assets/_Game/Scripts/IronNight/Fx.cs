@@ -15,12 +15,13 @@ namespace IronNight
         class Puff
         {
             public Transform t; public Renderer r; public float life, age, size, grow, spin, alphaPow, stretch; public Color color; public Vector3 vel, axis;
-            public bool smoke, gravity, aligned, flat;
+            public bool smoke, gravity, aligned, flat, leaf; public float spinRate;
             public int frames, cols, rows, frame0;   // a sprite sheet: frames stepped over the life, or one fixed frame
         }
 
         Material addGlow, addFlame, addSpark, smokeSoft, smokeRagged, addRing;
         Material addExplosion, smokeSheet, addSparks, blendFlak, blendDust, addMuzzle, addTracer, addObjective;   // the photographic sprites
+        Material leafFx;   // torn sprigs: the hedges' own lit, cut-out leaves sheet
         static readonly int BaseMapST = Shader.PropertyToID("_BaseMap_ST"); static readonly Vector4 WholeSheet = new Vector4(1f, 1f, 0f, 0f);
         Texture2D glowTex, flameTex, smokeTex, sparkTex, ringTex;
         readonly List<Puff> puffs = new List<Puff>(); readonly Stack<GameObject> quadPool = new Stack<GameObject>();
@@ -40,6 +41,7 @@ namespace IronNight
             smokeSoft = Make(smoke, Lightswarm.ProceduralSprites.GroundShadow(128).texture); smokeRagged = Make(smoke, smokeTex);
             Texture2D Pic(string n) => Resources.Load<Texture2D>("Fx/" + n);
             addExplosion = Make(additive, Pic("fx_explosion")); smokeSheet = Make(smoke, Pic("fx_smoke")); addSparks = Make(additive, Pic("fx_sparks"));
+            leafFx = new Material(Resources.Load<Material>("FoliageCut"));
             addObjective = Make(additive, Resources.Load<Texture2D>("Textures/ring_objective")); blendFlak = Make(smoke, Pic("fx_flak")); blendDust = Make(smoke, Pic("fx_dust")); addMuzzle = Make(additive, Pic("fx_muzzle")); addTracer = Make(additive, Pic("fx_tracer"));
         }
 
@@ -205,6 +207,19 @@ namespace IronNight
             Spawn(addGlow, pos + Vector3.up * 0.3f, 1.4f, new Color(1f, 0.8f, 0.5f, 0.8f), 0.05f, Vector3.zero, 0.2f);
         }
 
+        /// <summary>A hull shouldering through a hedge: torn sprigs thrown up ahead of it that tumble down slowly, and
+        /// the dust shaken out of the bushes. The tint is the season's: green, winter-grey, or the straw of a wattle fence.</summary>
+        public void Leaves(Vector3 pos, Vector3 dir, Color tint)
+        {
+            for (int i = 0; i < 16; i++)
+            {
+                var v = (dir * 0.7f + Random.insideUnitSphere * 0.8f + Vector3.up * 1.2f).normalized * (2.5f + Random.value * 4.5f); float k = 0.75f + Random.value * 0.5f;
+                var l = Sheet(Spawn(leafFx, pos + Random.insideUnitSphere * 0.9f, 0.35f + Random.value * 0.35f, new Color(tint.r * k, tint.g * k, tint.b * k, 1f), 1.4f + Random.value * 1.2f, v, 0f), 2, 2, 1, Random.Range(0, 4));
+                l.leaf = true; l.alphaPow = 0.12f; l.spinRate = Random.Range(-260f, 260f);
+            }
+            for (int i = 0; i < 2; i++) Spawn(blendDust, pos + Random.insideUnitSphere * 0.6f, 2f + Random.value, new Color(0.62f, 0.58f, 0.46f, 0.4f), 1.2f + Random.value * 0.5f, dir * 1.5f + Vector3.up * 1.2f, 1.4f, true);
+        }
+
         /// <summary>The smoke screen: a big slow grey cloud that hangs for a while.</summary>
         public void SmokeCloud(Vector3 pos, float life)
         {
@@ -297,6 +312,12 @@ namespace IronNight
                 var p = puffs[i]; p.age += dt; float q = p.age / p.life;
                 if (q >= 1f) { p.t.gameObject.SetActive(false); quadPool.Push(p.t.gameObject); puffs.RemoveAt(i); continue; }
                 if (p.gravity) p.vel += Vector3.down * (26f * dt);
+                if (p.leaf)
+                {
+                    // a sprig tumbling down, held up by the air, lying where it lands
+                    p.vel += Vector3.down * (7f * dt); float drag = 1f - Mathf.Min(1f, 1.8f * dt); p.vel.x *= drag; p.vel.z *= drag; p.vel.y = Mathf.Max(p.vel.y, -1.8f); p.spin += p.spinRate * dt;
+                    if (p.t.position.y < 0.08f && p.vel.y < 0f) { p.vel = Vector3.zero; p.spinRate = 0f; }
+                }
                 p.t.position += p.vel * dt;
                 float s = p.size * (1f + q * p.grow);
                 p.t.localScale = p.stretch > 1f ? new Vector3(s / Mathf.Sqrt(p.stretch), s * p.stretch, 1f) : Vector3.one * s;

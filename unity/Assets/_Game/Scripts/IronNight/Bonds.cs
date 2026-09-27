@@ -16,7 +16,7 @@ namespace IronNight
         static readonly System.DateTime Epoch = new System.DateTime(2026, 9, 27);
         public const int Tiers = 40, StarsPerTier = 6, SeasonDays = 35, BondGold = 500, TierGold = 60;
 
-        static int DaysIn => Mathf.Max(0, (System.DateTime.Now.Date - Epoch).Days);
+        static int DaysIn => Mathf.Max(0, (GameClock.Now.Date - Epoch).Days);
         public static int Season => DaysIn / SeasonDays + 1;
         public static string SeasonName(int s) => ((s - 1) % 3) == 0 ? "Operation Cobra" : ((s - 1) % 3) == 1 ? "The Bulge" : "Citadel";
         public static string SeasonCamo(int s) => ((s - 1) % 3) == 0 ? "hedgerow" : ((s - 1) % 3) == 1 ? "whitewash" : "steppe";
@@ -25,7 +25,7 @@ namespace IronNight
         {
             get
             {
-                var end = Epoch.AddDays(Season * SeasonDays); var left = end - System.DateTime.Now;
+                var end = Epoch.AddDays(Season * SeasonDays); var left = end - GameClock.Now;
                 return left.TotalDays >= 1 ? (int)left.TotalDays + " d " + left.Hours + " h" : (int)left.TotalHours + " h " + left.Minutes + " min";
             }
         }
@@ -115,7 +115,7 @@ namespace IronNight
         };
         public static int Week => DaysIn / 7;
         /// <summary>Time to the next orders, short.</summary>
-        public static string WeekLeft { get { var left = Epoch.AddDays((Week + 1) * 7) - System.DateTime.Now; return left.TotalDays >= 1 ? (int)left.TotalDays + " d " + left.Hours + " h" : (int)left.TotalHours + " h " + left.Minutes + " min"; } }
+        public static string WeekLeft { get { var left = Epoch.AddDays((Week + 1) * 7) - GameClock.Now; return left.TotalDays >= 1 ? (int)left.TotalDays + " d " + left.Hours + " h" : (int)left.TotalHours + " h " + left.Minutes + " min"; } }
         /// <summary>The week's five: the first always "fight nights" or "destroy tanks", the rest drawn from the pool.</summary>
         public static Order[] WeekOrders
         {
@@ -127,7 +127,7 @@ namespace IronNight
                 return list.ToArray();
             }
         }
-        static int Count(string key) => key == "nights" ? Depot.NightsFought : Depot.Total(key);
+        static int Count(string key) { Depot.Load(); return key == "nights" ? Depot.NightsFought : Depot.Total(key); }   // the depot loaded first: the week's counts are taken at start, before the battle loads it
         static string W(string k) => "bonds.w" + Week + "." + k;
         /// <summary>The week's starting counts, taken the first time the week is seen (at start, before any night).</summary>
         public static void EnsureWeek() { foreach (var o in WeekOrders) if (!PlayerPrefs.HasKey(W("base." + o.key))) PlayerPrefs.SetInt(W("base." + o.key), Count(o.key)); PlayerPrefs.Save(); }
