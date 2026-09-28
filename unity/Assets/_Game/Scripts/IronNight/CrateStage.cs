@@ -8,8 +8,8 @@ namespace IronNight
     /// <summary>
     /// A little stage far under the field where a crate is filmed: its own camera into a texture, a dark floor with a
     /// pool of warm light, a cool rim behind. It takes the crates' pictures for the buttons and the calendar, and plays
-    /// a crate's opening: the crate drops in and settles, breathes while it waits, shakes when tapped, then throws its
-    /// lid off in a burst of gold light and sparks.
+    /// a crate's opening: the crate drops in and settles, breathes while it waits, shakes when tapped with the light
+    /// growing at its seams, then bursts in gold light and sparks.
     /// </summary>
     public class CrateStage : MonoBehaviour
     {
@@ -17,11 +17,11 @@ namespace IronNight
         static CrateStage instance;
         static readonly Dictionary<string, Sprite> pictures = new Dictionary<string, Sprite>();
         Camera cam; UniversalAdditionalCameraData camData; RenderTexture rt; GameObject floor;
-        Transform crate, lid, beam; Light key, rim, inner; Material beamMat; ParticleSystem sparks;
-        float t, shakeT = -1f, burstT = -1f, crateH; bool landed, fogWas; Vector3 lidVel, lidSpin;
+        Transform crate, beam; Light key, rim, inner; Material beamMat; ParticleSystem sparks;
+        float t, shakeT = -1f, burstT = -1f, crateH, mouth = 0.95f; bool landed, fogWas;
 
         public RenderTexture Texture => rt;
-        /// <summary>Seconds since the lid flew, or -1 while the crate is still shut.</summary>
+        /// <summary>Seconds since the crate burst open, or -1 while it is still shut.</summary>
         public float SinceBurst => burstT;
         public bool Waiting => crate != null && landed && shakeT < 0f;
         public float Age => t;
@@ -40,7 +40,7 @@ namespace IronNight
             cam.targetTexture = rt; cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.015f, 0.015f, 0.02f, 1f);
             cam.fieldOfView = 30f; cam.nearClipPlane = 0.1f; cam.farClipPlane = 30f; cam.enabled = false;
             camData = cg.AddComponent<UniversalAdditionalCameraData>(); camData.renderPostProcessing = true; camData.volumeLayerMask = 1;   // the field's bloom and grading (Default layer), not the hangar's
-            cam.transform.position = Home + new Vector3(2.5f, 2.1f, -3.9f); cam.transform.LookAt(Home + new Vector3(0f, 0.75f, 0f));   // room above the crate for the lid and the light
+            cam.transform.position = Home + new Vector3(2.5f, 2.1f, -3.9f); cam.transform.LookAt(Home + new Vector3(0f, 0.75f, 0f));   // room above the crate for the light
             floor = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(floor.GetComponent<Collider>()); floor.transform.SetParent(transform, false);
             floor.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); floor.transform.localScale = new Vector3(80f, 80f, 1f);   // wide enough that its far edge never shows
             var fm = new Material(Resources.Load<Material>("VehicleLit")); fm.SetColor("_BaseColor", new Color(0.035f, 0.033f, 0.032f)); floor.GetComponent<Renderer>().sharedMaterial = fm;
@@ -74,11 +74,11 @@ namespace IronNight
 
         static Bounds BoundsOf(GameObject g) { var rs = g.GetComponentsInChildren<Renderer>(); var b = rs[0].bounds; foreach (var r in rs) b.Encapsulate(r.bounds); return b; }
 
-        /// <summary>A crate on the floor: the ammunition box for a supply crate, the airdrop crate in warm wood for an
-        /// officer's; a plank lid over its top, the part that flies.</summary>
+        /// <summary>A crate on the floor: the ammunition box for a supply crate (standing open, its lid up and the shells
+        /// showing), the airdrop crate in warm wood for an officer's.</summary>
         void Place(string kind)
         {
-            if (crate != null) { crate.gameObject.SetActive(false); Destroy(crate.gameObject); } if (lid != null) { lid.gameObject.SetActive(false); Destroy(lid.gameObject); }   // hidden at once: Destroy waits for the end of the frame
+            if (crate != null) { crate.gameObject.SetActive(false); Destroy(crate.gameObject); }   // hidden at once: Destroy waits for the end of the frame
             bool officer = kind == "officer";
             var pf = Resources.Load<GameObject>(officer ? "Props/crate" : "Props/ammocrate") ?? Resources.Load<GameObject>("Props/crate");
             var holder = new GameObject("Crate").transform; holder.SetParent(transform, false); holder.position = Home;
@@ -88,9 +88,7 @@ namespace IronNight
             foreach (var r in model.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = m; r.shadowCastingMode = ShadowCastingMode.On; }
             var b = BoundsOf(model); model.transform.localScale *= (officer ? 1.75f : 1.25f) / Mathf.Max(0.01f, Mathf.Max(b.size.x, b.size.z)); b = BoundsOf(model);   // a metre and a quarter across, the officer's long crate more
             model.transform.position += new Vector3(Home.x - b.center.x, Home.y - b.min.y, Home.z - b.center.z); b = BoundsOf(model); crateH = b.size.y;
-            var lg = GameObject.CreatePrimitive(PrimitiveType.Cube); Destroy(lg.GetComponent<Collider>()); lid = lg.transform; lid.SetParent(holder, false);
-            lid.localScale = new Vector3(b.size.x * 1.03f, Mathf.Max(0.05f, b.size.y * 0.08f), b.size.z * 1.03f); lid.position = new Vector3(Home.x, b.max.y - lid.localScale.y * 0.25f, Home.z); lid.localRotation = Quaternion.identity;
-            var lm = new Material(Resources.Load<Material>("VehicleLit")); lm.SetColor("_BaseColor", officer ? new Color(0.38f, 0.26f, 0.14f) : new Color(0.26f, 0.28f, 0.18f)); lg.GetComponent<Renderer>().sharedMaterial = lm; lg.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.On;
+            mouth = pf.name == "ammocrate" ? 0.72f : 0.95f;   // the light comes out of the open box's mouth, a little under its raised lid, or over the shut crate's top
             crate = holder; crate.rotation = Quaternion.Euler(0f, 22f, 0f);
         }
 
@@ -108,7 +106,7 @@ namespace IronNight
             var prev = RenderTexture.active; RenderTexture.active = small; var tex = new Texture2D(256, 256, TextureFormat.RGBA32, false); tex.ReadPixels(new Rect(0, 0, 256, 256), 0, 0); tex.Apply(); RenderTexture.active = prev;
             st.cam.transform.position = camAt; st.cam.transform.LookAt(Home + new Vector3(0f, 0.75f, 0f));
             st.cam.targetTexture = st.rt; st.cam.backgroundColor = new Color(0.015f, 0.015f, 0.02f, 1f); st.camData.renderPostProcessing = true; st.floor.SetActive(true); small.Release();
-            if (st.crate != null) { st.crate.gameObject.SetActive(false); Destroy(st.crate.gameObject); st.crate = null; st.lid = null; }
+            if (st.crate != null) { st.crate.gameObject.SetActive(false); Destroy(st.crate.gameObject); st.crate = null; }
             sp = Sprite.Create(tex, new Rect(0, 0, 256, 256), new Vector2(0.5f, 0.5f), 100f); pictures[kind] = sp; return sp;
         }
 
@@ -120,13 +118,11 @@ namespace IronNight
         }
         /// <summary>The tap: it shakes, then bursts.</summary>
         public void Tap() { if (Waiting) shakeT = 0f; }
-        public void Stop() { cam.enabled = false; sparks.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); if (crate != null) Destroy(crate.gameObject); if (lid != null) Destroy(lid.gameObject); crate = null; lid = null; }
+        public void Stop() { cam.enabled = false; sparks.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); if (crate != null) Destroy(crate.gameObject); crate = null; }
 
         void Burst()
         {
-            burstT = 0f; lid.SetParent(transform, true);
-            lidVel = new Vector3(Random.Range(-0.7f, 0.7f), 4.4f, 1.3f); lidSpin = new Vector3(Random.Range(220f, 340f), Random.Range(-120f, 120f), Random.Range(-180f, 180f));
-            beam.gameObject.SetActive(true); sparks.transform.position = Home + new Vector3(0f, crateH * 0.95f, 0f); sparks.Play(); Sfx.LevelUp();
+            burstT = 0f; beam.gameObject.SetActive(true); sparks.transform.position = Home + new Vector3(0f, crateH * mouth, 0f); sparks.Play(); Sfx.LevelUp();
         }
 
         void Update()
@@ -157,11 +153,10 @@ namespace IronNight
             if (burstT >= 0f)
             {
                 burstT += dt;
-                if (lid != null) { lidVel += Vector3.down * 9.8f * dt; lid.position += lidVel * dt; lid.Rotate(lidSpin * dt, Space.World); if (lid.position.y < Home.y - 3f) lid.gameObject.SetActive(false); }
                 inner.intensity = burstT < 0.12f ? Mathf.Lerp(14f, 60f, burstT / 0.12f) : Mathf.Lerp(60f, 12f, Mathf.Clamp01((burstT - 0.12f) / 1.4f));
                 float a = burstT < 0.15f ? burstT / 0.15f * 0.95f : Mathf.Lerp(0.95f, 0.35f, Mathf.Clamp01((burstT - 0.15f) / 1.6f));
                 beamMat.SetColor("_BaseColor", new Color(1f, 0.78f, 0.4f, a));
-                beam.position = Home + new Vector3(0f, crateH + 1.5f, 0f); beam.localScale = new Vector3(1.05f + 0.1f * Mathf.Sin(burstT * 5f), 3.6f, 1f);
+                beam.position = Home + new Vector3(0f, crateH * mouth + 1.5f, 0f); beam.localScale = new Vector3(1.05f + 0.1f * Mathf.Sin(burstT * 5f), 3.6f, 1f);
                 beam.rotation = Quaternion.LookRotation(beam.position - cam.transform.position);
             }
             rim.intensity = 7f + Mathf.Sin(t * 1.6f) * 1.2f;

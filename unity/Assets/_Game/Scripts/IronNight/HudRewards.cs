@@ -56,7 +56,14 @@ namespace IronNight
         // test switches, each opening its screen straight away: --mail, --qm (five hours gathered), --opencrate (a crate, tapped by itself)
         public void TestMail() { welcomed = true; ShowMail(); }
         public void TestQuartermaster() { welcomed = true; PlayerPrefs.SetString("qm.since", GameClock.UtcNow.AddHours(-5).Ticks.ToString()); ShowQuartermaster(); }
-        public void TestCrate() { welcomed = true; if (Rewards.CratesTotal == 0) Rewards.AddCrates("supply", 1); autoTap = true; ShowCrate(Rewards.NextCrate); }
+        /// <summary>Test switch --opencrate: the next crate, tapped open by itself; --opencrate=supply or =officer: that
+        /// kind, left waiting for the tap.</summary>
+        public void TestCrate(string kind = null)
+        {
+            welcomed = true;
+            if (kind != null) { if (Rewards.Crates(kind) == 0) Rewards.AddCrates(kind, 1); ShowCrate(kind); return; }
+            if (Rewards.CratesTotal == 0) Rewards.AddCrates("supply", 1); autoTap = true; ShowCrate(Rewards.NextCrate);
+        }
         bool autoTap;
 
         // ---- the title's buttons: the quartermaster and the crate ----
