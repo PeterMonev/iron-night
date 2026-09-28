@@ -43,6 +43,7 @@ Licence: https://creativecommons.org/licenses/by/4.0/
 | Cinzel | Natanael Gama, The Cinzel Project Authors | the game's name, titles and big numbers |
 | Barlow Condensed | Jeremy Tribby | eyebrows, tabs and buttons in spaced capitals |
 | Barlow | Jeremy Tribby | all other text |
+| Caveat | Pablo Impallari, The Caveat Project Authors | the crew's letters home, in handwriting |
 
 The licence texts are in `unity/Assets/_Game/Resources/Fonts/OFL-*.txt`. The fonts are used unmodified.
 
