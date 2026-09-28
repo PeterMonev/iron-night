@@ -53,6 +53,11 @@ namespace IronNight
         public static int Dawns(string tank) => PlayerPrefs.GetInt(K(tank, "dawns"), 0);
         public static int Best(string tank) => PlayerPrefs.GetInt(K(tank, "best"), 0);
         public static int Rings(string tank) => Mathf.Min(MaxRings, Kills(tank) / KillsPerRing);
+        /// <summary>The big cats (Tigers, King Tigers, Panthers) knocked out while it led: its marks on the turret.</summary>
+        public static int Cats(string tank) => PlayerPrefs.GetInt(K(tank, "cats"), 0);
+        public static void AddCats(string tank, int n) { if (string.IsNullOrEmpty(tank) || n <= 0) return; PlayerPrefs.SetInt(K(tank, "cats"), Cats(tank) + n); PlayerPrefs.Save(); }
+        /// <summary>Test switch --cats=N: the tank's marks set outright.</summary>
+        public static void TestCats(string tank, int n) { PlayerPrefs.SetInt(K(tank, "cats"), Mathf.Max(0, n)); PlayerPrefs.Save(); }
 
         public static int Stars(string tank) { int x = TotalXp(tank), s = 0; for (int i = 1; i < RankAt.Length; i++) if (x >= RankAt[i]) s = i; return s; }
         public static string Rank(string tank) => RankNames[Stars(tank)];

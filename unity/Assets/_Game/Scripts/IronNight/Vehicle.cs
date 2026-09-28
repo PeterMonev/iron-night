@@ -163,15 +163,19 @@ namespace IronNight
         /// <summary>The gun has just fired: the barrel slams back and the hull rocks on its springs.</summary>
         public void Recoil() { recoil = 1f; }
 
-        static Font stencilFont; UnityEngine.GameObject[] nameBoards;
-        /// <summary>The tank's name in white stencil on both sides of its turret. Each side is found by a ray from out
-        /// there toward the turret at its middle height, a little behind the middle of its body (the gun's thin tube left
-        /// out of the measure), and the board is laid along the armour it meets.</summary>
-        public void PaintName(string name)
+        static Font stencilFont; static Texture2D tigerMark; UnityEngine.GameObject[] nameBoards; int paintedCats;
+        /// <summary>A new name on the turret, the marks under it kept.</summary>
+        public void PaintName(string name) => PaintTurret(name, paintedCats);
+        /// <summary>The tank's name in white stencil on both sides of its turret, and under it a white Tiger for every big
+        /// cat it has knocked out (up to five; past that one Tiger and the count). Each side is found by rays from out
+        /// there toward the turret, a little behind the middle of its body (the gun's thin tube left out of the measure),
+        /// and each board is laid along the armour they meet.</summary>
+        public void PaintTurret(string name, int cats)
         {
             if (nameBoards != null) foreach (var g in nameBoards) if (g != null) Destroy(g);
-            nameBoards = null;
-            if (string.IsNullOrEmpty(name) || turret == null || spec.isGun) return;
+            nameBoards = null; paintedCats = cats;
+            bool named = !string.IsNullOrEmpty(name);
+            if ((!named && cats <= 0) || turret == null || spec.isGun) return;
             var tm = turret.Find("TurretMesh"); if (tm == null) return;
             var tri = new System.Collections.Generic.List<Vector3>();
             foreach (var mf in tm.GetComponentsInChildren<MeshFilter>())
@@ -186,25 +190,63 @@ namespace IronNight
             foreach (var p in tri) if (Mathf.Abs(p.x) > wide * 0.3f) { lo = Vector3.Min(lo, p); hi = Vector3.Max(hi, p); }   // the body: the gun's tube is thin
             if (hi.x < lo.x) return;
             float y = Mathf.Lerp(lo.y, hi.y, 0.45f), z = Mathf.Lerp(lo.z, hi.z, 0.36f), w = Mathf.Clamp((hi.z - lo.z) * 0.5f, 0.45f, 0.95f);
+            float my = named ? Mathf.Max(lo.y + 0.08f, y - 0.19f) : y;   // the marks under the name, or where it would be
             var boards = new System.Collections.Generic.List<UnityEngine.GameObject>();
             foreach (float side in new[] { 1f, -1f })
             {
-                // five rays along the board's length: it stands just outside the outermost armour they meet, laid along their mean slope
-                float outX = 0f; var nSum = Vector3.zero; int hits = 0;
-                for (int k = 0; k < 5; k++)
-                {
-                    var o = new Vector3(side * (wide + 2f), y, z + (k - 2) * w / 4f); var d = new Vector3(-side, 0f, 0f); float best = float.MaxValue; var n = Vector3.zero;
-                    for (int i = 0; i + 2 < tri.Count; i += 3)
-                        if (RayHits(o, d, tri[i], tri[i + 1], tri[i + 2], out float t) && t < best) { best = t; n = Vector3.Cross(tri[i + 1] - tri[i], tri[i + 2] - tri[i]).normalized; }
-                    if (best == float.MaxValue) continue;
-                    if (n.x * side < 0f) n = -n;   // outward
-                    outX = Mathf.Max(outX, Mathf.Abs(o.x - side * best)); nSum += n; hits++;
-                }
-                if (hits < 3) continue;
-                var nm = nSum.normalized; nm.z = 0f; nm.Normalize();   // leaning with the side, not turned along the turret
-                boards.Add(NameBoard(name, new Vector3(side * (outX + 0.02f), y, z), nm, w));
+                if (named && OnArmour(tri, wide, side, y, z, w, out var at, out var nm)) boards.Add(NameBoard(name, at, nm, w));
+                if (cats > 0 && OnArmour(tri, wide, side, my, z, w, out var at2, out var nm2)) boards.Add(MarksBoard(cats, side, at2, nm2, w));
             }
             nameBoards = boards.ToArray();
+        }
+
+        /// <summary>Where a board goes on one side of the turret at a height: five rays along its length from out there; it
+        /// stands just outside the outermost armour they meet, laid along their mean slope. False when too few meet it.</summary>
+        static bool OnArmour(System.Collections.Generic.List<Vector3> tri, float wide, float side, float y, float z, float w, out Vector3 at, out Vector3 normal)
+        {
+            float outX = 0f; var nSum = Vector3.zero; int hits = 0; at = normal = Vector3.zero;
+            for (int k = 0; k < 5; k++)
+            {
+                var o = new Vector3(side * (wide + 2f), y, z + (k - 2) * w / 4f); var d = new Vector3(-side, 0f, 0f); float best = float.MaxValue; var n = Vector3.zero;
+                for (int i = 0; i + 2 < tri.Count; i += 3)
+                    if (RayHits(o, d, tri[i], tri[i + 1], tri[i + 2], out float t) && t < best) { best = t; n = Vector3.Cross(tri[i + 1] - tri[i], tri[i + 2] - tri[i]).normalized; }
+                if (best == float.MaxValue) continue;
+                if (n.x * side < 0f) n = -n;   // outward
+                outX = Mathf.Max(outX, Mathf.Abs(o.x - side * best)); nSum += n; hits++;
+            }
+            if (hits < 3) return false;
+            normal = nSum.normalized; normal.z = 0f; normal.Normalize();   // leaning with the side, not turned along the turret
+            at = new Vector3(side * (outX + 0.02f), y, z); return true;
+        }
+
+        /// <summary>The kill marks' board: white Tigers side on, facing the way the tank does, or one and the count.</summary>
+        UnityEngine.GameObject MarksBoard(int cats, float side, Vector3 at, Vector3 normal, float width)
+        {
+            var go = new UnityEngine.GameObject("Marks", typeof(RectTransform), typeof(Canvas)); go.layer = turret.gameObject.layer; go.transform.SetParent(turret, false);
+            go.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+            var rt = go.GetComponent<RectTransform>(); rt.sizeDelta = new Vector2(width * 1000f, 130f); rt.localScale = Vector3.one * 0.001f;
+            rt.localPosition = at; rt.localRotation = Quaternion.LookRotation(-normal, Vector3.up);
+            tigerMark ??= Resources.Load<Texture2D>("Textures/mark_tiger");
+            var paint = new Color(0.72f, 0.71f, 0.66f, 0.95f);
+            int shown = cats <= 5 ? cats : 1; const float MarkW = 240f, MarkH = 94f, Gap = 22f;
+            var count = cats > 5 ? "×" + cats : null; float countW = count != null ? 50f + 52f * count.Length : 0f;
+            float total = shown * MarkW + (shown - 1) * Gap + (count != null ? Gap + countW : 0f), x = -total / 2f;
+            for (int i = 0; i < shown; i++)
+            {
+                var mg = new UnityEngine.GameObject("Tiger", typeof(RectTransform), typeof(UnityEngine.UI.RawImage)); mg.layer = go.layer; mg.transform.SetParent(go.transform, false);
+                var mr = mg.GetComponent<RectTransform>(); mr.sizeDelta = new Vector2(MarkW, MarkH); mr.anchoredPosition = new Vector2(x + MarkW / 2f, 0f); x += MarkW + Gap;
+                var ri = mg.GetComponent<UnityEngine.UI.RawImage>(); ri.texture = tigerMark; ri.color = paint; ri.raycastTarget = false;
+                if (side < 0f) ri.uvRect = new Rect(1f, 0f, -1f, 1f);   // on the left side the board's right is the tank's rear: turned to face forward
+            }
+            if (count != null)
+            {
+                var tg = new UnityEngine.GameObject("Count", typeof(RectTransform), typeof(UnityEngine.UI.Text)); tg.layer = go.layer; tg.transform.SetParent(go.transform, false);
+                var tr = tg.GetComponent<RectTransform>(); tr.sizeDelta = new Vector2(countW, 130f); tr.anchoredPosition = new Vector2(x + countW / 2f, 0f);
+                var t = tg.GetComponent<UnityEngine.UI.Text>(); t.font = stencilFont ??= Resources.Load<Font>("Fonts/BarlowCondensed-Bold"); t.text = count; t.fontSize = 104; t.alignment = TextAnchor.MiddleLeft; t.color = paint; t.raycastTarget = false;
+                t.horizontalOverflow = HorizontalWrapMode.Overflow;
+            }
+            if (total > width * 1000f) rt.localScale *= width * 1000f / total;   // a narrow turret: the row smaller
+            return go;
         }
 
         /// <summary>A board of stencilled capitals in the turret's frame at a point of its armour, its face out along the normal.</summary>

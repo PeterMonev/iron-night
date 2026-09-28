@@ -7,11 +7,11 @@ namespace IronNight
     /// its own camera into a texture the garage tab shows. Lives far below the field so nothing else sees it. A drag on
     /// the picture turns the tank; left alone it turns slowly on its own.
     /// </summary>
-    public class Garage : MonoBehaviour
+    public partial class Garage : MonoBehaviour
     {
         public RenderTexture Texture { get; private set; }
         public RenderTexture TitleTexture { get; private set; }   // the whole screen behind the menu
-        Camera titleCam; bool titleOn;
+        Camera titleCam; bool titleOn, framedDepot; Transform floor;
         Camera cam; Transform stage; Vehicle shown; string shownId; float spin = 35f, spinVel; Light lamp, fill;
         static readonly Vector3 Home = new Vector3(0f, -600f, 0f);
 
@@ -67,7 +67,7 @@ namespace IronNight
             }
             g.Texture = new RenderTexture(1024, 768, 24) { antiAliasing = 2 };
             // the hangar: concrete underfoot, brick at the back, corrugated steel at the sides, steel beams and lamps overhead, the door open on the night
-            var floor = GameObject.CreatePrimitive(PrimitiveType.Plane); Destroy(floor.GetComponent<Collider>()); floor.transform.SetParent(go.transform, false); floor.transform.localScale = new Vector3(4.4f, 1f, 4.4f);
+            var floor = GameObject.CreatePrimitive(PrimitiveType.Plane); Destroy(floor.GetComponent<Collider>()); floor.transform.SetParent(go.transform, false); floor.transform.localScale = new Vector3(4.4f, 1f, 4.4f); g.floor = floor.transform;
             floor.GetComponent<Renderer>().sharedMaterial = Surface("hangar_floor", new Vector2(9f, 9f), new Color(0.62f, 0.62f, 0.64f), 0.42f);
             Wall(go.transform, new Vector3(0f, 6f, 20f), Quaternion.identity, new Vector3(46f, 12f, 1f), Surface("hangar_brick", new Vector2(9f, 2.4f), new Color(0.62f, 0.6f, 0.58f), 0.12f));
             Wall(go.transform, new Vector3(-22f, 6f, 0f), Quaternion.Euler(0f, -90f, 0f), new Vector3(44f, 12f, 1f), Surface("hangar_metal", new Vector2(8f, 2.2f), new Color(0.6f, 0.62f, 0.66f), 0.3f));
@@ -123,11 +123,12 @@ namespace IronNight
             var camGo = new GameObject("GarageCamera"); camGo.transform.SetParent(go.transform, false); camGo.transform.localPosition = new Vector3(0f, 3.6f, -9f); camGo.transform.LookAt(go.transform.position + new Vector3(0f, 1.2f, 0f));
             g.cam = camGo.AddComponent<Camera>(); g.cam.targetTexture = g.Texture; g.cam.fieldOfView = 34f; g.cam.nearClipPlane = 0.3f; g.cam.farClipPlane = 60f; g.cam.clearFlags = CameraClearFlags.SolidColor; g.cam.backgroundColor = new Color(0.05f, 0.05f, 0.06f); g.cam.enabled = false;
             var data = camGo.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>(); data.renderShadows = true; data.renderPostProcessing = true; data.volumeLayerMask = 1 << HangarLayer;
+            g.BuildBoard();
             return g;
         }
 
-        /// <summary>The tank on the turntable takes its new name.</summary>
-        public void Repaint() { if (shown != null && shownId != null) shown.PaintName(Career.Name(shownId)); }
+        /// <summary>The tank on the turntable takes its new name, and its marks as they stand.</summary>
+        public void Repaint() { if (shown != null && shownId != null) shown.PaintTurret(Career.Name(shownId), Career.Cats(shownId)); }
 
         /// <summary>Puts the tank of that spec on the turntable (the last one goes); painted as the platoon is.</summary>
         public void Show(VehicleSpec spec)
@@ -135,7 +136,7 @@ namespace IronNight
             if (spec == null || (shown != null && shownId == spec.id)) return;
             if (shown != null) Destroy(shown.gameObject);
             shown = Vehicle.Create(spec, true, Home, 0f); shown.transform.SetParent(stage, true); shownId = spec.id;
-            shown.turretYaw = 0.35f; shown.Apply(); shown.enabled = false; shown.KillRings(Career.Rings(spec.id)); shown.PaintName(Career.Name(spec.id)); foreach (var t in shown.GetComponentsInChildren<Transform>()) if (t.name == "Commander") CrewIdle.Bring(t.gameObject, 9, 0.8f); ShowCrew(System.Array.Exists(Depot.Leaders, x => x.id == spec.id && x.nation == "su") ? "su" : "us");
+            shown.turretYaw = 0.35f; shown.Apply(); shown.enabled = false; shown.KillRings(Career.Rings(spec.id)); shown.PaintTurret(Career.Name(spec.id), Career.Cats(spec.id)); foreach (var t in shown.GetComponentsInChildren<Transform>()) if (t.name == "Commander") CrewIdle.Bring(t.gameObject, 9, 0.8f); ShowCrew(System.Array.Exists(Depot.Leaders, x => x.id == spec.id && x.nation == "su") ? "su" : "us");
             if (parkedTank == null && parked != null)
             {
                 // one of the wingmen parked at the back, in the shadows
@@ -181,6 +182,7 @@ namespace IronNight
         /// <summary>The menu camera's framing: the tank and its crew between the name and the tiles for the title, high in the frame for the depot (a card fills the lower half).</summary>
         public void Frame(bool depot)
         {
+            framedDepot = depot;
             Vector3 at = depot ? new Vector3(-9.6f, 3.4f, -15.2f) : new Vector3(-13.03f, 4.22f, -20.63f), aim = depot ? new Vector3(0.2f, -1.7f, 0.3f) : new Vector3(0.2f, -1.3f, 0.3f);
             foreach (var a in System.Environment.GetCommandLineArgs())
                 if (!depot && a.StartsWith("--titlecam=")) { var p = System.Array.ConvertAll(a.Substring(11).Split(','), s => float.Parse(s, System.Globalization.CultureInfo.InvariantCulture)); at = new Vector3(p[0], p[1], p[2]); aim = new Vector3(p[3], p[4], p[5]); }
@@ -190,11 +192,14 @@ namespace IronNight
         /// <summary>The menu backdrop: the tank turning slowly under the roof lights.</summary>
         public void SetTitle(bool on) { titleOn = on; titleCam.enabled = on; if (on) gameObject.SetActive(true); else if (!cam.enabled) gameObject.SetActive(false); }
         public void Drag(float dx) { spinVel = dx * 0.35f; }
+        static readonly float TestSpin = System.Array.Find(System.Environment.GetCommandLineArgs(), a => a.StartsWith("--spin=")) is string s ? float.Parse(s.Substring(7), System.Globalization.CultureInfo.InvariantCulture) : -1f;   // test switch --spin=degrees
 
         void Update()
         {
             if (!cam.enabled && !titleOn) return;
-            spinVel = Mathf.MoveTowards(spinVel, titleOn && !cam.enabled ? 5f : 12f, Time.unscaledDeltaTime * 30f); spin += spinVel * Time.unscaledDeltaTime;
+            TickRepair(Time.unscaledDeltaTime);
+            spinVel = Mathf.MoveTowards(spinVel, welding != null ? 0f : titleOn && !cam.enabled ? 5f : 12f, Time.unscaledDeltaTime * 30f); spin += spinVel * Time.unscaledDeltaTime;   // under repair it stands
+            if (TestSpin >= 0f) { spin = TestSpin; spinVel = 0f; }
             stage.localRotation = Quaternion.Euler(0f, spin, 0f);
             lamp.intensity = 34f + Mathf.Sin(Time.unscaledTime * 9f) * 0.8f;   // the hangar lamp hums
         }

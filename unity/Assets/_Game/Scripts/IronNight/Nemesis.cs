@@ -64,6 +64,13 @@ namespace IronNight
             Data.aces.Add(ace); Save(); return ace;
         }
         public static void Met(Ace a, string place) { a.met++; a.place = place; Save(); }
+        /// <summary>The hunt board's eight places, one for each name on the roster: 0 not met yet, 1 at large, 2 dead.</summary>
+        public static int[] Board()
+        {
+            var s = new int[Surnames.Length];
+            foreach (var a in Data.aces) { int i = System.Array.IndexOf(Surnames, a.name); if (i >= 0 && (a.dead || a.met > 0)) s[i] = a.dead ? 2 : 1; }
+            return s;
+        }
 
         /// <summary>His tank knocked out. A promoted ace may bail out of the burning wreck (true: he will be back, scarred
         /// and a rank higher); otherwise he is dead and his trophy goes on the wall. Either way the bounty is paid.</summary>

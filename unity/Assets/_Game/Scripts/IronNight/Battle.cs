@@ -58,7 +58,7 @@ namespace IronNight
         bool daily; string dailyDay = "", rule = "";   // the daily challenge: its day and the rule of the night
         int crewSteady, crewEagle, crewSnap, crewHands, crewRacks, crewHe, crewFoot, crewMech, crewRough, crewBow, crewSignals, crewSpot;   // the levels of the crew's gifts (Crew)
         float AirCoolFull => 60f - 6f * crewSignals;
-        string leaderId = "", leaderName = "", careerLine = ""; int careerXp, careerKills, crewXpBanked; bool careerNight, careerDawn; float careerDamage = 1f, careerReload = 1f, careerSpeed = 1f;   // the leader's own tank   // an operation night: the operation and which of its nights (0: a free night)
+        string leaderId = "", leaderName = "", careerLine = ""; int careerXp, careerKills, careerCats, crewXpBanked; bool careerNight, careerDawn, leaderLost; float careerDamage = 1f, careerReload = 1f, careerSpeed = 1f;   // the leader's own tank   // an operation night: the operation and which of its nights (0: a free night)
         int nightTracked, nightFocus, talliedTracked, nightLamps, talliedLamps, nightAces;
         bool crewCounted, crewLostTonight, premiumNight, bossCrate, dawnRolled; int crewBefore, starsBanked;   // the crew's nights: counted at dawn, lost with the leader unless he is pulled back
         Vehicle focus; float focusLeft; Transform focusRing;   // the enemy the platoon was told to hit
@@ -205,7 +205,7 @@ namespace IronNight
             hud.Set(t, platoon.Count); hud.SetLevel(level, 0f);
             PlaceCamera(true);
             stick.Blocked = true; hud.ShowTitle(false);
-            foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); } else if (arg == "--shop") hud.ShowShop(); else if (arg == "--supplies") { suppliesGranted = true; hud.SuppliesGranted = true; } else if (arg.StartsWith("--tankname=")) { var tn = arg.Substring(11); int cut = tn.IndexOf(':'); Career.PaintName(cut > 0 ? tn.Substring(0, cut) : Depot.LeaderId, (cut > 0 ? tn.Substring(cut + 1) : tn).Replace('_', ' ')); hud.Repainted(); } else if (arg == "--mail") hud.TestMail(); else if (arg == "--qm") hud.TestQuartermaster(); else if (arg == "--opencrate") hud.TestCrate(); else if (arg.StartsWith("--opencrate=")) hud.TestCrate(arg.Substring(12)); else if (arg.StartsWith("--bondstars=")) Bonds.TestStars(int.Parse(arg.Substring(12))); else if (arg == "--bonds") hud.ShowBonds(); else if (arg == "--wanted") { Nemesis.TestSeed(); hud.ShowWanted(); } else if (arg == "--crewtab") { stick.Blocked = true; hud.ShowCrewTab(); } else if (arg.StartsWith("--sheet=")) hud.TestSheet(arg.Substring(8)); else if (arg == "--mapseed" || arg == "--mapfall") Campaign.TestSeed(arg == "--mapfall");
+            foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); } else if (arg == "--shop") hud.ShowShop(); else if (arg == "--supplies") { suppliesGranted = true; hud.SuppliesGranted = true; } else if (arg == "--repair") Garage.Damaged(Depot.LeaderId); else if (arg == "--aces") { Nemesis.TestSeed(); hud.garage.RefreshBoard(); } else if (arg.StartsWith("--cats=")) { Career.TestCats(Depot.LeaderId, int.Parse(arg.Substring(7))); hud.Repainted(); } else if (arg == "--promote") { PlayerPrefs.SetInt("rank.seen", Depot.RankLevel - 1); hud.ShowTitle(reserveGranted); } else if (arg.StartsWith("--tankname=")) { var tn = arg.Substring(11); int cut = tn.IndexOf(':'); Career.PaintName(cut > 0 ? tn.Substring(0, cut) : Depot.LeaderId, (cut > 0 ? tn.Substring(cut + 1) : tn).Replace('_', ' ')); hud.Repainted(); } else if (arg == "--mail") hud.TestMail(); else if (arg == "--qm") hud.TestQuartermaster(); else if (arg == "--opencrate") hud.TestCrate(); else if (arg.StartsWith("--opencrate=")) hud.TestCrate(arg.Substring(12)); else if (arg.StartsWith("--bondstars=")) Bonds.TestStars(int.Parse(arg.Substring(12))); else if (arg == "--bonds") hud.ShowBonds(); else if (arg == "--wanted") { Nemesis.TestSeed(); hud.ShowWanted(); } else if (arg == "--crewtab") { stick.Blocked = true; hud.ShowCrewTab(); } else if (arg.StartsWith("--sheet=")) hud.TestSheet(arg.Substring(8)); else if (arg == "--mapseed" || arg == "--mapfall") Campaign.TestSeed(arg == "--mapfall");
             hud.OnStart += () => Radio("start");
             if (opNight == 0 && !daily && !weekly && PlayerPrefs.GetInt("route.launch", 0) == 1) { PlayerPrefs.SetInt("route.launch", 0); PlayerPrefs.Save(); StartNight(); Radio("start"); }
             if (sneak) { SneakBuild(); StartNight(); Radio("start"); string np = Hud.UiSprite("sneak_" + theatre) != null ? "sneak_" + theatre : theatre == "kursk" ? "route_kursk_belts" : "route_bocage"; hud.Briefing(np, "Night raid · " + TheatreName, "No lights, no shooting. Slip through to the depot and blow it. The sentries send up flares: in their light, stand still or get out of it. They see what moves."); }
@@ -613,7 +613,7 @@ namespace IronNight
             {
                 if (ace != null && !ace.dead && Dist(ace, v) < ace.Range * 1.3f) { if (v == Leader) nemLeader = true; else nemWingmen++; }   // the ace close by: it goes on his account
                 bool wasLeader = v == Leader; platoon.Remove(v);
-                if (wasLeader || platoon.Count == 0) { End(false); return; }
+                if (wasLeader || platoon.Count == 0) { leaderLost = true; End(false); return; }
                 wingmenLost++; hud.Toast(gotOut ? "Wingman lost · the crew got out" : "Wingman lost · no one got out");
             }
             else
@@ -2015,6 +2015,8 @@ namespace IronNight
                 int xpNow = Mathf.RoundToInt((score * (stand ? 0.05f : 0.1f) + (dawn ? 100 : 0)) * (premiumNight ? Depot.PremiumMul : 1f)), gain = Mathf.Max(0, xpNow - careerXp);
                 Career.Add(leaderId, gain, Mathf.Max(0, kills - careerKills), !careerNight, dawn && !careerDawn, score);
                 careerXp = Mathf.Max(careerXp, xpNow); careerKills = kills; careerNight = true; if (dawn) careerDawn = true;
+                Career.AddCats(leaderId, nightTigers - careerCats); careerCats = Mathf.Max(careerCats, nightTigers);   // a white Tiger on the turret for each
+                if (leaderLost || (dawn && Leader != null && Leader.hp <= Depot.LeaderHp * 0.5f)) Garage.Damaged(leaderId);   // a hard night: the mechanics will be at her
                 careerLine = "\n" + leaderName + " · +" + gain + " XP" + (Career.AnyUpgrade(leaderId) ? " · an upgrade is ready" : "");
                 int cxNow = Mathf.RoundToInt((score * (stand ? 0.05f : 0.1f) + (dawn ? 100 : 0)) * (premiumNight ? Depot.PremiumMul : 1f)), cGain = Mathf.Max(0, cxNow - crewXpBanked); Depot.AddCrewXp(cGain); crewXpBanked = Mathf.Max(crewXpBanked, cxNow);   // the crew's share, in the second currency
                 if (crewXpBanked > 0) careerLine += "\nCrew · +" + crewXpBanked + " XP to train with";
@@ -2046,6 +2048,7 @@ namespace IronNight
             string crewLine = dawn ? $"\nThe crew's {Depot.CrewNights}{(Depot.CrewNights == 1 ? "st" : Depot.CrewNights == 2 ? "nd" : Depot.CrewNights == 3 ? "rd" : "th")} night together · {Depot.CrewName}" : crewLostTonight && crewBefore > 0 ? $"\nThe crew got out, but {crewBefore} nights together are lost" : "";
             hud.SetEndNumbers(kills, $"{m}:{s:00}", acc, score * (doubled ? 2 : 1), nightInfantry + " infantry · level " + level + " · " + objectivesReached + (objectivesReached == 1 ? " objective" : " objectives"));
             string statLine = crewLine + careerLine + lines;
+            ShowMoment();   // the night's best moment, over the end sheet that follows
             if (stand) { StandEnd(dawn, statLine); return; }
             if (convoy) { ConvoyEnd(dawn, statLine); return; }
             if (sneak) { SneakEnd(dawn, statLine); return; }

@@ -468,9 +468,10 @@ namespace IronNight
             if (garage != null) { garage.SetActive(false); garage.Show(VehicleSpec.ById(Depot.LeaderId)); garage.SetTitle(true); garage.Frame(false); titleBackdrop.texture = garage.TitleTexture; }
             Sfx.Music(true);
             Depot.Load(); Medals.Check(); hudGroup.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(false); RefreshRewardButtons();
+            { var won = Depot.Promotions(); if (won.Count > 0) ShowPromotion(won[won.Count - 1]); }   // a new rank: its ceremony, over the title
             rankLine.text = Depot.Rank.ToUpperInvariant() + "\n" + (Depot.NightsFought == 0 ? "first night" : Depot.NightsFought + " nights · " + Depot.CrewName.ToLowerInvariant() + " · " + Depot.CrewNights + " together"); Tick(pointsLine, Depot.Points); Tick(xpLine, Depot.CrewXp, "", " XP"); Tick(goldLine, Depot.Gold); trainBtn.SetActive(Depot.DailyTrainReady); titleStats.rectTransform.anchoredPosition = new Vector2(0, Depot.DailyTrainReady ? 300 : 350);
             int m = Mathf.FloorToInt(Depot.BestTime / 60f), s = Mathf.FloorToInt(Depot.BestTime % 60f);
-            { var sheet = Resources.Load<Texture2D>("UI/rank_insignia"); if (sheet != null && rankBadge != null) { int cell = Depot.RankIndex; rankBadge.sprite = UiSprite("rank_insignia", new Rect(cell * sheet.width / 6f, 0f, sheet.width / 6f, sheet.height)); rankBadge.enabled = Depot.NightsFought > 0; } }
+            { var sheet = Resources.Load<Texture2D>("UI/rank_insignia"); if (sheet != null && rankBadge != null) { int cell = Depot.RankIndex; rankBadge.sprite = UiSprite("rank_insignia", new Rect(cell * sheet.height, 0f, sheet.height, sheet.height)); rankBadge.enabled = Depot.NightsFought > 0; } }
             { var today = Daily.Today; bool played = Daily.Played(today);   // the daily tile: the rule to come, or the day's best
               dailyCount.text = played ? "best " + Daily.Best(today).ToString("N0", En) : Daily.RuleOf(today).name.ToLowerInvariant();
               dailyEdge.color = played ? new Color(1f, 1f, 1f, 0.16f) : new Color(0.96f, 0.68f, 0.24f, 0.75f);
@@ -720,6 +721,8 @@ namespace IronNight
                 rec.rectTransform.sizeDelta = new Vector2(880, 34);
                 int rings = Career.Rings(id), toNext = Career.KillsPerRing - Career.Kills(id) % Career.KillsPerRing;
                 var rg = MakeText(row.transform, "Rings", new Vector2(0f, 1f), new Vector2(30, -118), TextAnchor.UpperLeft, 26, amber); rg.text = (rings == 0 ? "No kill rings yet" : rings + (rings == 1 ? " kill ring" : " kill rings") + " on the barrel") + (rings < Career.MaxRings ? " · the next in " + toNext + " kills" : ""); rg.rectTransform.sizeDelta = new Vector2(560, 34);
+                int cats = Career.Cats(id); var ct = MakeText(row.transform, "Cats", new Vector2(0f, 1f), new Vector2(30, -152), TextAnchor.UpperLeft, 26, amber); ct.rectTransform.sizeDelta = new Vector2(540, 34);
+                ct.text = cats == 0 ? "No Tiger marked on the turret yet" : cats + (cats == 1 ? " Tiger or Panther" : " Tigers and Panthers") + " marked on the turret";
                 bool chosen = Depot.LeaderId == id;
                 var lead = MakeButton(row.transform, chosen ? "Leading" : "Lead", new Vector2(1f, 0f), new Vector2(-190, 48), new Vector2(340, 80), 30, () => { if (Depot.PickLeader(c)) RefreshDepot(); });
                 lead.GetComponent<Image>().color = chosen ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : new Color(0.2f, 0.22f, 0.24f, 0.95f);

@@ -81,8 +81,44 @@ namespace IronNight
             string eyebrow = v == boss ? "BOSS · KNOCKED OUT" : v == ace ? "ACE · KNOCKED OUT" : "KNOCKED OUT", title = v.spec.name.ToUpperInvariant(), sub = "+" + points.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
             if (v == ace && aceName != null) { var parts = aceName.Split(new[] { " · " }, System.StringSplitOptions.None); title = parts[0].ToUpperInvariant(); sub = v.spec.name.ToUpperInvariant() + " · " + sub; }
             if (v == ace && nem != null) { eyebrow = nem.met > 1 ? "NEMESIS · KNOCKED OUT" : "ACE · KNOCKED OUT"; sub = nemEscaped ? "HE BAILED OUT · HE WILL BE BACK" : "BOUNTY +" + Nemesis.BountyPoints(nem).ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + (Nemesis.BountyGold(nem) > 0 ? " · +" + Nemesis.BountyGold(nem) + " GOLD" : ""); }
-            hud.Cinema(true, false); hud.CineCard(eyebrow, title, sub, 0.2f, KillLen - 0.1f, true); hud.Toast("", 0.01f);   // the caption says it: no toast after
+            hud.Cinema(true, false); hud.CineCard(eyebrow, title, sub, 0.2f, KillLen - 0.1f, true); hud.Toast("", 0.01f); MomentBegins(v, eyebrow, title, sub);   // the caption says it: no toast after
         }
+
+        // ---- the moment of the night: five pictures of its best killcam, shown as a reel over the end sheet ----
+        static readonly float[] MomentAt = { 0.5f, 0.9f, 1.3f, 1.7f, 2.1f };   // real seconds into the killcam, after its swoop in
+        RenderTexture[] momentFrames; RenderTexture momentCapture; int momentRank = -1, momentTaken; bool momentRecording, momentShown; string momentEyebrow, momentTitle, momentSub;
+
+        /// <summary>A killcam begins: if it beats the night's best so far, its pictures become the night's moment.</summary>
+        void MomentBegins(Vehicle v, string eyebrow, string title, string sub)
+        {
+            int rank = v == boss ? 4 : v == ace ? 3 : v.spec == VehicleSpec.KingTiger ? 2 : 1;
+            if (rank <= momentRank) return;
+            momentRank = rank; momentTaken = 0; momentRecording = true;
+            int m = Mathf.FloorToInt(t / 60f), s = Mathf.FloorToInt(t % 60f);
+            momentEyebrow = eyebrow; momentTitle = title; momentSub = (sub + " · " + m + ":" + s.ToString("00") + " · " + TheatreName).ToUpperInvariant();
+        }
+
+        /// <summary>During the killcam, at each of its moments: a picture from the camera as it stands, without the screen's words.</summary>
+        void TickMoment()
+        {
+            if (!momentRecording) return;
+            if (momentTaken >= MomentAt.Length) { momentRecording = false; if (momentCapture != null) { momentCapture.Release(); momentCapture = null; } return; }
+            if (shotT < MomentAt[momentTaken]) return;
+            int w = Mathf.Max(64, Mathf.RoundToInt(Screen.width * 0.6f)), h = Mathf.Max(64, Mathf.RoundToInt(Screen.height * 0.6f));
+            if (momentCapture == null || momentCapture.width != w || momentCapture.height != h) { if (momentCapture != null) momentCapture.Release(); momentCapture = new RenderTexture(w, h, 24) { antiAliasing = 2 }; }   // the one the camera draws into, smoothed as the game is
+            var req = new UnityEngine.Rendering.RenderPipeline.StandardRequest { destination = momentCapture };
+            if (UnityEngine.Rendering.RenderPipeline.SupportsRenderRequest(cam, req)) UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(cam, req); else { cam.targetTexture = momentCapture; cam.Render(); cam.targetTexture = null; }
+            momentFrames ??= new RenderTexture[MomentAt.Length];
+            var rt = momentFrames[momentTaken];
+            if (rt == null || rt.width != w || rt.height != h) { if (rt != null) rt.Release(); rt = momentFrames[momentTaken] = new RenderTexture(w, h, 0); }
+            Graphics.Blit(momentCapture, rt);   // resolved out of the smoothing, kept without depth
+            momentTaken++;
+        }
+
+        /// <summary>The night over: its moment, once, over the end sheet, if a killcam gave it two pictures or more.</summary>
+        void ShowMoment() { if (momentShown || momentRank < 0 || momentTaken < 2) return; momentShown = true; hud.ShowMoment(momentFrames, momentTaken, momentEyebrow, momentTitle, momentSub); }
+
+        void OnDestroy() { if (momentFrames != null) foreach (var rt in momentFrames) if (rt != null) rt.Release(); if (momentCapture != null) momentCapture.Release(); }
 
         /// <summary>An old enemy back on the field: the camera goes to him for a moment, his name and what they call him
         /// under it. No slow motion: the night goes on.</summary>
@@ -201,6 +237,7 @@ namespace IronNight
             if (shotIn > 0f && shotT < shotIn) { float k = Smoother(shotT / shotIn); p = Vector3.Lerp(fromPos, p, k); r = Quaternion.Slerp(fromRot, r, k); fov = Mathf.Lerp(fromFov, fov, k); }
             if (shake > 0f) { p += Random.insideUnitSphere * (shake * 0.15f); shake = Mathf.Max(0f, shake - dt * 4f); }
             cam.transform.SetPositionAndRotation(p, r); cam.fieldOfView = fov;
+            if (camShot == CamShot.Kill) TickMoment();
             if (L != null) flareLight.transform.position = L.transform.position + Vector3.up * 11f;
 
             if (camShot == CamShot.Intro)

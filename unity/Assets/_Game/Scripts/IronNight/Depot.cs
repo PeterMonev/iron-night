@@ -207,9 +207,42 @@ namespace IronNight
         }
         public static List<string[]> NightLog() { var list = new List<string[]>(); for (int i = 0; i < 10; i++) { var s = PlayerPrefs.GetString("log." + i, ""); if (s != "") list.Add(s.Split('|')); } return list; }
 
+        /// <summary>A rank: its name, the nights fought it takes, and what the promotion pays.</summary>
+        public class RankStep { public string name, kind; public int nights, amount; }
+        public static readonly RankStep[] Ranks =
+        {
+            new RankStep { name = "Recruit", nights = 0 },
+            new RankStep { name = "Trooper", nights = 1, kind = "supply", amount = 1 },
+            new RankStep { name = "Corporal", nights = 5, kind = "gold", amount = 25 },
+            new RankStep { name = "Sergeant", nights = 10, kind = "supply", amount = 1 },
+            new RankStep { name = "Lieutenant", nights = 20, kind = "gold", amount = 50 },
+            new RankStep { name = "Captain", nights = 40, kind = "officer", amount = 1 },
+            new RankStep { name = "Major", nights = 80, kind = "gold", amount = 100 },
+            new RankStep { name = "Lieutenant Colonel", nights = 120, kind = "officer", amount = 1 },
+            new RankStep { name = "Brigadier General", nights = 180, kind = "gold", amount = 150 },
+            new RankStep { name = "Major General", nights = 260, kind = "officer", amount = 1 },
+            new RankStep { name = "Lieutenant General", nights = 360, kind = "gold", amount = 200 },
+            new RankStep { name = "General", nights = 500, kind = "gold", amount = 300 },
+        };
+        /// <summary>The rank's step on the ladder, by nights fought (0: recruit).</summary>
+        public static int RankLevel { get { Load(); int n = NightsFought, k = 0; for (int i = 0; i < Ranks.Length; i++) if (n >= Ranks[i].nights) k = i; return k; } }
         /// <summary>A rank for the title screen, by nights fought.</summary>
-        public static int RankIndex { get { Load(); int n = NightsFought; return n < 1 ? 0 : n < 5 ? 0 : n < 10 ? 1 : n < 20 ? 2 : n < 40 ? 3 : n < 80 ? 4 : 5; } }   // the cell of the insignia sheet: private .. captain
-        public static string Rank { get { Load(); int n = NightsFought; return n < 1 ? "Recruit" : n < 5 ? "Trooper" : n < 10 ? "Corporal" : n < 20 ? "Sergeant" : n < 40 ? "Lieutenant" : n < 80 ? "Captain" : "Major"; } }
+        public static string Rank => Ranks[RankLevel].name;
+        /// <summary>The cell of the insignia sheet: trooper's one chevron in the first, general's four stars in the last; a recruit has none.</summary>
+        public static int RankIndex => Mathf.Max(0, RankLevel - 1);
+        public static RankStep NextRank => RankLevel + 1 < Ranks.Length ? Ranks[RankLevel + 1] : null;
+
+        /// <summary>The ranks won since the last ceremony, oldest first, their rewards paid now. The first look on record
+        /// takes the rank as it stands, so a player's earlier ranks are not replayed.</summary>
+        public static List<RankStep> Promotions()
+        {
+            var won = new List<RankStep>(); int now = RankLevel;
+            if (!PlayerPrefs.HasKey("rank.seen")) { PlayerPrefs.SetInt("rank.seen", now); PlayerPrefs.Save(); return won; }
+            int seen = PlayerPrefs.GetInt("rank.seen", now);
+            for (int i = seen + 1; i <= now; i++) { won.Add(Ranks[i]); if (!string.IsNullOrEmpty(Ranks[i].kind)) Rewards.GiveLoot(new Rewards.Loot { kind = Ranks[i].kind, amount = Ranks[i].amount }); }
+            if (now != seen) { PlayerPrefs.SetInt("rank.seen", now); PlayerPrefs.Save(); }
+            return won;
+        }
         public static Color CamoTint { get { foreach (var c in Camos) if (c.id == CamoId) return c.tint; return Color.white; } }
         public static bool OwnsCamo(Camo c) => c.cost == 0 || PlayerPrefs.GetInt("depot.camo." + c.id, 0) == 1;
         public static bool PickCamo(Camo c)

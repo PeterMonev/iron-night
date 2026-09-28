@@ -14,7 +14,7 @@ namespace IronNight
         const int Rate = 44100;
         static Sfx instance;
         AudioClip shot, shotHeavy, shotFar, hit, explosion, artillery, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, front, whistle, rumble, ricochet, ricochet2, flak, reload, turretLoop, mg, faust, stuka, drone, crunch, brush, whoosh, fighter;
-        readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, turret, ambient, frontLine, ui; Transform listener;
+        readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, turret, ambient, frontLine, ui, weld; Transform listener;
 
         public static void Build(Camera cam)
         {
@@ -410,6 +410,31 @@ namespace IronNight
         /// <summary>The night's ambient bed: wind, or rain on the hull.</summary>
         public static void Ambient(bool raining) { if (!instance) return; var a = instance.ambient; a.clip = raining ? instance.rain : instance.wind; a.volume = raining ? 0.32f : 0.18f; a.Play(); }
         public static void Pickup() { if (instance) instance.ui.PlayOneShot(instance.pickup, 0.6f); }
+        /// <summary>A welder in the hangar: 1 while the arc burns, 0 between. The loop is made the first time it is wanted.</summary>
+        public static void Weld(float level)
+        {
+            if (!instance) return; var s = instance.weld;
+            if (s == null)
+            {
+                if (level <= 0f) return;
+                s = instance.weld = instance.gameObject.AddComponent<AudioSource>(); s.clip = instance.Clip("weld", Crackle()); s.loop = true; s.playOnAwake = false; s.spatialBlend = 0f; s.volume = 0f; s.Play();
+            }
+            s.volume = level * 0.14f;
+        }
+        /// <summary>The arc's sound: the metal spitting (hundreds of short bright pops a second) over a hiss and the buzz of
+        /// the current, in a loop whose seam falls on a whole number of the buzz's cycles.</summary>
+        static float[] Crackle()
+        {
+            int n = Dsp.N(2.5f); var d = new float[n]; var r = Dsp.rng;
+            var hiss = Dsp.Noise(n); Dsp.Highpass(hiss, 2500f); Dsp.Add(d, hiss, 0.1f);
+            for (int k = 0; k < 950; k++)
+            {
+                int at = r.Next(n), len = 40 + r.Next(280); float g = (float)(0.15 + r.NextDouble() * 0.85);
+                for (int i = 0; i < len && at + i < n; i++) d[at + i] += (float)(r.NextDouble() * 2.0 - 1.0) * g * Mathf.Exp(-i / (len * 0.25f));
+            }
+            Dsp.Add(d, Dsp.Sine(n, t => 100f), 0.04f);
+            Dsp.Highpass(d, 450f); Dsp.Normalize(d, 0.8f); return d;
+        }
         public static void Click() { if (instance) instance.ui.PlayOneShot(instance.click, 0.5f); }
         public static void LevelUp() { if (instance) instance.ui.PlayOneShot(instance.levelUp, 0.6f); }
         /// <summary>The leader's engine and tracks: louder and higher when driving.</summary>
