@@ -292,7 +292,7 @@ namespace IronNight
               var st = MakeImage(xpc.transform, "Star", new Vector2(0f, 0.5f), new Vector2(18, 0), new Vector2(30, 30), XpBlue); Currency(st, "icon_crewxp", StarSprite()); st.rectTransform.pivot = new Vector2(0f, 0.5f);
               xpLine = MakeText(xpc.transform, "Text", new Vector2(0f, 0.5f), new Vector2(60, 0), TextAnchor.MiddleLeft, 28, XpBlue); xpLine.rectTransform.pivot = new Vector2(0f, 0.5f); xpLine.rectTransform.sizeDelta = new Vector2(200, 60); xpLine.font = BoldFont(); }
             goldLine = GoldPill(titleSheet.transform, new Vector2(-50, -218), 330f, true);
-            BuildCrateButton(); BuildBondsButton();
+            BuildCrateButton(); BuildBondsButton(); BuildWeeklyButton();
             // the name
             var eyebrow = MakeText(titleSheet.transform, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -190), TextAnchor.MiddleCenter, 26, new Color(0.96f, 0.68f, 0.24f)); eyebrow.text = Spaced("WWII · NIGHT ASSAULT"); eyebrow.font = LabelFont();
             var big = MakeText(titleSheet.transform, "Name", new Vector2(0.5f, 1f), new Vector2(0, -300), TextAnchor.MiddleCenter, 170, ink); big.text = "IRON NIGHT"; big.rectTransform.sizeDelta = new Vector2(1040, 240); big.verticalOverflow = VerticalWrapMode.Overflow;
@@ -504,7 +504,7 @@ namespace IronNight
         /// <summary>Test switch --garage=id: straight into the garage tab with that tank on the turntable.</summary>
         public void ShowGarage(VehicleSpec spec) { depotTab = 1; ShowDepot(); if (garage != null) garage.Show(spec); }
         /// <summary>Test switch --sheet=settings, medals, records, help, orders or pause: that sheet, open over the title.</summary>
-        public void TestSheet(string name) { if (name == "settings") ShowSettings(); else if (name == "medals") ShowMedals(); else if (name == "records") ShowRecords(); else if (name == "help") helpSheet.SetActive(true); else if (name == "orders") ShowOrders(); else if (name == "names") { var lc = System.Array.Find(Depot.Leaders, x => x.id == Depot.LeaderId); if (lc != null) ShowNames(lc.id, lc.nation); } else if (name == "pause") { ShowPause(true, true); pauseSheet.transform.SetAsLastSibling(); } }
+        public void TestSheet(string name) { if (name == "settings") ShowSettings(); else if (name == "medals") ShowMedals(); else if (name == "records") ShowRecords(); else if (name == "help") helpSheet.SetActive(true); else if (name == "orders") ShowOrders(); else if (name == "weekly") ShowWeekly(); else if (name == "names") { var lc = System.Array.Find(Depot.Leaders, x => x.id == Depot.LeaderId); if (lc != null) ShowNames(lc.id, lc.nation); } else if (name == "pause") { ShowPause(true, true); pauseSheet.transform.SetAsLastSibling(); } }
         /// <summary>Test switch --crewtab: straight into the depot's crew tab.</summary>
         public void ShowCrewTab() { depotTab = 2; ShowDepot(); }
         /// <summary>Test switch --dossier=id: a tank's service record, the tank in the hangar.</summary>

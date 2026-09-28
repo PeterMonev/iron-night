@@ -54,6 +54,7 @@ namespace IronNight
         Material shellTemplate; Texture2D glowTex;
         Formation formation = Formation.Wedge; Phase phase = Phase.Title; bool reserveGranted, suppliesGranted, cardsAgainUsed, cardsAllUsed;
         Operations.Op op; Operations.Night opN; int opNight, wingmenLost; float goalsTick; Campaign.Sector mapSector; bool mapPaid;   // a war map night: its sector, paid once
+        bool weekly; int weeklyBanked;   // the week's event night, and the count it has already added to the week
         bool daily; string dailyDay = "", rule = "";   // the daily challenge: its day and the rule of the night
         int crewSteady, crewEagle, crewSnap, crewHands, crewRacks, crewHe, crewFoot, crewMech, crewRough, crewBow, crewSignals, crewSpot;   // the levels of the crew's gifts (Crew)
         float AirCoolFull => 60f - 6f * crewSignals;
@@ -123,18 +124,21 @@ namespace IronNight
                 daily = true; dailyDay = dl; rule = Daily.RuleOf(dl).id; foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--rule=")) rule = arg.Substring(7);
                 theatre = Daily.Theatre(dl); route = Daily.Route(dl); Random.InitState(Daily.Seed(dl));   // the same first throw of the dice for everyone
             }
+            // the week's event: its rule, its front and its way in, the same for everyone this week
+            var wl = PlayerPrefs.GetString("weekly.launch", ""); PlayerPrefs.DeleteKey("weekly.launch"); foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg == "--weekly") wl = "1";   // test switch: --weekly
+            if (opNight == 0 && !daily && mapSector == null && wl.Length > 0) { weekly = true; var we = Weekly.Now; rule = we.rule; theatre = we.theatre; route = we.route; }
             // a last stand holds a crossroads in a village on the chosen front
             var sl = PlayerPrefs.GetString("stand.launch", ""); PlayerPrefs.DeleteKey("stand.launch"); foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg == "--stand") sl = theatre;   // test switch: --stand
-            if (opNight == 0 && !daily && sl.Length > 0) { stand = true; theatre = sl; route = "village"; }
+            if (opNight == 0 && !daily && !weekly && sl.Length > 0) { stand = true; theatre = sl; route = "village"; }
             // a convoy runs up the lane through the open fields of the chosen front, once its trucks are built
             var cl = PlayerPrefs.GetString("convoy.launch", ""); PlayerPrefs.DeleteKey("convoy.launch"); foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg == "--convoy") cl = theatre;   // test switch: --convoy
-            if (opNight == 0 && !daily && !stand && cl.Length > 0 && ConvoyReady(cl)) { convoy = true; theatre = cl; route = "open"; }
+            if (opNight == 0 && !daily && !weekly && !stand && cl.Length > 0 && ConvoyReady(cl)) { convoy = true; theatre = cl; route = "open"; }
             // a night raid slips through the searchlight line on the chosen front
             var nl = PlayerPrefs.GetString("sneak.launch", ""); PlayerPrefs.DeleteKey("sneak.launch"); foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg == "--nightraid") nl = theatre;   // test switch: --nightraid (--raid is the Stukas)
-            if (opNight == 0 && !daily && !stand && !convoy && nl.Length > 0) { sneak = true; theatre = nl; route = "open"; }
+            if (opNight == 0 && !daily && !weekly && !stand && !convoy && nl.Length > 0) { sneak = true; theatre = nl; route = "open"; }
             builtRoute = route; Props.Route = route; Props.SneakNight = sneak; routePay = stand ? 0.5f : convoy ? 0.9f : sneak ? 1f : route == "village" ? 1.2f : route == "bocage" ? 1.15f : 1.1f;   // the country is built for this way in
             PickWeather(); weatherTurn = NightLength * Random.Range(0.35f, 0.62f);
-            builtTheatre = theatre; Props.Theatre = theatre; if (theatre == "kursk") routePay *= 1.15f; if (opNight > 0 || daily) weatherTurn = 0f; string nation = theatre == "kursk" ? "su" : "us"; if (Depot.Nation != nation) Depot.Nation = nation;
+            builtTheatre = theatre; Props.Theatre = theatre; if (theatre == "kursk") routePay *= 1.15f; if (opNight > 0 || daily || weekly) weatherTurn = 0f; string nation = theatre == "kursk" ? "su" : "us"; if (Depot.Nation != nation) Depot.Nation = nation;
             BuildWorld();
             // the night always starts with the leader alone; the platoon grows from the salvaged crates to 3, a rewarded ad opens a 4th slot.
             // The depot's permanent upgrades set the starting numbers
@@ -142,7 +146,7 @@ namespace IronNight
             reloadMul = Depot.ReloadMul; rangeMul = Depot.RangeMul * (Depot.CrewLevel >= 3 ? 1.05f : 1f); speedMul = Depot.SpeedMul; maxPlatoon = rule == "alone" ? 1 : 3;
             if (rule == "stukas") raidTimer = 5f; if (rule == "aces") aceTimer = 60f; if (debugAce) { aceTimer = 0.5f; Nemesis.PreferOld = true; }
             if (weather == Weather.Fog) { rangeMul *= 0.8f; enemyRangeMul = 0.8f; } else if (weather == Weather.Overcast) enemyRangeMul = 0.9f; else if (weather == Weather.Rain) { speedMul *= 0.92f; enemyRangeMul = 0.95f; }
-            hud.SetConditions((stand ? "Last stand · " : convoy ? "Convoy · " : sneak ? "Night raid · " : daily ? "Daily · " : "") + TheatreName + (route == "village" ? " · village" : route == "bocage" ? (theatre == "kursk" ? " · tree belts" : " · bocage") : (theatre == "kursk" ? " · steppe" : " · open fields")), winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Overcast ? "a dark night, the enemy sees 10% less" : weather == Weather.Rain ? (winter ? "the platoon slows in the drifts, the enemy sees 5% less" : "mud slows the platoon, the enemy sees 5% less") : "");
+            hud.SetConditions((stand ? "Last stand · " : convoy ? "Convoy · " : sneak ? "Night raid · " : daily ? "Daily · " : weekly ? "Weekly · " : "") + TheatreName + (route == "village" ? " · village" : route == "bocage" ? (theatre == "kursk" ? " · tree belts" : " · bocage") : (theatre == "kursk" ? " · steppe" : " · open fields")), winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Overcast ? "a dark night, the enemy sees 10% less" : weather == Weather.Rain ? (winter ? "the platoon slows in the drifts, the enemy sees 5% less" : "mud slows the platoon, the enemy sees 5% less") : "");
             hud.OnQuality = () => { LowQuality = !LowQuality; ApplyQuality(); hud.SetQualityLabel(!LowQuality); };
             if (veteran) hud.Toast("Veteran night · points ×1.5", 3f);
             hud.OnDaily = () => { Depot.ClaimDaily(); hud.ShowTitle(reserveGranted); };
@@ -174,6 +178,7 @@ namespace IronNight
             hud.OnRoute = r => { route = r; PlayerPrefs.SetString("route", r); PlayerPrefs.Save(); };
             hud.OnTheatre = t => theatre = t;
             hud.OnDailyChallenge = () => { PlayerPrefs.SetString("daily.launch", Daily.Today); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); };
+            hud.OnWeekly = () => { PlayerPrefs.SetString("weekly.launch", "1"); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); };
             hud.OnAir = () => { if (!airUp || airCool > 0f || phase != Phase.Play || strike != null) return; airArmed = !airArmed; airArmedLeft = 8f; hud.Toast(airArmed ? "Tap the target" : "Air strike called off", 2f); Sfx.Click(); };
             hud.OnAd = () => { if (phase == Phase.End) Ads.Rewarded("end", EndReward); };
             hud.OnGoldAd = () => { if (phase != Phase.End) return; if (Depot.SpendGold(Depot.GoldRepair)) EndReward(); else hud.ShowShop(); };   // not enough gold: the shop
@@ -195,18 +200,18 @@ namespace IronNight
             hud.OnSuppliesAd = () => Ads.Rewarded("supplies", () => { suppliesGranted = true; hud.SuppliesGranted = true; Sfx.Pickup(); hud.ShowTitle(reserveGranted); });
             hud.OnPause = Pause; hud.OnResume = Resume; hud.OnSound = () => { Sfx.Muted = !Sfx.Muted; hud.ShowPause(!Sfx.Muted, !LowQuality); };
             hud.OnQuit = () => { Resume(); revived = true; End(false); };   // no rewarded repair after walking away
-            hud.OnRestart = () => { Time.timeScale = 1f; if (stand) { PlayerPrefs.SetString("stand.launch", theatre); PlayerPrefs.Save(); } if (convoy) { PlayerPrefs.SetString("convoy.launch", theatre); PlayerPrefs.Save(); } if (sneak) { PlayerPrefs.SetString("sneak.launch", theatre); PlayerPrefs.Save(); } if (mapSector != null) { PlayerPrefs.SetString("map.launch", mapSector.id); PlayerPrefs.Save(); } if (opNight > 0) { PlayerPrefs.SetString("op.launch", op.id + ":" + opNight); PlayerPrefs.Save(); } if (daily) { PlayerPrefs.SetString("daily.launch", dailyDay); PlayerPrefs.Save(); } SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); };
+            hud.OnRestart = () => { Time.timeScale = 1f; if (stand) { PlayerPrefs.SetString("stand.launch", theatre); PlayerPrefs.Save(); } if (convoy) { PlayerPrefs.SetString("convoy.launch", theatre); PlayerPrefs.Save(); } if (sneak) { PlayerPrefs.SetString("sneak.launch", theatre); PlayerPrefs.Save(); } if (mapSector != null) { PlayerPrefs.SetString("map.launch", mapSector.id); PlayerPrefs.Save(); } if (opNight > 0) { PlayerPrefs.SetString("op.launch", op.id + ":" + opNight); PlayerPrefs.Save(); } if (daily) { PlayerPrefs.SetString("daily.launch", dailyDay); PlayerPrefs.Save(); } if (weekly) { PlayerPrefs.SetString("weekly.launch", "1"); PlayerPrefs.Save(); } SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); };
             if (debugDawn) t = 250f; if (debugMid) { t = 100f; mortarTimer = 6f; starTimer = 9f; observerTimer = 4f; mineTimer = 6f; }
             hud.Set(t, platoon.Count); hud.SetLevel(level, 0f);
             PlaceCamera(true);
             stick.Blocked = true; hud.ShowTitle(false);
             foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); } else if (arg == "--shop") hud.ShowShop(); else if (arg == "--supplies") { suppliesGranted = true; hud.SuppliesGranted = true; } else if (arg.StartsWith("--tankname=")) { var tn = arg.Substring(11); int cut = tn.IndexOf(':'); Career.PaintName(cut > 0 ? tn.Substring(0, cut) : Depot.LeaderId, (cut > 0 ? tn.Substring(cut + 1) : tn).Replace('_', ' ')); hud.Repainted(); } else if (arg == "--mail") hud.TestMail(); else if (arg == "--qm") hud.TestQuartermaster(); else if (arg == "--opencrate") hud.TestCrate(); else if (arg.StartsWith("--opencrate=")) hud.TestCrate(arg.Substring(12)); else if (arg.StartsWith("--bondstars=")) Bonds.TestStars(int.Parse(arg.Substring(12))); else if (arg == "--bonds") hud.ShowBonds(); else if (arg == "--wanted") { Nemesis.TestSeed(); hud.ShowWanted(); } else if (arg == "--crewtab") { stick.Blocked = true; hud.ShowCrewTab(); } else if (arg.StartsWith("--sheet=")) hud.TestSheet(arg.Substring(8)); else if (arg == "--mapseed" || arg == "--mapfall") Campaign.TestSeed(arg == "--mapfall");
             hud.OnStart += () => Radio("start");
-            if (opNight == 0 && !daily && PlayerPrefs.GetInt("route.launch", 0) == 1) { PlayerPrefs.SetInt("route.launch", 0); PlayerPrefs.Save(); StartNight(); Radio("start"); }
+            if (opNight == 0 && !daily && !weekly && PlayerPrefs.GetInt("route.launch", 0) == 1) { PlayerPrefs.SetInt("route.launch", 0); PlayerPrefs.Save(); StartNight(); Radio("start"); }
             if (sneak) { SneakBuild(); StartNight(); Radio("start"); string np = Hud.UiSprite("sneak_" + theatre) != null ? "sneak_" + theatre : theatre == "kursk" ? "route_kursk_belts" : "route_bocage"; hud.Briefing(np, "Night raid · " + TheatreName, "No lights, no shooting. Slip through to the depot and blow it. The sentries send up flares: in their light, stand still or get out of it. They see what moves."); }
             if (convoy) { ConvoyBuild(); StartNight(); Radio("start"); string cp = Hud.UiSprite("convoy_" + theatre) != null ? "convoy_" + theatre : theatre == "kursk" ? "route_kursk_steppe" : "route_open"; hud.Briefing(cp, "Convoy · " + TheatreName, "Bring the five trucks up the road to the checkpoint. The enemy goes for the trucks."); }
             if (stand) { StandBuild(); StartNight(); Radio("start"); string sp = Hud.UiSprite("stand_" + theatre) != null ? "stand_" + theatre : theatre == "kursk" ? "route_kursk_village" : theatre == "ardennes" ? "campaign_ardennes" : "campaign_lastpush"; hud.Briefing(sp, "Last stand · " + TheatreName, "Hold the crossroads through ten waves. Between them, dig in: sandbags, hedgehogs, mines."); }
-            if (daily) { StartNight(); Radio("start"); var dr = Daily.RuleOf(dailyDay); hud.Briefing(Daily.Picture(dailyDay), "Daily challenge · " + dr.name, dr.line); }
+            if (weekly) { StartNight(); Radio("start"); var we = Weekly.Now; hud.Briefing(we.picture, "Weekly event · " + we.name, we.line); } if (daily) { StartNight(); Radio("start"); var dr = Daily.RuleOf(dailyDay); hud.Briefing(Daily.Picture(dailyDay), "Daily challenge · " + dr.name, dr.line); }
             if (mapSector != null) { StartNight(); Radio("start"); hud.Briefing(mapSector.theatre == "ardennes" ? "campaign_ardennes" : mapSector.theatre == "kursk" ? (mapSector.route == "village" ? "route_kursk_village" : mapSector.route == "bocage" ? "route_kursk_belts" : "route_kursk_steppe") : "route_" + mapSector.route, "Road to Berlin · " + mapSector.name, Campaign.Counter == mapSector ? "Counterattack! Hold " + mapSector.name + " until dawn or it is lost." : "Take " + mapSector.name + ": hold the night until dawn and the sector is ours."); }
             if (opNight > 0) { StartNight(); Radio("start"); hud.Briefing(Hud.UiSprite(opN.picture) != null ? opN.picture : op.cover, op.name + " · night " + opNight + " of " + op.nights.Length, opN.name + " · " + opN.second.text.ToLowerInvariant() + ", " + opN.third.text.ToLowerInvariant()); } Debug.Log("Iron Night: battle built, debugBoss=" + debugBoss + " args=" + string.Join(" ", System.Environment.GetCommandLineArgs()));
             if (phase == Phase.Title && PlayerPrefs.GetInt("map.open", 0) == 1) { PlayerPrefs.DeleteKey("map.open"); hud.ShowMap(); }   // back from a war map night: straight to the map
@@ -911,7 +916,7 @@ namespace IronNight
         {
             float r = Random.value; weather = r < 0.45f ? Weather.Clear : r < 0.7f ? Weather.Overcast : r < 0.85f ? Weather.Fog : Weather.Rain;
             winter = theatre == "ardennes";
-            if (daily) { var w = Daily.Weather(dailyDay); weather = w == "fog" ? Weather.Fog : w == "rain" ? Weather.Rain : w == "overcast" ? Weather.Overcast : Weather.Clear; if (rule == "stukas") weather = Weather.Clear; }
+            if (daily) { var w = Daily.Weather(dailyDay); weather = w == "fog" ? Weather.Fog : w == "rain" ? Weather.Rain : w == "overcast" ? Weather.Overcast : Weather.Clear; if (rule == "stukas") weather = Weather.Clear; } if (weekly && rule == "stukas") weather = Weather.Clear;
             if (mapSector != null) weather = mapSector.weather == "fog" ? Weather.Fog : mapSector.weather == "rain" ? Weather.Rain : mapSector.weather == "overcast" ? Weather.Overcast : Weather.Clear;   // the sector as the map shows it
             if (opNight > 0) weather = opN.weather == "fog" ? Weather.Fog : opN.weather == "rain" ? Weather.Rain : opN.weather == "overcast" ? Weather.Overcast : Weather.Clear;   // the night as it was briefed
             var args = System.Environment.GetCommandLineArgs();   // test switches: --fog, --rain, --overcast, --clear, --winter, --summer
@@ -948,7 +953,7 @@ namespace IronNight
             if (weather == Weather.Rain) { if (rain == null) BuildRain(); else { rain.Play(); } } else if (rain != null) rain.Stop(true, ParticleSystemStopBehavior.StopEmitting);
             Sfx.Ambient(wet); LightShaft.boost = weather == Weather.Fog ? 1.8f : weather == Weather.Rain ? 1.3f : 1f;
             SetSky(0f, 0f, 0f);
-            hud.SetConditions((stand ? "Last stand · " : convoy ? "Convoy · " : sneak ? "Night raid · " : daily ? "Daily · " : "") + TheatreName + (route == "village" ? " · village" : route == "bocage" ? (theatre == "kursk" ? " · tree belts" : " · bocage") : (theatre == "kursk" ? " · steppe" : " · open fields")), winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Rain ? "the enemy shoots short" : weather == Weather.Overcast ? "a dark night, the enemy sees less" : "the moon is up: they see you");
+            hud.SetConditions((stand ? "Last stand · " : convoy ? "Convoy · " : sneak ? "Night raid · " : daily ? "Daily · " : weekly ? "Weekly · " : "") + TheatreName + (route == "village" ? " · village" : route == "bocage" ? (theatre == "kursk" ? " · tree belts" : " · bocage") : (theatre == "kursk" ? " · steppe" : " · open fields")), winter && weather == Weather.Rain ? "Snow" : weather.ToString(), weather == Weather.Fog ? "everyone sees 20% less" : weather == Weather.Rain ? "the enemy shoots short" : weather == Weather.Overcast ? "a dark night, the enemy sees less" : "the moon is up: they see you");
         }
 
         /// <summary>Low quality for weak phones: no moon shadows, no post-processing, no rain or snow.</summary>
@@ -2027,6 +2032,14 @@ namespace IronNight
             }
             if (nem != null && ace != null && !ace.dead && !nemReported) { nemReported = true; lines.Append("\n" + Nemesis.Survived(nem, NightPlace, nemWingmen, nemLeader)); }   // the ace still out there
             if (dawn && !dawnRolled) { dawnRolled = true; if (Random.value < 0.25f) { Rewards.AddCrates("supply", 1); lines.Append("\nSupply crate · found at dawn · open it on the title"); } }
+            if (weekly)
+            {   // the week's event: this night's count (only what is new if the night ends twice), each step it reaches paid
+                var we = Weekly.Now; int count = Weekly.NightCount(we, kills, nightTigers, nightInfantry, nightAces, dawn, score);
+                foreach (var paid in Weekly.Add(Mathf.Max(0, count - weeklyBanked))) lines.Append("\n" + we.name + " · a step won · " + paid);
+                weeklyBanked = Mathf.Max(weeklyBanked, count);
+                int last = we.steps[we.steps.Length - 1].at;
+                lines.Append("\n" + we.name + " · " + (Weekly.AllDone ? "every step won this week" : Mathf.Min(Weekly.Count, last).ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " of " + last.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " · " + we.goal.ToLowerInvariant()));
+            }
             hud.SetEndPoints(earned + bonus);
             int m = Mathf.FloorToInt(t / 60f), s = Mathf.FloorToInt(t % 60f);
             int acc = shotsFired > 0 ? Mathf.RoundToInt(100f * shotsHit / shotsFired) : 0;
@@ -2038,9 +2051,18 @@ namespace IronNight
             if (sneak) { SneakEnd(dawn, statLine); return; }
             if (mapSector != null) { MapEnd(dawn, statLine); return; }
             if (daily) { DailyEnd(dawn, statLine, dawn ? !doubled : !revived, earned + bonus); return; }
+            if (weekly) { WeeklyEnd(dawn, statLine, dawn ? !doubled : !revived); return; }
             if (opNight > 0) { OperationEnd(dawn, dawn ? !doubled : !revived, earned + bonus, bonus); return; }
             hud.ShowEnd(dawn, statLine + (endless ? "\nHeld into daylight · points ×1.5" : ""), dawn ? !doubled : !revived, endless && !dawn ? "DAYLIGHT · LEADER KNOCKED OUT" : null, endless && !dawn ? "The long night is over" : null);
             hud.ShowHold(dawn && !endless);
+        }
+
+        /// <summary>A night of the week's event over: the end sheet under the event's name; again fights it once more.</summary>
+        void WeeklyEnd(bool dawn, string statLine, bool adAvailable)
+        {
+            var we = Weekly.Now;
+            hud.ShowEnd(dawn, statLine, adAvailable, "WEEKLY EVENT · " + we.name.ToUpperInvariant(), dawn ? "The line holds" : "Assault over", "Fight the week's battle again");
+            hud.OnAgain = () => { PlayerPrefs.SetString("weekly.launch", "1"); PlayerPrefs.Save(); SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); };
         }
 
         /// <summary>A daily challenge over: the night's own score (no ads, no multipliers) goes against the day's best, and
