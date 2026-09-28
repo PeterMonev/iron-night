@@ -35,5 +35,21 @@ namespace IronNight.EditorTools
             var report = BuildPipeline.BuildPlayer(Scenes, "../builds/android/IronNight.apk", BuildTarget.Android, BuildOptions.None);
             Debug.Log($"Iron Night: Android build {report.summary.result} ({report.summary.totalErrors} errors)");
         }
+
+        /// <summary>The bundle Google Play takes: an Android App Bundle whose data rides in an install-time asset pack
+        /// (Play Asset Delivery, "split application binary"), so the base module stays under the store's 200 MB. Players
+        /// get all of it on install, as with the APK. Signed with the keystore in Publishing Settings, else the debug key.</summary>
+        [MenuItem("Iron Night/Build Android App Bundle")]
+        public static void Aab()
+        {
+            AdsSetup.Setup();
+            EditorUserBuildSettings.buildAppBundle = true; PlayerSettings.Android.splitApplicationBinary = true;
+            try
+            {
+                var report = BuildPipeline.BuildPlayer(Scenes, "../builds/android/IronNight.aab", BuildTarget.Android, BuildOptions.None);
+                Debug.Log($"Iron Night: Android App Bundle {report.summary.result} ({report.summary.totalErrors} errors)");
+            }
+            finally { EditorUserBuildSettings.buildAppBundle = false; PlayerSettings.Android.splitApplicationBinary = false; }   // the test APK stays whole
+        }
     }
 }
