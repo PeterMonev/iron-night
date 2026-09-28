@@ -39,7 +39,8 @@ Licence: https://creativecommons.org/licenses/by/4.0/
 ## Fonts (SIL Open Font License 1.1)
 | Font | Author | Use |
 |---|---|---|
-| Bebas Neue | Ryoichi Tsunekawa (Dharma Type) | the game's name and headings |
+| Cinzel | Natanael Gama, The Cinzel Project Authors | the game's name, titles and big numbers |
+| Barlow Condensed | Jeremy Tribby | eyebrows, tabs and buttons in spaced capitals |
 | Barlow | Jeremy Tribby | all other text |
 
 The licence texts are in `unity/Assets/_Game/Resources/Fonts/OFL-*.txt`. The fonts are used unmodified.

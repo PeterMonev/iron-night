@@ -57,8 +57,8 @@ namespace IronNight
             var b = wantedBody;
             { var glow = MakeImage(b, "Glow", new Vector2(0.5f, 1f), new Vector2(0f, 250f), new Vector2(1600f, 1100f), new Color(0.9f, 0.3f, 0.15f, 0.08f)); glow.sprite = Lightswarm.ProceduralSprites.Glow(64, 0.1f); }
             MakeGhost(b, "BACK", new Vector2(0f, 1f), new Vector2(130, -95), new Vector2(200, 80), 26, () => { wantedSheet.SetActive(false); RefreshWantedTile(); });
-            var ey = MakeText(b, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -150), TextAnchor.MiddleCenter, 26, MapRed); ey.text = Spaced("INTELLIGENCE · ENEMY ACES"); ey.font = BoldFont(); ey.rectTransform.sizeDelta = new Vector2(900, 40);
-            var ti = MakeText(b, "Title", new Vector2(0.5f, 1f), new Vector2(0, -190), TextAnchor.MiddleCenter, 110, OpInk); ti.text = "MOST WANTED"; ti.font = DisplayFont(); ti.rectTransform.sizeDelta = new Vector2(1000, 140); ti.verticalOverflow = VerticalWrapMode.Overflow;
+            var ey = MakeText(b, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -150), TextAnchor.MiddleCenter, 26, MapRed); ey.text = Spaced("INTELLIGENCE · ENEMY ACES"); ey.font = LabelFont(); ey.rectTransform.sizeDelta = new Vector2(900, 40);
+            var ti = MakeText(b, "Title", new Vector2(0.5f, 1f), new Vector2(0, -190), TextAnchor.MiddleCenter, 110, OpInk); ti.text = "MOST WANTED"; Engrave(ti); ti.rectTransform.sizeDelta = new Vector2(1000, 140); ti.verticalOverflow = VerticalWrapMode.Overflow;
             var ln = MakeText(b, "Line", new Vector2(0.5f, 1f), new Vector2(0, -318), TextAnchor.MiddleCenter, 24, OpDim); ln.rectTransform.sizeDelta = new Vector2(1000, 40);
             ln.text = line ?? "An ace who gets away comes back stronger. Finish them.";
             if (line != null) ln.color = OpAmber;
@@ -76,7 +76,7 @@ namespace IronNight
             var dead = Nemesis.Dead;
             if (dead.Count > 0)
             {
-                var th = MakeText(ct, "Wall", new Vector2(0.5f, 1f), new Vector2(0, y - 20f), TextAnchor.MiddleCenter, 26, GoldInk); th.text = Spaced("TROPHY WALL"); th.font = BoldFont(); th.rectTransform.sizeDelta = new Vector2(900, 40); y -= 80f;
+                var th = MakeText(ct, "Wall", new Vector2(0.5f, 1f), new Vector2(0, y - 20f), TextAnchor.MiddleCenter, 26, GoldInk); th.text = Spaced("TROPHY WALL"); th.font = LabelFont(); th.rectTransform.sizeDelta = new Vector2(900, 40); y -= 80f;
                 for (int i = 0; i < dead.Count; i++)
                 {
                     var d = dead[i]; float x = (i % 3 - 1) * 335f; float top = y - (i / 3) * 215f;
@@ -97,15 +97,15 @@ namespace IronNight
             var mask = new GameObject("Photo", typeof(RectTransform), typeof(RectMask2D)); mask.transform.SetParent(frame.transform, false); var mr = mask.GetComponent<RectTransform>(); mr.anchorMin = mr.anchorMax = mr.pivot = new Vector2(0.5f, 0.5f); mr.sizeDelta = new Vector2(240f, 288f);
             var sp = AcePortrait(a); var ph = MakeImage(mask.transform, "Pic", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(240f, 288f), new Color(1f, 0.93f, 0.8f)); ph.sprite = sp; ph.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             { float c = Mathf.Max(240f / sp.rect.width, 288f / sp.rect.height); ph.rectTransform.sizeDelta = new Vector2(sp.rect.width * c, sp.rect.height * c); }
-            var rk = MakeText(t, "Rank", new Vector2(0f, 1f), new Vector2(304, -28), TextAnchor.UpperLeft, 20, new Color(0.35f, 0.29f, 0.22f)); rk.text = Spaced(a.FullRank.ToUpperInvariant() + " · " + Nemesis.Tank(a).name.ToUpperInvariant()); rk.font = BoldFont(); rk.rectTransform.sizeDelta = new Vector2(560, 30);
-            var nm = MakeText(t, "Name", new Vector2(0f, 1f), new Vector2(302, -56), TextAnchor.UpperLeft, 66, PaperInk); nm.text = a.name.ToUpperInvariant(); nm.font = DisplayFont(); nm.rectTransform.sizeDelta = new Vector2(560, 80); nm.verticalOverflow = VerticalWrapMode.Overflow;
+            var rk = MakeText(t, "Rank", new Vector2(0f, 1f), new Vector2(304, -28), TextAnchor.UpperLeft, 20, new Color(0.35f, 0.29f, 0.22f)); rk.text = Spaced(a.FullRank.ToUpperInvariant() + " · " + Nemesis.Tank(a).name.ToUpperInvariant()); rk.font = LabelFont(); rk.rectTransform.sizeDelta = new Vector2(560, 30);
+            var nm = MakeText(t, "Name", new Vector2(0f, 1f), new Vector2(302, -56), TextAnchor.UpperLeft, 66, PaperInk); nm.text = a.name.ToUpperInvariant(); Serif(nm); nm.rectTransform.sizeDelta = new Vector2(560, 80); nm.verticalOverflow = VerticalWrapMode.Overflow;
             var nk = MakeText(t, "Nick", new Vector2(0f, 1f), new Vector2(304, -134), TextAnchor.UpperLeft, 26, StampRed); nk.text = string.IsNullOrEmpty(a.nick) ? "no name for him yet" : a.nick; nk.font = BoldFont(); nk.rectTransform.sizeDelta = new Vector2(660, 36);
             for (int s = 0; s < 5; s++) { var st = MakeImage(t, "Rank" + s, new Vector2(0f, 1f), new Vector2(304f + s * 34f, -180f), new Vector2(28f, 28f), s < a.level ? StampRed : new Color(0.55f, 0.5f, 0.42f, 0.6f)); st.sprite = StarSprite(); st.rectTransform.pivot = new Vector2(0f, 1f); }
             var rec = MakeText(t, "Record", new Vector2(0f, 1f), new Vector2(304, -220), TextAnchor.UpperLeft, 22, PaperInk); rec.text = Nemesis.Record(a) + " · last seen at " + a.place; rec.rectTransform.sizeDelta = new Vector2(660, 60);
             var bt = MakeText(t, "Bounty", new Vector2(0f, 0f), new Vector2(304, 36), TextAnchor.LowerLeft, 26, PaperInk); bt.font = BoldFont(); bt.rectTransform.sizeDelta = new Vector2(420, 40);
             bt.text = "Bounty " + Nemesis.BountyPoints(a).ToString("N0", En) + " points" + (Nemesis.BountyGold(a) > 0 ? " · " + Nemesis.BountyGold(a) + " gold" : "");
             // the stamp
-            var stamp = MakeText(t, "Stamp", new Vector2(1f, 1f), new Vector2(-34, -30), TextAnchor.MiddleCenter, 58, new Color(StampRed.r, StampRed.g, StampRed.b, 0.85f)); stamp.text = "WANTED"; stamp.font = DisplayFont(); stamp.rectTransform.sizeDelta = new Vector2(250, 76); stamp.rectTransform.pivot = new Vector2(1f, 1f); stamp.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -9f);
+            var stamp = MakeText(t, "Stamp", new Vector2(1f, 1f), new Vector2(-34, -30), TextAnchor.MiddleCenter, 58, new Color(StampRed.r, StampRed.g, StampRed.b, 0.85f)); stamp.text = "WANTED"; stamp.font = LabelBoldFont(); stamp.rectTransform.sizeDelta = new Vector2(250, 76); stamp.rectTransform.pivot = new Vector2(1f, 1f); stamp.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -9f);
             var box = MakeImage(stamp.transform, "Box", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(236f, 72f), new Color(StampRed.r, StampRed.g, StampRed.b, 0.85f)); box.sprite = Outline(); box.type = Image.Type.Sliced; box.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             // the ad: study him
             if (a.studied) { var sd = MakeText(t, "Studied", new Vector2(1f, 0f), new Vector2(-34, 36), TextAnchor.LowerRight, 22, new Color(0.2f, 0.45f, 0.22f)); sd.text = "Tactics studied · +30% against him"; sd.font = BoldFont(); sd.rectTransform.sizeDelta = new Vector2(420, 34); }

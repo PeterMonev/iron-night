@@ -13,7 +13,7 @@ namespace IronNight
     {
         const int Rate = 44100;
         static Sfx instance;
-        AudioClip shot, shotHeavy, shotFar, hit, explosion, artillery, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, front, whistle, rumble, ricochet, ricochet2, flak, reload, turretLoop, mg, faust, stuka, drone, crunch, brush, fighter;
+        AudioClip shot, shotHeavy, shotFar, hit, explosion, artillery, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, front, whistle, rumble, ricochet, ricochet2, flak, reload, turretLoop, mg, faust, stuka, drone, crunch, brush, whoosh, fighter;
         readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, turret, ambient, frontLine, ui; Transform listener;
 
         public static void Build(Camera cam)
@@ -252,6 +252,15 @@ namespace IronNight
             Dsp.Normalize(mix, 0.75f); return mix;
         }
 
+        /// <summary>A sheet coming in: air swept past, a band of noise rising in pitch as it swells and falling away.</summary>
+        static float[] MakeWhoosh()
+        {
+            const float len = 0.42f; int n = Dsp.N(len); var mix = Dsp.Noise(n);
+            Dsp.BandpassSweep(mix, t => 500f + 2600f * Mathf.Clamp01(t / len), 0.9f);
+            Dsp.Env(mix, t => Mathf.Sin(Mathf.Clamp01(t / len) * Mathf.PI) * Mathf.Exp(-t * 2.5f));
+            Dsp.Normalize(mix, 0.6f); return mix;
+        }
+
         /// <summary>Aero engines somewhere overhead in the dark: a low, beating drone that swells and hangs.</summary>
         static float[] MakeDrone()
         {
@@ -318,7 +327,7 @@ namespace IronNight
             mg = Load("mg", () => Gun(0f, 0.3f, false)); faust = Load("faust", () => Gun(0.2f, 0.8f, false));
             explosion = Load("explosion", MakeExplosion); artillery = Load("artillery", MakeExplosion); hit = Load("hit", ArmourHit); ricochet = Load("ricochet", MakeRicochet); ricochet2 = Resources.Load<AudioClip>("Audio/ricochet2");
             engineLoop = Load("engine", MakeEngine); tracksLoop = Load("tracks", Tracks);
-            whistle = Load("whistle", MakeWhistle); stuka = Load("stuka", MakeStukaDive); drone = Load("drone", MakeDrone); crunch = Load("crunch", MakeCrunch); brush = Load("brush", MakeBrush); fighter = Load("fighter", MakeFighterPass); rumble = Load("shotFar", MakeRumble); wind = Load("wind", Wind); rain = Load("rain", Rain); front = Resources.Load<AudioClip>("Audio/front");
+            whistle = Load("whistle", MakeWhistle); stuka = Load("stuka", MakeStukaDive); drone = Load("drone", MakeDrone); crunch = Load("crunch", MakeCrunch); brush = Load("brush", MakeBrush); whoosh = Load("whoosh", MakeWhoosh); fighter = Load("fighter", MakeFighterPass); rumble = Load("shotFar", MakeRumble); wind = Load("wind", Wind); rain = Load("rain", Rain); front = Resources.Load<AudioClip>("Audio/front");
             pickup = Load("pickup", () => Radio(new[] { 880f, 1320f }, 0.12f)); levelUp = Load("levelUp", () => Radio(new[] { 523f, 659f, 784f }, 0.2f)); click = Load("click", MakeClick);
 
             for (int i = 0; i < 12; i++) { var s = NewSource("Voice " + i); s.spatialBlend = 0.75f; s.rolloffMode = AudioRolloffMode.Linear; s.minDistance = 12f; s.maxDistance = 140f; pool.Add(s); }
@@ -357,6 +366,7 @@ namespace IronNight
         public static void StukaDive(Vector3 pos) { if (instance) instance.PlayAt(instance.stuka, pos, 1f, Random.Range(0.97f, 1.03f)); }
         public static void FighterPass(Vector3 pos) { if (instance) instance.PlayAt(instance.fighter, pos, 1f, Random.Range(0.96f, 1.04f)); }
         public static void Crunch(Vector3 pos) { if (instance) instance.PlayAt(instance.crunch, pos, 0.55f, Random.Range(0.85f, 1.15f)); }
+        public static void Whoosh() { if (instance && instance.whoosh != null) instance.ui.PlayOneShot(instance.whoosh, 0.28f); }
         public static void Brush(Vector3 pos) { if (instance) instance.PlayAt(instance.brush, pos, 0.7f, Random.Range(0.88f, 1.12f)); }
         public static void Drone(Vector3 pos) { if (instance) instance.PlayAt(instance.drone, pos, 0.9f, 1f); }
         public static void Whistle(Vector3 pos) { if (instance) instance.PlayAt(instance.whistle, pos, 0.7f, Random.Range(0.95f, 1.05f)); }

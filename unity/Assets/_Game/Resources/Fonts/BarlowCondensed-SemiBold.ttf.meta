@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: cdbe5d3a562b7b4489ea6359d5f713bd
+guid: 22b37169a89a6a444b0eda7dd2d62a94
 TrueTypeFontImporter:
   externalObjects: {}
   serializedVersion: 4
@@ -9,7 +9,7 @@ TrueTypeFontImporter:
   characterPadding: 1
   includeFontData: 1
   fontNames:
-  - Bebas Neue
+  - Barlow Condensed
   fallbackFontReferences: []
   customCharacters: 
   fontRenderingMode: 0

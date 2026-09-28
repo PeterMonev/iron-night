@@ -137,6 +137,47 @@ namespace Lightswarm
             tex.Apply(); return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(radius + 2, radius + 2, radius + 2, radius + 2));
         }
 
+        /// <summary>The rounded card and its gloss on one texture, so that a card and its sheen batch together: [0] the shape,
+        /// [1] a wash of white fading from the top edge to nothing by the middle, with a bright hairline along the top rim.
+        /// Both 9-sliced like RoundedRect.</summary>
+        public static Sprite[] RoundedGlass(int radius = 24, int size = 96)
+        {
+            var tex = NewTexture(size * 2, size);
+            for (int y = 0; y < size; y++) for (int x = 0; x < size; x++)
+            {
+                float dx = Mathf.Max(0f, Mathf.Abs(x + 0.5f - size * 0.5f) - (size * 0.5f - radius)), dy = Mathf.Max(0f, Mathf.Abs(y + 0.5f - size * 0.5f) - (size * 0.5f - radius));
+                float d = Mathf.Sqrt(dx * dx + dy * dy), a = Mathf.Clamp01(radius - d + 0.5f), up = (y + 0.5f) / size;
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+                float wash = Mathf.SmoothStep(0f, 1f, (up - 0.45f) / 0.55f), rim = Mathf.Clamp01(1.6f - (radius - d)) * Mathf.SmoothStep(0f, 1f, (up - 0.55f) / 0.45f);
+                tex.SetPixel(size + x, y, new Color(1f, 1f, 1f, a * Mathf.Clamp01(0.06f * wash + 0.2f * rim)));
+            }
+            tex.Apply(); var border = new Vector4(radius + 2, radius + 2, radius + 2, radius + 2);
+            return new[] { Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, border), Sprite.Create(tex, new Rect(size, 0, size, size), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, border) };
+        }
+
+        /// <summary>A soft darkening toward the edges and corners of whatever it is stretched over.</summary>
+        public static Sprite Vignette(int size = 64)
+        {
+            var tex = NewTexture(size, size);
+            for (int y = 0; y < size; y++) for (int x = 0; x < size; x++)
+            {
+                float u = (x + 0.5f) / size * 2f - 1f, v = (y + 0.5f) / size * 2f - 1f, r = Mathf.Sqrt((u * u + v * v) * 0.8f);
+                tex.SetPixel(x, y, new Color(0f, 0f, 0f, 0.6f * Mathf.SmoothStep(0f, 1f, (r - 0.5f) / 0.7f)));
+            }
+            tex.Apply(); return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        /// <summary>Film grain: a tile of black with noise in its alpha, to lay faintly over the screen and shift every few
+        /// frames. It only darkens, in proportion to what is under it, so it reads the same on the lit title and the
+        /// near-black sheets.</summary>
+        public static Texture2D Grain(int size = 128)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Repeat };
+            var rng = new System.Random(71);
+            for (int y = 0; y < size; y++) for (int x = 0; x < size; x++) { float g = (float)rng.NextDouble(); tex.SetPixel(x, y, new Color(0f, 0f, 0f, g)); }
+            tex.Apply(); return tex;
+        }
+
         /// <summary>The same shape with only its edge: a 2 px outline for ghost buttons and cards.</summary>
         public static Sprite RoundedOutline(int radius = 24, int size = 96, float width = 2f)
         {

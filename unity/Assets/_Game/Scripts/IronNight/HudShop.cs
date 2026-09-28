@@ -102,8 +102,8 @@ namespace IronNight
             { var glow = MakeImage(b, "Glow", new Vector2(0.5f, 1f), new Vector2(0f, 250f), new Vector2(1600f, 1100f), new Color(1f, 0.72f, 0.28f, 0.1f)); glow.sprite = Lightswarm.ProceduralSprites.Glow(64, 0.1f); }
             MakeGhost(b, "BACK", new Vector2(0f, 1f), new Vector2(130, -95), new Vector2(200, 80), 26, () => { shopSheet.SetActive(false); RefreshGold(); });
             shopGold = GoldPill(b, new Vector2(-50f, -65f), 300f, false); shopGold.text = Depot.Gold.ToString("N0", En);
-            var ey = MakeText(b, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -150), TextAnchor.MiddleCenter, 26, OpAmber); ey.text = Spaced("POST EXCHANGE"); ey.font = BoldFont(); ey.rectTransform.sizeDelta = new Vector2(600, 40);
-            var ti = MakeText(b, "Title", new Vector2(0.5f, 1f), new Vector2(0, -190), TextAnchor.MiddleCenter, 120, OpInk); ti.text = "SHOP"; ti.font = DisplayFont(); ti.rectTransform.sizeDelta = new Vector2(900, 150); ti.verticalOverflow = VerticalWrapMode.Overflow;
+            var ey = MakeText(b, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -150), TextAnchor.MiddleCenter, 26, OpAmber); ey.text = Spaced("POST EXCHANGE"); ey.font = LabelFont(); ey.rectTransform.sizeDelta = new Vector2(600, 40);
+            var ti = MakeText(b, "Title", new Vector2(0.5f, 1f), new Vector2(0, -190), TextAnchor.MiddleCenter, 120, OpInk); ti.text = "SHOP"; Engrave(ti); ti.rectTransform.sizeDelta = new Vector2(900, 150); ti.verticalOverflow = VerticalWrapMode.Overflow;
 
             // gold: a free handful for an ad, then the packs
             ShopHeading(b, -380f, "GOLD");
@@ -134,7 +134,7 @@ namespace IronNight
         /// <summary>A section name between two thin rules.</summary>
         static void ShopHeading(Transform parent, float y, string name)
         {
-            var t = MakeText(parent, "Heading", new Vector2(0.5f, 1f), new Vector2(0, y), TextAnchor.MiddleCenter, 24, OpDim); t.text = Spaced(name); t.font = BoldFont(); t.rectTransform.sizeDelta = new Vector2(600, 36);
+            var t = MakeText(parent, "Heading", new Vector2(0.5f, 1f), new Vector2(0, y), TextAnchor.MiddleCenter, 24, OpDim); t.text = Spaced(name); t.font = LabelFont(); t.rectTransform.sizeDelta = new Vector2(600, 36);
             for (int s = -1; s <= 1; s += 2) { var r = MakeImage(parent, "Rule", new Vector2(0.5f, 1f), new Vector2(s * 330f, y - 18f), new Vector2(280f, 2f), new Color(1f, 1f, 1f, 0.12f)); r.rectTransform.pivot = new Vector2(0.5f, 0.5f); }
         }
 
@@ -146,8 +146,8 @@ namespace IronNight
             var t = card.transform;
             var glow = MakeImage(t, "Glow", new Vector2(0.5f, 0.5f), new Vector2(-115f, 30f), new Vector2(340f, 240f), new Color(1f, 0.75f, 0.3f, 0.18f)); glow.sprite = Lightswarm.ProceduralSprites.Glow(64, 0.1f);
             GoldPile(t, new Vector2(-112f, 34f), new Vector2(224f, 132f), Bars(p.gold));
-            var amt = MakeText(t, "Gold", new Vector2(0.5f, 0.5f), new Vector2(105f, 44f), TextAnchor.MiddleCenter, 80, GoldInk); amt.text = p.gold.ToString("N0", En); amt.font = DisplayFont(); amt.rectTransform.sizeDelta = new Vector2(250f, 110f); amt.verticalOverflow = VerticalWrapMode.Overflow;
-            var lb = MakeText(t, "Label", new Vector2(0.5f, 0.5f), new Vector2(105f, -6f), TextAnchor.MiddleCenter, 20, OpDim); lb.text = Spaced("GOLD"); lb.font = BoldFont(); lb.rectTransform.sizeDelta = new Vector2(250f, 30f);
+            var amt = MakeText(t, "Gold", new Vector2(0.5f, 0.5f), new Vector2(105f, 44f), TextAnchor.MiddleCenter, 80, GoldInk); amt.text = p.gold.ToString("N0", En); Serif(amt); amt.rectTransform.sizeDelta = new Vector2(250f, 110f); amt.verticalOverflow = VerticalWrapMode.Overflow;
+            var lb = MakeText(t, "Label", new Vector2(0.5f, 0.5f), new Vector2(105f, -6f), TextAnchor.MiddleCenter, 20, OpDim); lb.text = Spaced("GOLD"); lb.font = LabelFont(); lb.rectTransform.sizeDelta = new Vector2(250f, 30f);
             if (p.bonus != null) Ribbon(t, p.best ? "BEST VALUE · " + p.bonus : p.bonus, p.best);
             var buy = MakePrimary(t, Store.Price(p), new Vector2(0.5f, 0f), new Vector2(0f, 52f), new Vector2(440f, 68f), 30, () => Store.Buy(p, (ok, why) => { if (ok) { Sfx.Pickup(); RefreshGold(); } BuildShop(why); }));
             buy.transform.Find("Label").GetComponent<Text>().text = Store.Price(p);
@@ -161,8 +161,8 @@ namespace IronNight
             var t = card.transform;
             var glow = MakeImage(t, "Glow", new Vector2(0.5f, 0.5f), new Vector2(-115f, 30f), new Vector2(340f, 240f), new Color(1f, 0.75f, 0.3f, 0.12f)); glow.sprite = Lightswarm.ProceduralSprites.Glow(64, 0.1f);
             GoldPile(t, new Vector2(-112f, 34f), new Vector2(170f, 100f), 1);
-            var amt = MakeText(t, "Gold", new Vector2(0.5f, 0.5f), new Vector2(105f, 44f), TextAnchor.MiddleCenter, 80, GoldInk); amt.text = "+" + Depot.GoldPerAd; amt.font = DisplayFont(); amt.rectTransform.sizeDelta = new Vector2(250f, 110f); amt.verticalOverflow = VerticalWrapMode.Overflow;
-            var lb = MakeText(t, "Label", new Vector2(0.5f, 0.5f), new Vector2(105f, -6f), TextAnchor.MiddleCenter, 20, OpDim); lb.text = Spaced("FREE GOLD"); lb.font = BoldFont(); lb.rectTransform.sizeDelta = new Vector2(250f, 30f);
+            var amt = MakeText(t, "Gold", new Vector2(0.5f, 0.5f), new Vector2(105f, 44f), TextAnchor.MiddleCenter, 80, GoldInk); amt.text = "+" + Depot.GoldPerAd; Serif(amt); amt.rectTransform.sizeDelta = new Vector2(250f, 110f); amt.verticalOverflow = VerticalWrapMode.Overflow;
+            var lb = MakeText(t, "Label", new Vector2(0.5f, 0.5f), new Vector2(105f, -6f), TextAnchor.MiddleCenter, 20, OpDim); lb.text = Spaced("FREE GOLD"); lb.font = LabelFont(); lb.rectTransform.sizeDelta = new Vector2(250f, 30f);
             Ribbon(t, left > 0 ? left + " of " + Depot.GoldAdsPerDay + " today" : "more tomorrow", false);
             var ad = MakeButton(t, left > 0 ? "Watch an ad" : "Come back tomorrow", new Vector2(0.5f, 0f), new Vector2(0f, 52f), new Vector2(440f, 68f), 28, () =>
             {

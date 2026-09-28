@@ -59,8 +59,8 @@ namespace IronNight
             var b = mapBody; var pic = MapPicture(); float mw = MapH * pic.rect.width / pic.rect.height, sx = mw / 1536f, sy = MapH / 1024f;
             MakeGhost(b, "BACK", new Vector2(0f, 1f), new Vector2(130, -95), new Vector2(200, 80), 26, CloseMap);
             MakeGhost(b, "OPERATIONS", new Vector2(1f, 1f), new Vector2(-170, -95), new Vector2(280, 80), 24, () => ShowOperations());
-            var ey = MakeText(b, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -150), TextAnchor.MiddleCenter, 26, OpAmber); ey.text = Spaced("THE ROAD TO BERLIN"); ey.font = BoldFont(); ey.rectTransform.sizeDelta = new Vector2(900, 40);
-            var ti = MakeText(b, "Title", new Vector2(0.5f, 1f), new Vector2(0, -186), TextAnchor.MiddleCenter, 100, OpInk); ti.text = Campaign.Victory ? "VICTORY" : "WAR MAP"; ti.font = DisplayFont(); ti.rectTransform.sizeDelta = new Vector2(900, 130); ti.verticalOverflow = VerticalWrapMode.Overflow;
+            var ey = MakeText(b, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -150), TextAnchor.MiddleCenter, 26, OpAmber); ey.text = Spaced("THE ROAD TO BERLIN"); ey.font = LabelFont(); ey.rectTransform.sizeDelta = new Vector2(900, 40);
+            var ti = MakeText(b, "Title", new Vector2(0.5f, 1f), new Vector2(0, -186), TextAnchor.MiddleCenter, 100, OpInk); ti.text = Campaign.Victory ? "VICTORY" : "WAR MAP"; Engrave(ti); ti.rectTransform.sizeDelta = new Vector2(900, 130); ti.verticalOverflow = VerticalWrapMode.Overflow;
             var st = MakeText(b, "State", new Vector2(0.5f, 1f), new Vector2(0, -300), TextAnchor.MiddleCenter, 24, OpDim); st.rectTransform.sizeDelta = new Vector2(1000, 36);
             var counter = Campaign.Counter;
             st.text = "West " + Campaign.TakenOn("west") + " of " + Campaign.WestCount + " · East " + Campaign.TakenOn("east") + " of " + Campaign.EastCount + (Campaign.Victory ? " · Berlin taken" : counter != null ? " · counterattack at " + counter.name + ", " + Campaign.CounterLeft + " left" : "");
@@ -102,7 +102,7 @@ namespace IronNight
             var op = Operations.ById(opId); if (op == null) return;
             var b = MakeButton(parent, "", new Vector2(0f, 1f), pos, new Vector2(56, 56), 20, () => ShowOperation(op)); b.GetComponent<Image>().color = new Color(0.08f, 0.07f, 0.05f, 0.85f); b.transform.Find("Label").gameObject.SetActive(false);
             var sti = MakeImage(b.transform, "Star", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(40, 40), GoldInk); sti.sprite = StarSprite(); sti.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-            var tl = MakeText(b.transform, "Op", new Vector2(0.5f, 0f), new Vector2(0, -22), TextAnchor.UpperCenter, 16, GoldInk); tl.text = Spaced("OP"); tl.font = BoldFont(); tl.rectTransform.sizeDelta = new Vector2(80, 22); tl.rectTransform.pivot = new Vector2(0.5f, 1f);
+            var tl = MakeText(b.transform, "Op", new Vector2(0.5f, 0f), new Vector2(0, -22), TextAnchor.UpperCenter, 16, GoldInk); tl.text = Spaced("OP"); tl.font = LabelFont(); tl.rectTransform.sizeDelta = new Vector2(80, 22); tl.rectTransform.pivot = new Vector2(0.5f, 1f);
         }
         /// <summary>The operations sheet opened on one operation's nights.</summary>
         void ShowOperation(Operations.Op op) { ShowOperations(); OpNights(op); }
@@ -135,7 +135,7 @@ namespace IronNight
             int total = s.road == "west" ? Campaign.WestCount : Campaign.EastCount;
             var ey = MakeText(t, "Eyebrow", new Vector2(0f, 1f), new Vector2(36, -26), TextAnchor.UpperLeft, 22, OpAmber); ey.font = BoldFont(); ey.rectTransform.sizeDelta = new Vector2(900, 32);
             ey.text = Spaced(s.road == "both" ? "WHERE THE ROADS MEET" : (s.road == "west" ? "WESTERN ROAD" : "EASTERN ROAD") + " · SECTOR " + (s.depth + 1) + " OF " + total);
-            var nm = MakeText(t, "Name", new Vector2(0f, 1f), new Vector2(34, -58), TextAnchor.UpperLeft, 76, OpInk); nm.text = s.name.ToUpperInvariant(); nm.font = DisplayFont(); nm.rectTransform.sizeDelta = new Vector2(920, 96); nm.verticalOverflow = VerticalWrapMode.Overflow;
+            var nm = MakeText(t, "Name", new Vector2(0f, 1f), new Vector2(34, -58), TextAnchor.UpperLeft, 76, OpInk); nm.text = s.name.ToUpperInvariant(); Engrave(nm, true, 0.72f); nm.rectTransform.sizeDelta = new Vector2(920, 96); nm.verticalOverflow = VerticalWrapMode.Overflow;
             string way = s.route == "village" ? "village" : s.route == "bocage" ? (s.theatre == "kursk" ? "tree belts" : "bocage") : (s.theatre == "kursk" ? "steppe" : "open fields");
             var ln = MakeText(t, "Line", new Vector2(0f, 1f), new Vector2(36, -160), TextAnchor.UpperLeft, 24, OpDim); ln.rectTransform.sizeDelta = new Vector2(930, 36);
             ln.text = s.when.Substring(0, 1) + s.when.Substring(1).ToLowerInvariant() + " · " + way + " · " + s.weather + (s.theatre == "ardennes" ? " · snow" : "") + (s.veteran ? " · veteran enemy" : "") + (s.road == "east" || s.id == "berlin" ? " · Soviet tanks" : " · American tanks");

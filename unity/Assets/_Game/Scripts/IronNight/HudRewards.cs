@@ -132,8 +132,8 @@ namespace IronNight
         {
             var b = RewardSheet(1f); int done = Rewards.MailDone; bool ready = Rewards.MailReady;
             { var glow = MakeImage(b, "Glow", new Vector2(0.5f, 1f), new Vector2(0f, 200f), new Vector2(1600f, 1100f), new Color(1f, 0.72f, 0.28f, 0.09f)); glow.sprite = Lightswarm.ProceduralSprites.Glow(64, 0.1f); }
-            var ey = MakeText(b, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -250), TextAnchor.MiddleCenter, 26, OpAmber); ey.text = Spaced("DAILY REWARDS · DAY " + Mathf.Min(7, done + (ready ? 1 : 0)) + " OF 7"); ey.font = BoldFont(); ey.rectTransform.sizeDelta = new Vector2(800, 40);
-            var ti = MakeText(b, "Title", new Vector2(0.5f, 1f), new Vector2(0, -290), TextAnchor.MiddleCenter, 110, OpInk); ti.text = "MAIL CALL"; ti.font = DisplayFont(); ti.rectTransform.sizeDelta = new Vector2(900, 140); ti.verticalOverflow = VerticalWrapMode.Overflow;
+            var ey = MakeText(b, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -250), TextAnchor.MiddleCenter, 26, OpAmber); ey.text = Spaced("DAILY REWARDS · DAY " + Mathf.Min(7, done + (ready ? 1 : 0)) + " OF 7"); ey.font = LabelFont(); ey.rectTransform.sizeDelta = new Vector2(800, 40);
+            var ti = MakeText(b, "Title", new Vector2(0.5f, 1f), new Vector2(0, -290), TextAnchor.MiddleCenter, 110, OpInk); ti.text = "MAIL CALL"; Engrave(ti); ti.rectTransform.sizeDelta = new Vector2(900, 140); ti.verticalOverflow = VerticalWrapMode.Overflow;
             var ln = MakeText(b, "Line", new Vector2(0.5f, 1f), new Vector2(0, -432), TextAnchor.MiddleCenter, 24, OpDim); ln.text = "A parcel from home every day. Miss a day and the row starts again."; ln.rectTransform.sizeDelta = new Vector2(980, 40);
             for (int i = 0; i < 7; i++)
             {
@@ -142,10 +142,13 @@ namespace IronNight
                 var card = MakeCard(b, "Day", new Vector2(0.5f, 1f), top, size, today ? new Color(0.13f, 0.1f, 0.06f, 0.98f) : new Color(0.07f, 0.075f, 0.09f, 0.96f), 0.16f); card.rectTransform.pivot = new Vector2(0.5f, 1f);
                 if (today) card.transform.Find("Edge").GetComponent<Image>().color = new Color(1f, 0.78f, 0.35f, 0.95f);
                 var t = card.transform;
-                var dl = MakeText(t, "Day", new Vector2(0.5f, 1f), new Vector2(0, -16), TextAnchor.UpperCenter, 22, today ? OpAmber : OpDim); dl.text = Spaced(today && !taken ? "TODAY" : "DAY " + (i + 1)); dl.font = BoldFont(); dl.rectTransform.sizeDelta = new Vector2(size.x, 34);
+                var dl = MakeText(t, "Day", new Vector2(0.5f, 1f), new Vector2(0, -16), TextAnchor.UpperCenter, 22, today ? OpAmber : OpDim); dl.text = Spaced(today && !taken ? "TODAY" : "DAY " + (i + 1)); dl.font = LabelFont(); dl.rectTransform.sizeDelta = new Vector2(size.x, 34);
                 RewardIcon(t, big ? new Vector2(-260f, -6f) : new Vector2(0f, 12f), big ? 150f : 110f, g.kind, null);
                 var am = MakeText(t, "Amount", new Vector2(0.5f, 0.5f), big ? new Vector2(150f, -6f) : new Vector2(0f, -100f), TextAnchor.MiddleCenter, big ? 44 : 28, today ? OpInk : new Color(0.85f, 0.83f, 0.78f)); am.text = RewardLine(g.kind, g.amount, null); am.font = BoldFont(); am.rectTransform.sizeDelta = new Vector2(big ? 560f : 290f, 60f);
-                if (taken && !(today && justTaken != null)) { var shade = MakeImage(t, "Taken", new Vector2(0.5f, 0.5f), Vector2.zero, size, new Color(0.02f, 0.02f, 0.03f, 0.62f)); shade.sprite = Rounded(); shade.type = Image.Type.Sliced; shade.rectTransform.pivot = new Vector2(0.5f, 0.5f); var tk = MakeText(t, "T", new Vector2(0.5f, 0.5f), Vector2.zero, TextAnchor.MiddleCenter, 26, new Color(0.45f, 0.85f, 0.5f)); tk.text = Spaced("COLLECTED"); tk.font = BoldFont(); tk.rectTransform.sizeDelta = new Vector2(size.x, 40); }
+                if (taken && !(today && justTaken != null)) { var shade = MakeImage(t, "Taken", new Vector2(0.5f, 0.5f), Vector2.zero, size, new Color(0.02f, 0.02f, 0.03f, 0.62f)); shade.sprite = Rounded(); shade.type = Image.Type.Sliced; shade.rectTransform.pivot = new Vector2(0.5f, 0.5f); var green = new Color(0.45f, 0.85f, 0.5f, 0.92f);
+                    var st = MakeImage(t, "Stamp", new Vector2(0.5f, 0.5f), big ? new Vector2(-260f, -6f) : new Vector2(0f, 12f), new Vector2(236f, 66f), new Color(0.03f, 0.06f, 0.04f, 0.88f)); st.sprite = Rounded(); st.type = Image.Type.Sliced; st.rectTransform.pivot = new Vector2(0.5f, 0.5f); st.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -8f);
+                    var se = MakeImage(st.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(236f, 66f), green); se.sprite = Outline(); se.type = Image.Type.Sliced; se.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                    var tk = MakeText(st.transform, "T", new Vector2(0.5f, 0.5f), Vector2.zero, TextAnchor.MiddleCenter, 30, green); tk.text = Spaced("COLLECTED"); tk.font = LabelBoldFont(); tk.rectTransform.sizeDelta = new Vector2(236f, 50f); }
                 if (today && justTaken != null) card.gameObject.AddComponent<Pop>();
             }
             if (ready)
@@ -168,27 +171,27 @@ namespace IronNight
         void ShowQuartermaster()
         {
             var b = RewardSheet(0.93f); float h = Rewards.QmHours; int p = Rewards.QmPoints, x = Rewards.QmXp;
-            var card = MakeCard(b, "Card", new Vector2(0.5f, 0.5f), new Vector2(0f, 60f), new Vector2(960f, 1060f), new Color(0.06f, 0.065f, 0.08f, 0.98f), 0.2f); card.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            var card = MakeCard(b, "Card", new Vector2(0.5f, 0.5f), new Vector2(0f, 30f), new Vector2(960f, 1120f), new Color(0.06f, 0.065f, 0.08f, 0.98f), 0.2f); card.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             card.transform.Find("Edge").GetComponent<Image>().color = new Color(1f, 0.78f, 0.35f, 0.5f);
             var t = card.transform;
             { var glow = MakeImage(t, "Glow", new Vector2(0.5f, 1f), new Vector2(0f, 40f), new Vector2(760f, 520f), new Color(1f, 0.72f, 0.3f, 0.18f)); glow.sprite = Lightswarm.ProceduralSprites.Glow(64, 0.1f); }
             var pic = MakeImage(t, "Crate", new Vector2(0.5f, 1f), new Vector2(0f, -30f), new Vector2(280f, 280f), Color.white); pic.sprite = CrateStage.Picture("supply"); pic.preserveAspect = true; pic.enabled = pic.sprite != null;
-            var ey = MakeText(t, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -320), TextAnchor.MiddleCenter, 26, OpAmber); ey.text = Spaced("QUARTERMASTER"); ey.font = BoldFont(); ey.rectTransform.sizeDelta = new Vector2(800, 40);
-            var ti = MakeText(t, "Title", new Vector2(0.5f, 1f), new Vector2(0, -360), TextAnchor.MiddleCenter, 84, OpInk); ti.text = p >= 50 ? "SUPPLIES ARE IN" : "STILL GATHERING"; ti.font = DisplayFont(); ti.rectTransform.sizeDelta = new Vector2(900, 110); ti.verticalOverflow = VerticalWrapMode.Overflow;
+            var ey = MakeText(t, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -320), TextAnchor.MiddleCenter, 26, OpAmber); ey.text = Spaced("QUARTERMASTER"); ey.font = LabelFont(); ey.rectTransform.sizeDelta = new Vector2(800, 40);
+            var ti = MakeText(t, "Title", new Vector2(0.5f, 1f), new Vector2(0, -360), TextAnchor.MiddleCenter, 84, OpInk); ti.text = p >= 50 ? "SUPPLIES ARE IN" : "STILL GATHERING"; Engrave(ti); ti.rectTransform.sizeDelta = new Vector2(900, 110); ti.verticalOverflow = VerticalWrapMode.Overflow;
             int hh = Mathf.FloorToInt(h), mm = Mathf.FloorToInt((h - hh) * 60f);
             var ln = MakeText(t, "Line", new Vector2(0.5f, 1f), new Vector2(0, -470), TextAnchor.MiddleCenter, 24, OpDim); ln.rectTransform.sizeDelta = new Vector2(900, 40);
             ln.text = (hh > 0 ? hh + " h " : "") + mm + " min of gathering · he holds up to " + (int)Rewards.QmCapHours + " hours" + (Depot.Premium ? " · premium +50%" : "");
-            RewardIcon(t, new Vector2(-250f, -60f), 90f, "points", null);
-            var pv = MakeText(t, "Points", new Vector2(0.5f, 0.5f), new Vector2(-80f, -60f), TextAnchor.MiddleLeft, 64, OpAmber); pv.text = "+" + p.ToString("N0", En); pv.font = DisplayFont(); pv.rectTransform.sizeDelta = new Vector2(420f, 90f); pv.rectTransform.pivot = new Vector2(0f, 0.5f);
-            RewardIcon(t, new Vector2(-250f, -170f), 90f, "xp", null);
-            var xv = MakeText(t, "Xp", new Vector2(0.5f, 0.5f), new Vector2(-80f, -170f), TextAnchor.MiddleLeft, 64, XpBlue); xv.text = "+" + x.ToString("N0", En) + " XP"; xv.font = DisplayFont(); xv.rectTransform.sizeDelta = new Vector2(420f, 90f); xv.rectTransform.pivot = new Vector2(0f, 0.5f);
+            RewardIcon(t, new Vector2(-250f, -30f), 90f, "points", null);
+            var pv = MakeText(t, "Points", new Vector2(0.5f, 0.5f), new Vector2(-80f, -30f), TextAnchor.MiddleLeft, 64, OpAmber); pv.text = "+" + p.ToString("N0", En); Serif(pv); pv.rectTransform.sizeDelta = new Vector2(420f, 90f); pv.rectTransform.pivot = new Vector2(0f, 0.5f);
+            RewardIcon(t, new Vector2(-250f, -140f), 90f, "xp", null);
+            var xv = MakeText(t, "Xp", new Vector2(0.5f, 0.5f), new Vector2(-80f, -140f), TextAnchor.MiddleLeft, 64, XpBlue); xv.text = "+" + x.ToString("N0", En) + " XP"; Serif(xv); xv.rectTransform.sizeDelta = new Vector2(420f, 90f); xv.rectTransform.pivot = new Vector2(0f, 0.5f);
             if (p >= 50)
             {
-                MakePrimary(t, "Collect", new Vector2(0.5f, 0f), new Vector2(-222f, 170f), new Vector2(420f, 116f), 36, () => { Rewards.QmCollect(1); Sfx.Pickup(); CloseRewards(); });
-                var ad = MakeButton(t, "×" + Rewards.QmAdMul + " · watch an ad", new Vector2(0.5f, 0f), new Vector2(222f, 170f), new Vector2(420f, 116f), 32, () => Ads.Rewarded("quartermaster", () => { Rewards.QmCollect(Rewards.QmAdMul); Sfx.Pickup(); CloseRewards(); }));
+                MakePrimary(t, "Collect", new Vector2(0.5f, 0f), new Vector2(-222f, 230f), new Vector2(420f, 116f), 36, () => { Rewards.QmCollect(1); Sfx.Pickup(); CloseRewards(); });
+                var ad = MakeButton(t, "×" + Rewards.QmAdMul + " · watch an ad", new Vector2(0.5f, 0f), new Vector2(222f, 230f), new Vector2(420f, 116f), 32, () => Ads.Rewarded("quartermaster", () => { Rewards.QmCollect(Rewards.QmAdMul); Sfx.Pickup(); CloseRewards(); }));
                 ad.GetComponent<Image>().color = XpDeep;
             }
-            MakeGhost(t, p >= 50 ? "Later" : "Close", new Vector2(0.5f, 0f), new Vector2(0f, 60f), new Vector2(300f, 80f), 28, CloseRewards);
+            MakeGhost(t, p >= 50 ? "Later" : "Close", new Vector2(0.5f, 0f), new Vector2(0f, 104f), new Vector2(300f, 80f), 28, CloseRewards);
         }
 
         // ---- the crate ----
@@ -205,8 +208,8 @@ namespace IronNight
             { var vb = view.AddComponent<Button>(); vb.transition = Selectable.Transition.None; vb.onClick.AddListener(() => stage.Tap()); }   // a tap on the crate opens it
             var ey = MakeText(b, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -120), TextAnchor.MiddleCenter, 26, OpAmber); ey.font = BoldFont(); ey.rectTransform.sizeDelta = new Vector2(900, 40);
             int left = Rewards.CratesTotal; ey.text = Spaced(left > 1 ? left + " CRATES WAITING" : "ONE CRATE WAITING");
-            var ti = MakeText(b, "Title", new Vector2(0.5f, 1f), new Vector2(0, -160), TextAnchor.MiddleCenter, 96, OpInk); ti.text = Rewards.CrateName(kind).ToUpperInvariant(); ti.font = DisplayFont(); ti.rectTransform.sizeDelta = new Vector2(1000, 120); ti.verticalOverflow = VerticalWrapMode.Overflow;
-            crateTap = MakeText(b, "Tap", new Vector2(0.5f, 1f), new Vector2(0, -1250), TextAnchor.MiddleCenter, 34, OpAmber); crateTap.text = Spaced("TAP THE CRATE"); crateTap.font = BoldFont(); crateTap.rectTransform.sizeDelta = new Vector2(900, 50);
+            var ti = MakeText(b, "Title", new Vector2(0.5f, 1f), new Vector2(0, -160), TextAnchor.MiddleCenter, 96, OpInk); ti.text = Rewards.CrateName(kind).ToUpperInvariant(); Engrave(ti); ti.rectTransform.sizeDelta = new Vector2(1000, 120); ti.verticalOverflow = VerticalWrapMode.Overflow;
+            crateTap = MakeText(b, "Tap", new Vector2(0.5f, 1f), new Vector2(0, -1250), TextAnchor.MiddleCenter, 34, OpAmber); crateTap.text = Spaced("TAP THE CRATE"); crateTap.font = LabelFont(); crateTap.rectTransform.sizeDelta = new Vector2(900, 50);
             var odds = MakeText(b, "Odds", new Vector2(0.5f, 0f), new Vector2(0, 40), TextAnchor.LowerCenter, 19, OpDim); odds.text = "Inside: " + Rewards.Odds(kind) + ". Crates are never sold."; odds.rectTransform.sizeDelta = new Vector2(960, 80);
             burstFlash = MakeImage(b, "Flash", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(4000f, 4000f), new Color(1f, 0.93f, 0.78f, 0f)); burstFlash.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             stage.Play(kind);

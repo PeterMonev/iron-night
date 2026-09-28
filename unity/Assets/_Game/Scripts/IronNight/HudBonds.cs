@@ -22,7 +22,7 @@ namespace IronNight
             var glow = MakeImage(b.transform, "Glow", new Vector2(0.5f, 0.5f), new Vector2(0, 22), new Vector2(180, 160), new Color(1f, 0.72f, 0.3f, 0.2f)); glow.sprite = Lightswarm.ProceduralSprites.Glow(64, 0.1f); glow.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             var ring = MakeImage(b.transform, "Ring", new Vector2(0.5f, 0.5f), new Vector2(0, 24), new Vector2(104, 104), GoldInk); ring.sprite = Lightswarm.ProceduralSprites.Ring(64, 0.09f); ring.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             var star = MakeImage(b.transform, "Star", new Vector2(0.5f, 0.5f), new Vector2(0, 24), new Vector2(64, 64), GoldInk); star.sprite = StarSprite(); star.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-            var lb = MakeText(b.transform, "Name", new Vector2(0.5f, 0f), new Vector2(0, 34), TextAnchor.LowerCenter, 18, OpAmber); lb.text = Spaced("WAR BONDS"); lb.font = BoldFont(); lb.rectTransform.sizeDelta = new Vector2(184, 26);
+            var lb = MakeText(b.transform, "Name", new Vector2(0.5f, 0f), new Vector2(0, 34), TextAnchor.LowerCenter, 18, OpAmber); lb.text = Spaced("WAR BONDS"); lb.font = LabelFont(); lb.rectTransform.sizeDelta = new Vector2(184, 26);
             bondsTier = MakeText(b.transform, "Tier", new Vector2(0.5f, 0f), new Vector2(0, 8), TextAnchor.LowerCenter, 20, OpInk); bondsTier.font = BoldFont(); bondsTier.rectTransform.sizeDelta = new Vector2(184, 28);
             var badge = MakeImage(b.transform, "Badge", new Vector2(1f, 1f), new Vector2(10, 10), new Vector2(52, 52), new Color(0.86f, 0.22f, 0.16f)); badge.sprite = Lightswarm.ProceduralSprites.Glow(64, 0.9f); badge.rectTransform.pivot = new Vector2(1f, 1f); bondsBadge = badge.gameObject;
             bondsBadgeN = MakeText(badge.transform, "N", new Vector2(0.5f, 0.5f), new Vector2(0, 1), TextAnchor.MiddleCenter, 28, Color.white); bondsBadgeN.font = BoldFont(); bondsBadgeN.rectTransform.sizeDelta = new Vector2(52, 52); bondsBadgeN.rectTransform.pivot = new Vector2(0.5f, 0.5f);
@@ -55,15 +55,15 @@ namespace IronNight
             { var glow = MakeImage(b, "Glow", new Vector2(0.5f, 1f), new Vector2(0f, 250f), new Vector2(1600f, 1100f), new Color(1f, 0.72f, 0.28f, 0.1f)); glow.sprite = Lightswarm.ProceduralSprites.Glow(64, 0.1f); }
             MakeGhost(b, "BACK", new Vector2(0f, 1f), new Vector2(130, -95), new Vector2(200, 80), 26, CloseBonds);
             var gp = GoldPill(b, new Vector2(-50f, -65f), 300f, false); gp.text = Depot.Gold.ToString("N0", En);
-            var ey = MakeText(b, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -150), TextAnchor.MiddleCenter, 26, OpAmber); ey.text = Spaced("SEASON " + season + " · " + Bonds.SeasonName(season).ToUpperInvariant()); ey.font = BoldFont(); ey.rectTransform.sizeDelta = new Vector2(900, 40);
-            var ti = MakeText(b, "Title", new Vector2(0.5f, 1f), new Vector2(0, -190), TextAnchor.MiddleCenter, 110, OpInk); ti.text = "WAR BONDS"; ti.font = DisplayFont(); ti.rectTransform.sizeDelta = new Vector2(900, 140); ti.verticalOverflow = VerticalWrapMode.Overflow;
+            var ey = MakeText(b, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -150), TextAnchor.MiddleCenter, 26, OpAmber); ey.text = Spaced("SEASON " + season + " · " + Bonds.SeasonName(season).ToUpperInvariant()); ey.font = LabelFont(); ey.rectTransform.sizeDelta = new Vector2(900, 40);
+            var ti = MakeText(b, "Title", new Vector2(0.5f, 1f), new Vector2(0, -190), TextAnchor.MiddleCenter, 110, OpInk); ti.text = "WAR BONDS"; Engrave(ti); ti.rectTransform.sizeDelta = new Vector2(900, 140); ti.verticalOverflow = VerticalWrapMode.Overflow;
             var ends = MakeText(b, "Ends", new Vector2(0.5f, 1f), new Vector2(0, -318), TextAnchor.MiddleCenter, 24, OpDim); ends.text = "The season ends in " + Bonds.Left + " · a tier is " + Bonds.StarsPerTier + " stars"; ends.rectTransform.sizeDelta = new Vector2(980, 40);
 
             // how far along
             {
                 var card = MakeCard(b, "Progress", new Vector2(0.5f, 1f), new Vector2(0f, -370f), new Vector2(1000f, 140f), new Color(0.07f, 0.075f, 0.09f, 0.96f), 0.16f); card.rectTransform.pivot = new Vector2(0.5f, 1f); var t = card.transform;
-                var tl = MakeText(t, "TierLabel", new Vector2(0f, 1f), new Vector2(40, -20), TextAnchor.UpperLeft, 20, OpDim); tl.text = Spaced("TIER"); tl.font = BoldFont(); tl.rectTransform.sizeDelta = new Vector2(160, 30);
-                var tn = MakeText(t, "Tier", new Vector2(0f, 1f), new Vector2(38, -44), TextAnchor.UpperLeft, 80, GoldInk); tn.text = tier.ToString(); tn.font = DisplayFont(); tn.rectTransform.sizeDelta = new Vector2(160, 90); tn.verticalOverflow = VerticalWrapMode.Overflow;
+                var tl = MakeText(t, "TierLabel", new Vector2(0f, 1f), new Vector2(40, -20), TextAnchor.UpperLeft, 20, OpDim); tl.text = Spaced("TIER"); tl.font = LabelFont(); tl.rectTransform.sizeDelta = new Vector2(160, 30);
+                var tn = MakeText(t, "Tier", new Vector2(0f, 1f), new Vector2(38, -44), TextAnchor.UpperLeft, 80, GoldInk); tn.text = tier.ToString(); Serif(tn); tn.rectTransform.sizeDelta = new Vector2(160, 90); tn.verticalOverflow = VerticalWrapMode.Overflow;
                 int into = tier >= Bonds.Tiers ? Bonds.StarsPerTier : stars % Bonds.StarsPerTier;
                 var bl = MakeText(t, "BarLine", new Vector2(0f, 1f), new Vector2(200, -34), TextAnchor.UpperLeft, 24, OpInk); bl.rectTransform.sizeDelta = new Vector2(500, 36);
                 bl.text = tier >= Bonds.Tiers ? "Every tier reached" : into + " / " + Bonds.StarsPerTier + " stars to tier " + (tier + 1);
@@ -82,8 +82,8 @@ namespace IronNight
                 cr.anchorMin = cr.anchorMax = cr.pivot = new Vector2(0f, 1f); float width = 150f + Bonds.Tiers * TierW + 20f; cr.sizeDelta = new Vector2(width, 640f);
                 var sr = vp.GetComponent<ScrollRect>(); sr.content = cr; sr.viewport = vr; sr.horizontal = true; sr.vertical = false; sr.movementType = ScrollRect.MovementType.Clamped; sr.inertia = true; sr.decelerationRate = 0.1f; sr.scrollSensitivity = 60f; bondsScroll = sr;
                 var ct = content.transform;
-                var fl = MakeText(ct, "Free", new Vector2(0f, 1f), new Vector2(20, -190), TextAnchor.MiddleLeft, 22, OpDim); fl.text = Spaced("FREE"); fl.font = BoldFont(); fl.rectTransform.sizeDelta = new Vector2(130, 40);
-                var gl = MakeText(ct, "Gold", new Vector2(0f, 1f), new Vector2(20, -455), TextAnchor.MiddleLeft, 22, GoldInk); gl.text = Spaced("GOLD") + "\n" + Spaced("BOND"); gl.font = BoldFont(); gl.rectTransform.sizeDelta = new Vector2(130, 70);
+                var fl = MakeText(ct, "Free", new Vector2(0f, 1f), new Vector2(20, -190), TextAnchor.MiddleLeft, 22, OpDim); fl.text = Spaced("FREE"); fl.font = LabelFont(); fl.rectTransform.sizeDelta = new Vector2(130, 40);
+                var gl = MakeText(ct, "Gold", new Vector2(0f, 1f), new Vector2(20, -455), TextAnchor.MiddleLeft, 22, GoldInk); gl.text = Spaced("GOLD") + "\n" + Spaced("BOND"); gl.font = LabelFont(); gl.rectTransform.sizeDelta = new Vector2(130, 70);
                 var line0 = MakeImage(ct, "Line", new Vector2(0f, 1f), new Vector2(150f + TierW * 0.5f, -31f), new Vector2((Bonds.Tiers - 1) * TierW, 3f), new Color(1f, 1f, 1f, 0.12f)); line0.rectTransform.pivot = new Vector2(0f, 0.5f);
                 if (tier > 1) { var line1 = MakeImage(ct, "Reached", new Vector2(0f, 1f), new Vector2(150f + TierW * 0.5f, -31f), new Vector2((tier - 1) * TierW, 3f), GoldInk); line1.rectTransform.pivot = new Vector2(0f, 0.5f); }
                 for (int n = 1; n <= Bonds.Tiers; n++) TierColumn(ct, n, tier);
@@ -95,7 +95,7 @@ namespace IronNight
             {
                 var card = MakeCard(b, "Bond", new Vector2(0.5f, 1f), new Vector2(0f, -1195f), new Vector2(1000f, 140f), new Color(0.1f, 0.08f, 0.05f, 0.96f), 0.2f); card.rectTransform.pivot = new Vector2(0.5f, 1f); var t = card.transform;
                 card.transform.Find("Edge").GetComponent<Image>().color = new Color(1f, 0.8f, 0.35f, Bonds.GoldBond ? 0.9f : 0.5f);
-                var bt = MakeText(t, "Name", new Vector2(0f, 1f), new Vector2(34, -18), TextAnchor.UpperLeft, 44, GoldInk); bt.text = Bonds.GoldBond ? "GOLD BOND · ACTIVE" : "GOLD BOND"; bt.font = DisplayFont(); bt.rectTransform.sizeDelta = new Vector2(640, 56);
+                var bt = MakeText(t, "Name", new Vector2(0f, 1f), new Vector2(34, -18), TextAnchor.UpperLeft, 44, GoldInk); bt.text = Bonds.GoldBond ? "GOLD BOND · ACTIVE" : "GOLD BOND"; Engrave(bt, true, 0.8f, 2f); bt.rectTransform.sizeDelta = new Vector2(640, 56);
                 var bd = MakeText(t, "Line", new Vector2(0f, 1f), new Vector2(34, -76), TextAnchor.UpperLeft, 22, OpDim); bd.rectTransform.sizeDelta = new Vector2(640, 56);
                 bd.text = Bonds.GoldBond ? "Every gold reward of the season is yours, and a star more every night." : "Every gold reward of the season, and a star more every night.";
                 if (!Bonds.GoldBond) GoldButtonAt(t, new Vector2(1f, 0.5f), new Vector2(-150f, 0f), new Vector2(250f, 100f), "UNLOCK", Bonds.BondGold, () => BondsConfirm("bond", Bonds.BondGold, "Tap again: the gold bond for " + Bonds.BondGold + " gold", Bonds.BuyBond, "Gold bond · the gold rewards are yours"));
@@ -105,7 +105,7 @@ namespace IronNight
             // the week's orders
             {
                 MakeGhost(b, "STANDING ORDERS", new Vector2(0.5f, 1f), new Vector2(370f, -1378f), new Vector2(260f, 52f), 18, ShowOrders);
-                var wh = MakeText(b, "Weekly", new Vector2(0.5f, 1f), new Vector2(-130, -1360), TextAnchor.MiddleCenter, 24, OpDim); wh.text = Spaced("WEEKLY ORDERS") + "  ·  new orders in " + Bonds.WeekLeft; wh.font = BoldFont(); wh.rectTransform.sizeDelta = new Vector2(1000, 40);
+                var wh = MakeText(b, "Weekly", new Vector2(0.5f, 1f), new Vector2(-130, -1360), TextAnchor.MiddleCenter, 24, OpDim); wh.text = Spaced("WEEKLY ORDERS") + "  ·  new orders in " + Bonds.WeekLeft; wh.font = LabelFont(); wh.rectTransform.sizeDelta = new Vector2(1000, 40);
                 var orders = Bonds.WeekOrders;
                 for (int i = 0; i < orders.Length; i++)
                 {
@@ -137,12 +137,12 @@ namespace IronNight
                 var am = MakeText(t, "Amount", new Vector2(0.5f, 0.5f), new Vector2(0f, -30f), TextAnchor.MiddleCenter, 24, gold ? GoldInk : OpInk); am.font = BoldFont(); am.rectTransform.sizeDelta = new Vector2(TierW - 30f, 56f); am.resizeTextForBestFit = true; am.resizeTextMinSize = 14; am.resizeTextMaxSize = 24;
                 am.text = RewardLine(l.kind, l.amount, l.id) + (gold && n == Bonds.Tiers ? " + 100 gold" : "");
                 Vector2 btnPos = new Vector2(0f, 30f), btnSize = new Vector2(TierW - 40f, 50f);
-                if (taken) { var tk = MakeText(t, "Taken", new Vector2(0.5f, 0f), btnPos, TextAnchor.MiddleCenter, 20, new Color(0.45f, 0.85f, 0.5f)); tk.text = Spaced("TAKEN"); tk.font = BoldFont(); tk.rectTransform.sizeDelta = btnSize; tk.rectTransform.pivot = new Vector2(0.5f, 0.5f); var sh = MakeImage(t, "Shade", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(TierW - 20f, 250f), new Color(0.02f, 0.02f, 0.03f, 0.45f)); sh.sprite = Rounded(); sh.type = Image.Type.Sliced; sh.rectTransform.pivot = new Vector2(0.5f, 0.5f); continue; }
-                if (!reached) { var lk = MakeText(t, "Locked", new Vector2(0.5f, 0f), btnPos, TextAnchor.MiddleCenter, 18, OpDim); lk.text = Spaced(gold && !Bonds.GoldBond ? "GOLD BOND" : "TIER " + n); lk.font = BoldFont(); lk.rectTransform.sizeDelta = btnSize; lk.rectTransform.pivot = new Vector2(0.5f, 0.5f); continue; }
+                if (taken) { var tk = MakeText(t, "Taken", new Vector2(0.5f, 0f), btnPos, TextAnchor.MiddleCenter, 20, new Color(0.45f, 0.85f, 0.5f)); tk.text = Spaced("TAKEN"); tk.font = LabelFont(); tk.rectTransform.sizeDelta = btnSize; tk.rectTransform.pivot = new Vector2(0.5f, 0.5f); var sh = MakeImage(t, "Shade", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(TierW - 20f, 250f), new Color(0.02f, 0.02f, 0.03f, 0.45f)); sh.sprite = Rounded(); sh.type = Image.Type.Sliced; sh.rectTransform.pivot = new Vector2(0.5f, 0.5f); continue; }
+                if (!reached) { var lk = MakeText(t, "Locked", new Vector2(0.5f, 0f), btnPos, TextAnchor.MiddleCenter, 18, OpDim); lk.text = Spaced(gold && !Bonds.GoldBond ? "GOLD BOND" : "TIER " + n); lk.font = LabelFont(); lk.rectTransform.sizeDelta = btnSize; lk.rectTransform.pivot = new Vector2(0.5f, 0.5f); continue; }
                 int tn = n;
                 if (!gold || Bonds.GoldBond) { MakePrimary(t, "Claim", new Vector2(0.5f, 0f), btnPos, btnSize, 22, () => { if (Bonds.Claim(tn, gold)) Sfx.Pickup(); RebuildBonds(RewardLine(l.kind, l.amount, l.id) + (l.kind == "supply" || l.kind == "officer" ? " · open it on the title" : "")); }); continue; }
                 if (Bonds.AdClaimable(l)) { var ad = MakeButton(t, "Watch ad", new Vector2(0.5f, 0f), btnPos, btnSize, 22, () => Ads.Rewarded("bonds", () => { if (Bonds.Claim(tn, true, true)) Sfx.Pickup(); RebuildBonds(RewardLine(l.kind, l.amount, l.id)); })); ad.GetComponent<Image>().color = XpDeep; continue; }
-                var need = MakeText(t, "Bond", new Vector2(0.5f, 0f), btnPos, TextAnchor.MiddleCenter, 18, GoldInk); need.text = Spaced("GOLD BOND"); need.font = BoldFont(); need.rectTransform.sizeDelta = btnSize; need.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                var need = MakeText(t, "Bond", new Vector2(0.5f, 0f), btnPos, TextAnchor.MiddleCenter, 18, GoldInk); need.text = Spaced("GOLD BOND"); need.font = LabelFont(); need.rectTransform.sizeDelta = btnSize; need.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             }
         }
 
