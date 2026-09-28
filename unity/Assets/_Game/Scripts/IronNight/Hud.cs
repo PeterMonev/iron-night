@@ -217,7 +217,7 @@ namespace IronNight
                 goldBtn = MakeButton(endSheet.transform, "", new Vector2(0.5f, 0.5f), new Vector2(320, -226), new Vector2(240, 130), 40, () => OnGoldAd?.Invoke());
                 goldBtn.GetComponent<Image>().color = new Color(0.08f, 0.085f, 0.1f, 0.96f); goldBtn.transform.Find("Label").gameObject.SetActive(false);
                 var ge = MakeImage(goldBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(240, 130), new Color(1f, 0.8f, 0.35f, 0.6f)); ge.sprite = Outline(); ge.type = Image.Type.Sliced; ge.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-                var gb = MakeImage(goldBtn.transform, "Bar", new Vector2(0.5f, 0.5f), new Vector2(-46, 0), new Vector2(66, 44), Color.white); gb.sprite = GoldSprite();
+                var gb = MakeImage(goldBtn.transform, "Bar", new Vector2(0.5f, 0.5f), new Vector2(-46, 0), new Vector2(66, 44), Color.white); gb.sprite = GoldSprite(); gb.preserveAspect = true;
                 var gt = MakeText(goldBtn.transform, "Gold", new Vector2(0.5f, 0.5f), new Vector2(34, 0), TextAnchor.MiddleCenter, 44, GoldInk); gt.text = Depot.GoldRepair.ToString(); gt.font = BoldFont(); gt.rectTransform.sizeDelta = new Vector2(110, 60);
             }
             adNote = MakeText(endSheet.transform, "AdNote", new Vector2(0.5f, 0.5f), new Vector2(0, -336), TextAnchor.MiddleCenter, 28, dim); adNote.rectTransform.sizeDelta = new Vector2(900, 100);
@@ -284,11 +284,11 @@ namespace IronNight
             rankBadge = MakeImage(titleSheet.transform, "Rank", new Vector2(0f, 1f), new Vector2(50, -70), new Vector2(84, 84), Color.white); rankBadge.preserveAspect = true; rankBadge.rectTransform.pivot = new Vector2(0f, 1f);
             rankLine = MakeText(titleSheet.transform, "RankLine", new Vector2(0f, 1f), new Vector2(150, -72), TextAnchor.UpperLeft, 26, new Color(0.9f, 0.88f, 0.84f)); rankLine.rectTransform.pivot = new Vector2(0f, 1f); rankLine.rectTransform.sizeDelta = new Vector2(520, 90); rankLine.font = BoldFont();
             { var pts = MakeCard(titleSheet.transform, "Points", new Vector2(1f, 1f), new Vector2(-50, -70), new Vector2(330, 72), new Color(0.06f, 0.07f, 0.09f, 0.75f), 0.2f); pts.rectTransform.pivot = new Vector2(1f, 1f);
-              var coin = MakeImage(pts.transform, "Coin", new Vector2(0f, 0.5f), new Vector2(18, 0), new Vector2(30, 30), new Color(0.96f, 0.68f, 0.24f)); coin.sprite = Lightswarm.ProceduralSprites.Ring(64, 0.16f); coin.rectTransform.pivot = new Vector2(0f, 0.5f);
+              var coin = MakeImage(pts.transform, "Coin", new Vector2(0f, 0.5f), new Vector2(18, 0), new Vector2(30, 30), new Color(0.96f, 0.68f, 0.24f)); Currency(coin, "icon_points", Lightswarm.ProceduralSprites.Ring(64, 0.16f)); coin.rectTransform.pivot = new Vector2(0f, 0.5f);
               var coinCore = MakeImage(pts.transform, "CoinCore", new Vector2(0f, 0.5f), new Vector2(27, 0), new Vector2(12, 12), new Color(0.96f, 0.68f, 0.24f)); coinCore.sprite = Lightswarm.ProceduralSprites.Glow(32, 0.7f); coinCore.rectTransform.pivot = new Vector2(0f, 0.5f);
               pointsLine = MakeText(pts.transform, "Text", new Vector2(0f, 0.5f), new Vector2(64, 0), TextAnchor.MiddleLeft, 30, new Color(0.96f, 0.68f, 0.24f)); pointsLine.rectTransform.pivot = new Vector2(0f, 0.5f); pointsLine.rectTransform.sizeDelta = new Vector2(260, 72); pointsLine.font = BoldFont(); }
             { var xpc = MakeCard(titleSheet.transform, "Xp", new Vector2(1f, 1f), new Vector2(-50, -150), new Vector2(330, 60), new Color(0.06f, 0.07f, 0.09f, 0.75f), 0.2f); xpc.rectTransform.pivot = new Vector2(1f, 1f);
-              var st = MakeImage(xpc.transform, "Star", new Vector2(0f, 0.5f), new Vector2(18, 0), new Vector2(30, 30), XpBlue); st.sprite = StarSprite(); st.rectTransform.pivot = new Vector2(0f, 0.5f);
+              var st = MakeImage(xpc.transform, "Star", new Vector2(0f, 0.5f), new Vector2(18, 0), new Vector2(30, 30), XpBlue); Currency(st, "icon_crewxp", StarSprite()); st.rectTransform.pivot = new Vector2(0f, 0.5f);
               xpLine = MakeText(xpc.transform, "Text", new Vector2(0f, 0.5f), new Vector2(60, 0), TextAnchor.MiddleLeft, 28, XpBlue); xpLine.rectTransform.pivot = new Vector2(0f, 0.5f); xpLine.rectTransform.sizeDelta = new Vector2(200, 60); xpLine.font = BoldFont(); }
             goldLine = GoldPill(titleSheet.transform, new Vector2(-50, -218), 330f, true);
             BuildCrateButton(); BuildBondsButton();
@@ -330,7 +330,7 @@ namespace IronNight
             trainBtn = MakeGhost(titleSheet.transform, "Daily training · watch an ad · +" + Depot.DailyTrainXp + " crew XP", new Vector2(0.5f, 0f), new Vector2(0, 392), new Vector2(920, 64), 24, () => { if (Depot.DailyTrainReady) Ads.Rewarded("train", () => { if (Depot.ClaimDailyTrain()) { Sfx.Pickup(); trainBtn.SetActive(false); titleStats.rectTransform.anchoredPosition = new Vector2(0, 350); Tick(xpLine, Depot.CrewXp, "", " XP"); } }); }, 0.12f);
             trainBtn.GetComponent<Image>().color = new Color(0.12f, 0.2f, 0.32f, 0.92f);
             { var tl = trainBtn.transform.Find("Label").GetComponent<Text>(); tl.rectTransform.anchoredPosition = new Vector2(20, 0);
-              var ts = MakeImage(trainBtn.transform, "Star", new Vector2(0.5f, 0.5f), new Vector2(20f - tl.preferredWidth / 2f - 24f, 0), new Vector2(30, 30), XpBlue); ts.sprite = StarSprite(); ts.rectTransform.pivot = new Vector2(0.5f, 0.5f); }
+              var ts = MakeImage(trainBtn.transform, "Star", new Vector2(0.5f, 0.5f), new Vector2(20f - tl.preferredWidth / 2f - 24f, 0), new Vector2(30, 30), XpBlue); Currency(ts, "icon_crewxp", StarSprite()); ts.rectTransform.pivot = new Vector2(0.5f, 0.5f); }
             reserveNote = MakeText(titleSheet.transform, "ReserveNote", new Vector2(0.5f, 0f), new Vector2(235, 470), TextAnchor.MiddleCenter, 22, dim); reserveNote.text = ""; reserveNote.rectTransform.pivot = new Vector2(0.5f, 0.5f); reserveNote.rectTransform.sizeDelta = new Vector2(450, 70);
             titleStats = MakeText(titleSheet.transform, "Stats", new Vector2(0.5f, 0f), new Vector2(0, 300), TextAnchor.MiddleCenter, 24, new Color(0.72f, 0.7f, 0.66f)); titleStats.rectTransform.sizeDelta = new Vector2(940, 80);
             // the standing orders on their own sheet
@@ -416,10 +416,10 @@ namespace IronNight
             { var back = MakeGhost(depotSheet.transform, "Back", new Vector2(0f, 1f), new Vector2(120, -105), new Vector2(180, 70), 26, () => OnBack?.Invoke(), 0.25f); back.transform.Find("Label").GetComponent<Text>().text = Spaced("BACK"); }
             { var dt = MakeText(depotSheet.transform, "Title", new Vector2(0.5f, 1f), new Vector2(0, -110), TextAnchor.MiddleCenter, 84, ink); dt.text = "DEPOT"; Engrave(dt); dt.verticalOverflow = VerticalWrapMode.Overflow; var dsh = dt.gameObject.AddComponent<UnityEngine.UI.Shadow>(); dsh.effectColor = new Color(0f, 0f, 0f, 0.8f); dsh.effectDistance = new Vector2(0f, -5f); }
             { var pts = MakeCard(depotSheet.transform, "Points", new Vector2(1f, 1f), new Vector2(-50, -70), new Vector2(300, 72), new Color(0.06f, 0.07f, 0.09f, 0.75f), 0.2f); pts.rectTransform.pivot = new Vector2(1f, 1f);
-              var coin = MakeImage(pts.transform, "Coin", new Vector2(0f, 0.5f), new Vector2(18, 0), new Vector2(30, 30), new Color(0.96f, 0.68f, 0.24f)); coin.sprite = Lightswarm.ProceduralSprites.Ring(64, 0.16f); coin.rectTransform.pivot = new Vector2(0f, 0.5f);
+              var coin = MakeImage(pts.transform, "Coin", new Vector2(0f, 0.5f), new Vector2(18, 0), new Vector2(30, 30), new Color(0.96f, 0.68f, 0.24f)); Currency(coin, "icon_points", Lightswarm.ProceduralSprites.Ring(64, 0.16f)); coin.rectTransform.pivot = new Vector2(0f, 0.5f);
               depotPoints = MakeText(pts.transform, "Text", new Vector2(0f, 0.5f), new Vector2(64, 0), TextAnchor.MiddleLeft, 30, new Color(0.96f, 0.68f, 0.24f)); depotPoints.rectTransform.pivot = new Vector2(0f, 0.5f); depotPoints.rectTransform.sizeDelta = new Vector2(230, 72); depotPoints.font = BoldFont(); }
             { var xpc = MakeCard(depotSheet.transform, "Xp", new Vector2(1f, 1f), new Vector2(-50, -150), new Vector2(300, 60), new Color(0.06f, 0.07f, 0.09f, 0.75f), 0.2f); xpc.rectTransform.pivot = new Vector2(1f, 1f);
-              var st = MakeImage(xpc.transform, "Star", new Vector2(0f, 0.5f), new Vector2(18, 0), new Vector2(30, 30), XpBlue); st.sprite = StarSprite(); st.rectTransform.pivot = new Vector2(0f, 0.5f);
+              var st = MakeImage(xpc.transform, "Star", new Vector2(0f, 0.5f), new Vector2(18, 0), new Vector2(30, 30), XpBlue); Currency(st, "icon_crewxp", StarSprite()); st.rectTransform.pivot = new Vector2(0f, 0.5f);
               depotXp = MakeText(xpc.transform, "Text", new Vector2(0f, 0.5f), new Vector2(60, 0), TextAnchor.MiddleLeft, 28, XpBlue); depotXp.rectTransform.pivot = new Vector2(0f, 0.5f); depotXp.rectTransform.sizeDelta = new Vector2(200, 60); depotXp.font = BoldFont(); }
             depotGold = GoldPill(depotSheet.transform, new Vector2(-50, -218), 300f, true);
             MakeText(depotSheet.transform, "Hint", new Vector2(0.5f, 0f), new Vector2(0, 1062), TextAnchor.MiddleCenter, 22, dim).text = "drag the tank to turn it · tap a tank in the list to see it";
@@ -716,7 +716,7 @@ namespace IronNight
             var dim = new Color(0.66f, 0.64f, 0.59f); int left = Depot.AdsLeftToday;
             var row = MakeImage(depotRows, "Row xp", new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 112), new Color(0.07f, 0.1f, 0.14f, 0.96f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);
             var edge = MakeImage(row.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(940, 112), new Color(XpBlue.r, XpBlue.g, XpBlue.b, 0.35f)); edge.sprite = Outline(); edge.type = Image.Type.Sliced; edge.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-            var st = MakeImage(row.transform, "Star", new Vector2(0f, 0.5f), new Vector2(30, 0), new Vector2(46, 46), XpBlue); st.sprite = StarSprite(); st.rectTransform.pivot = new Vector2(0f, 0.5f);
+            var st = MakeImage(row.transform, "Star", new Vector2(0f, 0.5f), new Vector2(30, 0), new Vector2(46, 46), XpBlue); Currency(st, "icon_crewxp", StarSprite()); st.rectTransform.pivot = new Vector2(0f, 0.5f);
             var lb = MakeText(row.transform, "Label", new Vector2(0f, 1f), new Vector2(96, -18), TextAnchor.UpperLeft, 22, dim); lb.text = "Crew experience · trains the men"; lb.rectTransform.sizeDelta = new Vector2(440, 30);
             var val = MakeText(row.transform, "Value", new Vector2(0f, 1f), new Vector2(96, -48), TextAnchor.UpperLeft, 40, XpBlue); val.text = Depot.CrewXp.ToString("N0", En) + " XP"; val.font = BoldFont(); val.rectTransform.sizeDelta = new Vector2(440, 52); val.verticalOverflow = VerticalWrapMode.Overflow;
             var ad = MakeButton(row.transform, left > 0 ? "Watch an ad · +" + Depot.AdCrewXp + " XP" : "No more ads today", new Vector2(1f, 0f), new Vector2(-195, 66), new Vector2(350, 62), 24, () => { if (Depot.AdsLeftToday > 0) Ads.Rewarded("crewxp", () => { if (Depot.WatchXpAd()) { Sfx.Pickup(); RefreshDepot(); } }); });
@@ -1028,6 +1028,15 @@ namespace IronNight
         GameObject opsSheet; Transform opsBody; Text opsCount; static Sprite starSprite;
         static readonly Color OpAmber = new Color(0.96f, 0.68f, 0.24f), OpInk = new Color(0.93f, 0.91f, 0.86f), OpDim = new Color(0.66f, 0.64f, 0.59f), OpOff = new Color(0.22f, 0.22f, 0.24f);
         static Sprite StarSprite() => starSprite ??= Lightswarm.ProceduralSprites.Star(128);
+        /// <summary>A currency's icon: the painted picture (Resources/UI/icon_points, icon_crewxp) in its own colours and a
+        /// fifth larger than the drawn shape it replaces; false, with the drawn shape in its tint, when the picture is
+        /// missing.</summary>
+        static bool Currency(Image img, string painted, Sprite drawn)
+        {
+            var s = UiSprite(painted);
+            if (s == null) { img.sprite = drawn; return false; }
+            img.sprite = s; img.color = Color.white; img.preserveAspect = true; img.rectTransform.sizeDelta *= 1.2f; return true;
+        }
 
         /// <summary>The operations sheet from the title: the three operations, then an operation's nights, then a night's briefing.</summary>
         void ShowOperations()

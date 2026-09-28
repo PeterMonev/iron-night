@@ -114,6 +114,7 @@ namespace IronNight
         public void Play(string kind)
         {
             Place(kind); t = 0f; shakeT = -1f; burstT = -1f; landed = false; inner.intensity = 0f; beam.gameObject.SetActive(false); sparks.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            cam.transform.LookAt(Home + new Vector3(0f, Mathf.Clamp(crateH * 0.55f, 0.4f, 0.75f), 0f));   // the crate's middle, a low one no longer at the foot of the frame
             cam.targetTexture = rt; cam.enabled = true; Pose(0f);
         }
         /// <summary>The tap: it shakes, then bursts.</summary>

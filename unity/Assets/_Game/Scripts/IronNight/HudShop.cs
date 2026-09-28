@@ -19,6 +19,7 @@ namespace IronNight
         public static Sprite GoldSprite()
         {
             if (goldSprite != null) return goldSprite;
+            goldSprite = UiSprite("icon_gold"); if (goldSprite != null) return goldSprite;   // the painted stack of bars, or the drawn bar below when it is missing
             const int W = 96, H = 64; var tex = new Texture2D(W, H, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
             // the three faces we see, as quads from the bottom left: the front, the top, the right side
             var front = new[] { new Vector2(6, 6), new Vector2(78, 6), new Vector2(66, 30), new Vector2(18, 30) };
@@ -52,7 +53,7 @@ namespace IronNight
         static void GoldPile(Transform parent, Vector2 center, Vector2 box, int bars)
         {
             int rows = bars <= 1 ? 1 : bars <= 3 ? 2 : bars <= 6 ? 3 : bars <= 10 ? 4 : 5;
-            float w = Mathf.Min(box.x / (rows * 0.78f + 0.22f), box.y * 1.5f / (1f + (rows - 1) * 0.42f)), h = w / 1.5f;   // the bar picture is 3:2
+            var gs = GoldSprite(); float aspect = gs.rect.width / gs.rect.height, w = Mathf.Min(box.x / (rows * 0.78f + 0.22f), box.y * aspect / (1f + (rows - 1) * 0.42f)), h = w / aspect;   // as wide against its height as the picture
             for (int r = 0; r < rows; r++)
             {
                 int n = rows - r; float y = center.y - box.y * 0.5f + h * 0.5f + r * h * 0.42f;
@@ -66,7 +67,7 @@ namespace IronNight
         {
             var pill = MakeCard(parent, "Gold", new Vector2(1f, 1f), topRight, new Vector2(width, 60f), new Color(0.06f, 0.07f, 0.09f, 0.75f), 0.2f); pill.rectTransform.pivot = new Vector2(1f, 1f);
             pill.transform.Find("Edge").GetComponent<Image>().color = new Color(1f, 0.8f, 0.35f, 0.4f);
-            var bar = MakeImage(pill.transform, "Bar", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(45f, 30f), Color.white); bar.sprite = GoldSprite(); bar.rectTransform.pivot = new Vector2(0f, 0.5f);
+            var bar = MakeImage(pill.transform, "Bar", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(45f, 30f), Color.white); bar.sprite = GoldSprite(); bar.preserveAspect = true; bar.rectTransform.pivot = new Vector2(0f, 0.5f);
             var t = MakeText(pill.transform, "Text", new Vector2(0f, 0.5f), new Vector2(64f, 0f), TextAnchor.MiddleLeft, 28, GoldInk); t.rectTransform.pivot = new Vector2(0f, 0.5f); t.rectTransform.sizeDelta = new Vector2(width - 130f, 60f); t.font = BoldFont();
             if (!opens) return t;
             var plus = MakeImage(pill.transform, "Plus", new Vector2(1f, 0.5f), new Vector2(-10f, 0f), new Vector2(40f, 40f), OpAmber); plus.sprite = Rounded(); plus.type = Image.Type.Sliced;
@@ -189,7 +190,7 @@ namespace IronNight
             bool tall = size.y > 105f;
             var w = MakeText(btn.transform, "What", new Vector2(0.5f, 0.5f), new Vector2(tall ? 0f : 60f, tall ? 22f : 0f), TextAnchor.MiddleCenter, tall ? 26 : 24, OpInk); w.text = what; w.font = BoldFont(); w.rectTransform.sizeDelta = new Vector2(size.x - 20f, 40f);
             float px = tall ? -24f : -size.x * 0.5f + 60f, py = tall ? -22f : 0f;
-            var bar = MakeImage(btn.transform, "Bar", new Vector2(0.5f, 0.5f), new Vector2(px - 26f, py), new Vector2(42f, 28f), Color.white); bar.sprite = GoldSprite();
+            var bar = MakeImage(btn.transform, "Bar", new Vector2(0.5f, 0.5f), new Vector2(px - 26f, py), new Vector2(42f, 28f), Color.white); bar.sprite = GoldSprite(); bar.preserveAspect = true;
             var g = MakeText(btn.transform, "Gold", new Vector2(0.5f, 0.5f), new Vector2(px + 32f, py), TextAnchor.MiddleCenter, 30, GoldInk); g.text = gold.ToString("N0", En); g.font = BoldFont(); g.rectTransform.sizeDelta = new Vector2(90f, 40f);
             btn.transform.Find("Label").gameObject.SetActive(false);
         }

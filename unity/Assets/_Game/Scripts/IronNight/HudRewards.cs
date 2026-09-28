@@ -110,11 +110,11 @@ namespace IronNight
         {
             if (kind == "points")
             {
-                var ring = MakeImage(parent, "Coin", new Vector2(0.5f, 0.5f), center, new Vector2(size, size), OpAmber); ring.sprite = Lightswarm.ProceduralSprites.Ring(64, 0.16f); ring.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-                var core = MakeImage(parent, "Core", new Vector2(0.5f, 0.5f), center, new Vector2(size * 0.4f, size * 0.4f), OpAmber); core.sprite = Lightswarm.ProceduralSprites.Glow(32, 0.7f); core.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                var ring = MakeImage(parent, "Coin", new Vector2(0.5f, 0.5f), center, new Vector2(size, size), OpAmber); ring.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                if (!Currency(ring, "icon_points", Lightswarm.ProceduralSprites.Ring(64, 0.16f))) { var core = MakeImage(parent, "Core", new Vector2(0.5f, 0.5f), center, new Vector2(size * 0.4f, size * 0.4f), OpAmber); core.sprite = Lightswarm.ProceduralSprites.Glow(32, 0.7f); core.rectTransform.pivot = new Vector2(0.5f, 0.5f); }
             }
-            else if (kind == "xp" || kind == "premium") { var st = MakeImage(parent, "Star", new Vector2(0.5f, 0.5f), center, new Vector2(size, size), kind == "xp" ? XpBlue : GoldInk); st.sprite = StarSprite(); st.rectTransform.pivot = new Vector2(0.5f, 0.5f); }
-            else if (kind == "gold") { var g = MakeImage(parent, "Gold", new Vector2(0.5f, 0.5f), center, new Vector2(size * 1.3f, size * 0.87f), Color.white); g.sprite = GoldSprite(); g.rectTransform.pivot = new Vector2(0.5f, 0.5f); }
+            else if (kind == "xp" || kind == "premium") { var st = MakeImage(parent, "Star", new Vector2(0.5f, 0.5f), center, new Vector2(size, size), kind == "xp" ? XpBlue : GoldInk); if (kind != "xp" || !Currency(st, "icon_crewxp", StarSprite())) st.sprite = StarSprite(); st.rectTransform.pivot = new Vector2(0.5f, 0.5f); }
+            else if (kind == "gold") { var g = MakeImage(parent, "Gold", new Vector2(0.5f, 0.5f), center, new Vector2(size * 1.3f, size * 0.87f), Color.white); g.sprite = GoldSprite(); g.preserveAspect = true; g.rectTransform.pivot = new Vector2(0.5f, 0.5f); }
             else if (kind == "camo") { var c = MakeImage(parent, "Swatch", new Vector2(0.5f, 0.5f), center, new Vector2(size, size), CamoColor(id)); c.sprite = Rounded(); c.type = Image.Type.Sliced; c.rectTransform.pivot = new Vector2(0.5f, 0.5f); }
             else { var c = MakeImage(parent, "Crate", new Vector2(0.5f, 0.5f), center, new Vector2(size * 1.25f, size * 1.25f), Color.white); c.sprite = CrateStage.Picture(kind); c.preserveAspect = true; c.rectTransform.pivot = new Vector2(0.5f, 0.5f); }
         }
