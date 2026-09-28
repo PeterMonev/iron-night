@@ -26,29 +26,61 @@ namespace IronNight
         /// <summary>The sound switch on the pause sheet; remembered between nights.</summary>
         public static bool Muted { get => PlayerPrefs.GetInt("sound", 1) == 0; set { PlayerPrefs.SetInt("sound", value ? 0 : 1); PlayerPrefs.Save(); AudioListener.volume = value ? 0f : 1f; } }
         public static bool MusicOff { get => PlayerPrefs.GetInt("music", 1) == 0; set { PlayerPrefs.SetInt("music", value ? 0 : 1); PlayerPrefs.Save(); if (instance != null) instance.MusicTick(0f); } }
-        AudioSource music; float musicWant;   // the menu theme: up in the hangar, out in the field
+        // ---- the music: a theme for each part of the evening (Resources/Audio/music_<name>), on two decks that crossfade ----
+        class Deck { public AudioSource src; public float want, rate; public bool on, held; }   // on: given a clip to play; held: paused by the music switch
+        readonly Deck[] decks = new Deck[2]; int live = -1; string theme;
+        static float ThemeGain(string t) => t == "menu" ? 0.34f : t == "battle" ? 0.3f : t == "boss" ? 0.3f : 0.6f;   // the drums are 5 dB louder than the rest
+        static float ThemeSeam(string t) => t == "menu" ? 5f : t == "battle" ? 3f : t == "boss" ? 4f : 0f;   // seconds before its end a looping theme crosses into its start (0: played once)
+        static float ThemeFrom(string t) => t == "boss" ? 0.8f : 0f;   // past a silence at the head
 
-        /// <summary>The march in the menu: fades in when the hangar is on screen, out when the night starts.</summary>
-        public static void Music(bool on)
+        /// <summary>The theme to play now: "menu" in the hangar, "battle" under the fight, "boss" while the Tiger lives,
+        /// "dawn" once at the win; null for silence. Whatever plays crossfades into it.</summary>
+        public static void Theme(string name)
         {
-            if (instance == null) return;
-            if (instance.music == null)
-            {
-                var clip = Resources.Load<AudioClip>("Audio/menu_theme"); if (clip == null) return;
-                var go = new GameObject("Music"); go.transform.SetParent(instance.transform, false);
-                instance.music = go.AddComponent<AudioSource>(); instance.music.clip = clip; instance.music.loop = true; instance.music.volume = 0f; instance.music.spatialBlend = 0f; instance.music.priority = 0;
-            }
-            instance.musicWant = on ? 0.38f : 0f;
-            if (on && !instance.music.isPlaying && !MusicOff) instance.music.Play();
+            if (instance == null || instance.theme == name) return;
+            instance.theme = name; instance.Cross(name, name == "dawn" ? 1.2f : 2.5f); Debug.Log("Music: " + (name ?? "silence"));
+        }
+        /// <summary>What the decks play now, for the self-test's log: each playing deck's clip, volume and place in it.</summary>
+        public static string NowPlaying()
+        {
+            if (instance == null) return "no sound";
+            var sb = new System.Text.StringBuilder(instance.theme ?? "silence");
+            foreach (var d in instance.decks) if (d != null && d.on && d.src.clip != null) sb.Append(" | ").Append(d.src.clip.name).Append(' ').Append(d.src.volume.ToString("0.00")).Append(" @ ").Append(d.src.time.ToString("0.0")).Append('/').Append(d.src.clip.length.ToString("0.0")).Append(d.src.isPlaying ? "" : " stopped");
+            return sb.ToString();
+        }
+        /// <summary>The title's switch: the hangar's theme, or silence as the night starts.</summary>
+        public static void Music(bool on) => Theme(on ? "menu" : null);
+
+        void Cross(string name, float seconds)
+        {
+            foreach (var d in decks) if (d != null && d.on) { d.want = 0f; d.rate = Mathf.Max(0.02f, d.src.volume / Mathf.Max(0.1f, seconds)); }
+            if (name == null) { live = -1; return; }
+            var clip = Resources.Load<AudioClip>("Audio/music_" + name); if (clip == null) { live = -1; return; }
+            int k = live < 0 ? 0 : 1 - live; var dk = decks[k] ??= NewDeck(k);
+            dk.src.Stop(); dk.src.clip = clip; dk.src.volume = 0f; dk.src.time = Mathf.Min(ThemeFrom(name), clip.length * 0.5f);
+            dk.want = ThemeGain(name); dk.rate = dk.want / Mathf.Max(0.1f, seconds); dk.held = false; dk.on = true; dk.src.Play(); live = k;
+        }
+        Deck NewDeck(int k)
+        {
+            var go = new GameObject("Music " + k); go.transform.SetParent(transform, false);
+            var s = go.AddComponent<AudioSource>(); s.loop = false; s.playOnAwake = false; s.spatialBlend = 0f; s.priority = 0; s.ignoreListenerPause = true; return new Deck { src = s };
         }
         void Update() { MusicTick(Time.unscaledDeltaTime); }
 
         void MusicTick(float dt)
         {
-            if (music == null) return;
-            float want = MusicOff ? 0f : musicWant;
-            music.volume = Mathf.MoveTowards(music.volume, want, dt <= 0f ? 1f : dt * 0.7f);
-            if (music.volume <= 0.001f && music.isPlaying) music.Pause(); else if (want > 0f && !music.isPlaying) music.UnPause();
+            bool off = MusicOff;
+            foreach (var d in decks)
+            {
+                if (d == null || !d.on) continue;
+                if (off) { if (d.src.isPlaying) { d.src.Pause(); d.held = true; } continue; }
+                if (d.held) { d.src.UnPause(); d.held = false; }
+                d.src.volume = dt <= 0f ? d.want : Mathf.MoveTowards(d.src.volume, d.want, Mathf.Max(d.rate, 0.02f) * dt);
+                if ((d.want <= 0f && d.src.volume <= 0.001f) || !d.src.isPlaying) { d.src.Stop(); d.on = false; }   // faded out, or a theme played once has run to its end
+            }
+            if (off || live < 0 || theme == null) return;
+            var lv = decks[live]; float seam = ThemeSeam(theme);
+            if (lv != null && lv.on && seam > 0f && lv.src.clip != null && lv.src.time >= lv.src.clip.length - seam) Cross(theme, seam);   // a looping theme crosses into its own start
         }
 
         // ---- the DSP kit: everything works on float buffers at 44.1 kHz ----

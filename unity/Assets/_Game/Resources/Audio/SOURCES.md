@@ -30,8 +30,17 @@ Sound Effects Free License (free for commercial use). Neither may be redistribut
 | pickup | Mixkit 2544 "Metal button radio ping" | Mixkit |
 | levelUp | Mixkit 265 "Quick positive video game notification interface" | Mixkit |
 
-## Menu theme
-`menu_theme.wav` — "The U.S. Field Artillery" (John Philip Sousa, 1917; the tune of "The Army Goes Rolling Along"),
-performed by the United States Marine Band, 2019. A work of the US federal government: public domain.
-Source: https://commons.wikimedia.org/wiki/File:Sousa%27s_%22U.S._Field_Artillery%22_-_United_States_Marine_Band_(2019).mp3
-Prepared with `art/pipeline/music-prep.py` (stereo 44.1 kHz, fades, normalised); imported streaming + Vorbis.
+## Music
+Four themes from Pixabay (Pixabay Content License: free for commercial use, no attribution required, not to be
+redistributed as standalone files), kept as the downloaded MP3s; Unity imports them compressed in memory as Vorbis, so
+two decks can play one theme at once for its seamless loop (`Sfx.Theme`).
+
+| Clip | Where | Source | Author |
+|---|---|---|---|
+| music_menu | the hangar | Pixabay 219094 "Battlefield Borders (Ambience)", 2:00 | AberrantRealities |
+| music_battle | under the fight | Pixabay 444879 "Echoes of the Battlefield - Cinematic Percussion Ambience", 3:39 | DesiFreeMusic |
+| music_boss | while the Tiger Ace or the King Tiger lives | Pixabay 493408 "Cinematic Drums War", 1:50 | Alec_Koff |
+| music_dawn | once, at the win | Pixabay 293125 "Majestic Brass Fanfare", 0:51 | Luis_Humanoide |
+
+Until 2026-09-28 the menu played Sousa's "The U.S. Field Artillery" by the United States Marine Band (public domain,
+`menu_theme.wav`, in the git history).

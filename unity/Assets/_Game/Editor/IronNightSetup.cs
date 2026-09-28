@@ -188,8 +188,8 @@ namespace IronNight.EditorTools
             foreach (var guid in AssetDatabase.FindAssets("t:AudioClip", new[] { "Assets/_Game/Resources/Audio" }))
             {
                 var path = AssetDatabase.GUIDToAssetPath(guid); var imp = AssetImporter.GetAtPath(path) as AudioImporter; if (imp == null) continue;
-                bool music = path.Contains("menu_theme"); var s = imp.defaultSampleSettings;
-                var want = music ? AudioClipLoadType.Streaming : AudioClipLoadType.DecompressOnLoad;
+                bool music = path.Contains("/music_"); var s = imp.defaultSampleSettings;   // the themes: two decks may play one at once, so in memory, not streamed
+                var want = music ? AudioClipLoadType.CompressedInMemory : AudioClipLoadType.DecompressOnLoad;
                 var fmt = music ? AudioCompressionFormat.Vorbis : AudioCompressionFormat.PCM;
                 if (s.loadType == want && s.compressionFormat == fmt) continue;
                 s.loadType = want; s.compressionFormat = fmt; s.quality = 0.55f; imp.defaultSampleSettings = s; imp.SaveAndReimport();

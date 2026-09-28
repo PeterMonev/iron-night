@@ -15,6 +15,7 @@ What was used to make Iron Night, under which license, and what each license ask
 | Mockup placeholder sprites (not shipped) | UnLucky Studio "Top Down Planes" (OpenGameArt) | CC0 | none |
 | Sound effects (guns, hits, explosions, engine, tracks, wind, rain, front line) | Pixabay sound library, listed per file in unity/Assets/_Game/Resources/Audio/SOURCES.md | Pixabay Content License | free for commercial use, no attribution; not to be redistributed as standalone files |
 | Sound effects (UI, heavy gun) | Mixkit, listed per file in the same SOURCES.md | Mixkit Sound Effects Free License | free for commercial use, no attribution; not to be redistributed as standalone files |
+| Music (the hangar, the fight, the boss, the dawn) | Pixabay: "Battlefield Borders" (AberrantRealities), "Echoes of the Battlefield" (DesiFreeMusic), "Cinematic Drums War" (Alec_Koff), "Majestic Brass Fanfare" (Luis_Humanoide); listed in the same SOURCES.md | Pixabay Content License | free for commercial use, no attribution; not to be redistributed as standalone files |
 | Effects, ground details, UI | procedural, written for this project | — | — |
 
 Generated images and models are not copyrightable works by themselves; the code, the game design, the scene compositions

@@ -95,6 +95,7 @@ namespace IronNight
                 if (shotIn > 0f) { shotIn -= dt; if (shotIn <= 0f) Shot(shotLabel); }
                 if (closeIn > 0f) { closeIn -= dt; if (closeIn <= 0f) Close(); }
                 if ((nextLook -= dt) <= 0f) { nextLook = 1.5f; LostTexts(); }
+                if ((nextMusic -= dt) <= 0f) { nextMusic = 10f; Debug.Log("QA music: " + Sfx.NowPlaying()); }
                 if (b == null) b = FindAnyObjectByType<Battle>();
                 if (b == null || b.hud == null || b.stick == null) return;
                 if (b.phase != lastPhase)
@@ -190,7 +191,7 @@ namespace IronNight
                 return hits.Count > 0 && (hits[0].gameObject == btn.gameObject || hits[0].gameObject.transform.IsChildOf(btn.transform));
             }
             readonly HashSet<string> hidden = new HashSet<string>();
-            readonly HashSet<string> lost = new HashSet<string>(); readonly Dictionary<Text, string> suspects = new Dictionary<Text, string>(); float nextLook = 1.5f;
+            readonly HashSet<string> lost = new HashSet<string>(); readonly Dictionary<Text, string> suspects = new Dictionary<Text, string>(); float nextLook = 1.5f, nextMusic = 3f;
             /// <summary>Every text on screen that has words but draws none of them: a line taller than its box, or a box too
             /// small for the smallest size it may shrink to. Counted at the second look that finds it so, with the same words.</summary>
             void LostTexts()

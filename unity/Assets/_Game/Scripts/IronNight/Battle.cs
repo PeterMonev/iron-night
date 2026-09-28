@@ -381,7 +381,7 @@ namespace IronNight
         void HoldOn()
         {
             if (endless || t < NightLength) return;
-            endless = true; phase = Phase.Play; stick.Blocked = false; hud.HideEnd(); enemyRangeMul *= 1.25f; spawnTimer = Mathf.Min(spawnTimer, 4f);
+            endless = true; phase = Phase.Play; stick.Blocked = false; hud.HideEnd(); Sfx.Theme("battle"); enemyRangeMul *= 1.25f; spawnTimer = Mathf.Min(spawnTimer, 4f);
             hud.Toast("Daylight · the enemy sees everything · points ×1.5", 3.5f); Radio("start");
         }
 
@@ -620,7 +620,7 @@ namespace IronNight
                 hud.Popup(v.transform.position, "+" + worth * 50, new Color(0.95f, 0.66f, 0.23f)); shake = Mathf.Max(shake, Dist(v, Leader) < 25f ? 0.5f : 0.2f);
                 combo = Time.time - lastKill < 4f ? combo + 1 : 1; lastKill = Time.time;
                 if (combo >= 2) { int bonus = combo * 25; score += bonus; hud.Popup(v.transform.position + Vector3.up * 3f, "×" + combo + " +" + bonus, new Color(1f, 0.92f, 0.6f)); if (combo == 3) hud.Toast("Triple kill", 1.8f); else if (combo == 5) hud.Toast("Rampage", 1.8f); }
-                if (v == boss) { score += 1500; bossKilled = true; shake = 2f; SlowMo(0.8f); hud.HideBoss(); hud.Toast("Tiger Ace destroyed · +1500"); }
+                if (v == boss) { score += 1500; bossKilled = true; shake = 2f; SlowMo(0.8f); hud.HideBoss(); Sfx.Theme("battle"); hud.Toast("Tiger Ace destroyed · +1500"); }
                 if (v == ace) { score += 600; shake = Mathf.Max(shake, 1f); SlowMo(0.7f); Depot.Tally("acesNamed", 1); nightAces++; hud.Popup(v.transform.position, "+600", new Color(1f, 0.8f, 0.4f)); if (nem != null && !nemReported) { nemReported = true; nemEscaped = Nemesis.Knocked(nem, NightPlace); } hud.Toast(nemEscaped ? nem.Title + " bailed out of the burning tank · he will be back" : aceName + " is finished · +600", 3f); Radio("kill"); }
                 Killcam(v, worth * 50 + (v == boss ? 1500 : 0) + (v == ace ? 600 : 0));
                 if (xp >= xpNeed) LevelUp(); else hud.SetLevel(level, (float)xp / xpNeed);
@@ -755,7 +755,7 @@ namespace IronNight
             var bossSpec = winter && VehicleSpec.Available(VehicleSpec.KingTiger) ? VehicleSpec.KingTiger : VehicleSpec.TigerAce;
             boss = Foe(bossSpec, L.transform.position + f * 52f, L.yaw + Mathf.PI);
             foreach (var side in new[] { -1f, 1f }) Foe(VehicleSpec.PanzerIV, L.transform.position + f * 58f + r * side * 9f, L.yaw + Mathf.PI);
-            hud.ShowBoss(bossSpec.name); hud.Toast(bossSpec == VehicleSpec.KingTiger ? "King Tiger · kill it before dawn" : "Tiger Ace · kill it before dawn"); Debug.Log("Iron Night: boss spawned at " + t.ToString("0.0"));
+            hud.ShowBoss(bossSpec.name); Sfx.Theme("boss"); hud.Toast(bossSpec == VehicleSpec.KingTiger ? "King Tiger · kill it before dawn" : "Tiger Ace · kill it before dawn"); Debug.Log("Iron Night: boss spawned at " + t.ToString("0.0"));
         }
 
         /// <summary>Kursk's wave: a Panzerkeil driving straight at the platoon from 62 m ahead, a Tiger at the tip and the
@@ -1992,7 +1992,7 @@ namespace IronNight
         void End(bool dawn)
         {
             if (phase == Phase.End) return;
-            phase = Phase.End; stick.Blocked = true; EndOrbit();
+            phase = Phase.End; stick.Blocked = true; EndOrbit(); Sfx.Theme(dawn ? "dawn" : null);
             int earned = Mathf.RoundToInt(score * (veteran ? 1.5f : 1f) * (endless ? 1.5f : 1f) * routePay * (premiumNight ? Depot.PremiumMul : 1f)) * (doubled ? 2 : 1) + (dawn || endless ? 500 : 0);
             Depot.AddPoints(earned - banked); banked = earned;                       // a revived night banks only what is new
             if (!nightRecorded) { Depot.RecordNight(kills, t); nightRecorded = true; }
@@ -2143,7 +2143,7 @@ namespace IronNight
             var L = Vehicle.Create(Wingman, true, platoon.Count > 0 ? platoon[0].transform.position - platoon[0].Forward * 8f : Vector3.zero, platoon.Count > 0 ? platoon[0].yaw : 0f);
             if (crewLostTonight) { Depot.CrewNights = crewBefore; crewLostTonight = false; }   // pulled out alive: the same men, their nights kept
             L.hp = Depot.LeaderHp; platoon.Insert(0, L); leaderShield = 4f;
-            hud.HideEnd(); phase = Phase.Play; stick.Blocked = false; hud.Toast("Field repair · back in the fight");
+            hud.HideEnd(); phase = Phase.Play; stick.Blocked = false; Sfx.Theme("battle"); hud.Toast("Field repair · back in the fight");
         }
     }
 }

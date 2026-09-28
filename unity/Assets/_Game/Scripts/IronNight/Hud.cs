@@ -366,7 +366,7 @@ namespace IronNight
                 "  creativecommons.org/licenses/by/4.0\n\n" +
                 "Other vehicles, props and pictures: generated for this game (Microsoft TRELLIS 2, MIT; built with DINOv3).\n" +
                 "Sound effects: Pixabay (Pixabay Content License) and Mixkit (Mixkit License), authors listed in the game's SOURCES.\n" +
-                "Menu march: Sousa's 'The U.S. Field Artillery', United States Marine Band - public domain.\n" +
+                "Music: Pixabay (Pixabay Content License) - 'Battlefield Borders' by AberrantRealities, 'Echoes of the Battlefield' by DesiFreeMusic, 'Cinematic Drums War' by Alec_Koff, 'Majestic Brass Fanfare' by Luis_Humanoide.\n" +
                 "Made with Unity.\n\nProgress is kept on this device only, with no account. The ads you choose to watch come from Google AdMob, which may use your device's advertising ID: see the privacy policy.";
             adChoices = MakeGhost(settingsSheet.transform, "Ad privacy choices", new Vector2(0.5f, 0f), new Vector2(0, 290), new Vector2(880, 100), 32, () => Ads.ShowPrivacyChoices()); adChoices.SetActive(false);   // Europe: the ad consent can be changed at any time
             MakeGhost(settingsSheet.transform, "Privacy policy", new Vector2(0.5f, 0f), new Vector2(0, 150), new Vector2(560, 100), 30, () => { if (!Battle.QaOn) Application.OpenURL("https://petermonev.github.io/iron-night/privacy.html"); });
