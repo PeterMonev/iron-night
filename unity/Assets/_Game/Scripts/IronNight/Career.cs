@@ -31,6 +31,20 @@ namespace IronNight
         }
 
         static string K(string tank, string what) => "tank." + tank + "." + what;
+        // ---- the name painted on the turret: the first coat for nothing, every new one for gold ----
+        public const int RepaintGold = 100;
+        public static string Name(string tank) { var s = PlayerPrefs.GetString(K(tank, "name"), ""); return s.Length > 0 ? s : null; }
+        /// <summary>Paints a name on the tank's turret: free the first time, RepaintGold every time after. False when the gold is short.</summary>
+        public static bool PaintName(string tank, string name)
+        {
+            if (Name(tank) != null && !Depot.SpendGold(RepaintGold)) return false;
+            PlayerPrefs.SetString(K(tank, "name"), name); PlayerPrefs.Save(); return true;
+        }
+        /// <summary>The names the crews gave their tanks, by nation.</summary>
+        public static string[] Names(string nation) => nation == "su" ? SovietNames : AmericanNames;
+        static readonly string[] AmericanNames = { "Cobra King", "Fury", "Lucky Lady", "In the Mood", "Thunderbolt", "Jumbo", "Hell on Wheels", "Old Faithful", "Brooklyn Bomber", "Miss Liberty", "Bad Penny", "Sweet Sue" };
+        static readonly string[] SovietNames = { "For the Motherland", "Moscow", "Vengeance", "Suvorov", "Kutuzov", "Dmitri Donskoi", "Alexander Nevsky", "To Berlin!", "For Leningrad", "Siberian", "Partisan", "Fearless" };
+
         public static int Xp(string tank) => PlayerPrefs.GetInt(K(tank, "xp"), 0);             // earned and not yet spent
         public static int TotalXp(string tank) => PlayerPrefs.GetInt(K(tank, "xpTotal"), 0);   // ever earned: the rank
         public static int Step(string tank, string module) => PlayerPrefs.GetInt(K(tank, module), 0);

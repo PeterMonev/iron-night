@@ -23,7 +23,7 @@ namespace IronNight
         /// <summary>Asks for consent where the law wants it, then starts AdMob and loads the first ad. Once, at start.</summary>
         public static void Start() => Runner.Get().Begin();
 
-        /// <summary>Plays a rewarded ad for a placement ("end", "reserve", "train", "crewxp", "gold"); onReward runs only if
+        /// <summary>Plays a rewarded ad for a placement ("end", "reserve", "supplies", "cards", "allcards", "train", "crewxp", "gold" and so on); onReward runs only if
         /// it was watched to the end.</summary>
         public static void Rewarded(string placement, System.Action onReward)
         {

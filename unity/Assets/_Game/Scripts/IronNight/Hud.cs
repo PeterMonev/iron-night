@@ -98,7 +98,7 @@ namespace IronNight
         void Apply()
         {
             float e = 1f - (1f - t) * (1f - t) * (1f - t);
-            group.alpha = Mathf.Clamp01(t / 0.6f); rt.anchoredPosition = home + new Vector2(0f, -36f * (1f - e));
+            group.alpha = Mathf.Clamp01(t / 0.6f); group.interactable = t >= 0.6f; rt.anchoredPosition = home + new Vector2(0f, -36f * (1f - e));
             float s = 0.985f + 0.015f * e; rt.localScale = new Vector3(s, s, 1f);
         }
     }
@@ -133,6 +133,7 @@ namespace IronNight
         public System.Action OnAd, OnAgain, OnStart, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder, OnAir, OnDailyChallenge, OnStandReady; public System.Action<string> OnRoute, OnTheatre, OnStand, OnStandItem, OnConvoy, OnSneak; public System.Action<string, int> OnOperation; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[3]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], routePays = new Text[3], theatreLabels = new Text[3]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, airBtn, routeSheet, trainBtn; Text xpLine, depotXp; static readonly Color XpBlue = new Color(0.56f, 0.76f, 0.98f), XpDeep = new Color(0.22f, 0.43f, 0.74f, 0.96f); Text airLabel; Image airFill; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
 
         Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel, setSound, setQuality, setVibe, setMusic, rankLine, pointsLine, ordersCount; GameObject settingsSheet, ordersSheet; RawImage titleBackdrop, depotBackdrop; GarageDrag depotDrag; readonly List<RectTransform> embers = new List<RectTransform>(); readonly List<float> emberPhase = new List<float>(); GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
+        public System.Action OnSuppliesAd; public bool SuppliesGranted; bool suppliesOffer; Text cardsEyebrow;
         Image levelFill, flash; GameObject sheet, endSheet, adBtn, titleSheet, depotSheet, hudGroup, reserveBtn, pauseSheet; Text soundLabel; Transform missionRoot;
         class Rising { public Text t; public float life; public Vector3 world; }
         readonly List<Rising> popups = new List<Rising>(); readonly Stack<Text> popupPool = new Stack<Text>(); RectTransform canvasRect;
@@ -198,7 +199,7 @@ namespace IronNight
             // level-up sheet
             sheet = new GameObject("LevelUp", typeof(RectTransform), typeof(Image)); sheet.transform.SetParent(t, false);
             Stretch(sheet); sheet.GetComponent<Image>().color = new Color(0.02f, 0.03f, 0.04f, 0.8f);
-            { var ey = MakeText(sheet.transform, "Eyebrow", new Vector2(0.5f, 0.5f), new Vector2(0, 600), TextAnchor.MiddleCenter, 28, new Color(0.96f, 0.68f, 0.24f)); ey.text = Spaced("LEVEL UP"); ey.font = LabelFont(); }
+            { var ey = MakeText(sheet.transform, "Eyebrow", new Vector2(0.5f, 0.5f), new Vector2(0, 600), TextAnchor.MiddleCenter, 28, new Color(0.96f, 0.68f, 0.24f)); ey.text = Spaced("LEVEL UP"); ey.font = LabelFont(); cardsEyebrow = ey; }
             { var ch = MakeText(sheet.transform, "Title", new Vector2(0.5f, 0.5f), new Vector2(0, 530), TextAnchor.MiddleCenter, 96, ink); ch.text = "Choose"; Engrave(ch, true, 0.8f); }
             var cards = new GameObject("Cards", typeof(RectTransform)); cards.transform.SetParent(sheet.transform, false);
             var crt = cards.GetComponent<RectTransform>(); crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 0.5f); crt.sizeDelta = Vector2.zero;
@@ -326,7 +327,7 @@ namespace IronNight
               var lbl = start.transform.Find("Label").GetComponent<Text>(); lbl.font = LabelBoldFont(); lbl.fontSize = 64; lbl.text = Spaced("TO BATTLE"); lbl.transform.SetAsLastSibling(); }
             dailyBtn = MakeGhost(titleSheet.transform, "Quartermaster", new Vector2(0.5f, 0f), new Vector2(-235, 470), new Vector2(450, 70), 24, () => ShowQuartermaster(), 0.1f);   // the daily gift is mail call now
             dailyBtn.GetComponent<Image>().color = new Color(0.16f, 0.36f, 0.22f, 0.92f);
-            reserveBtn = MakeGhost(titleSheet.transform, "4th tank tonight · watch an ad", new Vector2(0.5f, 0f), new Vector2(235, 470), new Vector2(450, 70), 24, () => OnReserveAd?.Invoke(), 0.12f);
+            reserveBtn = MakeGhost(titleSheet.transform, "4th tank tonight · watch an ad", new Vector2(0.5f, 0f), new Vector2(235, 470), new Vector2(450, 70), 24, () => { if (suppliesOffer) OnSuppliesAd?.Invoke(); else OnReserveAd?.Invoke(); }, 0.12f); Fit(reserveBtn.transform.Find("Label").GetComponent<Text>(), 18);
             trainBtn = MakeGhost(titleSheet.transform, "Daily training · watch an ad · +" + Depot.DailyTrainXp + " crew XP", new Vector2(0.5f, 0f), new Vector2(0, 392), new Vector2(920, 64), 24, () => { if (Depot.DailyTrainReady) Ads.Rewarded("train", () => { if (Depot.ClaimDailyTrain()) { Sfx.Pickup(); trainBtn.SetActive(false); titleStats.rectTransform.anchoredPosition = new Vector2(0, 350); Tick(xpLine, Depot.CrewXp, "", " XP"); } }); }, 0.12f);
             trainBtn.GetComponent<Image>().color = new Color(0.12f, 0.2f, 0.32f, 0.92f);
             { var tl = trainBtn.transform.Find("Label").GetComponent<Text>(); tl.rectTransform.anchoredPosition = new Vector2(20, 0);
@@ -366,7 +367,7 @@ namespace IronNight
                 "Other vehicles, props and pictures: generated for this game (Microsoft TRELLIS 2, MIT; built with DINOv3).\n" +
                 "Sound effects: Pixabay (Pixabay Content License) and Mixkit (Mixkit License), authors listed in the game's SOURCES.\n" +
                 "Menu march: Sousa's 'The U.S. Field Artillery', United States Marine Band - public domain.\n" +
-                "Made with Unity.\n\nProgress is kept on this device only. No account, no personal data.";
+                "Made with Unity.\n\nProgress is kept on this device only, with no account. The ads you choose to watch come from Google AdMob, which may use your device's advertising ID: see the privacy policy.";
             adChoices = MakeGhost(settingsSheet.transform, "Ad privacy choices", new Vector2(0.5f, 0f), new Vector2(0, 290), new Vector2(880, 100), 32, () => Ads.ShowPrivacyChoices()); adChoices.SetActive(false);   // Europe: the ad consent can be changed at any time
             MakeGhost(settingsSheet.transform, "Privacy policy", new Vector2(0.5f, 0f), new Vector2(0, 150), new Vector2(560, 100), 30, () => { if (!Battle.QaOn) Application.OpenURL("https://petermonev.github.io/iron-night/privacy.html"); });
             MakeGhost(settingsSheet.transform, "BACK", new Vector2(0f, 1f), new Vector2(130, -95), new Vector2(200, 80), 26, () => settingsSheet.SetActive(false));
@@ -478,7 +479,11 @@ namespace IronNight
             { RefreshMapTile();   // the first tile is the war map now, the operations are on it
               var cs = UiSprite("map_europe") ?? UiSprite(Operations.Current.cover) ?? UiSprite("campaign_normandy"); if (cs != null && opsPic != null) { opsPic.sprite = cs; float cover = Mathf.Max(216f / cs.rect.width, 240f / cs.rect.height); opsPic.rectTransform.sizeDelta = new Vector2(cs.rect.width * cover, cs.rect.height * cover); } }
             titleStats.text = Depot.NightsFought == 0 ? "First night. Drag anywhere to drive; the turrets fire on their own." : $"Best {Depot.BestKills} kills · longest {m}:{s:00} · {Depot.CrewName}: {Depot.CrewBonusText}";
-            reserveBtn.SetActive(!reserveGranted); reserveNote.text = reserveGranted ? "Reserve tank granted:\nthe platoon can grow to 4 tonight." : "";
+            {   // the slot beside the quartermaster: the 4th tank for an ad, then the supplies for another, then what is ready
+                suppliesOffer = reserveGranted && !SuppliesGranted; reserveBtn.SetActive(!reserveGranted || suppliesOffer);
+                reserveBtn.transform.Find("Label").GetComponent<Text>().text = suppliesOffer ? "4th tank ready · supplies: watch an ad" : "4th tank tonight · watch an ad";
+                reserveNote.text = reserveGranted && SuppliesGranted ? "A 4th tank, and a card to choose\nas the night begins." : "";
+            }
             Missions.Load(); foreach (Transform c in missionRoot) Destroy(c.gameObject); RefreshWantedTile();   // the fourth tile is the most wanted now, the standing orders are beside the weekly ones
             for (int i = 0; i < Missions.Active.Count; i++)
             {
@@ -499,7 +504,7 @@ namespace IronNight
         /// <summary>Test switch --garage=id: straight into the garage tab with that tank on the turntable.</summary>
         public void ShowGarage(VehicleSpec spec) { depotTab = 1; ShowDepot(); if (garage != null) garage.Show(spec); }
         /// <summary>Test switch --sheet=settings, medals, records, help, orders or pause: that sheet, open over the title.</summary>
-        public void TestSheet(string name) { if (name == "settings") ShowSettings(); else if (name == "medals") ShowMedals(); else if (name == "records") ShowRecords(); else if (name == "help") helpSheet.SetActive(true); else if (name == "orders") ShowOrders(); else if (name == "pause") { ShowPause(true, true); pauseSheet.transform.SetAsLastSibling(); } }
+        public void TestSheet(string name) { if (name == "settings") ShowSettings(); else if (name == "medals") ShowMedals(); else if (name == "records") ShowRecords(); else if (name == "help") helpSheet.SetActive(true); else if (name == "orders") ShowOrders(); else if (name == "names") { var lc = System.Array.Find(Depot.Leaders, x => x.id == Depot.LeaderId); if (lc != null) ShowNames(lc.id, lc.nation); } else if (name == "pause") { ShowPause(true, true); pauseSheet.transform.SetAsLastSibling(); } }
         /// <summary>Test switch --crewtab: straight into the depot's crew tab.</summary>
         public void ShowCrewTab() { depotTab = 2; ShowDepot(); }
         /// <summary>Test switch --dossier=id: a tank's service record, the tank in the hangar.</summary>
@@ -677,6 +682,18 @@ namespace IronNight
                 var nx = MakeText(row.transform, "Next", new Vector2(1f, 1f), new Vector2(-30, -206), TextAnchor.UpperRight, 20, dim); nx.text = next > 0 ? total.ToString("N0", En) + " / " + next.ToString("N0", En) + " XP to the next star" : total.ToString("N0", En) + " XP · every star won"; nx.rectTransform.sizeDelta = new Vector2(560, 28); nx.rectTransform.pivot = new Vector2(1f, 1f);
                 y -= 282f;
             }
+            // the name on its turret (the paint shop): the first coat free, a new one for gold
+            {
+                string painted = Career.Name(id);
+                var row = MakeImage(depotRows, "Row name", new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 150), card); row.rectTransform.pivot = new Vector2(0.5f, 1f);
+                var ey = MakeText(row.transform, "Eyebrow", new Vector2(0f, 1f), new Vector2(30, -24), TextAnchor.UpperLeft, 22, amber); ey.text = Spaced("PAINTED ON THE TURRET"); ey.font = LabelFont(); ey.rectTransform.sizeDelta = new Vector2(540, 30);
+                var pn = MakeText(row.transform, "Painted", new Vector2(0f, 1f), new Vector2(30, -62), TextAnchor.UpperLeft, painted != null ? 52 : 34, painted != null ? ink : dim); pn.rectTransform.sizeDelta = new Vector2(540, 64);
+                if (painted != null) { pn.text = painted.ToUpperInvariant(); Serif(pn); } else pn.text = "No name yet";
+                var pb = MakeButton(row.transform, painted == null ? "Paint a name" : "Repaint · " + Career.RepaintGold + " gold", new Vector2(1f, 0.5f), new Vector2(-190, 0), new Vector2(340, 80), 30, () => ShowNames(id, c.nation));
+                pb.GetComponent<Image>().color = painted == null ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : new Color(0.2f, 0.22f, 0.24f, 0.95f);
+                pb.transform.Find("Label").GetComponent<Text>().color = painted == null ? new Color(0.1f, 0.08f, 0.05f) : ink;
+                y -= 162f;
+            }
             // the three steps: gun, engine, armour
             foreach (var m in Career.Modules)
             {
@@ -708,6 +725,36 @@ namespace IronNight
                 lead.GetComponent<Image>().color = chosen ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : new Color(0.2f, 0.22f, 0.24f, 0.95f);
                 lead.transform.Find("Label").GetComponent<Text>().color = chosen ? new Color(0.1f, 0.08f, 0.05f) : ink; lead.GetComponent<Button>().interactable = !chosen;
             }
+        }
+
+        /// <summary>The tank on the turntable takes the name it has now.</summary>
+        public void Repainted() { if (garage != null) garage.Repaint(); }
+        GameObject namesSheet;
+        /// <summary>The paint shop's names for a tank: the ones its nation's crews gave theirs. A tap paints one on the
+        /// turret (the first coat free, a new one for gold); the name it has is marked.</summary>
+        void ShowNames(string tank, string nation)
+        {
+            var dim = new Color(0.66f, 0.64f, 0.59f); var amber = new Color(0.95f, 0.66f, 0.23f);
+            if (namesSheet != null) Destroy(namesSheet);
+            namesSheet = new GameObject("Names", typeof(RectTransform), typeof(Image)); namesSheet.transform.SetParent(canvas.transform, false); Stretch(namesSheet); namesSheet.GetComponent<Image>().color = new Color(0.03f, 0.04f, 0.05f, 1f);
+            SheetHead(namesSheet.transform, "PAINT SHOP", "NAME HER");
+            string now = Career.Name(tank);
+            var note = MakeText(namesSheet.transform, "Note", new Vector2(0.5f, 1f), new Vector2(0, -340), TextAnchor.MiddleCenter, 26, dim); note.rectTransform.sizeDelta = new Vector2(900, 40);
+            note.text = now == null ? "The first coat is on the house. Crews named their tanks for luck, for home, for a girl." : "A new coat costs " + Career.RepaintGold + " gold · you have " + Depot.Gold.ToString("N0", En); Fit(note, 18);
+            var names = Career.Names(nation);
+            for (int i = 0; i < names.Length; i++)
+            {
+                string nm = names[i]; bool current = nm == now;
+                var b = MakeGhost(namesSheet.transform, nm, new Vector2(0.5f, 1f), new Vector2(i % 2 == 0 ? -232f : 232f, -440f - (i / 2) * 124f), new Vector2(440f, 108f), 30, () =>
+                {
+                    if (nm == Career.Name(tank)) return;
+                    if (!Career.PaintName(tank, nm)) { Ads.Say("Not enough gold · the shop has more"); return; }
+                    Sfx.Pickup(); Destroy(namesSheet); namesSheet = null; if (garage != null) garage.Repaint(); RefreshDepot();
+                }, current ? 0.7f : 0.22f);
+                var lb = b.transform.Find("Label").GetComponent<Text>(); lb.text = nm.ToUpperInvariant(); Serif(lb, 0.8f); if (current) lb.color = amber;
+            }
+            MakeGhost(namesSheet.transform, "BACK", new Vector2(0f, 1f), new Vector2(130, -95), new Vector2(200, 80), 26, () => { Destroy(namesSheet); namesSheet = null; });
+            namesSheet.transform.SetAsLastSibling(); if (curtain != null) curtain.transform.SetAsLastSibling();
         }
 
         /// <summary>The crew's experience, and a rewarded ad for more (a few a day), at the head of the crew tab.</summary>
@@ -1325,9 +1372,12 @@ namespace IronNight
         public void SetBoss(float frac) { bossFill.rectTransform.sizeDelta = new Vector2(960f * Mathf.Clamp01(frac), 10f); }
         public void HideBoss() { bossBar.SetActive(false); }
 
-        public void ShowCards(List<Card> cards, System.Action<string> onPick)
+        /// <summary>The cards to choose from, under an eyebrow (LEVEL UP, SUPPLIES FOR THE NIGHT); under them the ads the
+        /// player may ask for, where offered: three other cards, all three taken.</summary>
+        public void ShowCards(List<Card> cards, System.Action<string> onPick, string eyebrow = "LEVEL UP", System.Action again = null, System.Action all = null)
         {
             foreach (Transform c in cardRoot) Destroy(c.gameObject);
+            if (cardsEyebrow != null) cardsEyebrow.text = Spaced(eyebrow);
             for (int i = 0; i < cards.Count; i++)
             {
                 var card = cards[i];
@@ -1337,13 +1387,16 @@ namespace IronNight
                 title.alignment = TextAnchor.UpperLeft; title.rectTransform.anchorMin = title.rectTransform.anchorMax = title.rectTransform.pivot = new Vector2(0f, 1f);
                 var pic = UiSprite(CardPicture(card.id)); float left = pic != null ? 262f : 30f;
                 if (pic != null) { var art = MakeImage(b.transform, "Art", new Vector2(0f, 0.5f), new Vector2(18f, 0f), new Vector2(214f, 214f), Color.white); art.sprite = pic; }
-                title.rectTransform.anchoredPosition = new Vector2(left, -22f); title.rectTransform.sizeDelta = new Vector2(900f - left - 20f, 70f);
+                title.rectTransform.anchoredPosition = new Vector2(left, -22f); title.rectTransform.sizeDelta = new Vector2(900f - left - 20f, 70f); title.text = card.title.ToUpperInvariant(); Serif(title, 0.66f);
                 var desc = MakeText(b.transform, "Desc", new Vector2(0f, 1f), new Vector2(left, -100f), TextAnchor.UpperLeft, 34, new Color(0.66f, 0.64f, 0.59f));
                 desc.rectTransform.sizeDelta = new Vector2(900f - left - 20f, 130f); desc.text = card.desc;
             }
+            if (again != null) MakeGhost(cardRoot, "Other cards · watch an ad", new Vector2(0.5f, 0.5f), new Vector2(all != null ? -232f : 0f, -520f), new Vector2(440f, 96f), 26, again, 0.18f);
+            if (all != null) MakeGhost(cardRoot, "Take all three · watch an ad", new Vector2(0.5f, 0.5f), new Vector2(again != null ? 232f : 0f, -520f), new Vector2(440f, 96f), 26, all, 0.18f);
             sheet.transform.SetAsLastSibling();   // over the rings and markers the night has made since the HUD was built
             sheet.SetActive(true);
         }
+        public void HideCards() { sheet.SetActive(false); }
 
         RectTransform endLedger; int endKills = -1, endGunnery, endScore; string endHeld, endSub, lastLedger = ""; GameObject endDepotBtn;
         static readonly string[] EndLabels = { "KNOCKED OUT", "HELD", "GUNNERY", "SCORE" };
@@ -1582,7 +1635,9 @@ namespace IronNight
             if (fpsTimer >= 0.5f) { float f = fpsFrames / fpsAccum; fps.text = ShowFps ? $"{f:0} fps" : ""; fpsAccum = 0; fpsFrames = 0; fpsTimer = 0; if (f < 38f && hudGroup.activeSelf) slowFor += 0.5f; else slowFor = 0f; if (slowFor >= 5f && !slowOffered && PlayerPrefs.GetInt("quality", 1) != 0) { slowOffered = true; Toast("Stuttering? Pause · Quality: low turns off shadows and rain", 5f); } }
             if (toastLeft > 0f && hudFade.alpha > 0.95f) { toastLeft -= Time.unscaledDeltaTime; if (toastLeft <= 0f) toast.text = ""; }
             toast.enabled = sheet == null || !sheet.activeSelf;   // hidden behind the level-up cards, back when they go
-            if (briefingLeft > 0f && hudFade.alpha > 0.95f) { briefingLeft -= Time.unscaledDeltaTime; if (briefingLeft <= 0f && briefing != null) briefing.SetActive(false); }
+            bool choosing = sheet != null && sheet.activeSelf;
+            if (briefing != null && briefingLeft > 0f && briefing.activeSelf == choosing) briefing.SetActive(!choosing);   // out of the way of the cards, back after them
+            if (briefingLeft > 0f && hudFade.alpha > 0.95f && !choosing) { briefingLeft -= Time.unscaledDeltaTime; if (briefingLeft <= 0f && briefing != null) briefing.SetActive(false); }
             TickNumbers(Time.unscaledDeltaTime); CurtainTick(Time.unscaledDeltaTime); TickCinema(Mathf.Min(Time.unscaledDeltaTime, 0.05f)); TickRewards(Mathf.Min(Time.unscaledDeltaTime, 0.05f)); TickMap();
             if (titleSheet != null && titleSheet.activeSelf) for (int i = 0; i < embers.Count; i++)
             {

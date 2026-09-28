@@ -25,7 +25,7 @@ namespace IronNight
         static float Smoother(float x) => x * x * x * (x * (x * 6f - 15f) + 10f);
 
         /// <summary>The play begins: the thumb drives, the first objective is briefed.</summary>
-        void Begin() { phase = Phase.Play; stick.Blocked = false; hud.SetAmmo(apRounds, heRounds, loadHe); if (objective != null) Brief(objective.kind); }   // the racks shown from the start, not after the first shot
+        void Begin() { phase = Phase.Play; stick.Blocked = false; hud.SetAmmo(apRounds, heRounds, loadHe); if (objective != null) Brief(objective.kind); if (suppliesGranted) { suppliesGranted = false; OfferCards(CardPool(), "SUPPLIES FOR THE NIGHT"); } }   // the racks shown from the start, not after the first shot, and the card of the supplies chosen
 
         /// <summary>The night's opening shot. False when there is nothing to film, and the night simply begins.</summary>
         bool IntroShot()

@@ -52,7 +52,7 @@ namespace IronNight
         readonly List<Vehicle> platoon = new List<Vehicle>(); readonly List<Vehicle> foes = new List<Vehicle>();
         readonly List<Shell> shells = new List<Shell>(); readonly List<Wreck> wrecks = new List<Wreck>();
         Material shellTemplate; Texture2D glowTex;
-        Formation formation = Formation.Wedge; Phase phase = Phase.Title; bool reserveGranted;
+        Formation formation = Formation.Wedge; Phase phase = Phase.Title; bool reserveGranted, suppliesGranted, cardsAgainUsed, cardsAllUsed;
         Operations.Op op; Operations.Night opN; int opNight, wingmenLost; float goalsTick; Campaign.Sector mapSector; bool mapPaid;   // a war map night: its sector, paid once
         bool daily; string dailyDay = "", rule = "";   // the daily challenge: its day and the rule of the night
         int crewSteady, crewEagle, crewSnap, crewHands, crewRacks, crewHe, crewFoot, crewMech, crewRough, crewBow, crewSignals, crewSpot;   // the levels of the crew's gifts (Crew)
@@ -191,7 +191,8 @@ namespace IronNight
             hud.OnOperation = (id, n) => { PlayerPrefs.SetString("op.launch", id + ":" + n); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); };
             hud.OnDepot = () => { stick.Blocked = true; StartCoroutine(Curtained(hud.ShowDepot)); }; hud.OnHold = HoldOn;
             hud.OnBack = () => { if (phase == Phase.End) SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); else StartCoroutine(Curtained(() => hud.ShowTitle(reserveGranted))); };
-            hud.OnReserveAd = () => Ads.Rewarded("reserve", () => { reserveGranted = true; maxPlatoon = 4; hud.ShowTitle(true); });
+            hud.OnReserveAd = () => Ads.Rewarded("reserve", () => { reserveGranted = true; maxPlatoon = 4; Sfx.Pickup(); hud.ShowTitle(true); });
+            hud.OnSuppliesAd = () => Ads.Rewarded("supplies", () => { suppliesGranted = true; hud.SuppliesGranted = true; Sfx.Pickup(); hud.ShowTitle(reserveGranted); });
             hud.OnPause = Pause; hud.OnResume = Resume; hud.OnSound = () => { Sfx.Muted = !Sfx.Muted; hud.ShowPause(!Sfx.Muted, !LowQuality); };
             hud.OnQuit = () => { Resume(); revived = true; End(false); };   // no rewarded repair after walking away
             hud.OnRestart = () => { Time.timeScale = 1f; if (stand) { PlayerPrefs.SetString("stand.launch", theatre); PlayerPrefs.Save(); } if (convoy) { PlayerPrefs.SetString("convoy.launch", theatre); PlayerPrefs.Save(); } if (sneak) { PlayerPrefs.SetString("sneak.launch", theatre); PlayerPrefs.Save(); } if (mapSector != null) { PlayerPrefs.SetString("map.launch", mapSector.id); PlayerPrefs.Save(); } if (opNight > 0) { PlayerPrefs.SetString("op.launch", op.id + ":" + opNight); PlayerPrefs.Save(); } if (daily) { PlayerPrefs.SetString("daily.launch", dailyDay); PlayerPrefs.Save(); } SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); };
@@ -199,7 +200,7 @@ namespace IronNight
             hud.Set(t, platoon.Count); hud.SetLevel(level, 0f);
             PlaceCamera(true);
             stick.Blocked = true; hud.ShowTitle(false);
-            foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); } else if (arg == "--shop") hud.ShowShop(); else if (arg == "--mail") hud.TestMail(); else if (arg == "--qm") hud.TestQuartermaster(); else if (arg == "--opencrate") hud.TestCrate(); else if (arg.StartsWith("--opencrate=")) hud.TestCrate(arg.Substring(12)); else if (arg.StartsWith("--bondstars=")) Bonds.TestStars(int.Parse(arg.Substring(12))); else if (arg == "--bonds") hud.ShowBonds(); else if (arg == "--wanted") { Nemesis.TestSeed(); hud.ShowWanted(); } else if (arg == "--crewtab") { stick.Blocked = true; hud.ShowCrewTab(); } else if (arg.StartsWith("--sheet=")) hud.TestSheet(arg.Substring(8)); else if (arg == "--mapseed" || arg == "--mapfall") Campaign.TestSeed(arg == "--mapfall");
+            foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); } else if (arg == "--shop") hud.ShowShop(); else if (arg == "--supplies") { suppliesGranted = true; hud.SuppliesGranted = true; } else if (arg.StartsWith("--tankname=")) { var tn = arg.Substring(11); int cut = tn.IndexOf(':'); Career.PaintName(cut > 0 ? tn.Substring(0, cut) : Depot.LeaderId, (cut > 0 ? tn.Substring(cut + 1) : tn).Replace('_', ' ')); hud.Repainted(); } else if (arg == "--mail") hud.TestMail(); else if (arg == "--qm") hud.TestQuartermaster(); else if (arg == "--opencrate") hud.TestCrate(); else if (arg.StartsWith("--opencrate=")) hud.TestCrate(arg.Substring(12)); else if (arg.StartsWith("--bondstars=")) Bonds.TestStars(int.Parse(arg.Substring(12))); else if (arg == "--bonds") hud.ShowBonds(); else if (arg == "--wanted") { Nemesis.TestSeed(); hud.ShowWanted(); } else if (arg == "--crewtab") { stick.Blocked = true; hud.ShowCrewTab(); } else if (arg.StartsWith("--sheet=")) hud.TestSheet(arg.Substring(8)); else if (arg == "--mapseed" || arg == "--mapfall") Campaign.TestSeed(arg == "--mapfall");
             hud.OnStart += () => Radio("start");
             if (opNight == 0 && !daily && PlayerPrefs.GetInt("route.launch", 0) == 1) { PlayerPrefs.SetInt("route.launch", 0); PlayerPrefs.Save(); StartNight(); Radio("start"); }
             if (sneak) { SneakBuild(); StartNight(); Radio("start"); string np = Hud.UiSprite("sneak_" + theatre) != null ? "sneak_" + theatre : theatre == "kursk" ? "route_kursk_belts" : "route_bocage"; hud.Briefing(np, "Night raid · " + TheatreName, "No lights, no shooting. Slip through to the depot and blow it. The sentries send up flares: in their light, stand still or get out of it. They see what moves."); }
@@ -805,6 +806,13 @@ namespace IronNight
         {
             if (camShot == CamShot.Kill) { levelWaiting = true; return; }   // the cards come after the killcam
             xp -= xpNeed; level++; xpNeed = 6 + level * 3; hud.SetLevel(level, (float)xp / xpNeed);
+            OfferCards(CardPool(), "LEVEL UP");
+        }
+
+        /// <summary>The cards the night can still give: all of them, less what is taken already, what this night's rule
+        /// forbids and what the platoon cannot use.</summary>
+        List<Hud.Card> CardPool()
+        {
             var all = new List<Hud.Card>
             {
                 new Hud.Card { id = "he", title = "High explosive", desc = "Eight more HE rounds in the racks and a wider burst: 7 m instead of 5." },
@@ -835,10 +843,25 @@ namespace IronNight
             if (artyInterval > 0f && artyInterval <= 12f) all.RemoveAll(c => c.id == "arty");
             if (rule == "alone") all.RemoveAll(c => c.id == "reinf" || c.id == "firefly" || c.id == "recovery" || c.id == "radionet" || c.id == "plates");   // nothing for wingmen that never come
             if (Depot.Nation != "us" || (!platoon.Exists(p => p != Leader && p.spec == VehicleSpec.Sherman) && platoon.Count >= maxPlatoon)) all.RemoveAll(c => c.id == "firefly");
-            var pick = new List<Hud.Card>(); while (pick.Count < 3 && all.Count > 0) { int i = Random.Range(0, all.Count); pick.Add(all[i]); all.RemoveAt(i); }
+            return all;
+        }
+
+        /// <summary>Three cards off the pool on the table, the night stopped while the player chooses. Under them, the two ads
+        /// the player may ask for, each once a night: three other cards, or all three taken.</summary>
+        void OfferCards(List<Hud.Card> pool, string eyebrow)
+        {
+            var pick = new List<Hud.Card>(); while (pick.Count < 3 && pool.Count > 0) { int i = Random.Range(0, pool.Count); pick.Add(pool[i]); pool.RemoveAt(i); }
+            if (pick.Count == 0) return;
             phase = Phase.LevelUp; stick.Blocked = true; Sfx.LevelUp();
-            hud.ShowCards(pick, id =>
-            {
+            System.Action again = cardsAgainUsed || pool.Count < 3 ? null : (System.Action)(() => Ads.Rewarded("cards", () => { cardsAgainUsed = true; OfferCards(pool, eyebrow); }));
+            System.Action all = cardsAllUsed || pick.Count < 3 ? null : (System.Action)(() => Ads.Rewarded("allcards", () => { cardsAllUsed = true; hud.HideCards(); foreach (var c in pick) TakeCard(c.id); CardsTaken(); }));
+            hud.ShowCards(pick, id => { TakeCard(id); CardsTaken(); }, eyebrow, again, all);
+        }
+
+        void CardsTaken() { phase = Phase.Play; stick.Blocked = false; }
+
+        void TakeCard(string id)
+        {
                 switch (id)
                 {
                     case "he": { int add = Mathf.Min(heMax + 8 - heRounds, 8 + heMax - heRounds); heMax += 8; heRounds = Mathf.Min(heMax, heRounds + 8); heBurst = 7f + 0.4f * crewHe; hud.SetAmmo(apRounds, heRounds, loadHe); break; }
@@ -869,8 +892,6 @@ namespace IronNight
                     case "widetracks": wideTracks = true; speedMul *= 1.08f; turretMul *= 1.05f; break;
                     case "plane": spotterPlane = true; planeTimer = 6f; break;
                 }
-                phase = Phase.Play; stick.Blocked = false;
-            });
         }
 
         /// <summary>The weather turns once, somewhere in the middle of the night: rain comes on, fog lifts off the

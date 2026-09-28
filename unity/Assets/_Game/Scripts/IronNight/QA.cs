@@ -94,6 +94,7 @@ namespace IronNight
                 AudioListener.volume = 0f;   // the scene's sound setting is put back on every load
                 if (shotIn > 0f) { shotIn -= dt; if (shotIn <= 0f) Shot(shotLabel); }
                 if (closeIn > 0f) { closeIn -= dt; if (closeIn <= 0f) Close(); }
+                if ((nextLook -= dt) <= 0f) { nextLook = 1.5f; LostTexts(); }
                 if (b == null) b = FindAnyObjectByType<Battle>();
                 if (b == null || b.hud == null || b.stick == null) return;
                 if (b.phase != lastPhase)
@@ -148,7 +149,7 @@ namespace IronNight
                 var live = new List<Button>(); Button wayIn = null, wayOut = null; var sig = new System.Text.StringBuilder();
                 foreach (var btn in FindObjectsByType<Button>(FindObjectsSortMode.None))
                 {
-                    if (!btn.isActiveAndEnabled || !btn.interactable || !OnTop(btn, es)) continue;
+                    if (!btn.isActiveAndEnabled || !btn.IsInteractable() || !OnTop(btn, es)) continue;
                     string label = Label(btn);
                     if (Seen(btn) < 0.1f) { string where = Path(btn.transform); if (hidden.Add(where)) Debug.LogWarning("QA hidden: a button no one can see takes taps in " + b.phase + ": " + where + " [" + label + "]"); continue; }
                     if (inPlay && (btn.name.Contains("Pause") || label == "II") && rng.NextDouble() > 0.1) continue;   // a pause now and then, not every time
@@ -189,6 +190,23 @@ namespace IronNight
                 return hits.Count > 0 && (hits[0].gameObject == btn.gameObject || hits[0].gameObject.transform.IsChildOf(btn.transform));
             }
             readonly HashSet<string> hidden = new HashSet<string>();
+            readonly HashSet<string> lost = new HashSet<string>(); readonly Dictionary<Text, string> suspects = new Dictionary<Text, string>(); float nextLook = 1.5f;
+            /// <summary>Every text on screen that has words but draws none of them: a line taller than its box, or a box too
+            /// small for the smallest size it may shrink to. Counted at the second look that finds it so, with the same words.</summary>
+            void LostTexts()
+            {
+                var now = new Dictionary<Text, string>();
+                foreach (var t in FindObjectsByType<Text>(FindObjectsSortMode.None))
+                {
+                    if (!t.isActiveAndEnabled || string.IsNullOrWhiteSpace(t.text) || t.color.a < 0.05f || t.canvas == null || !t.canvas.isActiveAndEnabled) continue;
+                    if (t.canvasRenderer.cull || t.cachedTextGenerator.characterCountVisible > 0) continue;   // culled: outside the window of a scrolling list
+                    float a = 1f; for (var p = t.transform; p != null; p = p.parent) { var g = p.GetComponent<CanvasGroup>(); if (g != null) a *= g.alpha; }
+                    if (a < 0.05f) continue;
+                    if (suspects.TryGetValue(t, out var was) && was == t.text) { string where = Path(t.transform); if (lost.Add(where)) Debug.LogWarning("QA lost text: nothing of it is drawn: " + where + " [" + t.text.Replace("\n", " ") + "]"); }
+                    now[t] = t.text;
+                }
+                suspects.Clear(); foreach (var kv in now) suspects[kv.Key] = kv.Value;
+            }
             /// <summary>How much of a button can be seen: the clearest of its graphics (a label on a clear ground counts)
             /// times every fading group above it.</summary>
             static float Seen(Button btn)
@@ -213,9 +231,10 @@ namespace IronNight
             {
                 enabled = false; TouchStick.Pilot = null;
                 var sb = new System.Text.StringBuilder();
-                sb.Append("QA DONE: ").Append(errors).Append(" errors, ").Append(order.Count).Append(" distinct, ").Append(hidden.Count).Append(" hidden buttons, ").Append(taps).Append(" taps, ").Append(nights).Append(" nights, ").Append(shotN).Append(" pictures");
+                sb.Append("QA DONE: ").Append(errors).Append(" errors, ").Append(order.Count).Append(" distinct, ").Append(hidden.Count).Append(" hidden buttons, ").Append(lost.Count).Append(" lost texts, ").Append(taps).Append(" taps, ").Append(nights).Append(" nights, ").Append(shotN).Append(" pictures");
                 foreach (var k in order) sb.Append("\n--- x").Append(seen[k]).Append(": ").Append(k).Append('\n').Append(stacks[k]);
                 foreach (var h in hidden) sb.Append("\n--- hidden: ").Append(h);
+                foreach (var l in lost) sb.Append("\n--- lost text: ").Append(l);
                 Debug.Log(sb.ToString());
                 Application.Quit();
             }

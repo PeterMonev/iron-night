@@ -126,13 +126,16 @@ namespace IronNight
             return g;
         }
 
+        /// <summary>The tank on the turntable takes its new name.</summary>
+        public void Repaint() { if (shown != null && shownId != null) shown.PaintName(Career.Name(shownId)); }
+
         /// <summary>Puts the tank of that spec on the turntable (the last one goes); painted as the platoon is.</summary>
         public void Show(VehicleSpec spec)
         {
             if (spec == null || (shown != null && shownId == spec.id)) return;
             if (shown != null) Destroy(shown.gameObject);
             shown = Vehicle.Create(spec, true, Home, 0f); shown.transform.SetParent(stage, true); shownId = spec.id;
-            shown.turretYaw = 0.35f; shown.Apply(); shown.enabled = false; shown.KillRings(Career.Rings(spec.id)); foreach (var t in shown.GetComponentsInChildren<Transform>()) if (t.name == "Commander") CrewIdle.Bring(t.gameObject, 9, 0.8f); ShowCrew(System.Array.Exists(Depot.Leaders, x => x.id == spec.id && x.nation == "su") ? "su" : "us");
+            shown.turretYaw = 0.35f; shown.Apply(); shown.enabled = false; shown.KillRings(Career.Rings(spec.id)); shown.PaintName(Career.Name(spec.id)); foreach (var t in shown.GetComponentsInChildren<Transform>()) if (t.name == "Commander") CrewIdle.Bring(t.gameObject, 9, 0.8f); ShowCrew(System.Array.Exists(Depot.Leaders, x => x.id == spec.id && x.nation == "su") ? "su" : "us");
             if (parkedTank == null && parked != null)
             {
                 // one of the wingmen parked at the back, in the shadows

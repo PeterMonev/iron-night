@@ -163,6 +163,75 @@ namespace IronNight
         /// <summary>The gun has just fired: the barrel slams back and the hull rocks on its springs.</summary>
         public void Recoil() { recoil = 1f; }
 
+        static Font stencilFont; UnityEngine.GameObject[] nameBoards;
+        /// <summary>The tank's name in white stencil on both sides of its turret. Each side is found by a ray from out
+        /// there toward the turret at its middle height, a little behind the middle of its body (the gun's thin tube left
+        /// out of the measure), and the board is laid along the armour it meets.</summary>
+        public void PaintName(string name)
+        {
+            if (nameBoards != null) foreach (var g in nameBoards) if (g != null) Destroy(g);
+            nameBoards = null;
+            if (string.IsNullOrEmpty(name) || turret == null || spec.isGun) return;
+            var tm = turret.Find("TurretMesh"); if (tm == null) return;
+            var tri = new System.Collections.Generic.List<Vector3>();
+            foreach (var mf in tm.GetComponentsInChildren<MeshFilter>())
+            {
+                if (mf.sharedMesh == null || !mf.sharedMesh.isReadable) continue;
+                var vs = mf.sharedMesh.vertices; var ts = mf.sharedMesh.triangles;
+                for (int i = 0; i < ts.Length; i++) tri.Add(turret.InverseTransformPoint(mf.transform.TransformPoint(vs[ts[i]])));
+            }
+            if (tri.Count < 3) return;
+            float wide = 0f; foreach (var p in tri) wide = Mathf.Max(wide, Mathf.Abs(p.x));
+            var lo = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue); var hi = -lo;
+            foreach (var p in tri) if (Mathf.Abs(p.x) > wide * 0.3f) { lo = Vector3.Min(lo, p); hi = Vector3.Max(hi, p); }   // the body: the gun's tube is thin
+            if (hi.x < lo.x) return;
+            float y = Mathf.Lerp(lo.y, hi.y, 0.45f), z = Mathf.Lerp(lo.z, hi.z, 0.36f), w = Mathf.Clamp((hi.z - lo.z) * 0.5f, 0.45f, 0.95f);
+            var boards = new System.Collections.Generic.List<UnityEngine.GameObject>();
+            foreach (float side in new[] { 1f, -1f })
+            {
+                // five rays along the board's length: it stands just outside the outermost armour they meet, laid along their mean slope
+                float outX = 0f; var nSum = Vector3.zero; int hits = 0;
+                for (int k = 0; k < 5; k++)
+                {
+                    var o = new Vector3(side * (wide + 2f), y, z + (k - 2) * w / 4f); var d = new Vector3(-side, 0f, 0f); float best = float.MaxValue; var n = Vector3.zero;
+                    for (int i = 0; i + 2 < tri.Count; i += 3)
+                        if (RayHits(o, d, tri[i], tri[i + 1], tri[i + 2], out float t) && t < best) { best = t; n = Vector3.Cross(tri[i + 1] - tri[i], tri[i + 2] - tri[i]).normalized; }
+                    if (best == float.MaxValue) continue;
+                    if (n.x * side < 0f) n = -n;   // outward
+                    outX = Mathf.Max(outX, Mathf.Abs(o.x - side * best)); nSum += n; hits++;
+                }
+                if (hits < 3) continue;
+                var nm = nSum.normalized; nm.z = 0f; nm.Normalize();   // leaning with the side, not turned along the turret
+                boards.Add(NameBoard(name, new Vector3(side * (outX + 0.02f), y, z), nm, w));
+            }
+            nameBoards = boards.ToArray();
+        }
+
+        /// <summary>A board of stencilled capitals in the turret's frame at a point of its armour, its face out along the normal.</summary>
+        UnityEngine.GameObject NameBoard(string name, Vector3 at, Vector3 normal, float width)
+        {
+            var go = new UnityEngine.GameObject("Name", typeof(RectTransform), typeof(Canvas)); go.layer = turret.gameObject.layer; go.transform.SetParent(turret, false);
+            go.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+            var rt = go.GetComponent<RectTransform>(); rt.sizeDelta = new Vector2(width * 1000f, 200f); rt.localScale = Vector3.one * 0.001f;   // a millimetre to the unit
+            rt.localPosition = at; rt.localRotation = Quaternion.LookRotation(-normal, Vector3.up);
+            var tg = new UnityEngine.GameObject("Text", typeof(RectTransform), typeof(UnityEngine.UI.Text)); tg.layer = go.layer; tg.transform.SetParent(go.transform, false);
+            var trt = tg.GetComponent<RectTransform>(); trt.anchorMin = Vector2.zero; trt.anchorMax = Vector2.one; trt.offsetMin = trt.offsetMax = Vector2.zero;
+            var t = tg.GetComponent<UnityEngine.UI.Text>(); t.font = stencilFont ??= Resources.Load<Font>("Fonts/BarlowCondensed-Bold"); t.text = name.ToUpperInvariant();
+            t.fontSize = 150; t.resizeTextForBestFit = true; t.resizeTextMinSize = 40; t.resizeTextMaxSize = 150; t.alignment = TextAnchor.MiddleCenter;
+            t.color = new Color(0.72f, 0.71f, 0.66f, 0.95f); t.raycastTarget = false;
+            return go;
+        }
+
+        /// <summary>Where a ray meets a triangle (Moller-Trumbore): the distance along it, or false.</summary>
+        static bool RayHits(Vector3 o, Vector3 d, Vector3 a, Vector3 b, Vector3 c, out float t)
+        {
+            t = 0f; var e1 = b - a; var e2 = c - a; var p = Vector3.Cross(d, e2); float det = Vector3.Dot(e1, p);
+            if (Mathf.Abs(det) < 1e-9f) return false;
+            float inv = 1f / det; var s = o - a; float u = Vector3.Dot(s, p) * inv; if (u < 0f || u > 1f) return false;
+            var q = Vector3.Cross(s, e1); float v = Vector3.Dot(d, q) * inv; if (v < 0f || u + v > 1f) return false;
+            t = Vector3.Dot(e2, q) * inv; return t > 0f;
+        }
+
         static Material ringMaterial;
         /// <summary>Kill rings painted round the barrel behind the muzzle, one for every fifty kills in this tank. Our own
         /// barrel has a known radius; an artist's gun is measured from the turret mesh, back from the muzzle past any brake.</summary>
