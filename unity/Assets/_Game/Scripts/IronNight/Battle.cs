@@ -54,11 +54,11 @@ namespace IronNight
         Material shellTemplate; Texture2D glowTex;
         Formation formation = Formation.Wedge; Phase phase = Phase.Title; bool reserveGranted, suppliesGranted, cardsAgainUsed, cardsAllUsed;
         Operations.Op op; Operations.Night opN; int opNight, wingmenLost; float goalsTick; Campaign.Sector mapSector; bool mapPaid;   // a war map night: its sector, paid once
-        bool weekly; int weeklyBanked;   // the week's event night, and the count it has already added to the week
+        bool weekly, starsDoubled, weekDoubled; int weeklyBanked;   // starsDoubled, weekDoubled: the night's war bond stars and its count for the week doubled for an ad   // the week's event night, and the count it has already added to the week
         bool daily; string dailyDay = "", rule = "";   // the daily challenge: its day and the rule of the night
         int crewSteady, crewEagle, crewSnap, crewHands, crewRacks, crewHe, crewFoot, crewMech, crewRough, crewBow, crewSignals, crewSpot;   // the levels of the crew's gifts (Crew)
         float AirCoolFull => 60f - 6f * crewSignals;
-        string leaderId = "", leaderName = "", careerLine = ""; int careerXp, careerKills, careerCats, crewXpBanked; bool careerNight, careerDawn, leaderLost; float careerDamage = 1f, careerReload = 1f, careerSpeed = 1f;   // the leader's own tank   // an operation night: the operation and which of its nights (0: a free night)
+        string leaderId = "", leaderName = "", careerLine = ""; int careerXp, careerKills, careerCats, crewXpBanked; bool careerNight, careerDawn, leaderLost, testDrive; float careerDamage = 1f, careerReload = 1f, careerSpeed = 1f;   // the leader's own tank   // an operation night: the operation and which of its nights (0: a free night)
         int nightTracked, nightFocus, talliedTracked, nightLamps, talliedLamps, nightAces;
         bool crewCounted, crewLostTonight, premiumNight, bossCrate, dawnRolled; int crewBefore, starsBanked;   // the crew's nights: counted at dawn, lost with the leader unless he is pulled back
         Vehicle focus; float focusLeft; Transform focusRing;   // the enemy the platoon was told to hit
@@ -150,12 +150,13 @@ namespace IronNight
             hud.OnQuality = () => { LowQuality = !LowQuality; ApplyQuality(); hud.SetQualityLabel(!LowQuality); };
             if (veteran) hud.Toast("Veteran night · points ×1.5", 3f);
             hud.OnDaily = () => { Depot.ClaimDaily(); hud.ShowTitle(reserveGranted); };
-            var leaderSpec = VehicleSpec.ById(Depot.LeaderId); if (!VehicleSpec.Available(leaderSpec)) leaderSpec = VehicleSpec.ById(Depot.WingmanId);
+            testDrive = Depot.TestDriveId != null;   // a tank lent for tonight leads it
+            var leaderSpec = VehicleSpec.ById(Depot.NightLeaderId); if (!VehicleSpec.Available(leaderSpec)) leaderSpec = VehicleSpec.ById(Depot.WingmanId);
             foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--tank=")) leaderSpec = VehicleSpec.ById(arg.Substring(7));   // test switch: --tank=is2
             var startAt = Vector3.zero; foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--at=")) { var xz = arg.Substring(5).Split(','); startAt = new Vector3(float.Parse(xz[0]), 0f, float.Parse(xz[1])); }   // test switch: --at=0,95
             if (convoy) startAt = new Vector3(ConvoyLane - 11f, 0f, 6f);   // beside the lane (the wedge clear of it), the trucks lined up behind
             foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg == "--careertest") Career.Add(leaderSpec.id, 4000, 320, false, false, 0);   // test switch: a seasoned tank
-            platoon.Add(Vehicle.Create(leaderSpec, true, startAt, 0f)); Leader.hp = Depot.LeaderHp;
+            Depot.NightTank = leaderSpec.id; if (testDrive) Debug.Log("Iron Night: test drive, the " + leaderSpec.name + " leads tonight"); platoon.Add(Vehicle.Create(leaderSpec, true, startAt, 0f)); Leader.hp = Depot.LeaderHp;
             leaderId = leaderSpec.id; leaderName = leaderSpec.name; careerDamage = Career.DamageMul(leaderId); careerReload = Career.ReloadMul(leaderId); careerSpeed = Career.SpeedMul(leaderId); Leader.KillRings(Career.Rings(leaderId));
             { var n = Depot.Nation; crewSteady = Crew.Gift(n, "steady"); crewEagle = Crew.Gift(n, "eagle"); crewSnap = Crew.Gift(n, "snap"); crewHands = Crew.Gift(n, "hands"); crewRacks = Crew.Gift(n, "racks"); crewHe = Crew.Gift(n, "he");
               crewFoot = Crew.Gift(n, "foot"); crewMech = Crew.Gift(n, "mech"); crewRough = Crew.Gift(n, "rough"); crewBow = Crew.Gift(n, "bow"); crewSignals = Crew.Gift(n, "signals"); crewSpot = Crew.Gift(n, "spot");
@@ -185,7 +186,7 @@ namespace IronNight
             hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             hud.OnStart = () => hud.ShowRoutes(() =>
             {
-                if (route == builtRoute && theatre == builtTheatre) StartCoroutine(Curtained(StartNight));
+                if (route == builtRoute && theatre == builtTheatre && (Depot.TestDriveId != null) == testDrive) StartCoroutine(Curtained(StartNight));   // a tank lent since: the platoon built again round her
                 else { PlayerPrefs.SetInt("route.launch", 1); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); }   // another way in: the country is built again
             });
             hud.garage = Garage.Build(); hud.garage.SetActive(false);
@@ -205,7 +206,7 @@ namespace IronNight
             hud.Set(t, platoon.Count); hud.SetLevel(level, 0f);
             PlaceCamera(true);
             stick.Blocked = true; hud.ShowTitle(false);
-            foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); } else if (arg == "--shop") hud.ShowShop(); else if (arg == "--supplies") { suppliesGranted = true; hud.SuppliesGranted = true; } else if (arg == "--repair") Garage.Damaged(Depot.LeaderId); else if (arg == "--aces") { Nemesis.TestSeed(); hud.garage.RefreshBoard(); } else if (arg.StartsWith("--cats=")) { Career.TestCats(Depot.LeaderId, int.Parse(arg.Substring(7))); hud.Repainted(); } else if (arg == "--promote") { PlayerPrefs.SetInt("rank.seen", Depot.RankLevel - 1); hud.ShowTitle(reserveGranted); } else if (arg.StartsWith("--tankname=")) { var tn = arg.Substring(11); int cut = tn.IndexOf(':'); Career.PaintName(cut > 0 ? tn.Substring(0, cut) : Depot.LeaderId, (cut > 0 ? tn.Substring(cut + 1) : tn).Replace('_', ' ')); hud.Repainted(); } else if (arg == "--mail") hud.TestMail(); else if (arg == "--qm") hud.TestQuartermaster(); else if (arg == "--opencrate") hud.TestCrate(); else if (arg.StartsWith("--opencrate=")) hud.TestCrate(arg.Substring(12)); else if (arg.StartsWith("--bondstars=")) Bonds.TestStars(int.Parse(arg.Substring(12))); else if (arg == "--bonds") hud.ShowBonds(); else if (arg == "--wanted") { Nemesis.TestSeed(); hud.ShowWanted(); } else if (arg == "--crewtab") { stick.Blocked = true; hud.ShowCrewTab(); } else if (arg.StartsWith("--sheet=")) hud.TestSheet(arg.Substring(8)); else if (arg == "--mapseed" || arg == "--mapfall") Campaign.TestSeed(arg == "--mapfall");
+            foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); } else if (arg == "--shop") hud.ShowShop(); else if (arg == "--supplies") { suppliesGranted = true; hud.SuppliesGranted = true; } else if (arg == "--repair") Garage.Damaged(Depot.LeaderId); else if (arg == "--testdrive") { var lend = Depot.TestDriveOffer; if (lend != null) { Depot.GrantTestDrive(lend); hud.ShowTitle(reserveGranted); } } else if (arg == "--aces") { Nemesis.TestSeed(); hud.garage.RefreshBoard(); } else if (arg.StartsWith("--cats=")) { Career.TestCats(Depot.LeaderId, int.Parse(arg.Substring(7))); hud.Repainted(); } else if (arg == "--promote") { PlayerPrefs.SetInt("rank.seen", Depot.RankLevel - 1); hud.ShowTitle(reserveGranted); } else if (arg.StartsWith("--tankname=")) { var tn = arg.Substring(11); int cut = tn.IndexOf(':'); Career.PaintName(cut > 0 ? tn.Substring(0, cut) : Depot.LeaderId, (cut > 0 ? tn.Substring(cut + 1) : tn).Replace('_', ' ')); hud.Repainted(); } else if (arg == "--mail") hud.TestMail(); else if (arg == "--qm") hud.TestQuartermaster(); else if (arg == "--opencrate") hud.TestCrate(); else if (arg.StartsWith("--opencrate=")) hud.TestCrate(arg.Substring(12)); else if (arg.StartsWith("--bondstars=")) Bonds.TestStars(int.Parse(arg.Substring(12))); else if (arg == "--bonds") hud.ShowBonds(); else if (arg == "--wanted") { Nemesis.TestSeed(); hud.ShowWanted(); } else if (arg == "--crewtab") { stick.Blocked = true; hud.ShowCrewTab(); } else if (arg.StartsWith("--sheet=")) hud.TestSheet(arg.Substring(8)); else if (arg == "--mapseed" || arg == "--mapfall") Campaign.TestSeed(arg == "--mapfall");
             hud.OnStart += () => Radio("start");
             if (opNight == 0 && !daily && !weekly && PlayerPrefs.GetInt("route.launch", 0) == 1) { PlayerPrefs.SetInt("route.launch", 0); PlayerPrefs.Save(); StartNight(); Radio("start"); }
             if (sneak) { SneakBuild(); StartNight(); Radio("start"); string np = Hud.UiSprite("sneak_" + theatre) != null ? "sneak_" + theatre : theatre == "kursk" ? "route_kursk_belts" : "route_bocage"; hud.Briefing(np, "Night raid · " + TheatreName, "No lights, no shooting. Slip through to the depot and blow it. The sentries send up flares: in their light, stand still or get out of it. They see what moves."); }
@@ -1930,7 +1931,7 @@ namespace IronNight
             fx.MuzzleFlash(from, dir); Sfx.Faust(from);
         }
 
-        void StartNight() { hud.HideTitle(); if (!IntroShot()) Begin(); }   // the opening shot first (Cine), then the play
+        void StartNight() { hud.HideTitle(); if (testDrive) Depot.SpendTestDrive(); if (!IntroShot()) Begin(); }   // the opening shot first (Cine), then the play
 
         /// <summary>A change of screen behind the black: down, swap, up.</summary>
         System.Collections.IEnumerator Curtained(System.Action swap)
@@ -2048,6 +2049,8 @@ namespace IronNight
             string crewLine = dawn ? $"\nThe crew's {Depot.CrewNights}{(Depot.CrewNights == 1 ? "st" : Depot.CrewNights == 2 ? "nd" : Depot.CrewNights == 3 ? "rd" : "th")} night together · {Depot.CrewName}" : crewLostTonight && crewBefore > 0 ? $"\nThe crew got out, but {crewBefore} nights together are lost" : "";
             hud.SetEndNumbers(kills, $"{m}:{s:00}", acc, score * (doubled ? 2 : 1), nightInfantry + " infantry · level " + level + " · " + objectivesReached + (objectivesReached == 1 ? " objective" : " objectives"));
             string statLine = crewLine + careerLine + lines;
+            OfferDoubles();
+            if (testDrive) { var lent = System.Array.Find(Depot.Leaders, c => c.id == leaderId); if (lent != null && !Depot.OwnsLeader(lent)) statLine += "\n" + lent.name + " goes back to the depot · " + lent.cost.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " points to keep her"; }
             ShowMoment();   // the night's best moment, over the end sheet that follows
             if (stand) { StandEnd(dawn, statLine); return; }
             if (convoy) { ConvoyEnd(dawn, statLine); return; }
@@ -2061,6 +2064,30 @@ namespace IronNight
         }
 
         /// <summary>A night of the week's event over: the end sheet under the event's name; again fights it once more.</summary>
+        /// <summary>The ledger's ads the player may take, once a night each: the night's war bond stars doubled, and on an
+        /// event night its count for the week doubled, with any step that reaches paid.</summary>
+        void OfferDoubles()
+        {
+            hud.ClearLedgerOffers(); var inv = System.Globalization.CultureInfo.InvariantCulture;
+            if (!starsDoubled && starsBanked > 0)
+                hud.LedgerOffer("War bonds · ", "×2 · ad", () => Ads.Rewarded("stars", () =>
+                {
+                    if (starsDoubled) return; starsDoubled = true; Bonds.AddStars(starsBanked); Sfx.Pickup();
+                    hud.ReplaceLedgerLine("War bonds · ", "War bonds · +" + starsBanked * 2 + " stars, doubled · tier " + Bonds.Tier);
+                }));
+            if (weekly && !weekDoubled && weeklyBanked > 0 && !Weekly.AllDone)
+            {
+                var we = Weekly.Now;
+                hud.LedgerOffer(we.name + " · ", "×2 · ad", () => Ads.Rewarded("week", () =>
+                {
+                    if (weekDoubled) return; weekDoubled = true; Sfx.Pickup();
+                    var paid = Weekly.Add(weeklyBanked); int last = we.steps[we.steps.Length - 1].at;
+                    hud.ReplaceLedgerLine(we.name + " · ", we.name + " · the night doubled · " + (Weekly.AllDone ? "every step won this week" : Mathf.Min(Weekly.Count, last).ToString("N0", inv) + " of " + last.ToString("N0", inv)));
+                    foreach (var p in paid) hud.AddLedgerLine(we.name + " · a step won · " + p);
+                }));
+            }
+        }
+
         void WeeklyEnd(bool dawn, string statLine, bool adAvailable)
         {
             var we = Weekly.Now;

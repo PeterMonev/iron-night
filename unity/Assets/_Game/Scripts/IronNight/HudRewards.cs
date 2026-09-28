@@ -76,7 +76,7 @@ namespace IronNight
                 lb.text = p >= 50 ? "Quartermaster · +" + p.ToString("N0", En) + " ready" : "Quartermaster · gathering";
                 dailyBtn.GetComponent<Image>().color = p >= 50 ? QmGreen : new Color(0.06f, 0.07f, 0.09f, 0.55f); dailyBtn.SetActive(true);
             }
-            RefreshBondsButton(); RefreshWeeklyButton();
+            RefreshBondsButton(); RefreshWeeklyButton(); RefreshTestDriveButton(); RefreshDispatchButton();
             if (crateBtn == null) return;
             int n = Rewards.CratesTotal; bool free = n == 0 && Rewards.FreeCrateReady;
             var sp = CrateStage.Picture(n > 0 ? Rewards.NextCrate : "supply"); if (sp != null) cratePic.sprite = sp;

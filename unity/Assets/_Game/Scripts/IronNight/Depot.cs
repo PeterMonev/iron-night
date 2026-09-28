@@ -167,6 +167,29 @@ namespace IronNight
             PlayerPrefs.SetString("depot.leader." + c.nation, c.id); Save(); return true;
         }
 
+        // ---- the test drive: the strongest tank not owned yet, lent for one night for a rewarded ad, once a day ----
+        /// <summary>Today's test drive: the strongest tank of the nation the player does not own yet (the Pershing, the
+        /// IS-2), or null when every one is owned or the day's drive is taken.</summary>
+        public static LeaderChoice TestDriveOffer
+        {
+            get
+            {
+                if (PlayerPrefs.GetString("testdrive.day", "") == Daily.Today) return null;
+                LeaderChoice best = null;
+                foreach (var c in Leaders) if (c.nation == Nation && !OwnsLeader(c) && VehicleSpec.Available(VehicleSpec.ById(c.id)) && (best == null || c.cost > best.cost)) best = c;
+                return best;
+            }
+        }
+        /// <summary>The tank lent for the next night, from the ad until the night begins; null without one.</summary>
+        public static string TestDriveId { get { var s = PlayerPrefs.GetString("testdrive.id", ""); return s.Length > 0 ? s : null; } }
+        public static void GrantTestDrive(LeaderChoice c) { PlayerPrefs.SetString("testdrive.id", c.id); PlayerPrefs.SetString("testdrive.day", Daily.Today); PlayerPrefs.Save(); }
+        /// <summary>The night has begun in the lent tank: the loan is spent, the night keeps her.</summary>
+        public static void SpendTestDrive() { PlayerPrefs.DeleteKey("testdrive.id"); PlayerPrefs.Save(); }
+        /// <summary>The tank that leads the next night: the lent one, or the player's own.</summary>
+        public static string NightLeaderId => TestDriveId ?? LeaderId;
+        /// <summary>The tank leading the night the battle was built for (set by the battle), whose armour steps count.</summary>
+        public static string NightTank;
+
         // the commanders: one bonus each, three to a nation, bought once and kept; the chosen one rides with the leader
         public class Commander { public string id, name, nation, bonus, desc, picture; public int cost; }
         public static readonly Commander[] Commanders =
@@ -253,7 +276,7 @@ namespace IronNight
         }
 
         // what the upgrades mean in the fight
-        public static float LeaderHp => 8f + Level("armor") + (CrewLevel >= 2 ? 1f : 0f) + Career.ExtraHits(LeaderId);   // the tank's own armour steps too
+        public static float LeaderHp => 8f + Level("armor") + (CrewLevel >= 2 ? 1f : 0f) + Career.ExtraHits(NightTank ?? LeaderId);   // the tank's own armour steps too (a lent tank's, on its night)
         // the leader's crew: nights survived together, per nation; lost with the leader unless the field repair pulls them out
         public static int CrewNights { get { Load(); return PlayerPrefs.GetInt("crew.nights." + Nation, 0); } set { PlayerPrefs.SetInt("crew.nights." + Nation, Mathf.Max(0, value)); Save(); } }
         public static int CrewLevel => CrewNights >= 10 ? 3 : CrewNights >= 5 ? 2 : CrewNights >= 2 ? 1 : 0;

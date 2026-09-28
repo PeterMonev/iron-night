@@ -30,9 +30,11 @@ namespace IronNight
                 var d = pc.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>(); d.renderShadows = true; d.renderPostProcessing = true; d.volumeLayerMask = 1 << HangarLayer;
             }
             var before = shown != null ? shown.spec : null; bool wasActive = gameObject.activeSelf; gameObject.SetActive(true);
-            var spinBefore = stage.localRotation; stage.localRotation = Quaternion.Euler(0f, 28f, 0f);
+            var spinBefore = stage.localRotation; stage.localRotation = Quaternion.Euler(0f, 208f, 0f);   // her front three-quarters to this camera, the gun toward it
             Show(spec); if (shown != null) shown.Apply();
+            foreach (var f in crewFigures) if (f != null) f.SetActive(false);   // the tank alone: the crew stand between her and this camera
             portraitCam.Render();
+            foreach (var f in crewFigures) if (f != null) f.SetActive(true);
             var tex = new Texture2D(portraitRt.width, portraitRt.height, TextureFormat.RGB24, false); var prev = RenderTexture.active; RenderTexture.active = portraitRt; tex.ReadPixels(new Rect(0, 0, portraitRt.width, portraitRt.height), 0, 0); RenderTexture.active = prev;
             var px = tex.GetPixels(); for (int i = 0; i < px.Length; i++) px[i] = new Color(Mathf.Min(1f, px[i].r * 1.45f), Mathf.Min(1f, px[i].g * 1.45f), Mathf.Min(1f, px[i].b * 1.45f), 1f); tex.SetPixels(px); tex.Apply();   // a little exposure: the list is smaller and darker than the hangar
             portraits[spec.id] = tex; stage.localRotation = spinBefore;

@@ -292,7 +292,7 @@ namespace IronNight
               var st = MakeImage(xpc.transform, "Star", new Vector2(0f, 0.5f), new Vector2(18, 0), new Vector2(30, 30), XpBlue); Currency(st, "icon_crewxp", StarSprite()); st.rectTransform.pivot = new Vector2(0f, 0.5f);
               xpLine = MakeText(xpc.transform, "Text", new Vector2(0f, 0.5f), new Vector2(60, 0), TextAnchor.MiddleLeft, 28, XpBlue); xpLine.rectTransform.pivot = new Vector2(0f, 0.5f); xpLine.rectTransform.sizeDelta = new Vector2(200, 60); xpLine.font = BoldFont(); }
             goldLine = GoldPill(titleSheet.transform, new Vector2(-50, -218), 330f, true);
-            BuildCrateButton(); BuildBondsButton(); BuildWeeklyButton();
+            BuildCrateButton(); BuildBondsButton(); BuildWeeklyButton(); BuildTestDriveButton(); BuildDispatchButton();
             // the name
             var eyebrow = MakeText(titleSheet.transform, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -190), TextAnchor.MiddleCenter, 26, new Color(0.96f, 0.68f, 0.24f)); eyebrow.text = Spaced("WWII · NIGHT ASSAULT"); eyebrow.font = LabelFont();
             var big = MakeText(titleSheet.transform, "Name", new Vector2(0.5f, 1f), new Vector2(0, -300), TextAnchor.MiddleCenter, 170, ink); big.text = "IRON NIGHT"; big.rectTransform.sizeDelta = new Vector2(1040, 240); big.verticalOverflow = VerticalWrapMode.Overflow;
@@ -463,9 +463,11 @@ namespace IronNight
             }
         }
 
+        bool titleReserve;   // the reserve's state the title was last shown with
         public void ShowTitle(bool reserveGranted)
         {
-            if (garage != null) { garage.SetActive(false); garage.Show(VehicleSpec.ById(Depot.LeaderId)); garage.SetTitle(true); garage.Frame(false); titleBackdrop.texture = garage.TitleTexture; }
+            titleReserve = reserveGranted;
+            if (garage != null) { garage.SetActive(false); garage.Show(VehicleSpec.ById(Depot.NightLeaderId)); garage.SetTitle(true); garage.Frame(false); titleBackdrop.texture = garage.TitleTexture; }
             Sfx.Music(true);
             Depot.Load(); Medals.Check(); hudGroup.SetActive(false); endSheet.SetActive(false); depotSheet.SetActive(false); RefreshRewardButtons();
             { var won = Depot.Promotions(); if (won.Count > 0) ShowPromotion(won[won.Count - 1]); }   // a new rank: its ceremony, over the title
@@ -505,7 +507,7 @@ namespace IronNight
         /// <summary>Test switch --garage=id: straight into the garage tab with that tank on the turntable.</summary>
         public void ShowGarage(VehicleSpec spec) { depotTab = 1; ShowDepot(); if (garage != null) garage.Show(spec); }
         /// <summary>Test switch --sheet=settings, medals, records, help, orders or pause: that sheet, open over the title.</summary>
-        public void TestSheet(string name) { if (name == "settings") ShowSettings(); else if (name == "medals") ShowMedals(); else if (name == "records") ShowRecords(); else if (name == "help") helpSheet.SetActive(true); else if (name == "orders") ShowOrders(); else if (name == "weekly") ShowWeekly(); else if (name == "names") { var lc = System.Array.Find(Depot.Leaders, x => x.id == Depot.LeaderId); if (lc != null) ShowNames(lc.id, lc.nation); } else if (name == "pause") { ShowPause(true, true); pauseSheet.transform.SetAsLastSibling(); } }
+        public void TestSheet(string name) { if (name == "settings") ShowSettings(); else if (name == "testdrive") ShowTestDrive(); else if (name == "dispatch") ShowDispatch(); else if (name == "medals") ShowMedals(); else if (name == "records") ShowRecords(); else if (name == "help") helpSheet.SetActive(true); else if (name == "orders") ShowOrders(); else if (name == "weekly") ShowWeekly(); else if (name == "names") { var lc = System.Array.Find(Depot.Leaders, x => x.id == Depot.LeaderId); if (lc != null) ShowNames(lc.id, lc.nation); } else if (name == "pause") { ShowPause(true, true); pauseSheet.transform.SetAsLastSibling(); } }
         /// <summary>Test switch --crewtab: straight into the depot's crew tab.</summary>
         public void ShowCrewTab() { depotTab = 2; ShowDepot(); }
         /// <summary>Test switch --dossier=id: a tank's service record, the tank in the hangar.</summary>
@@ -1423,6 +1425,21 @@ namespace IronNight
 
         /// <summary>The night's account on the end sheet: its four numbers large across the head and the line under them,
         /// then everything else it brought a line each with room between, and the points under the last.</summary>
+        readonly List<(string head, string label, System.Action act)> ledgerOffers = new List<(string, string, System.Action)>();
+        /// <summary>An ad the player may take for one line of the night's ledger (the line that starts with head): a small
+        /// button at its end.</summary>
+        public void LedgerOffer(string head, string label, System.Action act) => ledgerOffers.Add((head, label, act));
+        public void ClearLedgerOffers() => ledgerOffers.Clear();
+        /// <summary>The last line starting with head written anew (its offer taken, so gone), and the ledger drawn again.</summary>
+        public void ReplaceLedgerLine(string head, string line)
+        {
+            ledgerOffers.RemoveAll(o => o.head == head);
+            var ls = new List<string>(lastLedger.Split('\n')); int k = ls.FindLastIndex(x => x.Trim().StartsWith(head));
+            if (k >= 0) ls[k] = line; else ls.Add(line);
+            lastLedger = string.Join("\n", ls); BuildLedger(lastLedger);
+        }
+        public void AddLedgerLine(string line) { lastLedger += "\n" + line; BuildLedger(lastLedger); }
+
         void BuildLedger(string statLine)
         {
             foreach (Transform c in endLedger) Destroy(c.gameObject);
@@ -1452,6 +1469,14 @@ namespace IronNight
             {
                 int cut = ln.IndexOf(" · "); string text = cut > 0 ? "<color=#E3A64A>" + ln.Substring(0, cut) + "</color>   " + ln.Substring(cut + 3) : ln;   // what it is in amber, then what it brought
                 var row = MakeText(endLedger, "Line", new Vector2(0.5f, 0.5f), new Vector2(0f, top), TextAnchor.UpperCenter, size, ink); row.rectTransform.pivot = new Vector2(0.5f, 1f); row.rectTransform.sizeDelta = new Vector2(920f, pitch); row.supportRichText = true; row.text = text; Fit(row, 16);
+                int oi = ledgerOffers.FindIndex(o => ln.StartsWith(o.head));
+                if (oi >= 0)
+                {   // its ad: the line moves left, the button sits at its end
+                    var o = ledgerOffers[oi]; const float PW = 150f; float w = Mathf.Min(row.preferredWidth, 920f - PW - 24f), shift = -(PW + 16f) * 0.5f;
+                    row.rectTransform.sizeDelta = new Vector2(920f - PW - 16f, pitch); row.rectTransform.anchoredPosition = new Vector2(shift, top);
+                    var pill = MakeButton(endLedger, o.label, new Vector2(0.5f, 0.5f), new Vector2(shift + w * 0.5f + 16f + PW * 0.5f, top - pitch * 0.5f), new Vector2(PW, Mathf.Clamp(pitch - 4f, 34f, 46f)), 22, o.act);
+                    pill.GetComponent<Image>().color = new Color(0.95f, 0.66f, 0.23f, 0.95f); var pl = pill.transform.Find("Label").GetComponent<Text>(); pl.color = new Color(0.1f, 0.08f, 0.05f); pl.font = BoldFont();
+                }
                 top -= pitch;
             }
             endPoints.rectTransform.anchoredPosition = new Vector2(0f, top - pitch * 0.5f - 4f);
