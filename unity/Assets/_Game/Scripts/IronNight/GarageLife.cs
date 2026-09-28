@@ -77,8 +77,73 @@ namespace IronNight
             m.RecalculateNormals(); m.RecalculateTangents(); m.RecalculateBounds(); return m;
         }
 
+        /// <summary>The turntable's plate: a flat disc height thick, its picture laid on from above (the plate's circle
+        /// filling uvFill of the picture), and its rim, the second material.</summary>
+        static Mesh Disc(float radius, float height, int segments, float uvFill)
+        {
+            var v = new System.Collections.Generic.List<Vector3>(); var uv = new System.Collections.Generic.List<Vector2>();
+            var top = new System.Collections.Generic.List<int>(); var side = new System.Collections.Generic.List<int>();
+            v.Add(new Vector3(0f, height, 0f)); uv.Add(new Vector2(0.5f, 0.5f));
+            for (int i = 0; i <= segments; i++)
+            {
+                float a = i * Mathf.PI * 2f / segments, x = Mathf.Cos(a), z = Mathf.Sin(a);
+                v.Add(new Vector3(x * radius, height, z * radius)); uv.Add(new Vector2(0.5f + x * 0.5f * uvFill, 0.5f + z * 0.5f * uvFill));
+            }
+            for (int i = 1; i <= segments; i++) { top.Add(0); top.Add(i + 1); top.Add(i); }   // clockwise seen from above
+            int s0 = v.Count;
+            for (int i = 0; i <= segments; i++)
+            {
+                float a = i * Mathf.PI * 2f / segments, x = Mathf.Cos(a), z = Mathf.Sin(a);
+                v.Add(new Vector3(x * radius, height, z * radius)); uv.Add(new Vector2(i * 8f / segments, 1f));
+                v.Add(new Vector3(x * radius, 0f, z * radius)); uv.Add(new Vector2(i * 8f / segments, 0f));
+            }
+            for (int i = 0; i < segments; i++) { int a = s0 + i * 2, b = a + 2; side.Add(a); side.Add(b); side.Add(a + 1); side.Add(b); side.Add(b + 1); side.Add(a + 1); }
+            var m = new Mesh(); m.SetVertices(v); m.SetUVs(0, uv); m.subMeshCount = 2; m.SetTriangles(top, 0); m.SetTriangles(side, 1);
+            m.RecalculateNormals(); m.RecalculateTangents(); m.RecalculateBounds(); return m;
+        }
+
+        // ---- the workshop: what stands about in a tank depot (Props from Petar's pictures, through TRELLIS) ----
+        Material chainMat, bulbMat;
+
+        void DressWorkshop()
+        {
+            var t = transform;
+            // at the right, the Sherman's radial engine out on its stand under a work lamp, spare road wheels and track by it
+            Prop(t, "engine_radial", new Vector3(7.2f, 0f, 4.2f), -115f);
+            Prop(t, "wheels", new Vector3(9.9f, 0f, 5.9f), -49f);   // the stack, the leaning wheel and the track side by side to the camera
+            WorkLamp(new Vector3(7.2f, 3.1f, 4.2f));
+            // at the left under the hunt board, the workbench with a lamp of its own, and a diesel on its stand
+            Prop(t, "workbench", new Vector3(2.6f, 0f, 12.8f), -65f);
+            Prop(t, "engine_inline", new Vector3(5.6f, 0f, 15f), 147f);
+            WorkLamp(new Vector3(2.6f, 2.9f, 12.8f));
+            // the grime of years at the foot of the back wall
+            var grime = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(grime.GetComponent<Collider>()); grime.name = "Grime"; grime.transform.SetParent(t, false);
+            grime.transform.localPosition = new Vector3(0f, 0.8f, 19.96f); grime.transform.localScale = new Vector3(46f, 1.6f, 1f);
+            var gm = new Material(Resources.Load<Material>("Smoke")); gm.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.GradientDown(64, 1.3f).texture); gm.SetColor("_BaseColor", new Color(0.03f, 0.025f, 0.02f, 0.55f)); grime.GetComponent<Renderer>().sharedMaterial = gm;
+        }
+
+        /// <summary>A work lamp hung low on a chain from the roof: the green enamel shade (Props/lamp, a metre tall with its
+        /// chain, the bulb at its foot), a warm pool of light under it, the bulb aglow.</summary>
+        void WorkLamp(Vector3 at)
+        {
+            if (Prop(transform, "lamp", at, 0f) == null) return;
+            if (chainMat == null)
+            {
+                chainMat = new Material(Resources.Load<Material>("BarrelLit")); chainMat.SetColor("_BaseColor", new Color(0.16f, 0.15f, 0.14f)); chainMat.SetFloat("_Metallic", 0.6f); chainMat.SetFloat("_Smoothness", 0.4f);
+                bulbMat = new Material(Resources.Load<Material>("Additive")); bulbMat.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.Glow(64, 0.22f).texture); bulbMat.SetColor("_BaseColor", new Color(2.2f, 1.55f, 0.85f, 1f));   // past the bloom's threshold
+            }
+            float top = at.y + 0.98f, roof = 11.1f;
+            var chain = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(chain.GetComponent<Collider>()); chain.name = "Chain"; chain.transform.SetParent(transform, false);
+            chain.transform.localPosition = new Vector3(at.x, (top + roof) * 0.5f, at.z); chain.transform.localScale = new Vector3(0.03f, (roof - top) * 0.5f, 0.03f); chain.GetComponent<Renderer>().sharedMaterial = chainMat;
+            var light = new GameObject("WorkLight").AddComponent<Light>(); light.transform.SetParent(transform, false); light.transform.localPosition = at + new Vector3(0f, 0.12f, 0f); light.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            light.type = LightType.Spot; light.spotAngle = 125f; light.range = 7.5f; light.intensity = 14f; light.color = new Color(1f, 0.8f, 0.55f); light.shadows = LightShadows.None;
+            var bulb = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(bulb.GetComponent<Collider>()); bulb.name = "Bulb"; bulb.transform.SetParent(transform, false);
+            bulb.transform.localPosition = at + new Vector3(0f, 0.08f, 0f); bulb.transform.localScale = Vector3.one * 0.75f; bulb.GetComponent<Renderer>().sharedMaterial = bulbMat;
+            bulb.transform.rotation = Quaternion.LookRotation(bulb.transform.position - (transform.position + new Vector3(-11f, 3.8f, -18f)));   // turned to the menu's camera, between its two framings
+        }
+
         // ---- the repair after a hard night ----
-        const float RepairMinutes = 4f, RepairSpin = 250f;   // RepairSpin: the turntable stands with the gun toward the left of the picture, the far side to the wall
+        const float RepairMinutes = 4f, RepairSpin = 270f;   // RepairSpin: the turntable stands with the gun toward the camera's left, the rear corner the mechanic works at clear of the crew
         /// <summary>A tank back from a hard night: the mechanics are at it for a few minutes of the real clock.</summary>
         public static void Damaged(string tank) { if (string.IsNullOrEmpty(tank)) return; PlayerPrefs.SetString("garage.repair", tank + "|" + GameClock.UtcNow.AddMinutes(RepairMinutes).Ticks); PlayerPrefs.Save(); }
         static bool InRepair(string tank)
@@ -96,22 +161,54 @@ namespace IronNight
             if (now == (welding != null)) return;
             if (welding != null) { Destroy(welding.gameObject); welding = null; }
             if (!now) return;
-            if (!framedDepot) { spin = RepairSpin; spinVel = 0f; stage.localRotation = Quaternion.Euler(0f, spin, 0f); }   // stopped where it shows best (the title opens behind the curtain)
-            welding = Welding.Behind(shown, titleCam, floor);
+            spin = RepairSpin; spinVel = 0f; stage.localRotation = Quaternion.Euler(0f, spin, 0f);   // stopped where it shows best (a repair begins as the title opens, behind the curtain)
+            welding = Welding.AtWork(shown, titleCam, floor);
         }
     }
 
-    /// <summary>A welder at work behind a hull: the arc's blue-white light flickering in bursts with pauses between, sparks
-    /// thrown up over the armour to bounce on the floor, a glow over the hull's edge, and the crackle of it.</summary>
+    /// <summary>A tank under repair: a mechanic kneeling at its rear with his torch on the armour and his gas cart beside
+    /// him (without the figure, a welder unseen behind the hull), the arc's blue-white light flickering in bursts with
+    /// pauses between, sparks thrown off the plate to bounce on the floor, a glow at the torch, a thin smoke, the crackle.</summary>
     public class Welding : MonoBehaviour
     {
-        ParticleSystem sparks, smoke; Light arc; Transform glow; Camera eye; float burst, pause = 0.8f;
+        static readonly Vector3 TorchTip = new Vector3(-0.43f, 0.7f, 0.51f);   // the nozzle of the mechanic's torch in the figure's own frame (Props/mechanic, measured)
+        ParticleSystem sparks, smoke; Light arc; Transform glow; Camera eye; float burst, pause = 0.8f, glowSize = 2.1f, arcMax = 40f; bool visible;   // visible: the torch in sight, its sparks fewer and closer
 
-        /// <summary>Sets the welder to work on the tank's side away from the camera, at the edge of the rear deck.</summary>
-        public static Welding Behind(Vehicle tank, Camera eye, Transform floor)
+        /// <summary>Sets the repair going: the mechanic kneeling on the rear deck behind the turret, facing it, his torch on
+        /// its back; his gas cart on the floor behind the tank's left rear corner (the side the menu's camera sees with the
+        /// turntable stood at the repair angle).</summary>
+        public static Welding AtWork(Vehicle tank, Camera eye, Transform floor)
         {
-            var t = tank.transform; var hull = t.Find("Hull"); var lo = Vector3.one * 1e9f; var hi = -lo;
-            foreach (var mf in (hull != null ? hull : t).GetComponentsInChildren<MeshFilter>())
+            var t = tank.transform; PartBounds(t.Find("Hull"), t, out var lo, out var hi);
+            var root = new GameObject("Repair"); root.transform.SetParent(t, false);
+            var w = root.AddComponent<Welding>(); w.eye = eye;
+            var torch = new GameObject("Torch").transform;
+            var tur = t.Find("Turret"); PartBounds(tur, t, out var tlo, out var thi);
+            var man = tur != null && thi.z > tlo.z ? Garage.Prop(root.transform, "mechanic", new Vector3((tlo.x + thi.x) * 0.5f - TorchTip.x, tank.spec.ringHeight - 0.03f, tlo.z - TorchTip.z - 0.03f), 0f) : null;
+            if (man != null)
+            {
+                Garage.Prop(root.transform, "weldcart", new Vector3(lo.x - 0.75f, 0f, lo.z - 1.4f), 135f);   // its coiled hoses to the camera
+                torch.SetParent(man.transform, false); torch.localPosition = TorchTip;
+                torch.rotation = Quaternion.LookRotation(t.TransformDirection(new Vector3(-0.55f, 0.25f, -1f)));   // off the turret's back, over the deck, to fall down the armour
+                w.glowSize = 0.32f; w.arcMax = 6f; w.visible = true;
+            }
+            else
+            {
+                float side = eye != null && t.InverseTransformPoint(eye.transform.position).x > 0f ? -1f : 1f;   // the far side: the man and his arc hidden, their light not
+                torch.SetParent(root.transform, false); torch.localPosition = new Vector3(side > 0f ? hi.x - 0.25f : lo.x + 0.25f, Mathf.Lerp(lo.y, hi.y, 0.97f), Mathf.Lerp(lo.z, hi.z, 0.1f));
+                torch.localRotation = Quaternion.LookRotation(new Vector3(side * 0.55f, 1.6f, -0.35f));   // a fountain over the rear deck
+            }
+            Debug.Log("Iron Night: repair on " + tank.spec.id + (man != null ? ", the mechanic at his torch " : ", a welder unseen ") + torch.position.ToString("0.0"));
+            w.Build(torch, floor);
+            if (man != null) w.arc.transform.position = torch.position + t.forward * 0.3f + Vector3.up * 0.15f;   // before the torch, toward the turret
+            return w;
+        }
+
+        /// <summary>A part's box (the hull, the turret) in the tank's own frame, from its meshes' bounds.</summary>
+        static void PartBounds(Transform part, Transform t, out Vector3 lo, out Vector3 hi)
+        {
+            lo = Vector3.one * 1e9f; hi = -lo;
+            foreach (var mf in (part != null ? part : t).GetComponentsInChildren<MeshFilter>())
             {
                 if (mf.sharedMesh == null) continue; var b = mf.sharedMesh.bounds;
                 for (int c = 0; c < 8; c++)
@@ -120,45 +217,34 @@ namespace IronNight
                     lo = Vector3.Min(lo, p); hi = Vector3.Max(hi, p);
                 }
             }
-            if (hi.x < lo.x) { lo = new Vector3(-1.5f, 0f, -3f); hi = new Vector3(1.5f, 2.4f, 3f); }
-            float side = eye != null && t.InverseTransformPoint(eye.transform.position).x > 0f ? -1f : 1f;   // the far side: the man and his arc hidden, their light not
-            float fz = 0.1f, fy = 0.97f; var inv = System.Globalization.CultureInfo.InvariantCulture;
-            foreach (var a in System.Environment.GetCommandLineArgs())
-            {
-                if (a.StartsWith("--weldz=")) float.TryParse(a.Substring(8), System.Globalization.NumberStyles.Float, inv, out fz);
-                if (a.StartsWith("--weldy=")) float.TryParse(a.Substring(8), System.Globalization.NumberStyles.Float, inv, out fy);
-            }
-            var at = new Vector3(side > 0f ? hi.x - 0.25f : lo.x + 0.25f, Mathf.Lerp(lo.y, hi.y, fy), Mathf.Lerp(lo.z, hi.z, fz));
-            Debug.Log("Iron Night: welder on " + tank.spec.id + " at " + at.ToString("0.00") + ", hull " + lo.ToString("0.00") + " .. " + hi.ToString("0.00") + ", side " + side + ", world " + t.TransformPoint(at).ToString("0.0") + ", tank forward " + t.forward.ToString("0.00"));
-            var go = new GameObject("Welding"); go.transform.SetParent(t, false); go.transform.localPosition = at;
-            go.transform.localRotation = Quaternion.LookRotation(new Vector3(side * 0.55f, 1.6f, -0.35f));   // up, a little outward and back: a fountain over the rear deck
-            var w = go.AddComponent<Welding>(); w.eye = eye; w.Build(floor); return w;
+            if (hi.x < lo.x && part != null && part.name == "Hull") { lo = new Vector3(-1.5f, 0f, -3f); hi = new Vector3(1.5f, 2.4f, 3f); }
         }
 
-        void Build(Transform floor)
+        void Build(Transform torch, Transform floor)
         {
-            sparks = gameObject.AddComponent<ParticleSystem>(); sparks.Stop();
+            var spray = new GameObject("Sparks"); spray.transform.SetParent(torch, false); sparks = spray.AddComponent<ParticleSystem>(); sparks.Stop();
             var main = sparks.main; main.loop = true; main.useUnscaledTime = true; main.simulationSpace = ParticleSystemSimulationSpace.World; main.maxParticles = 600;
             main.startLifetime = new ParticleSystem.MinMaxCurve(0.6f, 1.5f); main.startSpeed = new ParticleSystem.MinMaxCurve(2.2f, 5.8f); main.startSize = new ParticleSystem.MinMaxCurve(0.028f, 0.05f); main.gravityModifier = 1.1f;
             var shrink = sparks.sizeOverLifetime; shrink.enabled = true; shrink.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(0.7f, 0.8f), new Keyframe(1f, 0f)));   // cooling: they go out rather than vanish
+            if (visible) { main.startLifetime = new ParticleSystem.MinMaxCurve(0.35f, 0.9f); main.startSpeed = new ParticleSystem.MinMaxCurve(1.4f, 3.6f); main.startSize = new ParticleSystem.MinMaxCurve(0.02f, 0.04f); }
             var em = sparks.emission; em.rateOverTime = 0f;
-            var sh = sparks.shape; sh.shapeType = ParticleSystemShapeType.Cone; sh.angle = 30f; sh.radius = 0.03f;
+            var sh = sparks.shape; sh.shapeType = ParticleSystemShapeType.Cone; sh.angle = visible ? 38f : 30f; sh.radius = 0.03f;
             if (floor != null) { var cl = sparks.collision; cl.enabled = true; cl.type = ParticleSystemCollisionType.Planes; cl.AddPlane(floor); cl.bounce = 0.35f; cl.dampen = 0.45f; cl.lifetimeLoss = 0.12f; cl.radiusScale = 0.5f; }   // they skitter across the concrete
-            var r = GetComponent<ParticleSystemRenderer>(); r.renderMode = ParticleSystemRenderMode.Stretch; r.velocityScale = 0.07f; r.lengthScale = 2f; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false;
+            var r = spray.GetComponent<ParticleSystemRenderer>(); r.renderMode = ParticleSystemRenderMode.Stretch; r.velocityScale = 0.07f; r.lengthScale = 2f; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false;
             var m = new Material(Resources.Load<Material>("Additive")); m.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.Glow(32, 0.45f).texture); m.SetColor("_BaseColor", new Color(4.2f, 1.45f, 0.32f, 1f)); r.sharedMaterial = m;   // past the bloom's threshold in red and green only: orange-hot, not white
             sparks.Play();
-            arc = new GameObject("Arc").AddComponent<Light>(); arc.transform.SetParent(transform, false); arc.transform.position = transform.position + Vector3.up * 1.1f;   // over the rear deck: its light on the turret's back, the deck and the floor
-            arc.type = LightType.Point; arc.range = 16f; arc.intensity = 0f; arc.color = new Color(0.66f, 0.8f, 1f); arc.shadows = LightShadows.None;
+            arc = new GameObject("Arc").AddComponent<Light>(); arc.transform.SetParent(torch, false); arc.transform.position = torch.position + Vector3.up * (glowSize > 1f ? 1.1f : 0.35f);   // unseen over the rear deck, or a little above the torch
+            arc.type = LightType.Point; arc.range = glowSize > 1f ? 16f : 12f; arc.intensity = 0f; arc.color = new Color(0.66f, 0.8f, 1f); arc.shadows = LightShadows.None;
             var gm = new Material(Resources.Load<Material>("Additive")); gm.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.Glow(64, 0.18f).texture); gm.SetColor("_BaseColor", new Color(1.1f, 1.35f, 1.8f, 1f));
             // a thin smoke off the work, drifting up
-            var sg = new GameObject("Fume"); sg.transform.SetParent(transform, false); sg.transform.rotation = Quaternion.LookRotation(Vector3.up); smoke = sg.AddComponent<ParticleSystem>(); smoke.Stop();
+            var sg = new GameObject("Fume"); sg.transform.SetParent(torch, false); sg.transform.rotation = Quaternion.LookRotation(Vector3.up); smoke = sg.AddComponent<ParticleSystem>(); smoke.Stop();
             var sm = smoke.main; sm.loop = true; sm.useUnscaledTime = true; sm.simulationSpace = ParticleSystemSimulationSpace.World; sm.maxParticles = 60; sm.startLifetime = new ParticleSystem.MinMaxCurve(2.5f, 4f); sm.startSpeed = new ParticleSystem.MinMaxCurve(0.25f, 0.6f); sm.startSize = new ParticleSystem.MinMaxCurve(0.35f, 0.7f); sm.startRotation = new ParticleSystem.MinMaxCurve(0f, 6.28f);
             var sem = smoke.emission; sem.rateOverTime = 0f; var ssh = smoke.shape; ssh.shapeType = ParticleSystemShapeType.Cone; ssh.angle = 12f; ssh.radius = 0.08f;
             var grow = smoke.sizeOverLifetime; grow.enabled = true; grow.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.6f, 1f, 2.2f));
             var sr = sg.GetComponent<ParticleSystemRenderer>(); sr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; sr.receiveShadows = false;
             var smat = new Material(Resources.Load<Material>("Smoke")); smat.SetTexture("_BaseMap", Lightswarm.ProceduralSprites.Glow(64, 0.25f).texture); smat.SetColor("_BaseColor", new Color(0.5f, 0.52f, 0.56f, 0.07f)); sr.sharedMaterial = smat;
             smoke.Play();
-            var q = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(q.GetComponent<Collider>()); q.name = "ArcGlow"; q.transform.SetParent(transform, false); q.GetComponent<Renderer>().sharedMaterial = gm; glow = q.transform; glow.localScale = Vector3.zero;
+            var q = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(q.GetComponent<Collider>()); q.name = "ArcGlow"; q.transform.SetParent(torch, false); q.GetComponent<Renderer>().sharedMaterial = gm; glow = q.transform; glow.localScale = Vector3.zero;
         }
 
         void Update()
@@ -166,9 +252,9 @@ namespace IronNight
             float dt = Time.unscaledDeltaTime;
             if (burst > 0f) { burst -= dt; if (burst <= 0f) pause = Random.Range(0.6f, 2.4f); }
             else { pause -= dt; if (pause <= 0f) burst = Random.Range(0.9f, 3.8f); }
-            bool on = burst > 0f; var fume = smoke.emission; fume.rateOverTime = on ? 9f : 1.5f; var em = sparks.emission; em.rateOverTime = on ? Random.Range(150f, 380f) : 0f;
-            arc.intensity = on ? Random.Range(12f, 40f) * (Random.value < 0.12f ? 0.25f : 1f) : Mathf.MoveTowards(arc.intensity, 0f, dt * 120f);   // an arc stutters
-            float s = on ? Random.Range(1.6f, 2.6f) : 0f; glow.localScale = new Vector3(s, s, 1f);
+            bool on = burst > 0f; var fume = smoke.emission; fume.rateOverTime = on ? 9f : 1.5f; var em = sparks.emission; em.rateOverTime = on ? Random.Range(150f, 380f) * (visible ? 0.45f : 1f) : 0f;
+            arc.intensity = on ? Random.Range(arcMax * 0.3f, arcMax) * (Random.value < 0.12f ? 0.25f : 1f) : Mathf.MoveTowards(arc.intensity, 0f, dt * 120f);   // an arc stutters
+            float s = on ? Random.Range(0.75f, 1.25f) * glowSize : 0f; glow.localScale = new Vector3(s, s, 1f);
             if (eye != null) glow.rotation = Quaternion.LookRotation(glow.position - eye.transform.position);
             Sfx.Weld(on ? 1f : 0f);
         }

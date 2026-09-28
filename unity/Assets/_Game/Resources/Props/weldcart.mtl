@@ -1,0 +1,3 @@
+newmtl weldcart
+Kd 1 1 1
+map_Kd weldcart_tex.png

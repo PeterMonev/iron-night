@@ -1,0 +1,3 @@
+newmtl engine_inline
+Kd 1 1 1
+map_Kd engine_inline_tex.png

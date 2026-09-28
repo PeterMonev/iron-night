@@ -1,0 +1,3 @@
+newmtl lamp
+Kd 1 1 1
+map_Kd lamp_tex.png
