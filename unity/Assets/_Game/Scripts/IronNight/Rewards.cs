@@ -33,6 +33,16 @@ namespace IronNight
         public static int QmPoints => Mathf.FloorToInt(QmHours * QmPointsPerHour * PremiumMul);
         public static int QmXp => Mathf.FloorToInt(QmHours * QmXpPerHour * PremiumMul);
         public static void QmCollect(int mul) { int p = QmPoints, x = QmXp; SetTicks("qm.since", Now); Depot.AddPoints(p * mul); Depot.AddCrewXp(x * mul); }
+        // the quartermaster rushed: a rewarded ad and he gathers two hours at once, three times a day, never past his eight
+        public const float QmRushHours = 2f; public const int QmRushesPerDay = 3;
+        public static int QmRushesLeft => PlayerPrefs.GetString("qm.rushday", "") == Daily.Today ? Mathf.Max(0, QmRushesPerDay - PlayerPrefs.GetInt("qm.rushes", 0)) : QmRushesPerDay;
+        public static bool QmCanRush => QmRushesLeft > 0 && QmHours < QmCapHours - 0.25f;
+        public static void QmRush()
+        {
+            var since = Ticks("qm.since"); if (since == System.DateTime.MinValue || since > Now) since = Now;
+            SetTicks("qm.since", since.AddHours(-QmRushHours));
+            PlayerPrefs.SetInt("qm.rushes", QmRushesPerDay - QmRushesLeft + 1); PlayerPrefs.SetString("qm.rushday", Daily.Today); PlayerPrefs.Save();
+        }
 
         // ---- mail call: a gift a day ----
         public class Gift { public string kind; public int amount; }   // points, xp, gold, supply, officer

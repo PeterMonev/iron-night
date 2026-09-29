@@ -12,8 +12,8 @@ namespace IronNight
     /// the wheel) come closer or stand back; a hedge or a tree in between brings the camera in front of it.
     /// While a photo is framed the camera draws into a picture of the screen's size, and the screen shows it through
     /// the look (Resources/Shaders/PhotoLook: the night's own colour, a 1944 sepia print, black and white; 1944 the
-    /// first time, then the last one chosen). The game renders with no post-processing, so the looks are drawn here, not
-    /// by volumes. A camera that draws nothing of the world puts the controls over the picture: URP draws the overlay
+    /// first time, then the last one chosen). The looks are drawn here, not by volumes, so they hold on low quality too,
+    /// where post-processing is off. A camera that draws nothing of the world puts the controls over the picture: URP draws the overlay
     /// UI only with a camera on the screen. The shutter renders the camera again, at least 1920 on the long side, lays
     /// the look on it, stamps a small IRON NIGHT in its corner and keeps it as a JPEG: on a phone in the gallery
     /// (Pictures/Iron Night) with SHARE beside it, on a computer in Pictures\Iron Night. A test copy of the game keeps

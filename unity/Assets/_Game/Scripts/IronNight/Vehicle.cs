@@ -396,7 +396,7 @@ namespace IronNight
         Material MakeMaterial(Texture2D tex, Texture2D nrm)
         {
             var mat = new Material(nrm != null && vehicleTemplateN != null ? vehicleTemplateN : vehicleTemplate); mat.SetTexture("_BaseMap", tex); if (nrm != null) mat.SetTexture("_BumpMap", nrm);
-            mat.SetColor("_BaseColor", friendly ? spec.tint * Depot.CamoTint : spec.tint); if (Wet) mat.SetFloat("_Smoothness", 0.55f); return mat;
+            mat.SetColor("_BaseColor", friendly ? spec.tint * Depot.NightCamoTint : spec.tint); if (Wet) mat.SetFloat("_Smoothness", 0.55f); return mat;
         }
 
         /// <summary>An artist's model comes as one OBJ per material (<name>_m0, _m1, ...) with textures <texture>_m<i>: all of them under one node.</summary>

@@ -199,7 +199,16 @@ namespace IronNight
                 var ad = MakeButton(t, "×" + Rewards.QmAdMul + " · watch an ad", new Vector2(0.5f, 0f), new Vector2(222f, 230f), new Vector2(420f, 116f), 32, () => Ads.Rewarded("quartermaster", () => { Rewards.QmCollect(Rewards.QmAdMul); Sfx.Pickup(); CloseRewards(); }));
                 ad.GetComponent<Image>().color = XpDeep;
             }
-            MakeGhost(t, p >= 50 ? "Later" : "Close", new Vector2(0.5f, 0f), new Vector2(0f, 104f), new Vector2(300f, 80f), 28, CloseRewards);
+            // rushed for a rewarded ad: two hours at once; the big button while he is still gathering, else beside LATER
+            bool rush = Rewards.QmCanRush;
+            if (rush)
+            {
+                System.Action go = () => Ads.Rewarded("qmrush", () => { Rewards.QmRush(); Sfx.Pickup(); ShowQuartermaster(); });
+                var rb = p >= 50 ? MakeButton(t, "Rush him · +2 h · ad", new Vector2(0.5f, 0f), new Vector2(170f, 104f), new Vector2(320f, 80f), 26, go)
+                                 : MakeButton(t, "Rush him · +2 hours · watch an ad", new Vector2(0.5f, 0f), new Vector2(0f, 230f), new Vector2(640f, 116f), 32, go);
+                rb.GetComponent<Image>().color = XpDeep;
+            }
+            MakeGhost(t, p >= 50 ? "Later" : "Close", new Vector2(0.5f, 0f), new Vector2(rush && p >= 50 ? -170f : 0f, 104f), new Vector2(300f, 80f), 28, CloseRewards);
         }
 
         // ---- the crate ----

@@ -37,6 +37,7 @@ namespace IronNight
         const float ShellSpeed = 62f, EnemyShellSpeed = 55f, GroundTile = 40f;
 
         Camera cam; Hud hud; TouchStick stick; Fx fx; Props props; Tracks tracks; Infantry infantry;
+        bool camoTrial;   // a camouflage lent for tonight when the night was built
         int nightInfantry, combo; float lastKill = -10f; bool veteran;
         Weather weather; Sky sky; float rumbleTimer = 12f, flicker, lightningTimer = 8f, lightning, thunderIn, enemyRangeMul = 1f, ammoMul = 1f, ammoLeft, dropTimer = debugDrops ? 3f : 35f; ParticleSystem rain;
         Objective objective; int objectivesReached; bool winter;
@@ -151,6 +152,7 @@ namespace IronNight
             if (veteran) hud.Toast("Veteran night · points ×1.5", 3f);
             hud.OnDaily = () => { Depot.ClaimDaily(); hud.ShowTitle(reserveGranted); };
             testDrive = Depot.TestDriveId != null;   // a tank lent for tonight leads it
+            camoTrial = Depot.CamoTrialId != null; Depot.NightCamo = Depot.CamoTrialId;   // a camouflage lent for tonight: the platoon wears it all night
             var leaderSpec = VehicleSpec.ById(Depot.NightLeaderId); if (!VehicleSpec.Available(leaderSpec)) leaderSpec = VehicleSpec.ById(Depot.WingmanId);
             foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--tank=")) leaderSpec = VehicleSpec.ById(arg.Substring(7));   // test switch: --tank=is2
             var startAt = Vector3.zero; foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--at=")) { var xz = arg.Substring(5).Split(','); startAt = new Vector3(float.Parse(xz[0]), 0f, float.Parse(xz[1])); }   // test switch: --at=0,95
@@ -186,7 +188,7 @@ namespace IronNight
             hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             hud.OnStart = () => hud.ShowRoutes(() =>
             {
-                if (route == builtRoute && theatre == builtTheatre && (Depot.TestDriveId != null) == testDrive) StartCoroutine(Curtained(StartNight));   // a tank lent since: the platoon built again round her
+                if (route == builtRoute && theatre == builtTheatre && (Depot.TestDriveId != null) == testDrive && (Depot.CamoTrialId != null) == camoTrial) StartCoroutine(Curtained(StartNight));   // a tank or a camouflage lent since: the platoon built again
                 else { PlayerPrefs.SetInt("route.launch", 1); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); }   // another way in: the country is built again
             });
             hud.garage = Garage.Build(); hud.garage.SetActive(false);
@@ -967,7 +969,7 @@ namespace IronNight
         {
             bool low = LowQuality;
             moon.shadows = low ? LightShadows.None : LightShadows.Soft;
-            var volume = FindAnyObjectByType<UnityEngine.Rendering.Volume>(); if (volume != null) volume.weight = low ? 0f : 1f;
+            UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(cam).renderPostProcessing = !low;   // no glow on low: the camera skips post-processing altogether
             if (rain != null) { if (low) rain.Stop(); else if (!rain.isPlaying) rain.Play(); } if (splashes != null) { if (low) splashes.Stop(); else if (!splashes.isPlaying) splashes.Play(); }
         }
 
@@ -1936,7 +1938,7 @@ namespace IronNight
             fx.MuzzleFlash(from, dir); Sfx.Faust(from);
         }
 
-        void StartNight() { hud.HideTitle(); if (testDrive) Depot.SpendTestDrive(); if (!IntroShot()) Begin(); }   // the opening shot first (Cine), then the play
+        void StartNight() { hud.HideTitle(); if (testDrive) Depot.SpendTestDrive(); if (camoTrial) Depot.SpendCamoTrial(); if (!IntroShot()) Begin(); }   // the opening shot first (Cine), then the play
 
         /// <summary>A change of screen behind the black: down, swap, up.</summary>
         System.Collections.IEnumerator Curtained(System.Action swap)
@@ -2057,6 +2059,7 @@ namespace IronNight
             string statLine = crewLine + careerLine + lines;
             OfferDoubles();
             if (testDrive) { var lent = System.Array.Find(Depot.Leaders, c => c.id == leaderId); if (lent != null && !Depot.OwnsLeader(lent)) statLine += "\n" + lent.name + " goes back to the depot · " + lent.cost.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " points to keep her"; }
+            if (camoTrial) { var cm = System.Array.Find(Depot.Camos, c => c.id == Depot.NightCamo); if (cm != null && !Depot.OwnsCamo(cm)) statLine += "\n" + cm.name + " camouflage goes back to the stores · " + cm.cost.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " points to keep it"; }
             ShowMoment();   // the night's best moment, over the end sheet that follows
             if (stand) { StandEnd(dawn, statLine); return; }
             if (convoy) { ConvoyEnd(dawn, statLine); return; }

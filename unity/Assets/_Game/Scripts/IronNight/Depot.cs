@@ -275,6 +275,26 @@ namespace IronNight
             PlayerPrefs.SetString("depot.camo", c.id); Save(); return true;
         }
 
+        // the camouflage trial: once a day a rewarded ad paints the platoon for one night in the dearest camouflage not owned
+        public static Camo CamoTrialOffer
+        {
+            get
+            {
+                if (PlayerPrefs.GetString("camotrial.day", "") == Daily.Today || CamoTrialId != null) return null;
+                Camo best = null;
+                foreach (var c in Camos) if (c.cost > 0 && !OwnsCamo(c) && (best == null || c.cost > best.cost)) best = c;
+                return best;
+            }
+        }
+        /// <summary>The camouflage lent for the next night, from the ad until the night begins; null without one.</summary>
+        public static string CamoTrialId { get { var s = PlayerPrefs.GetString("camotrial.id", ""); return s.Length > 0 ? s : null; } }
+        public static void GrantCamoTrial(Camo c) { PlayerPrefs.SetString("camotrial.id", c.id); PlayerPrefs.SetString("camotrial.day", Daily.Today); PlayerPrefs.Save(); }
+        public static void SpendCamoTrial() { PlayerPrefs.DeleteKey("camotrial.id"); PlayerPrefs.Save(); }
+        /// <summary>The camouflage lent for the night being fought, set when it is built (the trial itself is spent as it begins).</summary>
+        public static string NightCamo;
+        /// <summary>The paint the platoon wears: a lent camouflage, else the chosen one.</summary>
+        public static Color NightCamoTint { get { string id = CamoTrialId ?? NightCamo ?? CamoId; foreach (var c in Camos) if (c.id == id) return c.tint; return Color.white; } }
+
         // what the upgrades mean in the fight
         public static float LeaderHp => 8f + Level("armor") + (CrewLevel >= 2 ? 1f : 0f) + Career.ExtraHits(NightTank ?? LeaderId);   // the tank's own armour steps too (a lent tank's, on its night)
         // the leader's crew: nights survived together, per nation; lost with the leader unless the field repair pulls them out

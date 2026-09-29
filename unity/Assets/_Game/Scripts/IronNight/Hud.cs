@@ -552,6 +552,12 @@ namespace IronNight
                 var row = MakeImage(depotRows, "Row camo", new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 230), new Color(0.08f, 0.09f, 0.1f, 0.96f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);
                 var title = MakeText(row.transform, "Title", new Vector2(0f, 1f), new Vector2(30, -20), TextAnchor.UpperLeft, 44, new Color(0.93f, 0.91f, 0.86f)); title.text = "Camouflage"; title.rectTransform.sizeDelta = new Vector2(600, 60);
                 var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(30, -80), TextAnchor.UpperLeft, 28, new Color(0.66f, 0.64f, 0.59f)); desc.text = "The platoon's paint. Bought once, kept for good."; desc.rectTransform.sizeDelta = new Vector2(880, 80);
+                // the day's trial, top right: the dearest camouflage not owned, one night for a rewarded ad; once lent, its name
+                {
+                    var lentId = Depot.CamoTrialId; var offer = Depot.CamoTrialOffer;
+                    if (lentId != null) { var lent = System.Array.Find(Depot.Camos, x => x.id == lentId); var tl = MakeText(row.transform, "Trial", new Vector2(1f, 1f), new Vector2(-30, -28), TextAnchor.UpperRight, 24, new Color(0.95f, 0.66f, 0.23f)); tl.font = LabelFont(); tl.text = Spaced(((lent != null ? lent.name : "") + " tonight").ToUpperInvariant()); tl.rectTransform.sizeDelta = new Vector2(320, 40); }
+                    else if (offer != null) { var tb = MakeButton(row.transform, "Try " + offer.name + " tonight · ad", new Vector2(1f, 1f), new Vector2(-170, -44), new Vector2(300, 58), 22, () => Ads.Rewarded("camotrial", () => { Depot.GrantCamoTrial(offer); RefreshDepot(); })); tb.GetComponent<Image>().color = XpDeep; }
+                }
                 var shown = new List<Depot.Camo>(); foreach (var cc in Depot.Camos) if (cc.cost >= 0 || Depot.OwnsCamo(cc)) shown.Add(cc);   // a season's camouflage shows once it is won
                 float cw = Mathf.Min(210f, 900f / shown.Count - 10f);
                 for (int k = 0; k < shown.Count; k++)

@@ -65,6 +65,7 @@ namespace IronNight.EditorTools
             const string rendererPath = "Assets/_Game/Settings/IronNightRenderer.asset", assetPath = "Assets/_Game/Settings/IronNightURP.asset";
             var renderer = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(rendererPath);
             if (renderer == null) { renderer = ScriptableObject.CreateInstance<UniversalRendererData>(); AssetDatabase.CreateAsset(renderer, rendererPath); }
+            if (renderer.postProcessData == null) renderer.postProcessData = AssetDatabase.LoadAssetAtPath<PostProcessData>("Packages/com.unity.render-pipelines.universal/Runtime/Data/PostProcessData.asset");   // without it no volume ever shows
             var asset = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(assetPath);
             if (asset == null) { asset = UniversalRenderPipelineAsset.Create(renderer); AssetDatabase.CreateAsset(asset, assetPath); }
             var so = new SerializedObject(asset);
