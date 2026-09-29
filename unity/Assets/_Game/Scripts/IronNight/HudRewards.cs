@@ -44,13 +44,14 @@ namespace IronNight
         }
         void CloseRewards() { if (stage != null) stage.Stop(); opened = null; if (rewardSheet != null) rewardSheet.SetActive(false); RefreshRewardButtons(); RefreshGold(); if (pointsLine != null) Tick(pointsLine, Depot.Points); if (xpLine != null) Tick(xpLine, Depot.CrewXp, "", " XP"); }
 
-        /// <summary>The first time the title shows in a session: today's mail, then what the quartermaster gathered.</summary>
+        /// <summary>The first time the title shows in a session: the adjutant's greeting, then today's mail, then what the
+        /// quartermaster gathered.</summary>
         public void WelcomeBack()
         {
             if (welcomed) return; welcomed = true;
             CrateStage.Picture("supply"); CrateStage.Picture("officer");   // the pictures first, before a crate is ever on the stage
             RefreshRewardButtons();
-            if (Rewards.MailReady) ShowMail(); else if (Rewards.QmHours >= 0.5f) ShowQuartermaster();
+            Greet();
         }
 
         // test switches, each opening its screen straight away: --mail, --qm (five hours gathered), --opencrate (a crate, tapped by itself)

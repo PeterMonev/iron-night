@@ -43,7 +43,7 @@ namespace IronNight
             var next = Depot.NextRank;
             var nx = MakeText(t, "Next", new Vector2(0.5f, 0.5f), new Vector2(0f, -430f), TextAnchor.MiddleCenter, 22, OpDim); nx.font = LabelFont(); nx.rectTransform.sizeDelta = new Vector2(900, 34);
             nx.text = next != null ? Spaced("NEXT · " + next.name.ToUpperInvariant() + " AT " + next.nights + " NIGHTS") : Spaced("THE HIGHEST RANK THERE IS");
-            MakePrimary(t, "Salute", new Vector2(0.5f, 0f), new Vector2(0, 190), new Vector2(760, 140), 44, () => { Destroy(promoSheet); promoSheet = null; Sfx.Theme("menu"); RefreshRewardButtons(); });
+            MakePrimary(t, "Salute", new Vector2(0.5f, 0f), new Vector2(0, 190), new Vector2(760, 140), 44, () => { Destroy(promoSheet); promoSheet = null; Sfx.Theme("menu"); RefreshRewardButtons(); Congratulate(); });
             promoSheet.transform.SetAsLastSibling(); if (curtain != null) curtain.transform.SetAsLastSibling();
             Sfx.Theme("dawn");
         }

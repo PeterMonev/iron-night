@@ -28,7 +28,7 @@ namespace IronNight.EditorTools
                     string file = System.IO.Path.GetFileNameWithoutExtension(path);
                     if (file == "rank_insignia") continue;   // a strip of eleven cells: shrunk, each would blur
                     bool small = file.StartsWith("ace_") || file.StartsWith("crew_") || file.StartsWith("cmd_") || file.StartsWith("card_");   // drawn a few hundred pixels at most
-                    n += Android(path, small ? 512 : 1024, Astc6);
+                    n += Android(path, small ? 512 : file.StartsWith("adjutant_") ? 2048 : 1024, Astc6);   // the adjutant stands two thirds of the screen high: kept whole
                 }
                 foreach (var path in Paths("t:Texture2D", "Assets/_Game/Resources/Props")) n += Android(path, 1024, Astc8);
                 foreach (var path in Paths("t:Texture2D", "Assets/_Game/Resources/Textures", "Assets/_Game/Resources/Models"))
