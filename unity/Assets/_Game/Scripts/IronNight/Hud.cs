@@ -263,15 +263,18 @@ namespace IronNight
             // pause sheet
             pauseSheet = new GameObject("Pause", typeof(RectTransform), typeof(Image)); pauseSheet.transform.SetParent(root, false);
             Stretch(pauseSheet); pauseSheet.GetComponent<Image>().color = new Color(0.02f, 0.03f, 0.04f, 0.8f);
-            { var ey = MakeText(pauseSheet.transform, "Eyebrow", new Vector2(0.5f, 0.5f), new Vector2(0, 540), TextAnchor.MiddleCenter, 26, amber); ey.text = Spaced("IRON NIGHT"); ey.font = LabelFont(); ey.rectTransform.sizeDelta = new Vector2(600, 40); }
-            { var ti = MakeText(pauseSheet.transform, "Title", new Vector2(0.5f, 0.5f), new Vector2(0, 440), TextAnchor.MiddleCenter, 120, ink); ti.text = "PAUSED"; Engrave(ti); ti.rectTransform.sizeDelta = new Vector2(900, 150); ti.verticalOverflow = VerticalWrapMode.Overflow; }
-            MakePrimary(pauseSheet.transform, "Resume", new Vector2(0.5f, 0.5f), new Vector2(0, 210), new Vector2(880, 150), 46, () => OnResume?.Invoke());
-            var snd = MakeButton(pauseSheet.transform, "Sound: on", new Vector2(0.5f, 0.5f), new Vector2(0, 20), new Vector2(880, 110), 36, () => OnSound?.Invoke()); soundLabel = snd.transform.Find("Label").GetComponent<Text>(); RowLook(snd);
-            var qb = MakeButton(pauseSheet.transform, "Quality: high", new Vector2(0.5f, 0.5f), new Vector2(0, -110), new Vector2(880, 110), 36, () => OnQuality?.Invoke()); qualityLabel = qb.transform.Find("Label").GetComponent<Text>(); RowLook(qb);
-            { var qn = MakeText(pauseSheet.transform, "QualityNote", new Vector2(0.5f, 0.5f), new Vector2(0, -196), TextAnchor.MiddleCenter, 24, dim); qn.text = "Low: no shadows, no glow, no rain. For phones that stutter."; qn.rectTransform.sizeDelta = new Vector2(900, 40); Fit(qn, 18); }
-            var rs = MakeGhost(pauseSheet.transform, "Restart the night", new Vector2(0.5f, 0.5f), new Vector2(0, -340), new Vector2(880, 110), 34, () => OnRestart?.Invoke()); rs.transform.Find("Label").GetComponent<Text>().text = Spaced("RESTART THE NIGHT");
-            var ab = MakeGhost(pauseSheet.transform, "Abandon the assault", new Vector2(0.5f, 0.5f), new Vector2(0, -470), new Vector2(880, 110), 34, () => OnQuit?.Invoke()); var abl = ab.transform.Find("Label").GetComponent<Text>(); abl.text = Spaced("ABANDON THE ASSAULT"); abl.color = new Color(0.94f, 0.6f, 0.54f);
+            { var ey = MakeText(pauseSheet.transform, "Eyebrow", new Vector2(0.5f, 0.5f), new Vector2(0, 580), TextAnchor.MiddleCenter, 26, amber); ey.text = Spaced("IRON NIGHT"); ey.font = LabelFont(); ey.rectTransform.sizeDelta = new Vector2(600, 40); }
+            { var ti = MakeText(pauseSheet.transform, "Title", new Vector2(0.5f, 0.5f), new Vector2(0, 480), TextAnchor.MiddleCenter, 120, ink); ti.text = "PAUSED"; Engrave(ti); ti.rectTransform.sizeDelta = new Vector2(900, 150); ti.verticalOverflow = VerticalWrapMode.Overflow; }
+            MakePrimary(pauseSheet.transform, "Resume", new Vector2(0.5f, 0.5f), new Vector2(0, 260), new Vector2(880, 150), 46, () => OnResume?.Invoke());
+            { var ph = MakeButton(pauseSheet.transform, "Photo mode", new Vector2(0.5f, 0.5f), new Vector2(0, 100), new Vector2(880, 110), 36, () => OnPhotoMode?.Invoke()); RowLook(ph);
+              var phl = ph.transform.Find("Label").GetComponent<Text>(); phl.color = amber; CameraGlyph(ph.transform, new Vector2(-phl.preferredWidth * 0.5f - 46f, 0f), amber); }
+            var snd = MakeButton(pauseSheet.transform, "Sound: on", new Vector2(0.5f, 0.5f), new Vector2(0, -40), new Vector2(880, 110), 36, () => OnSound?.Invoke()); soundLabel = snd.transform.Find("Label").GetComponent<Text>(); RowLook(snd);
+            var qb = MakeButton(pauseSheet.transform, "Quality: high", new Vector2(0.5f, 0.5f), new Vector2(0, -170), new Vector2(880, 110), 36, () => OnQuality?.Invoke()); qualityLabel = qb.transform.Find("Label").GetComponent<Text>(); RowLook(qb);
+            { var qn = MakeText(pauseSheet.transform, "QualityNote", new Vector2(0.5f, 0.5f), new Vector2(0, -256), TextAnchor.MiddleCenter, 24, dim); qn.text = "Low: no shadows, no glow, no rain. For phones that stutter."; qn.rectTransform.sizeDelta = new Vector2(900, 40); Fit(qn, 18); }
+            var rs = MakeGhost(pauseSheet.transform, "Restart the night", new Vector2(0.5f, 0.5f), new Vector2(0, -400), new Vector2(880, 110), 34, () => OnRestart?.Invoke()); rs.transform.Find("Label").GetComponent<Text>().text = Spaced("RESTART THE NIGHT");
+            var ab = MakeGhost(pauseSheet.transform, "Abandon the assault", new Vector2(0.5f, 0.5f), new Vector2(0, -530), new Vector2(880, 110), 34, () => OnQuit?.Invoke()); var abl = ab.transform.Find("Label").GetComponent<Text>(); abl.text = Spaced("ABANDON THE ASSAULT"); abl.color = new Color(0.94f, 0.6f, 0.54f);
             pauseSheet.SetActive(false);
+            BuildPhoto(root);
 
             // title sheet: the hangar with the leader's tank behind everything
             titleSheet = new GameObject("Title", typeof(RectTransform), typeof(Image)); titleSheet.transform.SetParent(root, false);
@@ -1666,7 +1669,7 @@ namespace IronNight
             bool choosing = sheet != null && sheet.activeSelf;
             if (briefing != null && briefingLeft > 0f && briefing.activeSelf == choosing) briefing.SetActive(!choosing);   // out of the way of the cards, back after them
             if (briefingLeft > 0f && hudFade.alpha > 0.95f && !choosing) { briefingLeft -= Time.unscaledDeltaTime; if (briefingLeft <= 0f && briefing != null) briefing.SetActive(false); }
-            TickNumbers(Time.unscaledDeltaTime); CurtainTick(Time.unscaledDeltaTime); TickCinema(Mathf.Min(Time.unscaledDeltaTime, 0.05f)); TickRewards(Mathf.Min(Time.unscaledDeltaTime, 0.05f)); TickMap();
+            TickNumbers(Time.unscaledDeltaTime); CurtainTick(Time.unscaledDeltaTime); TickCinema(Mathf.Min(Time.unscaledDeltaTime, 0.05f)); TickRewards(Mathf.Min(Time.unscaledDeltaTime, 0.05f)); TickMap(); TickPhotoSheet(Mathf.Min(Time.unscaledDeltaTime, 0.05f));
             if (titleSheet != null && titleSheet.activeSelf) for (int i = 0; i < embers.Count; i++)
             {
                 var e = embers[i]; float ph = emberPhase[i]; var p = e.anchoredPosition; p.y += (18f + 10f * Mathf.Sin(ph)) * Time.unscaledDeltaTime; p.x += Mathf.Sin(Time.unscaledTime * 0.7f + ph) * 12f * Time.unscaledDeltaTime;

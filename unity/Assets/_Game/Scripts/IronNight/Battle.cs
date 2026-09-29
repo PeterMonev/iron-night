@@ -30,7 +30,7 @@ namespace IronNight
         class Drop { public Vector3 pos; public float height, age, lift, top; public int kind; public Transform crate, chute, marker; public LineRenderer lines; public Mesh canopy; public Vector3[] rest; }   // lift: the crate origin above its base; top: where the shrouds tie
         class Mortar { public Vector3 at; public float timer; public Transform ring; public bool bomb; }   // bomb: a dive bomber's, heavier
         class Star { public Vector3 pos; public float height, life, puff; public Transform flare, chute; public Light light; }
-        enum Phase { Title, Intro, Play, LevelUp, Pause, End }
+        enum Phase { Title, Intro, Play, LevelUp, Pause, End, Photo }
 
         static readonly float NightLength = NightArg();   // five minutes of darkness, dawn at 5:00 (--night=30 for tests)
         static float NightArg() { foreach (var a in System.Environment.GetCommandLineArgs()) if (a.StartsWith("--night=")) return float.Parse(a.Substring(8)); return 300f; }
@@ -200,6 +200,7 @@ namespace IronNight
             hud.OnReserveAd = () => Ads.Rewarded("reserve", () => { reserveGranted = true; maxPlatoon = 4; Sfx.Pickup(); hud.ShowTitle(true); });
             hud.OnSuppliesAd = () => Ads.Rewarded("supplies", () => { suppliesGranted = true; hud.SuppliesGranted = true; Sfx.Pickup(); hud.ShowTitle(reserveGranted); });
             hud.OnPause = Pause; hud.OnResume = Resume; hud.OnSound = () => { Sfx.Muted = !Sfx.Muted; hud.ShowPause(!Sfx.Muted, !LowQuality); };
+            hud.OnPhotoMode = PhotoIn; hud.OnPhotoBack = PhotoOut; hud.OnPhotoShutter = PhotoShutter; hud.OnPhotoShare = PhotoShare; hud.OnPhotoLook = ChoosePhotoLook;
             hud.OnQuit = () => { Resume(); revived = true; End(false); };   // no rewarded repair after walking away
             hud.OnRestart = () => { Time.timeScale = 1f; if (stand) { PlayerPrefs.SetString("stand.launch", theatre); PlayerPrefs.Save(); } if (convoy) { PlayerPrefs.SetString("convoy.launch", theatre); PlayerPrefs.Save(); } if (sneak) { PlayerPrefs.SetString("sneak.launch", theatre); PlayerPrefs.Save(); } if (mapSector != null) { PlayerPrefs.SetString("map.launch", mapSector.id); PlayerPrefs.Save(); } if (opNight > 0) { PlayerPrefs.SetString("op.launch", op.id + ":" + opNight); PlayerPrefs.Save(); } if (daily) { PlayerPrefs.SetString("daily.launch", dailyDay); PlayerPrefs.Save(); } if (weekly) { PlayerPrefs.SetString("weekly.launch", "1"); PlayerPrefs.Save(); } SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); };
             if (debugDawn) t = 250f; if (debugMid) { t = 100f; mortarTimer = 6f; starTimer = 9f; observerTimer = 4f; mineTimer = 6f; }
@@ -209,6 +210,7 @@ namespace IronNight
             foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--garage=")) { stick.Blocked = true; hud.ShowGarage(VehicleSpec.ById(arg.Substring(9))); } else if (arg.StartsWith("--dossier=")) { stick.Blocked = true; hud.ShowDossier(arg.Substring(10)); } else if (arg == "--shop") hud.ShowShop(); else if (arg == "--supplies") { suppliesGranted = true; hud.SuppliesGranted = true; } else if (arg == "--repair") Garage.Damaged(Depot.LeaderId); else if (arg == "--letters") { Letters.Served(Depot.Nation); hud.ShowTitle(reserveGranted); } else if (arg == "--testdrive") { var lend = Depot.TestDriveOffer; if (lend != null) { Depot.GrantTestDrive(lend); hud.ShowTitle(reserveGranted); } } else if (arg == "--aces") { Nemesis.TestSeed(); hud.garage.RefreshBoard(); } else if (arg.StartsWith("--cats=")) { Career.TestCats(Depot.LeaderId, int.Parse(arg.Substring(7))); hud.Repainted(); } else if (arg == "--promote") { PlayerPrefs.SetInt("rank.seen", Depot.RankLevel - 1); hud.ShowTitle(reserveGranted); } else if (arg.StartsWith("--tankname=")) { var tn = arg.Substring(11); int cut = tn.IndexOf(':'); Career.PaintName(cut > 0 ? tn.Substring(0, cut) : Depot.LeaderId, (cut > 0 ? tn.Substring(cut + 1) : tn).Replace('_', ' ')); hud.Repainted(); } else if (arg == "--mail") hud.TestMail(); else if (arg == "--qm") hud.TestQuartermaster(); else if (arg == "--opencrate") hud.TestCrate(); else if (arg.StartsWith("--opencrate=")) hud.TestCrate(arg.Substring(12)); else if (arg.StartsWith("--bondstars=")) Bonds.TestStars(int.Parse(arg.Substring(12))); else if (arg == "--bonds") hud.ShowBonds(); else if (arg == "--wanted") { Nemesis.TestSeed(); hud.ShowWanted(); } else if (arg == "--crewtab") { stick.Blocked = true; hud.ShowCrewTab(); } else if (arg.StartsWith("--sheet=")) hud.TestSheet(arg.Substring(8)); else if (arg == "--mapseed" || arg == "--mapfall") Campaign.TestSeed(arg == "--mapfall");
             hud.OnStart += () => Radio("start");
             if (opNight == 0 && !daily && !weekly && PlayerPrefs.GetInt("route.launch", 0) == 1) { PlayerPrefs.SetInt("route.launch", 0); PlayerPrefs.Save(); StartNight(); Radio("start"); }
+            if (photoTest >= 0 && phase == Phase.Title) { StartNight(); Radio("start"); }   // test switch: --photo=N
             if (sneak) { SneakBuild(); StartNight(); Radio("start"); string np = Hud.UiSprite("sneak_" + theatre) != null ? "sneak_" + theatre : theatre == "kursk" ? "route_kursk_belts" : "route_bocage"; hud.Briefing(np, "Night raid · " + TheatreName, "No lights, no shooting. Slip through to the depot and blow it. The sentries send up flares: in their light, stand still or get out of it. They see what moves."); }
             if (convoy) { ConvoyBuild(); StartNight(); Radio("start"); string cp = Hud.UiSprite("convoy_" + theatre) != null ? "convoy_" + theatre : theatre == "kursk" ? "route_kursk_steppe" : "route_open"; hud.Briefing(cp, "Convoy · " + TheatreName, "Bring the five trucks up the road to the checkpoint. The enemy goes for the trucks."); }
             if (stand) { StandBuild(); StartNight(); Radio("start"); string sp = Hud.UiSprite("stand_" + theatre) != null ? "stand_" + theatre : theatre == "kursk" ? "route_kursk_village" : theatre == "ardennes" ? "campaign_ardennes" : "campaign_lastpush"; hud.Briefing(sp, "Last stand · " + TheatreName, "Hold the crossroads through ten waves. Between them, dig in: sandbags, hedgehogs, mines."); }
@@ -256,6 +258,8 @@ namespace IronNight
 
         void Update()
         {
+            PhotoTestTick();
+            if (phase == Phase.Photo) { TickPhoto(); return; }   // photo mode: the fight holds still, only the camera moves
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             if (slowLeft > 0f) { slowLeft -= Time.unscaledDeltaTime; Time.timeScale = slowLeft <= 0f ? 1f : slowLeft < 0.25f ? Mathf.Lerp(1f, 0.3f, slowLeft / 0.25f) : 0.3f; }
             fx.Tick(dt);

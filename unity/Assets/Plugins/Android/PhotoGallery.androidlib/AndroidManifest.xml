@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Photo mode on Android 9 and older writes its pictures into Pictures/Iron Night and needs storage for it;
+     Android 10 and newer save them through MediaStore with no permission, so the request stops at 9. Reading is
+     declared too, with the same limit: a library that asks to write is taken to read as well, and the manifest
+     merger would otherwise add reading for every Android. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.monev.ironnight.photogallery">
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+</manifest>

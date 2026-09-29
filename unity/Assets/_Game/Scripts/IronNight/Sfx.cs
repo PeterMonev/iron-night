@@ -13,7 +13,7 @@ namespace IronNight
     {
         const int Rate = 44100;
         static Sfx instance;
-        AudioClip shot, shotHeavy, shotFar, hit, explosion, artillery, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, front, whistle, rumble, ricochet, ricochet2, flak, reload, turretLoop, mg, faust, stuka, drone, crunch, brush, whoosh, fighter;
+        AudioClip shot, shotHeavy, shotFar, hit, explosion, artillery, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, front, whistle, rumble, ricochet, ricochet2, flak, reload, turretLoop, mg, faust, stuka, drone, crunch, brush, whoosh, fighter, shutter;
         readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, turret, ambient, frontLine, ui, weld; Transform listener;
 
         public static void Build(Camera cam)
@@ -349,6 +349,20 @@ namespace IronNight
             var p = Dsp.Sine(n, t => 2400f); Dsp.Env(p, t => Dsp.Exp(t, 120f)); Dsp.Add(mix, p, 0.5f); Dsp.Normalize(mix, 0.5f); return mix;
         }
 
+        /// <summary>A camera of the time: the blind's two snaps, open and shut, each with a small spring's ring under it,
+        /// then the lever winding the film on in a short ratchet.</summary>
+        static float[] MakeShutter()
+        {
+            int n = Dsp.N(0.42f); var mix = new float[n];
+            foreach (var (at, gain, ring) in new[] { (0f, 1f, 2100f), (0.055f, 0.75f, 1500f) })
+            {
+                var snap = Dsp.Noise(Dsp.N(0.05f)); Dsp.Highpass(snap, 1800f); Dsp.Env(snap, t => Dsp.Exp(t, 260f)); Dsp.Add(mix, snap, gain, at);
+                var tone = Dsp.Sine(Dsp.N(0.08f), t => ring); Dsp.Env(tone, t => Dsp.Exp(t, 70f)); Dsp.Add(mix, tone, gain * 0.35f, at);
+            }
+            for (int k = 0; k < 7; k++) { var tick = Dsp.Noise(Dsp.N(0.012f)); Dsp.Highpass(tick, 3500f); Dsp.Env(tick, t => Dsp.Exp(t, 500f)); Dsp.Add(mix, tick, 0.22f, 0.2f + k * 0.022f); }
+            Dsp.Normalize(mix, 0.8f); return mix;
+        }
+
         /// <summary>The library clip when it is there, else the synthesised stand-in.</summary>
         AudioClip Load(string name, System.Func<float[]> fallback) { var c = Resources.Load<AudioClip>("Audio/" + name); return c != null ? c : Clip(name, fallback()); }
 
@@ -360,7 +374,7 @@ namespace IronNight
             explosion = Load("explosion", MakeExplosion); artillery = Load("artillery", MakeExplosion); hit = Load("hit", ArmourHit); ricochet = Load("ricochet", MakeRicochet); ricochet2 = Resources.Load<AudioClip>("Audio/ricochet2");
             engineLoop = Load("engine", MakeEngine); tracksLoop = Load("tracks", Tracks);
             whistle = Load("whistle", MakeWhistle); stuka = Load("stuka", MakeStukaDive); drone = Load("drone", MakeDrone); crunch = Load("crunch", MakeCrunch); brush = Load("brush", MakeBrush); whoosh = Load("whoosh", MakeWhoosh); fighter = Load("fighter", MakeFighterPass); rumble = Load("shotFar", MakeRumble); wind = Load("wind", Wind); rain = Load("rain", Rain); front = Resources.Load<AudioClip>("Audio/front");
-            pickup = Load("pickup", () => Radio(new[] { 880f, 1320f }, 0.12f)); levelUp = Load("levelUp", () => Radio(new[] { 523f, 659f, 784f }, 0.2f)); click = Load("click", MakeClick);
+            pickup = Load("pickup", () => Radio(new[] { 880f, 1320f }, 0.12f)); levelUp = Load("levelUp", () => Radio(new[] { 523f, 659f, 784f }, 0.2f)); click = Load("click", MakeClick); shutter = Load("shutter", MakeShutter);
 
             for (int i = 0; i < 12; i++) { var s = NewSource("Voice " + i); s.spatialBlend = 0.75f; s.rolloffMode = AudioRolloffMode.Linear; s.minDistance = 12f; s.maxDistance = 140f; pool.Add(s); }
             engine = NewSource("Engine"); engine.clip = engineLoop; engine.loop = true; engine.spatialBlend = 0f; engine.volume = 0f; engine.Play();
@@ -436,6 +450,7 @@ namespace IronNight
             Dsp.Highpass(d, 450f); Dsp.Normalize(d, 0.8f); return d;
         }
         public static void Click() { if (instance) instance.ui.PlayOneShot(instance.click, 0.5f); }
+        public static void Shutter() { if (instance) instance.ui.PlayOneShot(instance.shutter, 0.8f); }
         public static void LevelUp() { if (instance) instance.ui.PlayOneShot(instance.levelUp, 0.6f); }
         /// <summary>The leader's engine and tracks: louder and higher when driving.</summary>
         public static void Engine(float throttle)
