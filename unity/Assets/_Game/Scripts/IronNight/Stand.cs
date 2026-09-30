@@ -71,7 +71,7 @@ namespace IronNight
         {
             standWave++; standSpawned = 0; standQuota = 2 + standWave; standSpawnTimer = 0.4f; standBearing = Random.value * Mathf.PI * 2f; standArmed = null;
             var dir = new Vector3(Mathf.Sin(standBearing), 0f, Mathf.Cos(standBearing));
-            hud.Toast("Wave " + standWave + " · tanks, " + Clock(standAt + dir * 60f), 2.8f); Radio("start");
+            hud.Toast("Wave " + standWave + " · tanks, " + Clock(standAt + dir * 60f), 2.8f);
             if (standWave == 5) { if (theatre == "kursk") Panzerkeil(4); else Column(); }
             if (standWave == 8) Counterattack();
             if (standWave == StandWaves) Boss();
