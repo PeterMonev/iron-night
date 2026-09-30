@@ -435,7 +435,7 @@ namespace IronNight
                 var side = new Vector3(L.Forward.z, 0f, -L.Forward.x) * (Random.value < 0.5f ? 1f : -1f);
                 var at = props.PushOut(L.transform.position + L.Forward * Random.Range(26f, 36f) + side * Random.Range(7f, 15f), 1.5f); var face = L.transform.position - at; face.y = 0f;   // ahead and to a side: on the screen, so he can be tapped
                 observer = infantry.SpawnObserver(at, face.normalized); observerAge = 0f; observerRing = fx.Marker(at, new Color(1f, 0.35f, 0.3f), 5f, true);
-                hud.Toast("Forward observer, " + Clock(at) + " · tap him: he is calling the mortars", 3.4f); Sfx.Click(); if (Random.value < 0.5f) Radio("hit");
+                hud.Toast("Forward observer, " + Clock(at) + " · tap him: he is calling the mortars", 3.4f); Voices.Callout("observer", ClockHour(at)); Sfx.Click(); if (Random.value < 0.5f) Radio("hit");
                 return;
             }
             observerAge += dt;
@@ -459,7 +459,7 @@ namespace IronNight
             if (!stand && !convoy && !sneak && t > 120f) { mineTimer -= dt; if (mineTimer <= 0f && mines.Count < 12) {
                 mineTimer = 60f + Random.value * 30f; var side = new Vector3(L.Forward.z, 0f, -L.Forward.x) * (Random.value < 0.5f ? 1f : -1f); var start = L.transform.position + L.Forward * 44f + side * 34f;
                 if (VehicleSpec.Available(VehicleSpec.Halftrack)) { var ht = Foe(VehicleSpec.Halftrack, props.PushOut(start, 2f), Mathf.Atan2(-side.x, -side.z)); ht.sapper = true; ht.unloaded = true; ht.sapperLeft = 5; ht.lastMine = ht.transform.position; hud.Toast("Sapper half-track, " + Clock(start) + " · it is laying mines · kill it", 3.2f); }
-                else { for (int i = -2; i <= 2; i++) LayMine(props.PushOut(start - side * 34f + side * (i * 4f), 1f)); hud.Toast("Sappers laid mines ahead, " + Clock(start) + " · shoot them or go round", 3.2f); }
+                else { for (int i = -2; i <= 2; i++) LayMine(props.PushOut(start - side * 34f + side * (i * 4f), 1f)); hud.Toast("Sappers laid mines ahead, " + Clock(start) + " · shoot them or go round", 3.2f); Voices.Callout("mines", ClockHour(start)); }
                 Sfx.Click();
             } }
             for (int i = mines.Count - 1; i >= 0; i--)
@@ -713,13 +713,13 @@ namespace IronNight
                     {
                         // a half-track brings them: kill it on the way and the squad never dismounts
                         var pos = props.PushOut(L.transform.position + dir * Random.Range(60f, 72f), 3f);
-                        Foe(VehicleSpec.Halftrack, pos, Mathf.Atan2(-dir.x, -dir.z)); hud.Toast("Half-track with infantry, " + Clock(pos), 2.8f);
+                        Foe(VehicleSpec.Halftrack, pos, Mathf.Atan2(-dir.x, -dir.z)); hud.Toast("Half-track with infantry, " + Clock(pos), 2.8f); Voices.Callout("halftrack", ClockHour(pos));
                     }
                     else
                     {
                         // tank hunters on foot, out of the dark ahead
                         var pos = props.PushOut(L.transform.position + dir * (route == "bocage" ? Random.Range(18f, 26f) : Random.Range(30f, 40f)), 2f);
-                        infantry.Spawn(pos, -dir); hud.Toast("Infantry! Panzerfausts, " + Clock(pos), 2.8f);
+                        infantry.Spawn(pos, -dir); hud.Toast("Infantry! Panzerfausts, " + Clock(pos), 2.8f); Voices.Callout("infantry", ClockHour(pos));
                     }
                 }
                 else if (roll < gunShare && t > 20f)
@@ -742,7 +742,7 @@ namespace IronNight
                         if (posts.Count > 0) { var post = posts[Random.Range(0, posts.Count)]; var toL = L.transform.position - post; toL.y = 0f; toL.Normalize(); pos = props.PushOut(post + toL * 8f, 3f); gyaw = Mathf.Atan2(toL.x, toL.z); gspec = VehicleSpec.Flak88; }
                     }
                     var gun = Foe(gspec, pos, gyaw);
-                    hud.Toast((gspec == VehicleSpec.Flak88 ? "88! Flak gun, " : gspec == VehicleSpec.Flak38 ? "Flak battery, " : "Anti-tank gun dug in, ") + Clock(pos), 2.8f);
+                    hud.Toast((gspec == VehicleSpec.Flak88 ? "88! Flak gun, " : gspec == VehicleSpec.Flak38 ? "Flak battery, " : "Anti-tank gun dug in, ") + Clock(pos), 2.8f); Voices.Callout(gspec == VehicleSpec.Flak88 ? "eightyeight" : gspec == VehicleSpec.Flak38 ? "flak" : "guns", ClockHour(pos));
                 }
                 else
                 {
@@ -754,7 +754,7 @@ namespace IronNight
                     if (rule == "tigers" && t > 15f && spec != VehicleSpec.Tiger && spec != VehicleSpec.Panther && Random.value < 0.5f) spec = t > 60f && Random.value < 0.4f && VehicleSpec.Available(VehicleSpec.Panther) ? VehicleSpec.Panther : VehicleSpec.Tiger;
                     var pos = L.transform.position + dir * Random.Range(44f, 52f);
                     Foe(spec, pos, Mathf.Atan2(-dir.x, -dir.z));
-                    if (spec == VehicleSpec.Tiger) { hud.Toast("Tiger! " + Clock(pos), 2.8f); Radio("tiger"); } else if (spec == VehicleSpec.Panther) hud.Toast("Panther! " + Clock(pos), 2.8f);
+                    if (spec == VehicleSpec.Tiger) { hud.Toast("Tiger! " + Clock(pos), 2.8f); Voices.Callout("tiger", ClockHour(pos)); Radio("tiger"); } else if (spec == VehicleSpec.Panther) { hud.Toast("Panther! " + Clock(pos), 2.8f); Voices.Callout("panther", ClockHour(pos)); }
                 }
             }
             if (theatre == "kursk" && ((t >= 75f && !wave1) || (debugKeil && t >= 4f && !wave1))) { wave1 = true; Panzerkeil(3); }
@@ -788,7 +788,7 @@ namespace IronNight
                 var spec = i == 4 ? (VehicleSpec.Available(VehicleSpec.Panther) && t > 150f ? VehicleSpec.Panther : VehicleSpec.Tiger) : i >= 2 && Random.value < 0.4f ? VehicleSpec.StuG : VehicleSpec.PanzerIV;
                 Foe(spec, props.PushOut(tip + fw * back[i] + rt * side[i] * back[i] * 0.8f, 3f), yaw);
             }
-            hud.Toast("Panzerkeil! " + Clock(tip), 3f); Radio("tiger"); Sfx.Rumble(); shake = Mathf.Max(shake, 0.4f);
+            hud.Toast("Panzerkeil! " + Clock(tip), 3f); Voices.Callout("keil", ClockHour(tip)); Radio("tiger"); Sfx.Rumble(); shake = Mathf.Max(shake, 0.4f);
         }
 
         /// <summary>An armoured column crossing the front 34 m ahead: four Panzer IV and a Tiger in a line.</summary>
@@ -801,7 +801,7 @@ namespace IronNight
                 var pos = L.transform.position + f * (34f + i * 3f) - r * side * (46f + i * 9f);
                 Foe(spec, pos, Mathf.Atan2(r.x * side, r.z * side));
             }
-            hud.Toast("Armoured column, " + Clock(L.transform.position - r * side * 50f), 2.8f);
+            hud.Toast("Armoured column, " + Clock(L.transform.position - r * side * 50f), 2.8f); Voices.Callout("column", ClockHour(L.transform.position - r * side * 50f));
         }
 
         /// <summary>Vehicles push each other apart so the platoon never stacks and enemies keep a spacing.</summary>
@@ -1070,12 +1070,15 @@ namespace IronNight
         }
 
         /// <summary>Where something is, the way a commander calls it: "2 o'clock", from the leader's heading.</summary>
-        string Clock(Vector3 at)
+        string Clock(Vector3 at) => Leader == null ? "" : ClockHour(at) + " o'clock";
+
+        /// <summary>The hour on the clock face a point is at, from the leader's heading: 12 dead ahead.</summary>
+        int ClockHour(Vector3 at)
         {
-            var L = Leader; if (L == null) return ""; var d = at - L.transform.position; d.y = 0f;
+            var L = Leader; if (L == null) return 12; var d = at - L.transform.position; d.y = 0f;
             float rel = Mathf.DeltaAngle(L.yaw * Mathf.Rad2Deg, Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg);
             int hour = Mathf.RoundToInt(rel / 30f); if (hour <= 0) hour += 12;
-            return hour + " o'clock";
+            return hour;
         }
 
         static void Buzz() => Haptics.Heavy();
@@ -1167,7 +1170,7 @@ namespace IronNight
             float a = (Random.value - 0.5f) * 1.2f; var at = L.transform.position + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * 62f;
             ace = Foe(spec, props.PushOut(at, 3f), Mathf.Atan2(L.transform.position.x - at.x, L.transform.position.z - at.z));
             ace.hp *= Nemesis.HpMul(nem); aceHpMax = ace.hp; aceName = nem.Title + " · " + spec.name; bool back = nem.met > 0; Nemesis.Met(nem, NightPlace);
-            hud.Toast(back ? nem.Title + (string.IsNullOrEmpty(nem.nick) ? "" : ", " + nem.nick + ",") + " is back · " + Clock(at) : aceName + " · an ace is on the field, " + Clock(at), 3.4f); Sfx.Whistle(at); if (Random.value < 0.7f) Radio("hit");
+            hud.Toast(back ? nem.Title + (string.IsNullOrEmpty(nem.nick) ? "" : ", " + nem.nick + ",") + " is back · " + Clock(at) : aceName + " · an ace is on the field, " + Clock(at), 3.4f); Voices.Callout("ace", ClockHour(at)); Sfx.Whistle(at); if (Random.value < 0.7f) Radio("hit");
             if (back) NemesisCam(ace, nem);   // an old enemy: the camera goes to him
             fx.Marker(at, new Color(1f, 0.3f, 0.25f), 7f, true);
         }
@@ -2191,7 +2194,7 @@ namespace IronNight
                 case "samusenko": line = when == "start" ? "Samusenko: Check your engines. Go." : when == "kill" ? (r == 0 ? "Samusenko: Hit. Reload." : "Samusenko: Clean shot.") : when == "hit" ? "Samusenko: I'll patch it. Keep moving." : when == "tiger" ? "Samusenko: Heavy one. Don't stop." : when == "dawn" ? "Samusenko: Morning. Everyone still runs." : null; break;
                 case "belov": line = when == "start" ? "Belov: Engines warm. Let's run them." : when == "kill" ? (r == 0 ? "Belov: Ha! Next one." : "Belov: Too slow, Fritz.") : when == "hit" ? "Belov: Ouch. Faster, then." : when == "tiger" ? "Belov: Tiger? We're faster." : when == "dawn" ? "Belov: Sunrise. Good drive." : null; break;
             }
-            if (line != null) hud.Toast(line, 3f);
+            if (line != null) { hud.Toast(line, 3f); Voices.Commander(commander.id, when == "kill" ? "kill" + r : when); }
         }
 
         /// <summary>The end sheet's reward, for an ad watched or gold paid: at dawn the score doubles, a knocked-out leader

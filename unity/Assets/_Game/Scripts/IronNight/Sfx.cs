@@ -14,7 +14,7 @@ namespace IronNight
         const int Rate = 44100;
         static Sfx instance;
         AudioClip shot, shotHeavy, shotFar, hit, explosion, artillery, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, front, whistle, rumble, ricochet, ricochet2, flak, reload, turretLoop, mg, faust, stuka, drone, crunch, brush, whoosh, fighter, shutter;
-        readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, turret, ambient, frontLine, ui, weld; Transform listener;
+        readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, turret, ambient, frontLine, ui, weld, voice; Transform listener; readonly Queue<AudioClip> voiceQueue = new Queue<AudioClip>();
 
         public static void Build(Camera cam)
         {
@@ -65,7 +65,16 @@ namespace IronNight
             var go = new GameObject("Music " + k); go.transform.SetParent(transform, false);
             var s = go.AddComponent<AudioSource>(); s.loop = false; s.playOnAwake = false; s.spatialBlend = 0f; s.priority = 0; s.ignoreListenerPause = true; return new Deck { src = s };
         }
-        void Update() { MusicTick(Time.unscaledDeltaTime); }
+        void Update() { MusicTick(Time.unscaledDeltaTime); if (voice != null && !voice.isPlaying && voiceQueue.Count > 0) { voice.clip = voiceQueue.Dequeue(); voice.Play(); } }
+
+        /// <summary>A voice (Voices): its clips play one after another on a source of their own. While one speaks the next
+        /// waits, three clips at most; the rest is dropped. Missing clips are skipped.</summary>
+        public static void Voice(params AudioClip[] seq)
+        {
+            if (!instance || seq == null || instance.voice == null) return;
+            if (instance.voiceQueue.Count + (instance.voice.isPlaying ? 1 : 0) >= 3) return;
+            foreach (var c in seq) if (c != null) instance.voiceQueue.Enqueue(c);
+        }
 
         void MusicTick(float dt)
         {
@@ -382,6 +391,7 @@ namespace IronNight
             turret = NewSource("Turret"); turret.clip = turretLoop; turret.loop = true; turret.spatialBlend = 0f; turret.volume = 0f; if (turretLoop != null) turret.Play();
             frontLine = NewSource("Front"); frontLine.clip = front; frontLine.loop = true; frontLine.spatialBlend = 0f; frontLine.volume = 0.14f; if (front != null) frontLine.Play();
             ui = NewSource("Ui"); ui.spatialBlend = 0f;
+            voice = NewSource("Voice"); voice.spatialBlend = 0f; voice.priority = 0;
             ambient = NewSource("Wind"); ambient.clip = wind; ambient.loop = true; ambient.spatialBlend = 0f; ambient.volume = 0.18f; ambient.Play();
         }
 

@@ -32,10 +32,13 @@ namespace IronNight
         {
             if (promoSheet != null) { welcomeWaits = true; return; }
             bool off = OffDutyHour;
-            ShowAdjutant(Hello(off), AdjutantNews(), off, AfterGreeting);
+            ShowAdjutant(Hello(off), AdjutantNews(), off, AfterGreeting); Voices.Adjutant(AdjutantNation, HelloKind(off));
         }
 
         /// <summary>Her greeting by the hour, broken after the comma: good morning, afternoon or evening; late at night she is up too.</summary>
+        /// <summary>Which of her recorded greetings goes with the hour: morning, afternoon, evening, or night off duty.</summary>
+        static string HelloKind(bool off) { int h = System.DateTime.Now.Hour; return off ? "night" : h >= 5 && h < 12 ? "morning" : h < 18 ? "afternoon" : "evening"; }
+
         string Hello(bool off)
         {
             int h = System.DateTime.Now.Hour;
@@ -50,7 +53,7 @@ namespace IronNight
         {
             var lines = new List<string> { AdjutantNation == "su" ? "The whole regiment heard." : "The whole company heard.", "Tonight the drinks are on me." };
             bool waited = welcomeWaits; welcomeWaits = false;
-            ShowAdjutant("Congratulations,\n" + Address() + ".", lines, true, waited ? AfterGreeting : (System.Action)null);
+            ShowAdjutant("Congratulations,\n" + Address() + ".", lines, true, waited ? AfterGreeting : (System.Action)null); Voices.Adjutant(AdjutantNation, "congrats");
         }
 
         /// <summary>What waits for him, most pressing first, three at most.</summary>
@@ -77,7 +80,7 @@ namespace IronNight
         {
             welcomed = true; adjutantNation = spec.Contains("su") ? "su" : spec.Contains("us") ? "us" : null;
             bool off = spec.Contains("night");
-            ShowAdjutant(Hello(off), AdjutantNews(), off, null);
+            ShowAdjutant(Hello(off), AdjutantNews(), off, null); Voices.Adjutant(AdjutantNation, HelloKind(off));
         }
 
         /// <summary>Her sheet: the dark, her picture on the left, her words in a card on the right, CARRY ON under them.</summary>
