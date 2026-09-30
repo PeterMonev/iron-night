@@ -158,7 +158,7 @@ namespace IronNight
             var startAt = Vector3.zero; foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--at=")) { var xz = arg.Substring(5).Split(','); startAt = new Vector3(float.Parse(xz[0]), 0f, float.Parse(xz[1])); }   // test switch: --at=0,95
             if (convoy) startAt = new Vector3(ConvoyLane - 11f, 0f, 6f);   // beside the lane (the wedge clear of it), the trucks lined up behind
             foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg == "--careertest") Career.Add(leaderSpec.id, 4000, 320, false, false, 0);   // test switch: a seasoned tank
-            Depot.NightTank = leaderSpec.id; if (testDrive) Debug.Log("Iron Night: test drive, the " + leaderSpec.name + " leads tonight"); platoon.Add(Vehicle.Create(leaderSpec, true, startAt, 0f)); Leader.hp = Depot.LeaderHp;
+            Depot.NightTank = leaderSpec.id; Sfx.EngineVoice(leaderSpec.id); if (testDrive) Debug.Log("Iron Night: test drive, the " + leaderSpec.name + " leads tonight"); platoon.Add(Vehicle.Create(leaderSpec, true, startAt, 0f)); Leader.hp = Depot.LeaderHp;
             leaderId = leaderSpec.id; leaderName = leaderSpec.name; careerDamage = Career.DamageMul(leaderId); careerReload = Career.ReloadMul(leaderId); careerSpeed = Career.SpeedMul(leaderId); Leader.KillRings(Career.Rings(leaderId));
             { var n = Depot.Nation; crewSteady = Crew.Gift(n, "steady"); crewEagle = Crew.Gift(n, "eagle"); crewSnap = Crew.Gift(n, "snap"); crewHands = Crew.Gift(n, "hands"); crewRacks = Crew.Gift(n, "racks"); crewHe = Crew.Gift(n, "he");
               crewFoot = Crew.Gift(n, "foot"); crewMech = Crew.Gift(n, "mech"); crewRough = Crew.Gift(n, "rough"); crewBow = Crew.Gift(n, "bow"); crewSignals = Crew.Gift(n, "signals"); crewSpot = Crew.Gift(n, "spot");
@@ -529,7 +529,7 @@ namespace IronNight
             vis.position = pos; vis.rotation = Quaternion.LookRotation(cam.transform.forward, dir);
             shells.Add(new Shell { pos = pos, vel = dir * speed, friendly = v.friendly, he = v.friendly && heShot, dmg = v.spec.damage * v.damageMul * (v.friendly ? ammoMul : 1f) * (leaderShot && loadHe ? 0.6f : 1f), life = v.Range / speed + 0.25f, vis = vis });
             if (canister && leaderShot) { int swept = infantry.Blast(pos + v.GunDirection * 8f, 8f); if (swept > 0) { InfantryKilled(swept, pos + v.GunDirection * 8f); fx.Dust(new Vector3(pos.x, 0.3f, pos.z) + v.GunDirection * 8f); } }
-            fx.MuzzleFlash(pos, dir); Sfx.Shot(pos, v.friendly, v.spec.gunLength > 3f || v.spec.isGun); if (v.friendly) Sfx.Reload(v.transform.position); if (v == Leader) Haptics.Click();
+            fx.MuzzleFlash(pos, dir); Sfx.Shot(pos, v.friendly, v.spec.id); if (v.friendly) Sfx.Reload(v.transform.position); if (v == Leader) Haptics.Click();
         }
 
         void TickShells(float dt)
@@ -2063,6 +2063,7 @@ namespace IronNight
             if (testDrive) { var lent = System.Array.Find(Depot.Leaders, c => c.id == leaderId); if (lent != null && !Depot.OwnsLeader(lent)) statLine += "\n" + lent.name + " goes back to the depot · " + lent.cost.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " points to keep her"; }
             if (camoTrial) { var cm = System.Array.Find(Depot.Camos, c => c.id == Depot.NightCamo); if (cm != null && !Depot.OwnsCamo(cm)) statLine += "\n" + cm.name + " camouflage goes back to the stores · " + cm.cost.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " points to keep it"; }
             ShowMoment();   // the night's best moment, over the end sheet that follows
+            hud.SetPaper(MorningPaper(dawn));
             if (stand) { StandEnd(dawn, statLine); return; }
             if (convoy) { ConvoyEnd(dawn, statLine); return; }
             if (sneak) { SneakEnd(dawn, statLine); return; }

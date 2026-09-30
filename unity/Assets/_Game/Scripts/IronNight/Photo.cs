@@ -178,7 +178,7 @@ namespace IronNight
         }
 
         /// <summary>Keeps the picture and says where, for the note under its print; share is true when the phone can pass it on.</summary>
-        static string PhotoKeep(byte[] jpg, string name, out bool share)
+        internal static string PhotoKeep(byte[] jpg, string name, out bool share)
         {
             share = false;
             try

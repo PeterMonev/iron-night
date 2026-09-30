@@ -13,8 +13,8 @@ namespace IronNight
     {
         const int Rate = 44100;
         static Sfx instance;
-        AudioClip shot, shotHeavy, shotFar, hit, explosion, artillery, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, front, whistle, rumble, ricochet, ricochet2, flak, reload, turretLoop, mg, faust, stuka, drone, crunch, brush, whoosh, fighter, shutter;
-        readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, turret, ambient, frontLine, ui, weld, voice; Transform listener; readonly Queue<AudioClip> voiceQueue = new Queue<AudioClip>();
+        AudioClip shot, shotHeavy, shotFar, hit, explosion, artillery, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, front, whistle, rumble, ricochet, ricochet2, flak, reload, turretLoop, mg, faust, stuka, drone, crunch, brush, whoosh, fighter, shutter, crack, clatter;
+        readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, turret, ambient, frontLine, ui, weld, voice, diesel; float engineBase = 1f, dieselLevel; Transform listener; readonly Queue<AudioClip> voiceQueue = new Queue<AudioClip>();
 
         public static void Build(Camera cam)
         {
@@ -358,6 +358,27 @@ namespace IronNight
             var p = Dsp.Sine(n, t => 2400f); Dsp.Env(p, t => Dsp.Exp(t, 120f)); Dsp.Add(mix, p, 0.5f); Dsp.Normalize(mix, 0.5f); return mix;
         }
 
+        /// <summary>A shell going faster than sound: a sharp, bright snap of a quarter second over the shot's boom.</summary>
+        static float[] MakeCrack()
+        {
+            int n = Dsp.N(0.28f); var mix = new float[n];
+            var snap = Dsp.Noise(n); Dsp.Highpass(snap, 2600f); Dsp.Env(snap, t => Dsp.Exp(t, 90f)); Dsp.Add(mix, snap, 1f);
+            var body = Dsp.Noise(n); Dsp.Bandpass(body, 1200f, 0.9f); Dsp.Env(body, t => Dsp.Exp(t, 35f)); Dsp.Add(mix, body, 0.6f);
+            Dsp.Clip(mix, 1.6f); Dsp.Echo(mix, (0.09f, 0.25f, 3000f)); Dsp.Normalize(mix, 0.9f); return mix;
+        }
+
+        /// <summary>A diesel's clatter, one second that loops: the injectors' knock fourteen times a second, never twice the same.</summary>
+        static float[] MakeClatter()
+        {
+            int n = Dsp.N(1f); var mix = new float[n];
+            for (int k = 0; k < 14; k++)
+            {
+                var knock = Dsp.Noise(Dsp.N(0.03f)); Dsp.Bandpass(knock, 1400f + (float)Dsp.rng.NextDouble() * 600f, 1.2f); Dsp.Env(knock, t => Dsp.Exp(t, 160f));
+                Dsp.Add(mix, knock, 0.6f + (float)Dsp.rng.NextDouble() * 0.4f, k / 14f);
+            }
+            Dsp.Normalize(mix, 0.8f); return mix;
+        }
+
         /// <summary>A camera of the time: the blind's two snaps, open and shut, each with a small spring's ring under it,
         /// then the lever winding the film on in a short ratchet.</summary>
         static float[] MakeShutter()
@@ -383,11 +404,12 @@ namespace IronNight
             explosion = Load("explosion", MakeExplosion); artillery = Load("artillery", MakeExplosion); hit = Load("hit", ArmourHit); ricochet = Load("ricochet", MakeRicochet); ricochet2 = Resources.Load<AudioClip>("Audio/ricochet2");
             engineLoop = Load("engine", MakeEngine); tracksLoop = Load("tracks", Tracks);
             whistle = Load("whistle", MakeWhistle); stuka = Load("stuka", MakeStukaDive); drone = Load("drone", MakeDrone); crunch = Load("crunch", MakeCrunch); brush = Load("brush", MakeBrush); whoosh = Load("whoosh", MakeWhoosh); fighter = Load("fighter", MakeFighterPass); rumble = Load("shotFar", MakeRumble); wind = Load("wind", Wind); rain = Load("rain", Rain); front = Resources.Load<AudioClip>("Audio/front");
-            pickup = Load("pickup", () => Radio(new[] { 880f, 1320f }, 0.12f)); levelUp = Load("levelUp", () => Radio(new[] { 523f, 659f, 784f }, 0.2f)); click = Load("click", MakeClick); shutter = Load("shutter", MakeShutter);
+            pickup = Load("pickup", () => Radio(new[] { 880f, 1320f }, 0.12f)); levelUp = Load("levelUp", () => Radio(new[] { 523f, 659f, 784f }, 0.2f)); click = Load("click", MakeClick); shutter = Load("shutter", MakeShutter); crack = Clip("crack", MakeCrack()); clatter = Clip("clatter", MakeClatter());
 
             for (int i = 0; i < 12; i++) { var s = NewSource("Voice " + i); s.spatialBlend = 0.75f; s.rolloffMode = AudioRolloffMode.Linear; s.minDistance = 12f; s.maxDistance = 140f; pool.Add(s); }
             engine = NewSource("Engine"); engine.clip = engineLoop; engine.loop = true; engine.spatialBlend = 0f; engine.volume = 0f; engine.Play();
             tracks = NewSource("Tracks"); tracks.clip = tracksLoop; tracks.loop = true; tracks.spatialBlend = 0f; tracks.volume = 0f; tracks.Play();
+            diesel = NewSource("Diesel"); diesel.clip = clatter; diesel.loop = true; diesel.spatialBlend = 0f; diesel.volume = 0f; diesel.Play();
             turret = NewSource("Turret"); turret.clip = turretLoop; turret.loop = true; turret.spatialBlend = 0f; turret.volume = 0f; if (turretLoop != null) turret.Play();
             frontLine = NewSource("Front"); frontLine.clip = front; frontLine.loop = true; frontLine.spatialBlend = 0f; frontLine.volume = 0.14f; if (front != null) frontLine.Play();
             ui = NewSource("Ui"); ui.spatialBlend = 0f;
@@ -405,6 +427,46 @@ namespace IronNight
         }
 
         /// <summary>A gun firing: the heavy clip for the 17-pounder, the 88 and the Tigers; the far clip when the listener is more than 45 m away.</summary>
+        /// <summary>A gun by what fires it (VehicleSpec id): the heavy clip or the 75's, how high it sings, and how much of the
+        /// supersonic crack goes over it. The 88 cracks, the 17-pounder is the loudest thing on the field, the 122 booms.</summary>
+        public static void Shot(Vector3 pos, bool friendly, string gun)
+        {
+            if (!instance) return;
+            bool heavy; float pitch, snap;
+            switch (gun)
+            {
+                case "tiger": case "tigerace": case "kingtiger": case "flak88": heavy = true; pitch = 1.12f; snap = 1f; break;
+                case "firefly": case "m10": heavy = true; pitch = 1.08f; snap = 0.85f; break;
+                case "is2": heavy = true; pitch = 0.78f; snap = 0.35f; break;
+                case "su100": heavy = true; pitch = 0.88f; snap = 0.55f; break;
+                case "pershing": heavy = true; pitch = 0.97f; snap = 0.6f; break;
+                case "t34_85": heavy = true; pitch = 1.03f; snap = 0.5f; break;
+                case "panther": case "easy8": case "hellcat": case "kv85": heavy = false; pitch = 1.1f; snap = 0.45f; break;
+                case "chaffee": heavy = false; pitch = 1.18f; snap = 0f; break;
+                default: heavy = false; pitch = 1f; snap = 0f; break;
+            }
+            bool far = (pos - instance.listener.position).magnitude > 45f;
+            instance.PlayAt(far ? instance.shotFar : heavy ? instance.shotHeavy : instance.shot, pos, friendly ? 0.9f : 0.8f, pitch * Random.Range(0.95f, 1.05f));
+            if (snap > 0f && !far && instance.crack != null) instance.PlayAt(instance.crack, pos, 0.7f * snap, Random.Range(0.94f, 1.06f));
+        }
+        /// <summary>The leader's engine by its make: the Sherman's radial, the light tanks' high whine, the heavy ones' growl,
+        /// and under the Soviet diesels a clatter.</summary>
+        public static void EngineVoice(string tank)
+        {
+            if (!instance) return;
+            switch (tank)
+            {
+                case "hellcat": instance.engineBase = 1.2f; instance.dieselLevel = 0f; break;
+                case "chaffee": instance.engineBase = 1.15f; instance.dieselLevel = 0f; break;
+                case "pershing": instance.engineBase = 0.92f; instance.dieselLevel = 0f; break;
+                case "easy8": instance.engineBase = 0.97f; instance.dieselLevel = 0f; break;
+                case "m10": instance.engineBase = 0.95f; instance.dieselLevel = 0.5f; break;
+                case "t34_85": case "su100": instance.engineBase = 0.86f; instance.dieselLevel = 1f; break;
+                case "kv85": instance.engineBase = 0.8f; instance.dieselLevel = 1f; break;
+                case "is2": instance.engineBase = 0.78f; instance.dieselLevel = 1f; break;
+                default: instance.engineBase = 1f; instance.dieselLevel = 0f; break;
+            }
+        }
         public static void Shot(Vector3 pos, bool friendly, bool heavy)
         {
             if (!instance) return; bool far = (pos - instance.listener.position).magnitude > 45f;
@@ -465,9 +527,10 @@ namespace IronNight
         /// <summary>The leader's engine and tracks: louder and higher when driving.</summary>
         public static void Engine(float throttle)
         {
-            if (!instance) return; var e = instance.engine; e.volume = Mathf.Lerp(e.volume, 0.12f + 0.3f * throttle, 0.1f); e.pitch = Mathf.Lerp(e.pitch, 0.85f + 0.45f * throttle, 0.08f);
+            if (!instance) return; var e = instance.engine; e.volume = Mathf.Lerp(e.volume, 0.12f + 0.3f * throttle, 0.1f); e.pitch = Mathf.Lerp(e.pitch, (0.85f + 0.45f * throttle) * instance.engineBase, 0.08f);
+            var dz = instance.diesel; if (dz != null) { dz.volume = Mathf.Lerp(dz.volume, instance.dieselLevel * (0.05f + 0.13f * throttle), 0.1f); dz.pitch = Mathf.Lerp(dz.pitch, 0.9f + 0.35f * throttle, 0.08f); }
             var tr = instance.tracks; tr.volume = Mathf.Lerp(tr.volume, 0.16f * throttle, 0.15f); tr.pitch = Mathf.Lerp(tr.pitch, 0.8f + 0.4f * throttle, 0.1f);
         }
-        public static void Quiet(bool q) { if (instance) { instance.engine.mute = q; instance.tracks.mute = q; instance.turret.mute = q; instance.ambient.mute = q; instance.frontLine.mute = q; } }
+        public static void Quiet(bool q) { if (instance) { if (instance.diesel != null) instance.diesel.mute = q; instance.engine.mute = q; instance.tracks.mute = q; instance.turret.mute = q; instance.ambient.mute = q; instance.frontLine.mute = q; } }
     }
 }

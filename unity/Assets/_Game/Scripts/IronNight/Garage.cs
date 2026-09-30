@@ -98,6 +98,7 @@ namespace IronNight
             var doorLight = new GameObject("DoorLight").AddComponent<Light>(); doorLight.transform.SetParent(go.transform, false); doorLight.transform.localPosition = new Vector3(17f, 5f, 15f); doorLight.type = LightType.Point; doorLight.range = 24f; doorLight.intensity = 8f; doorLight.color = new Color(0.55f, 0.66f, 1f); doorLight.shadows = LightShadows.None;
             // a wide soft light in the middle so the walls and the roof read as walls, not as a void
             var amb = new GameObject("HangarAmbient").AddComponent<Light>(); amb.transform.SetParent(go.transform, false); amb.transform.localPosition = new Vector3(0f, 7f, 4f); amb.type = LightType.Point; amb.range = 52f; amb.intensity = 30f; amb.color = new Color(0.9f, 0.85f, 0.75f); amb.shadows = LightShadows.None;
+            g.doorMat = doorMat; g.hazeMat = hazeMat; g.doorLight = doorLight; g.ambLight = amb; g.TickDoor(true);
             // wall washers: a light falls off with the square of the distance, so the walls need lamps of their own close by
             foreach (var w in new[] { new Vector3(-9f, 9.5f, 15.5f), new Vector3(7f, 9.5f, 15.5f) }) { var ws = new GameObject("Washer").AddComponent<Light>(); ws.transform.SetParent(go.transform, false); ws.transform.localPosition = w; ws.transform.rotation = Quaternion.Euler(62f, 0f, 0f); ws.type = LightType.Spot; ws.spotAngle = 110f; ws.range = 20f; ws.intensity = 34f; ws.color = new Color(1f, 0.88f, 0.7f); ws.shadows = LightShadows.None; }
             foreach (var sx in new[] { -1f, 1f }) { var ws = new GameObject("SideWasher").AddComponent<Light>(); ws.transform.SetParent(go.transform, false); ws.transform.localPosition = new Vector3(sx * 17.5f, 9.5f, 2f); ws.transform.rotation = Quaternion.Euler(60f, sx > 0 ? 90f : -90f, 0f); ws.type = LightType.Spot; ws.spotAngle = 120f; ws.range = 22f; ws.intensity = 26f; ws.color = new Color(0.95f, 0.9f, 0.8f); ws.shadows = LightShadows.None; }
@@ -232,7 +233,7 @@ namespace IronNight
         void Update()
         {
             if (!cam.enabled && !titleOn) return;
-            TiltTitle();
+            TiltTitle(); TickDoor();
             TickRepair(Time.unscaledDeltaTime);
             spinVel = Mathf.MoveTowards(spinVel, welding != null ? 0f : titleOn && !cam.enabled ? 5f : 12f, Time.unscaledDeltaTime * 30f); spin += spinVel * Time.unscaledDeltaTime;   // under repair it stands
             if (TestSpin >= 0f) { spin = TestSpin; spinVel = 0f; }
