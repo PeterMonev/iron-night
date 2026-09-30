@@ -1818,6 +1818,7 @@ namespace IronNight
         }
         static string CardPicture(string id)
         {
+            if (UiSprite("card_" + id) != null) return "card_" + id;   // a card's own picture, once it has one
             switch (id)
             {
                 case "he": return "card_he"; case "apcr": return "card_apcr"; case "rapid": case "loaders": return "card_loader"; case "radar": case "optics": return "card_optics";
