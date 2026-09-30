@@ -202,15 +202,28 @@ namespace IronNight
                 if (!depot && a.StartsWith("--titlecam=")) { var p = System.Array.ConvertAll(a.Substring(11).Split(','), s => float.Parse(s, System.Globalization.CultureInfo.InvariantCulture)); at = new Vector3(p[0], p[1], p[2]); aim = new Vector3(p[3], p[4], p[5]); }
             float fit = Mathf.Max(1f, 0.5625f / Mathf.Max(0.1f, titleCam.aspect));   // narrower than 9:16: further back, the same width of the hangar in the picture
             titleCam.transform.localPosition = aim + (at - aim) * fit; titleCam.transform.LookAt(transform.position + aim);
+            frameAt = aim + (at - aim) * fit; frameAim = aim;
+        }
+        Vector3 frameAt, frameAim;   // the menu camera's framing, before the phone's tilt turns it
+
+        /// <summary>The parallax: the menu camera circles its aim a few degrees as the phone tilts, so the crew and the tank
+        /// move against the walls behind them and the hangar reads as deep, behind the glass of the menu.</summary>
+        void TiltTitle()
+        {
+            if (titleCam == null || !titleCam.enabled || frameAt == frameAim) return;
+            var t = Parallax.Tilt; var off = frameAt - frameAim; var side = Vector3.Cross(off, Vector3.up).normalized;
+            titleCam.transform.localPosition = frameAim + Quaternion.AngleAxis(t.x * 3f, Vector3.up) * Quaternion.AngleAxis(t.y * 2f, side) * off;
+            titleCam.transform.LookAt(transform.position + frameAim);
         }
         /// <summary>The menu backdrop: the tank turning slowly under the roof lights.</summary>
-        public void SetTitle(bool on) { titleOn = on; titleCam.enabled = on; if (on) gameObject.SetActive(true); else if (!cam.enabled) gameObject.SetActive(false); }
+        public void SetTitle(bool on) { titleOn = on; titleCam.enabled = on; if (on) gameObject.SetActive(true); else { Parallax.Sleep(); if (!cam.enabled) gameObject.SetActive(false); } }
         public void Drag(float dx) { spinVel = dx * 0.35f; }
         static readonly float TestSpin = System.Array.Find(System.Environment.GetCommandLineArgs(), a => a.StartsWith("--spin=")) is string s ? float.Parse(s.Substring(7), System.Globalization.CultureInfo.InvariantCulture) : -1f;   // test switch --spin=degrees
 
         void Update()
         {
             if (!cam.enabled && !titleOn) return;
+            TiltTitle();
             TickRepair(Time.unscaledDeltaTime);
             spinVel = Mathf.MoveTowards(spinVel, welding != null ? 0f : titleOn && !cam.enabled ? 5f : 12f, Time.unscaledDeltaTime * 30f); spin += spinVel * Time.unscaledDeltaTime;   // under repair it stands
             if (TestSpin >= 0f) { spin = TestSpin; spinVel = 0f; }

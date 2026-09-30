@@ -123,7 +123,7 @@ namespace IronNight
 
         void Burst()
         {
-            burstT = 0f; beam.gameObject.SetActive(true); sparks.transform.position = Home + new Vector3(0f, crateH * mouth, 0f); sparks.Play(); Sfx.LevelUp();
+            burstT = 0f; beam.gameObject.SetActive(true); sparks.transform.position = Home + new Vector3(0f, crateH * mouth, 0f); sparks.Play(); Sfx.LevelUp(); Haptics.Prize();
         }
 
         void Update()

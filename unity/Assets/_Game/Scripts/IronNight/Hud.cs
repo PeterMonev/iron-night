@@ -1845,7 +1845,7 @@ namespace IronNight
             var rt = go.GetComponent<RectTransform>(); rt.anchorMin = rt.anchorMax = anchor; rt.pivot = new Vector2(0.5f, 0.5f); rt.anchoredPosition = pos; rt.sizeDelta = size;
             var bi = go.GetComponent<Image>(); bi.color = new Color(0.03f, 0.04f, 0.06f, 0.6f); bi.sprite = Rounded(); bi.type = Image.Type.Sliced;
             go.AddComponent<PressFeel>();
-            var btn = go.GetComponent<Button>(); btn.onClick.AddListener(() => { if (UnityEngine.EventSystems.EventSystem.current != null) UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(null); Sfx.Click(); onClick(); });   // nothing stays selected: a stray key never presses a button again
+            var btn = go.GetComponent<Button>(); btn.onClick.AddListener(() => { if (UnityEngine.EventSystems.EventSystem.current != null) UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(null); Sfx.Click(); Haptics.Tick(); onClick(); });   // nothing stays selected: a stray key never presses a button again
             var cb = btn.colors; cb.highlightedColor = new Color(1f, 1f, 1f, 0.92f); cb.pressedColor = new Color(0.75f, 0.75f, 0.75f, 1f); cb.fadeDuration = 0.06f; btn.colors = cb;
             var t = MakeText(go.transform, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, TextAnchor.MiddleCenter, Mathf.RoundToInt(fontSize * 1.1f), new Color(0.93f, 0.91f, 0.86f)); t.font = LabelFont();   // condensed: a tenth larger
             t.GetComponent<RectTransform>().sizeDelta = size; t.text = label;

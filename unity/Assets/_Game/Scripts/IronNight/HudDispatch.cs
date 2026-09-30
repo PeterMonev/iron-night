@@ -72,12 +72,7 @@ namespace IronNight
             dispatchSheet.SetActive(false);
         }
 
-        static void Buzz()
-        {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            if (PlayerPrefs.GetInt("vibe", 1) == 1) Handheld.Vibrate();
-#endif
-        }
+        static void Buzz() => Haptics.Prize();
 
         static string PrizeShort(Dispatch.Prize p) =>
             p.kind == "points" ? p.amount + " PTS" : p.kind == "xp" ? p.amount + " XP" : p.kind == "gold" ? p.amount + " GOLD" : p.kind == "officer" ? "OFFICER'S" : "SUPPLY";
@@ -161,7 +156,7 @@ namespace IronNight
         {
             t += Time.unscaledDeltaTime; float k = Mathf.Clamp01(t / secs), e = 1f - Mathf.Pow(1f - k, 3f), z = Mathf.Lerp(from, to, e);
             transform.localRotation = Quaternion.Euler(0f, 0f, z);
-            int tick = Mathf.FloorToInt(z / 45f); if (tick != lastTick) { if (lastTick >= 0) Sfx.Click(); lastTick = tick; }
+            int tick = Mathf.FloorToInt(z / 45f); if (tick != lastTick) { if (lastTick >= 0) { Sfx.Click(); Haptics.Tick(); } lastTick = tick; }
             if (k >= 1f) { Destroy(this); done?.Invoke(); }
         }
     }

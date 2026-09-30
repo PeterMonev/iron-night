@@ -481,7 +481,7 @@ namespace IronNight
             var cap = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Destroy(cap.GetComponent<Collider>()); cap.transform.SetParent(go.transform, false); cap.transform.localPosition = new Vector3(0f, 1f, 0f); cap.transform.localScale = new Vector3(0.45f, 0.6f, 0.45f); cap.GetComponent<Renderer>().sharedMaterial = mineMaterial;
             mines.Add(new Mine { pos = go.transform.position, vis = go.transform, friendly = friendly });
         }
-        void Blow(Mine m) { fx.Explosion(m.pos); Sfx.Explosion(m.pos); props.Crater(m.pos, 2.5f); props.Blast(m.pos, 3f, 1f); shake = Mathf.Max(shake, 0.35f); Destroy(m.vis.gameObject); InfantryKilled(infantry.Blast(m.pos, 3f), m.pos); }
+        void Blow(Mine m) { fx.Explosion(m.pos); Sfx.Explosion(m.pos); Haptics.Boom(); props.Crater(m.pos, 2.5f); props.Blast(m.pos, 3f, 1f); shake = Mathf.Max(shake, 0.35f); Destroy(m.vis.gameObject); InfantryKilled(infantry.Blast(m.pos, 3f), m.pos); }
         /// <summary>The enemy's mine nearest a point within a reach, or null: a tap on it sets every gun onto it.</summary>
         Mine NearestMine(Vector3 at, float reach) { Mine best = null; float bd = reach; foreach (var m in mines) { if (m.friendly) continue; var d = m.pos - at; d.y = 0f; if (d.magnitude < bd) { bd = d.magnitude; best = m; } } return best; }
         bool MineShot(Vector3 at)
@@ -527,7 +527,7 @@ namespace IronNight
             vis.position = pos; vis.rotation = Quaternion.LookRotation(cam.transform.forward, dir);
             shells.Add(new Shell { pos = pos, vel = dir * speed, friendly = v.friendly, he = v.friendly && heShot, dmg = v.spec.damage * v.damageMul * (v.friendly ? ammoMul : 1f) * (leaderShot && loadHe ? 0.6f : 1f), life = v.Range / speed + 0.25f, vis = vis });
             if (canister && leaderShot) { int swept = infantry.Blast(pos + v.GunDirection * 8f, 8f); if (swept > 0) { InfantryKilled(swept, pos + v.GunDirection * 8f); fx.Dust(new Vector3(pos.x, 0.3f, pos.z) + v.GunDirection * 8f); } }
-            fx.MuzzleFlash(pos, dir); Sfx.Shot(pos, v.friendly, v.spec.gunLength > 3f || v.spec.isGun); if (v.friendly) Sfx.Reload(v.transform.position);
+            fx.MuzzleFlash(pos, dir); Sfx.Shot(pos, v.friendly, v.spec.gunLength > 3f || v.spec.isGun); if (v.friendly) Sfx.Reload(v.transform.position); if (v == Leader) Haptics.Click();
         }
 
         void TickShells(float dt)
@@ -603,6 +603,7 @@ namespace IronNight
             if (v.friendly && v == Leader) { hud.Flash(); shake = Mathf.Max(shake, 0.8f); Buzz(); }
             if (v.hp > 0f) { if (v == Leader) { hud.Toast("Leader hit"); if (Random.value < 0.4f) Radio("hit"); if (hasSmoke && smokeCooldown <= 0f) PopSmoke(); } return; }
             tracks.Forget(v);
+            if (!v.friendly) { if (v == ace || v.spec.hp >= 6f) Haptics.Boom(); else Haptics.Double(); }
             v.Wreck(); fx.Explosion(v.transform.position); Sfx.Explosion(v.transform.position); props.Scorch(v.transform, 6f + v.spec.radius * 1.5f); props.Blast(v.transform.position, 5f, 1.2f); InfantryKilled(infantry.Blast(v.transform.position, 6f), v.transform.position);
             var fire = new GameObject("WreckFire").AddComponent<Light>(); fire.type = LightType.Point; fire.color = new Color(1f, 0.5f, 0.2f); fire.range = 16f; fire.intensity = 6f; fire.shadows = LightShadows.None;
             fire.transform.position = v.transform.position + Vector3.up * 2.5f;
@@ -1074,12 +1075,7 @@ namespace IronNight
             return hour + " o'clock";
         }
 
-        static void Buzz()
-        {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            if (PlayerPrefs.GetInt("vibe", 1) == 1) Handheld.Vibrate();
-#endif
-        }
+        static void Buzz() => Haptics.Heavy();
 
         /// <summary>The next objective: a point 110 to 170 m ahead, within forty degrees of north, marked with green
         /// smoke and a light. Reaching it is worth 300 and the next one is set.</summary>
@@ -1608,6 +1604,7 @@ namespace IronNight
                 if (k < 1f) continue;
                 fx.Release(r.vis); rockets.RemoveAt(i);
                 fx.Explosion(r.to); Sfx.Explosion(r.to); props.Crater(r.to, 3f); props.Blast(r.to, 4.5f, 2f); shake = Mathf.Max(shake, 0.35f);
+                if (Leader != null && Flat(Leader.transform.position - r.to) < 20f) Haptics.Boom();
                 foreach (var v in foes.ToArray()) if (!v.dead && Flat(v.transform.position - r.to) < 4.5f) Damage(v, 2.2f, r.to);
                 foreach (var v in platoon.ToArray()) if (!v.dead && Flat(v.transform.position - r.to) < 4.5f) Damage(v, 2.2f, r.to);
                 InfantryKilled(infantry.Blast(r.to, 6f), r.to);
