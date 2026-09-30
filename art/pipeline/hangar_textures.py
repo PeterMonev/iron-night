@@ -97,10 +97,13 @@ def turntable():
 
 
 def door():
-    a = load('door_night'); h, w, _ = a.shape
-    want = int(round(w * 8.4 / 6.0)); cut = h - want                    # the opening is 6 m wide, 8.4 m high
-    a = a[int(cut * 0.25): h - (cut - int(cut * 0.25))]                # a little off the sky, the rest off the near concrete
-    save(a, 'door_night')
+    # the night, and the morning, the day and the evening the hangar shows by the player's clock (GarageTime.cs); the
+    # day's and the evening's pictures came with the roof's edge along their top, so theirs is cut off the sky
+    for name, top in (('door_night', 0.25), ('door_morning', 0.25), ('door_day', 1.0), ('door_evening', 1.0)):
+        a = load(name); h, w, _ = a.shape
+        want = int(round(w * 8.4 / 6.0)); cut = h - want                # the opening is 6 m wide, 8.4 m high
+        a = a[int(cut * top): h - (cut - int(cut * top))]              # the share of the cut off the sky, the rest off the near concrete
+        save(a, name)
 
 
 def poster():
@@ -121,6 +124,6 @@ def meta(name, normal=False):
 
 if __name__ == '__main__':
     floor(); brick(); turntable(); door(); poster()
-    for n, nm in (('turntable', False), ('turntable_n', True), ('door_night', False), ('poster_rolling', False)):
+    for n, nm in (('turntable', False), ('turntable_n', True), ('door_night', False), ('door_morning', False), ('door_day', False), ('door_evening', False), ('poster_rolling', False)):
         meta(n, nm)
     print('hangar textures written to', os.path.abspath(TEX))
