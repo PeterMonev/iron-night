@@ -41,8 +41,48 @@ namespace IronNight
             }
             StartShot(CamShot.Intro, IntroLen, 0f);
             IntroWords(out var eyebrow, out var title, out var sub);
-            hud.Cinema(true, false, true); hud.CineCard(eyebrow, title, sub, 0.45f, 3.2f, false); hud.CineSkip(true);
+            hud.Cinema(true, false, true); hud.CineSkip(true);
+            if (prologue) { shotT = -PrologueLen; prologueStep = 0; hud.CineBlack(true, true); }   // the prologue runs first, in the shot's time before zero
+            else hud.CineCard(eyebrow, title, sub, 0.45f, 3.2f, false);
             return true;
+        }
+
+        // ---- the prologue: a new player's first launch, before the first night ----
+        const float PrologueLen = 24f;
+        bool prologue; int prologueStep;
+
+        /// <summary>The prologue's words, one card at a time: the place and the month over black, what the nights are for
+        /// over the fields, the orders on the way down to the tank, the game's name over it.</summary>
+        void PrologueTick()
+        {
+            float u = shotT + PrologueLen; bool su = theatre == "kursk";
+            if (prologueStep == 0 && u >= 0f)
+            {
+                prologueStep = 1;
+                if (su) hud.CineCard("JULY 1943", "KURSK", "The Germans have gathered every tank they have for one last blow in the east.", 0.6f, 5.4f, true);
+                else if (winter) hud.CineCard("DECEMBER 1944", "THE ARDENNES", "In the snow and the fog, the Germans have broken through.", 0.6f, 5.4f, true);
+                else hud.CineCard("JULY 1944", "NORMANDY", "Six weeks after the landings, the Allies are still caught in the hedgerows.", 0.6f, 5.4f, true);
+            }
+            if (prologueStep == 1 && u >= 7f)
+            {
+                prologueStep = 2; hud.CineBlack(false); Sfx.Rumble();
+                hud.CineCard(su ? "BY DAY THE STUKAS OWN THE SKY" : winter ? "BY DAY THEIR TIGERS OWN THE ROADS" : "BY DAY THE GERMAN GUNS OWN THE FIELDS", "BY NIGHT", "the tanks go out.", 1.2f, 5.2f, true);
+            }
+            if (prologueStep == 2 && u >= 15f) { prologueStep = 3; hud.CineCard("ONE PLATOON · ONE NIGHT", "HOLD TILL DAWN", "Five minutes of dark. Every tank counts.", 0.4f, 5.2f, true); }
+            if (prologueStep == 3 && u >= 21f) { prologueStep = 4; hud.CineCard("", "IRON NIGHT", "", 0.2f, 3.4f, false); }
+        }
+
+        /// <summary>The prologue's camera, u seconds in: parked while it is black, then high over the fields drifting toward
+        /// the horizon (the stars and the searchlights over it), then down onto the opening shot's own first place, low
+        /// behind the leader looking out over his turret, where the opening crane takes over.</summary>
+        void ProloguePose(Vehicle L, float u, out Vector3 p, out Quaternion r, out float fov)
+        {
+            var o = L.transform.position; var f = L.Forward; var rt = new Vector3(f.z, 0f, -f.x);
+            var hiFrom = o - f * 70f + rt * 12f + Vector3.up * 30f; var hiTo = o - f * 42f + rt * 6f + Vector3.up * 21f; var hiAim = o + f * 70f + Vector3.up * 10f;
+            var low = o - f * 15f + rt * introSide + Vector3.up * introHigh; var lowAim = o + f * 40f + Vector3.up * 0.5f;
+            float a = Smooth(Mathf.Clamp01((u - 7f) / 9f)), b = Smoother(Mathf.Clamp01((u - 15f) / 9f));
+            p = Vector3.Lerp(Vector3.Lerp(hiFrom, hiTo, a), low, b);
+            r = Quaternion.LookRotation(Vector3.Lerp(hiAim, lowAim, b) - p); fov = Mathf.Lerp(48f, 52f, b);
         }
 
         /// <summary>The words over the opening shot: what kind of night, then the front (an operation's night, or the
@@ -216,12 +256,12 @@ namespace IronNight
             if (camShot == CamShot.Intro && SkipPressed())
             {
                 // cut short: the words go, the HUD comes, the camera swoops up to the platoon from where it is
-                hud.CineCardOut(); hud.Cinema(false, true); hud.CineSkip(false); if (!introBegun) { introBegun = true; Begin(); }
+                hud.CineCardOut(); hud.Cinema(false, true); hud.CineSkip(false); hud.CineBlack(false); if (!introBegun) { introBegun = true; Begin(); }
                 EndShot(0.9f); return TickShot(L);
             }
             shotT += dt;
             Vector3 p; Quaternion r; float fov;
-            if (camShot == CamShot.Intro) IntroPose(L, out p, out r, out fov);
+            if (camShot == CamShot.Intro) { if (shotT < 0f) PrologueTick(); IntroPose(L, out p, out r, out fov); }
             else if (camShot == CamShot.Kill)
             {
                 if (shotFollow != null && !shotFollow.dead) shotAt = Vector3.Lerp(shotAt, shotFollow.transform.position, 1f - Mathf.Exp(-dt * 6f));
@@ -254,6 +294,7 @@ namespace IronNight
         /// the crane up to the platoon's view, swinging out a little on its way and tilting down onto the ground ahead.</summary>
         void IntroPose(Vehicle L, out Vector3 p, out Quaternion r, out float fov)
         {
+            if (shotT < 0f) { ProloguePose(L, shotT + PrologueLen, out p, out r, out fov); return; }
             var o = L.transform.position; var f = L.Forward; var rt = new Vector3(f.z, 0f, -f.x);
             float a = Mathf.Clamp01(shotT / IntroCrane), push = 1f - (1f - a) * (1f - a);
             var low = o - f * Mathf.Lerp(15f, 12f, push) + rt * (introSide * Mathf.Lerp(1f, 0.75f, push)) + Vector3.up * (introHigh + 0.4f * push);

@@ -446,6 +446,7 @@ namespace IronNight
             // the cinema: black bars that slide over the top and bottom, and a card of words, while the camera has a shot
             {
                 var ci = new GameObject("Cinema", typeof(RectTransform)); ci.transform.SetParent(canvasGo.transform, false); Stretch(ci); ci.transform.SetSiblingIndex(hudGroup.transform.GetSiblingIndex() + 1);
+                cineBlack = MakeImage(ci.transform, "Black", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(4000f, 4000f), new Color(0f, 0f, 0f, 0f)); cineBlack.rectTransform.pivot = new Vector2(0.5f, 0.5f);
                 barTop = MakeImage(ci.transform, "BarTop", new Vector2(0.5f, 1f), new Vector2(0f, BarH), new Vector2(4000f, BarH), Color.black).rectTransform;
                 barBottom = MakeImage(ci.transform, "BarBottom", new Vector2(0.5f, 0f), new Vector2(0f, -BarH), new Vector2(4000f, BarH), Color.black).rectTransform;
                 var cc = new GameObject("Card", typeof(RectTransform), typeof(CanvasGroup)); cc.transform.SetParent(ci.transform, false);
@@ -1521,9 +1522,13 @@ namespace IronNight
         /// <summary>The words cut short: they fade out from where they are.</summary>
         public void CineCardOut() { float a = cardAge - cardDelay; if (a <= 0f) cardAge = cardDelay + cardLife; else cardLife = Mathf.Min(cardLife, a + 0.5f * cineFade.alpha); }
         public void CineSkip(bool on) { cineSkip.gameObject.SetActive(on); }
+        Image cineBlack; float blackWant;
+        /// <summary>Black under the cinema's words (the prologue's first ones stand on it): fades in or out, or at once.</summary>
+        public void CineBlack(bool on, bool now = false) { blackWant = on ? 1f : 0f; if (now && cineBlack != null) cineBlack.color = new Color(0f, 0f, 0f, blackWant); }
         void TickCinema(float dt)
         {
             barsAt = Mathf.MoveTowards(barsAt, barsWant, dt * 2.2f); float bk = barsAt * barsAt * (3f - 2f * barsAt);
+            if (cineBlack != null && !Mathf.Approximately(cineBlack.color.a, blackWant)) cineBlack.color = new Color(0f, 0f, 0f, Mathf.MoveTowards(cineBlack.color.a, blackWant, dt * 1.2f));
             barTop.anchoredPosition = new Vector2(0f, BarH * (1f - bk)); barBottom.anchoredPosition = new Vector2(0f, -BarH * (1f - bk));
             float hw = sheet.activeSelf ? 1f : hudWant; hudFade.alpha = Mathf.MoveTowards(hudFade.alpha, hw, dt * 3f); hudFade.blocksRaycasts = hw > 0.5f;   // the level-up sheet lives in the HUD: never hidden
             if (cineSkip.gameObject.activeSelf) { var sc = cineSkip.color; sc.a = bk * (0.5f + 0.2f * Mathf.Sin(Time.unscaledTime * 3f)); cineSkip.color = sc; }
