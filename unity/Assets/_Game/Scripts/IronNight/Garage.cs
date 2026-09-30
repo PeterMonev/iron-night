@@ -201,16 +201,25 @@ namespace IronNight
             foreach (var a in System.Environment.GetCommandLineArgs())
                 if (!depot && a.StartsWith("--titlecam=")) { var p = System.Array.ConvertAll(a.Substring(11).Split(','), s => float.Parse(s, System.Globalization.CultureInfo.InvariantCulture)); at = new Vector3(p[0], p[1], p[2]); aim = new Vector3(p[3], p[4], p[5]); }
             float fit = Mathf.Max(1f, 0.5625f / Mathf.Max(0.1f, titleCam.aspect));   // narrower than 9:16: further back, the same width of the hangar in the picture
-            titleCam.transform.localPosition = aim + (at - aim) * fit; titleCam.transform.LookAt(transform.position + aim);
-            frameAt = aim + (at - aim) * fit; frameAim = aim;
+            wantAt = aim + (at - aim) * fit; wantAim = aim;
+            if (frameAt == frameAim) { frameAt = wantAt; frameAim = wantAim; titleCam.transform.localPosition = frameAt; titleCam.transform.LookAt(transform.position + frameAim); }   // the first framing a cut, the ones after it a glide
         }
-        Vector3 frameAt, frameAim;   // the menu camera's framing, before the phone's tilt turns it
+        Vector3 frameAt, frameAim, wantAt, wantAim;   // the menu camera's framing as it glides to the one wanted, before the phone's tilt turns it
+
+        /// <summary>The camera walks up to the hunt board, the trophy wall, or back to the title's framing.</summary>
+        public void ViewBoard(bool on)
+        {
+            if (!on) { Frame(false); return; }
+            float aspect = Mathf.Max(0.3f, titleCam.aspect), dist = Mathf.Clamp(2.4f / (Mathf.Tan(titleCam.fieldOfView * 0.5f * Mathf.Deg2Rad) * aspect), 6f, 13f);
+            wantAim = BoardAt + new Vector3(0f, -0.1f, 0f); wantAt = wantAim + new Vector3(-0.16f, 0.1f, -1f).normalized * dist;
+        }
 
         /// <summary>The parallax: the menu camera circles its aim a few degrees as the phone tilts, so the crew and the tank
         /// move against the walls behind them and the hangar reads as deep, behind the glass of the menu.</summary>
         void TiltTitle()
         {
             if (titleCam == null || !titleCam.enabled || frameAt == frameAim) return;
+            float k = 1f - Mathf.Exp(-Time.unscaledDeltaTime * 3.5f); frameAt = Vector3.Lerp(frameAt, wantAt, k); frameAim = Vector3.Lerp(frameAim, wantAim, k);
             var t = Parallax.Tilt; var off = frameAt - frameAim; var side = Vector3.Cross(off, Vector3.up).normalized;
             titleCam.transform.localPosition = frameAim + Quaternion.AngleAxis(t.x * 3f, Vector3.up) * Quaternion.AngleAxis(t.y * 2f, side) * off;
             titleCam.transform.LookAt(transform.position + frameAim);

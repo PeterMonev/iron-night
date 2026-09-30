@@ -262,6 +262,7 @@ namespace IronNight
         void Update()
         {
             PhotoTestTick();
+            hud.LensRain = rain != null && rain.isPlaying && weather == Weather.Rain && !winter && (phase == Phase.Play || phase == Phase.Intro || phase == Phase.LevelUp || phase == Phase.Pause || phase == Phase.Photo);
             if (phase == Phase.Photo) { TickPhoto(); return; }   // photo mode: the fight holds still, only the camera moves
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             if (slowLeft > 0f) { slowLeft -= Time.unscaledDeltaTime; Time.timeScale = slowLeft <= 0f ? 1f : slowLeft < 0.25f ? Mathf.Lerp(1f, 0.3f, slowLeft / 0.25f) : 0.3f; }

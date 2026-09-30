@@ -155,6 +155,7 @@ namespace IronNight
             if (!FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>())
                 new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(UnityEngine.InputSystem.UI.InputSystemUIInputModule));
 
+            BuildLens(canvasGo.transform);
             var hg = new GameObject("PlayHud", typeof(RectTransform)); hg.transform.SetParent(canvasGo.transform, false); Stretch(hg); hudGroup = hg; hudFade = hg.AddComponent<CanvasGroup>();
             var t = hg.transform; canvasRect = canvasGo.GetComponent<RectTransform>();
             var fl = new GameObject("HitFlash", typeof(RectTransform), typeof(Image)); fl.transform.SetParent(t, false); Stretch(fl); flash = fl.GetComponent<Image>(); flash.color = new Color(0.8f, 0.1f, 0.05f, 0f); flash.raycastTarget = false;
@@ -1675,7 +1676,7 @@ namespace IronNight
             bool choosing = sheet != null && sheet.activeSelf;
             if (briefing != null && briefingLeft > 0f && briefing.activeSelf == choosing) briefing.SetActive(!choosing);   // out of the way of the cards, back after them
             if (briefingLeft > 0f && hudFade.alpha > 0.95f && !choosing) { briefingLeft -= Time.unscaledDeltaTime; if (briefingLeft <= 0f && briefing != null) briefing.SetActive(false); }
-            TickNumbers(Time.unscaledDeltaTime); CurtainTick(Time.unscaledDeltaTime); TickCinema(Mathf.Min(Time.unscaledDeltaTime, 0.05f)); TickRewards(Mathf.Min(Time.unscaledDeltaTime, 0.05f)); TickMap(); TickPhotoSheet(Mathf.Min(Time.unscaledDeltaTime, 0.05f)); TickAdjutant(Mathf.Min(Time.unscaledDeltaTime, 0.05f));
+            TickNumbers(Time.unscaledDeltaTime); CurtainTick(Time.unscaledDeltaTime); TickCinema(Mathf.Min(Time.unscaledDeltaTime, 0.05f)); TickRewards(Mathf.Min(Time.unscaledDeltaTime, 0.05f)); TickMap(); TickPhotoSheet(Mathf.Min(Time.unscaledDeltaTime, 0.05f)); TickAdjutant(Mathf.Min(Time.unscaledDeltaTime, 0.05f)); TickLens(Mathf.Min(Time.deltaTime, 0.05f));
             if (titleSheet != null && titleSheet.activeSelf) for (int i = 0; i < embers.Count; i++)
             {
                 var e = embers[i]; float ph = emberPhase[i]; var p = e.anchoredPosition; p.y += (18f + 10f * Mathf.Sin(ph)) * Time.unscaledDeltaTime; p.x += Mathf.Sin(Time.unscaledTime * 0.7f + ph) * 12f * Time.unscaledDeltaTime;

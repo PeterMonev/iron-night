@@ -77,12 +77,20 @@ namespace IronNight
             if (dead.Count > 0)
             {
                 var th = MakeText(ct, "Wall", new Vector2(0.5f, 1f), new Vector2(0, y - 20f), TextAnchor.MiddleCenter, 26, GoldInk); th.text = Spaced("TROPHY WALL"); th.font = LabelFont(); th.rectTransform.sizeDelta = new Vector2(900, 40); y -= 80f;
+                if (garage != null) MakeGhost(ct, "See the wall", new Vector2(0.5f, 1f), new Vector2(340f, y + 60f), new Vector2(250f, 60f), 22, ShowTrophyWall);
                 for (int i = 0; i < dead.Count; i++)
                 {
                     var d = dead[i]; float x = (i % 3 - 1) * 335f; float top = y - (i / 3) * 215f;
                     var card = MakeCard(ct, "Trophy", new Vector2(0.5f, 1f), new Vector2(x, top), new Vector2(320f, 200f), new Color(0.09f, 0.08f, 0.06f, 0.97f), 0.2f); card.rectTransform.pivot = new Vector2(0.5f, 1f); card.transform.Find("Edge").GetComponent<Image>().color = new Color(1f, 0.8f, 0.35f, 0.55f);
                     var tn = MakeText(card.transform, "Item", new Vector2(0.5f, 1f), new Vector2(0, -26), TextAnchor.UpperCenter, 26, GoldInk); tn.text = d.Title + "'s " + d.trophy; tn.font = BoldFont(); tn.rectTransform.sizeDelta = new Vector2(300, 70); tn.resizeTextForBestFit = true; tn.resizeTextMinSize = 16; tn.resizeTextMaxSize = 26;
                     var tw = MakeText(card.transform, "Where", new Vector2(0.5f, 0f), new Vector2(0, 24), TextAnchor.LowerCenter, 20, OpDim); tw.text = (string.IsNullOrEmpty(d.nick) ? "" : d.nick + "\n") + "killed at " + d.killedAt + " · " + d.killedOn; tw.rectTransform.sizeDelta = new Vector2(300, 90);
+                    // the trophy's picture on the left, the words beside it
+                    var ps = string.IsNullOrEmpty(d.trophy) ? null : UiSprite("trophy_" + d.trophy.Replace(' ', '_'));
+                    if (ps != null)
+                    {
+                        var pic = MakeImage(card.transform, "Pic", new Vector2(0f, 0.5f), new Vector2(10f, 0f), new Vector2(124f, 124f), Color.white); pic.sprite = ps; pic.preserveAspect = true;
+                        foreach (var tx in new[] { tn, tw }) { var r = tx.rectTransform; var an = new Vector2(1f, r.anchorMin.y); r.anchorMin = r.anchorMax = r.pivot = an; r.anchoredPosition = new Vector2(-12f, r.anchoredPosition.y); r.sizeDelta = new Vector2(178f, r.sizeDelta.y); tx.alignment = tx == tn ? TextAnchor.UpperLeft : TextAnchor.LowerLeft; }
+                    }
                 }
                 y -= ((dead.Count + 2) / 3) * 215f;
             }

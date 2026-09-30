@@ -53,7 +53,37 @@ namespace IronNight
                 if (board8[i] != 2) continue;
                 var x2 = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(x2.GetComponent<Collider>()); x2.name = "Cross"; x2.transform.SetParent(print.transform, false);
                 x2.transform.localPosition = new Vector3(0f, 0.05f, -0.01f); x2.transform.localRotation = Quaternion.Euler(0f, 0f, tilt * -1.3f + 4f); x2.transform.localScale = new Vector3(1.05f, 0.84f, 1f); x2.GetComponent<Renderer>().sharedMaterial = cross;
+                HangTrophy(i, x, y, tilt);
             }
+        }
+
+        static readonly System.Collections.Generic.Dictionary<string, Material> trophyMats = new System.Collections.Generic.Dictionary<string, Material>(); static Material trophyShade;
+
+        /// <summary>A dead ace's trophy (Resources/UI/trophy_<kind>) hung by a corner over his print, a thin shadow of it on
+        /// the board: his binoculars, his cap, his turret's number. Nothing while its picture is not there.</summary>
+        void HangTrophy(int i, float x, float y, float tilt)
+        {
+            var ace = Nemesis.Dead.Find(a => a.name == Nemesis.Surnames[i]); if (ace == null || string.IsNullOrEmpty(ace.trophy)) return;
+            string key = "trophy_" + ace.trophy.Replace(' ', '_');
+            if (!trophyMats.TryGetValue(key, out var mat))
+            {
+                var tex = Resources.Load<Texture2D>("UI/" + key); mat = null;
+                if (tex != null) { mat = new Material(Resources.Load<Material>("FoliageCut")); mat.SetTexture("_BaseMap", tex); mat.SetFloat("_Smoothness", 0.3f); }
+                trophyMats[key] = mat;
+            }
+            if (mat == null) return;
+            var pic = mat.GetTexture("_BaseMap"); float w = 0.52f, h = w * pic.height / pic.width, turn = -tilt * 0.6f - 7f;
+            if (trophyShade == null) { trophyShade = new Material(Resources.Load<Material>("FoliageCut")); trophyShade.SetColor("_BaseColor", Color.black); }
+            var shade = Pinned(prints, new Vector3(x + 0.23f, y - 0.27f, -0.02f), turn, w, h, trophyShade);
+            var mpb = new MaterialPropertyBlock(); mpb.SetTexture("_BaseMap", pic); shade.GetComponent<Renderer>().SetPropertyBlock(mpb);
+            Pinned(prints, new Vector3(x + 0.2f, y - 0.24f, -0.035f), turn, w, h, mat).name = "Trophy " + ace.trophy;
+        }
+
+        static Transform Pinned(Transform parent, Vector3 at, float turn, float w, float h, Material m)
+        {
+            var q = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(q.GetComponent<Collider>()); q.transform.SetParent(parent, false);
+            q.transform.localPosition = at; q.transform.localRotation = Quaternion.Euler(0f, 0f, turn); q.transform.localScale = new Vector3(w, h, 1f); q.GetComponent<Renderer>().sharedMaterial = m;
+            return q.transform;
         }
 
         static void Block(Transform parent, Vector3 pos, Vector3 size, Material m)
