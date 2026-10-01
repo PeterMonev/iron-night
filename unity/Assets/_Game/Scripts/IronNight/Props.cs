@@ -578,7 +578,7 @@ namespace IronNight
                     foreach (var r in go.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = materials[p.kind.mesh]; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
                     // trodden earth under it: a soft dark patch a little wider than the footprint
                     for (int c = 0; c < p.radii.Length; c++) { var q = Quad(go.transform, new Vector3(p.circleCenters[c].x, 0f, p.circleCenters[c].y), 0f, p.radii[c] * 2.4f, p.radii[c] * 2.4f, patchMaterial, 0.06f); q.GetComponent<Renderer>().receiveShadows = false; }
-                    if (p.state == 1) go.transform.rotation = Fallen(p); else if (p.state == 2) go.transform.localScale = new Vector3(1f, 0.22f, 1f);
+                    if (p.state == 1) { go.transform.rotation = Fallen(p); TwoSided(p); } else if (p.state == 2) go.transform.localScale = new Vector3(1f, 0.22f, 1f);
                     else if (p.kind.mesh.StartsWith("bridge_")) go.transform.localScale = new Vector3(1f, BridgeFlat, 1f);
                     else if (p.kind.mesh == "trench") { go.transform.localScale = new Vector3(1f, TrenchFlat, 1f); go.transform.position = p.pos + Vector3.up * TrenchSink; }
                     p.go = go; break;
@@ -1003,8 +1003,33 @@ namespace IronNight
         {
             if (p.state != 0) return;
             p.state = 1; p.radii = new float[0]; p.circleCenters = new Vector2[0]; p.fallYaw = Mathf.Atan2(dir.x, dir.z);
-            if (p.go != null) falling.Add(new Falling { p = p, rot0 = p.go.transform.rotation, axis = Vector3.Cross(Vector3.up, FallDir(p)) });
+            if (p.go != null) { TwoSided(p); falling.Add(new Falling { p = p, rot0 = p.go.transform.rotation, axis = Vector3.Cross(Vector3.up, FallDir(p)) }); }
         }
+
+        /// <summary>A model tree lying down: its mesh made two-sided (each face also the other way round, normal flipped)
+        /// under a material that culls back faces, so whichever side of a leaf faces up is lit. Made once per model.</summary>
+        void TwoSided(Prop p)
+        {
+            if (p.what != What.Model || p.go == null) return;
+            foreach (var mf in p.go.GetComponentsInChildren<MeshFilter>())
+            {
+                var src = mf.sharedMesh; if (src == null || !src.isReadable) continue;
+                if (!twoSided.TryGetValue(src, out var both))
+                {
+                    var v = src.vertices; var n = src.normals; var uv = src.uv; var t = src.triangles; int c = v.Length;
+                    var v2 = new Vector3[c * 2]; var n2 = new Vector3[c * 2]; var uv2 = new Vector2[c * 2]; var t2 = new int[t.Length * 2];
+                    for (int i = 0; i < c; i++) { v2[i] = v2[i + c] = v[i]; if (n.Length == c) { n2[i] = n[i]; n2[i + c] = -n[i]; } if (uv.Length == c) uv2[i] = uv2[i + c] = uv[i]; }
+                    for (int i = 0; i < t.Length; i += 3) { t2[i] = t[i]; t2[i + 1] = t[i + 1]; t2[i + 2] = t[i + 2]; int j = t.Length + i; t2[j] = t[i] + c; t2[j + 1] = t[i + 2] + c; t2[j + 2] = t[i + 1] + c; }
+                    both = new Mesh { indexFormat = c * 2 > 65000 ? UnityEngine.Rendering.IndexFormat.UInt32 : UnityEngine.Rendering.IndexFormat.UInt16, name = src.name + " two-sided" };
+                    both.vertices = v2; both.normals = n2; both.uv = uv2; both.triangles = t2; both.RecalculateBounds(); both.UploadMeshData(true); twoSided[src] = both;
+                }
+                mf.sharedMesh = both;
+                var r = mf.GetComponent<Renderer>(); if (r == null) continue;
+                if (!backCulled.TryGetValue(r.sharedMaterial, out var m)) { m = new Material(r.sharedMaterial); m.SetFloat("_Cull", 2f); backCulled[r.sharedMaterial] = m; }
+                r.sharedMaterial = m;
+            }
+        }
+        readonly Dictionary<Mesh, Mesh> twoSided = new Dictionary<Mesh, Mesh>(); readonly Dictionary<Material, Material> backCulled = new Dictionary<Material, Material>();
 
         void Crush(Prop p, bool byShell)
         {

@@ -603,7 +603,7 @@ namespace IronNight
             if (v == Leader && wetStowage && !savedTonight && v.hp - dmg <= 0f) { savedTonight = true; v.hp = 1f; leaderShield = 2.5f; hud.Flash(); shake = Mathf.Max(shake, 0.9f); hud.Toast("The wet racks held · the leader is alive on one", 3.2f); Sfx.Ricochet(v.transform.position); if (Random.value < 0.7f) Radio("hit"); return; }
             if (!v.friendly && bonus == "heavy" && v.spec.hp >= 6f) dmg *= 1.5f;
             if (v == ace && nem != null && nem.studied) dmg *= 1.3f;   // his tactics studied
-            v.Hit(dmg); Sfx.Hit(v.transform.position);
+            v.Hit(dmg); if (v.hp > 0f) Sfx.Hit(v.transform.position);   // the killing hit is heard as the blast alone, not a clang
             if (v.friendly && v == Leader) { hud.Flash(); shake = Mathf.Max(shake, 0.8f); Buzz(); }
             if (v.hp > 0f) { if (v == Leader) { hud.Toast("Leader hit"); if (Random.value < 0.4f) Radio("hit"); if (hasSmoke && smokeCooldown <= 0f) PopSmoke(); } return; }
             tracks.Forget(v);

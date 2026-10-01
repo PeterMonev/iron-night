@@ -489,7 +489,7 @@ namespace IronNight
         }
         public static void Hit(Vector3 pos) { if (instance) instance.PlayAt(Any(instance.hits), pos, 0.7f, Random.Range(0.9f, 1.1f)); }
         public static void Ricochet(Vector3 pos) { if (instance) instance.PlayAt(instance.ricochet2 != null && Random.value < 0.4f ? instance.ricochet2 : instance.ricochet, pos, 0.85f, Random.Range(0.92f, 1.1f)); }
-        public static void Explosion(Vector3 pos) { if (instance) instance.PlayAt(Any(instance.blasts), pos, 0.75f, Random.Range(0.92f, 1.05f)); }
+        public static void Explosion(Vector3 pos) { if (instance) instance.PlayAt(Any(instance.blasts), pos, 1f, Random.Range(0.92f, 1.05f)); }
         /// <summary>An artillery shell landing: a shorter, harder blast than a vehicle going up.</summary>
         public static void Artillery(Vector3 pos) { if (instance) instance.PlayAt(Any(instance.shells), pos, 0.7f, Random.Range(0.95f, 1.1f)); }
         /// <summary>The breech after one of ours fires: a clank half a second later, from the tank.</summary>
