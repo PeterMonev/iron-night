@@ -377,6 +377,7 @@ namespace IronNight
             props.platoon = L.transform.position; props.Tick();
             flareLight.range = 34f + platoon.Count * 3f;
             Sfx.Engine(stick.Active ? stick.Direction.magnitude : 0f);
+            { Vehicle near = null; float nd = 50f; foreach (var e in foes) { if (e.dead || e.spec.isGun) continue; float d = Dist(e, L); if (d < nd) { nd = d; near = e; } } if (near != null) Sfx.EnemyEngine(near.transform.position, 1f - nd / 50f, Mathf.InverseLerp(10f, 40f, near.spec.hp)); else Sfx.EnemyEngine(L.transform.position, 0f, 0f); }   // the nearest enemy tank rumbling in
             PlaceCamera(false);
             hud.Set(t, platoon.Count); hud.SetLeader(Mathf.CeilToInt(L.hp), Mathf.CeilToInt(Depot.LeaderHp)); hud.SetTally(kills, score);
             hud.ReloadArc(L.transform.position + Vector3.up * 0.2f, L.reloadLeft <= 0f ? 1f : 1f - L.reloadLeft / Mathf.Max(0.1f, L.spec.reload * L.reloadMul), cam);

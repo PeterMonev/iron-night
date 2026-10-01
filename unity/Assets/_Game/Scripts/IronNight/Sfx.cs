@@ -14,7 +14,7 @@ namespace IronNight
         const int Rate = 44100;
         static Sfx instance;
         AudioClip shot, shotHeavy, shotFar, hit, explosion, artillery, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, front, whistle, rumble, ricochet, ricochet2, flak, reload, turretLoop, mg, faust, stuka, drone, crunch, brush, whoosh, fighter, shutter, crack, clatter;
-        readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, turret, ambient, frontLine, ui, weld, voice, diesel; float engineBase = 1f, dieselLevel; Transform listener; readonly Queue<AudioClip> voiceQueue = new Queue<AudioClip>();
+        readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, turret, ambient, frontLine, ui, weld, voice, diesel, idle, enemyEngine; AudioClip idleLoop, enemyLoop; float engineBase = 1f, dieselLevel; Transform listener; readonly Queue<AudioClip> voiceQueue = new Queue<AudioClip>();
 
         public static void Build(Camera cam)
         {
@@ -403,11 +403,14 @@ namespace IronNight
             mg = Load("mg", () => Gun(0f, 0.3f, false)); faust = Load("faust", () => Gun(0.2f, 0.8f, false));
             explosion = Load("explosion", MakeExplosion); artillery = Load("artillery", MakeExplosion); hit = Load("hit", ArmourHit); ricochet = Load("ricochet", MakeRicochet); ricochet2 = Resources.Load<AudioClip>("Audio/ricochet2");
             engineLoop = Load("engine", MakeEngine); tracksLoop = Load("tracks", Tracks);
+            idleLoop = Resources.Load<AudioClip>("Audio/engine_idle"); enemyLoop = Resources.Load<AudioClip>("Audio/engine_enemy");
             whistle = Load("whistle", MakeWhistle); stuka = Load("stuka", MakeStukaDive); drone = Load("drone", MakeDrone); crunch = Load("crunch", MakeCrunch); brush = Load("brush", MakeBrush); whoosh = Load("whoosh", MakeWhoosh); fighter = Load("fighter", MakeFighterPass); rumble = Load("shotFar", MakeRumble); wind = Load("wind", Wind); rain = Load("rain", Rain); front = Resources.Load<AudioClip>("Audio/front");
             pickup = Load("pickup", () => Radio(new[] { 880f, 1320f }, 0.12f)); levelUp = Load("levelUp", () => Radio(new[] { 523f, 659f, 784f }, 0.2f)); click = Load("click", MakeClick); shutter = Load("shutter", MakeShutter); crack = Clip("crack", MakeCrack()); clatter = Clip("clatter", MakeClatter());
 
             for (int i = 0; i < 12; i++) { var s = NewSource("Voice " + i); s.spatialBlend = 0.75f; s.rolloffMode = AudioRolloffMode.Linear; s.minDistance = 12f; s.maxDistance = 140f; pool.Add(s); }
             engine = NewSource("Engine"); engine.clip = engineLoop; engine.loop = true; engine.spatialBlend = 0f; engine.volume = 0f; engine.Play();
+            idle = NewSource("Idle"); idle.clip = idleLoop; idle.loop = true; idle.spatialBlend = 0f; idle.volume = 0f; if (idleLoop != null) idle.Play();
+            enemyEngine = NewSource("EnemyEngine"); enemyEngine.clip = enemyLoop; enemyEngine.loop = true; enemyEngine.spatialBlend = 0.6f; enemyEngine.volume = 0f; if (enemyLoop != null) enemyEngine.Play();
             tracks = NewSource("Tracks"); tracks.clip = tracksLoop; tracks.loop = true; tracks.spatialBlend = 0f; tracks.volume = 0f; tracks.Play();
             diesel = NewSource("Diesel"); diesel.clip = clatter; diesel.loop = true; diesel.spatialBlend = 0f; diesel.volume = 0f; diesel.Play();
             turret = NewSource("Turret"); turret.clip = turretLoop; turret.loop = true; turret.spatialBlend = 0f; turret.volume = 0f; if (turretLoop != null) turret.Play();
@@ -527,10 +530,25 @@ namespace IronNight
         /// <summary>The leader's engine and tracks: louder and higher when driving.</summary>
         public static void Engine(float throttle)
         {
-            if (!instance) return; var e = instance.engine; e.volume = Mathf.Lerp(e.volume, 0.12f + 0.3f * throttle, 0.1f); e.pitch = Mathf.Lerp(e.pitch, (0.85f + 0.45f * throttle) * instance.engineBase, 0.08f);
+            if (!instance) return; var e = instance.engine;
+            if (instance.idleLoop != null)
+            {
+                // two layers: the idle fades out as the drive comes in, so a tank at rest idles
+                var id = instance.idle; id.volume = Mathf.Lerp(id.volume, 0.24f * (1f - throttle) + 0.03f, 0.1f); id.pitch = Mathf.Lerp(id.pitch, (0.95f + 0.15f * throttle) * instance.engineBase, 0.08f);
+                e.volume = Mathf.Lerp(e.volume, 0.04f + 0.34f * throttle, 0.1f); e.pitch = Mathf.Lerp(e.pitch, (0.88f + 0.22f * throttle) * instance.engineBase, 0.08f);
+            }
+            else { e.volume = Mathf.Lerp(e.volume, 0.12f + 0.3f * throttle, 0.1f); e.pitch = Mathf.Lerp(e.pitch, (0.85f + 0.45f * throttle) * instance.engineBase, 0.08f); }
             var dz = instance.diesel; if (dz != null) { dz.volume = Mathf.Lerp(dz.volume, instance.dieselLevel * (0.05f + 0.13f * throttle), 0.1f); dz.pitch = Mathf.Lerp(dz.pitch, 0.9f + 0.35f * throttle, 0.08f); }
             var tr = instance.tracks; tr.volume = Mathf.Lerp(tr.volume, 0.16f * throttle, 0.15f); tr.pitch = Mathf.Lerp(tr.pitch, 0.8f + 0.4f * throttle, 0.1f);
         }
-        public static void Quiet(bool q) { if (instance) { if (instance.diesel != null) instance.diesel.mute = q; instance.engine.mute = q; instance.tracks.mute = q; instance.turret.mute = q; instance.ambient.mute = q; instance.frontLine.mute = q; } }
+        /// <summary>The nearest enemy tank's engine: where it is, as loud as it is near the leader (closeness 1 beside him,
+        /// 0 out of earshot); heavier tanks lower.</summary>
+        public static void EnemyEngine(Vector3 pos, float closeness, float heavy)
+        {
+            if (!instance || instance.enemyLoop == null) return; var s = instance.enemyEngine; s.transform.position = pos;
+            s.volume = Mathf.Lerp(s.volume, 0.32f * Mathf.Clamp01(closeness), 0.06f); s.pitch = Mathf.Lerp(s.pitch, 1.05f - 0.2f * Mathf.Clamp01(heavy), 0.05f);
+        }
+
+        public static void Quiet(bool q) { if (instance) { if (instance.idle != null) instance.idle.mute = q; if (instance.enemyEngine != null) instance.enemyEngine.mute = q; if (instance.diesel != null) instance.diesel.mute = q; instance.engine.mute = q; instance.tracks.mute = q; instance.turret.mute = q; instance.ambient.mute = q; instance.frontLine.mute = q; } }
     }
 }

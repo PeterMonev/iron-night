@@ -1,5 +1,9 @@
 # Sound sources
 
+The real recordings (engines, tracks, turret, guns, the fighter) come from the Sonniss GDC Game Audio Bundles 2018 and
+2019 (https://sonniss.com/gameaudiogdc/): royalty-free, commercial use in games, no attribution required, not to be
+used for AI/ML training; prepared by `art/pipeline/sonniss-prep.py`.
+
 Library recordings, prepared by `art/pipeline/sfx-prep.py` (mono 44.1 kHz, trimmed, normalised, loops cross-faded).
 Pixabay files are under the Pixabay Content License (free for commercial use, no attribution required; the
 `freesound_community` ones were CC0 on Freesound before Pixabay mirrored them). Mixkit files are under the Mixkit
@@ -7,9 +11,9 @@ Sound Effects Free License (free for commercial use). Neither may be redistribut
 
 | Clip | Source | Author |
 |---|---|---|
-| shot | Pixabay 352459 "Cannon Shot" | Universfield |
-| shotHeavy | Mixkit 1700 "Gun explosion with long echo" | Mixkit |
-| shotFar | Pixabay 39685 "Distant Explosion" | freesound_community |
+| shot | Sonniss GDC 2019, "Battlefield Howitzers": M101 105 mm, distant, "Pound, Thick" | Airborne Sound |
+| shotHeavy | Sonniss GDC 2019, "Battlefield Howitzers": M101 105 mm, medium distant, "Firm, Heavy" | Airborne Sound |
+| shotFar | Sonniss GDC 2019, "Battlefield Howitzers": M101 105 mm, distant, "Explode, Crack" | Airborne Sound |
 | flak | Pixabay 85147 "antiair" | freesound_community |
 | reload | Pixabay 47828 "Tank Reload" | freesound_community |
 | mg | Pixabay 43670 "Machine Gun Burst" | freesound_community |
@@ -20,9 +24,12 @@ Sound Effects Free License (free for commercial use). Neither may be redistribut
 | explosion | Pixabay 369789 "Big Explosion sfx" | kave_msri |
 | artillery | Pixabay 100420 "Large Explosion" | freesound_community |
 | whistle | Pixabay 104653 "Incoming mortar 1" | freesound_community |
-| engine | Pixabay 88503 "Driving Tank Engine" | freesound_community |
-| tracks | Pixabay 197409 "Tank Track Ratteling" | u_3rdmeaw7un |
-| turret | Pixabay 14879 "Tank Turret Rotate" | freesound_community |
+| engine | Sonniss GDC 2018, "Sherman M4A3 Medium Tank" t3, on board, medium drive | Pole Position Production |
+| engine_idle | Sonniss GDC 2018, "Chaffee M24 Light Tank" t6, on board, idle in neutral | Pole Position Production |
+| engine_enemy | Sonniss GDC 2019, "Panzer IV Ausf. G" t10, outside, idle | Pole Position Production |
+| tracks | Sonniss GDC 2018, "Sherman M4A3 Medium Tank" t4, microphone by the right track | Pole Position Production |
+| turret | Sonniss GDC 2018, "Chaffee M24 Light Tank" t7, hydraulic traverse | Pole Position Production |
+| fighter | Sonniss GDC 2018, "North American P-51D Mustang" t2, full power, made into a pass | Pole Position Production |
 | wind | Pixabay 17044 "Outdoors_Night_Windy_01" | freesound_community |
 | rain | Pixabay 350531 "Heavy Rain on Metal Roof" | eryliaa |
 | front | Pixabay 242655 "SFX - Distant War Zone Bombardment" | fronbondi_skegs |

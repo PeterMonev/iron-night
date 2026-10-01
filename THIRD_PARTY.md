@@ -38,6 +38,12 @@ All modified for the game: split into hull and turret, rescaled, textures resize
 
 Licence: https://creativecommons.org/licenses/by/4.0/
 
+## Sound recordings (Sonniss GDC Game Audio Bundles 2018 and 2019)
+The tank engines, tracks, turret, the guns and the fighter's pass are cut from real recordings in the free Sonniss GDC
+Game Audio Bundles (https://sonniss.com/gameaudiogdc/): Pole Position Production (Sherman M4A3, Chaffee M24, Panzer IV
+Ausf. G, P-51D Mustang) and Airborne Sound (Battlefield Howitzers). Royalty-free and commercially usable in games, no
+attribution required; the sounds may not be used for AI/ML training. List per clip: unity/Assets/_Game/Resources/Audio/SOURCES.md.
+
 ## Fonts (SIL Open Font License 1.1)
 | Font | Author | Use |
 |---|---|---|
