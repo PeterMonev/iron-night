@@ -1,0 +1,3 @@
+newmtl barbed_wire
+Kd 1 1 1
+map_Kd barbed_wire_tex.png

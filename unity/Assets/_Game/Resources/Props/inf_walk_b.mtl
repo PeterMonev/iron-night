@@ -1,0 +1,3 @@
+newmtl inf_walk_b
+Kd 1 1 1
+map_Kd inf_walk_b_tex.png

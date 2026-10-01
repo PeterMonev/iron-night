@@ -1,0 +1,3 @@
+newmtl house_ruin
+Kd 1 1 1
+map_Kd house_ruin_tex.png

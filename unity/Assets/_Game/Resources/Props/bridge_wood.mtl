@@ -1,0 +1,3 @@
+newmtl bridge_wood
+Kd 1 1 1
+map_Kd bridge_wood_tex.png

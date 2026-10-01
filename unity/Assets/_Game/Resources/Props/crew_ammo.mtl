@@ -1,0 +1,3 @@
+newmtl crew_ammo
+Kd 1 1 1
+map_Kd crew_ammo_tex.png

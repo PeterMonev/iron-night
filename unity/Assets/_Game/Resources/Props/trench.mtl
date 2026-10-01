@@ -1,0 +1,3 @@
+newmtl trench
+Kd 1 1 1
+map_Kd trench_tex.png

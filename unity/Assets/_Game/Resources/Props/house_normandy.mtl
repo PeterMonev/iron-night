@@ -1,0 +1,3 @@
+newmtl house_normandy
+Kd 1 1 1
+map_Kd house_normandy_tex.png

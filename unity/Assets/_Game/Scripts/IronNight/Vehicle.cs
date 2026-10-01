@@ -15,6 +15,7 @@ namespace IronNight
         public float speedMul = 1f, damageMul = 1f, rangeMul = 1f, reloadMul = 1f, turretMul = 1f;
         public float bog = 1f;   // speed kept after going through something or over rubble; the battle lets it recover
         public bool dead;
+        public int crew = -1;   // a gun's crewmen left alive (Infantry.ManGun); -1 when it has no crew figures, 0 when they are all dead and it is silent
         public Vehicle target;
 
         Transform turret; Renderer[] renderers; Color[] baseColors; Transform muzzle, hullT, barrelT; Vector3 barrelHome; float hullYaw, recoil;

@@ -1,0 +1,3 @@
+newmtl tree_apple
+Kd 1 1 1
+map_Kd tree_apple_tex.png

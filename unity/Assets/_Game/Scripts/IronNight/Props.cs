@@ -13,7 +13,7 @@ namespace IronNight
     public class Props : MonoBehaviour
     {
         class Kind { public string mesh; public float length, height; public float[] circles; }
-        enum What { Model, Lane, Hedge, Tree, Decal, Searchlight, Fire }
+        enum What { Model, Lane, Hedge, Tree, Decal, Searchlight, Fire, Stream }
         class Prop
         {
             public What what; public Kind kind; public Vector3 pos; public float yaw, size, bound = 8f, height = -1f; public int seed;
@@ -21,6 +21,7 @@ namespace IronNight
             public Vector3 a, b; public float[] gaps; public float clearA, clearB;              // hedges: the line and its openings
             public GameObject go; public Mesh mesh, leaves; public float az, el = 42f; public LightShaft shaft; public Transform yoke, drum, lamp; public float flakTimer = 4f; public int burst; public Light glow;
             public int state; public float hp = -1f, fallYaw, burn; public bool drivable;   // 0 standing, 1 knocked over, 2 crushed, 3 ruined; a ruin is driven over
+            public bool manned;   // trenches and nests: their garrison has been put in (or never will be: the player's own sandbags)
             public List<Vector3> trodden;   // hedges: where hulls went through, as (along the line, half the width pressed flat, the side it lies to)
         }
 
@@ -50,6 +51,20 @@ namespace IronNight
             new Kind { mesh = "wreck", length = 6f, height = 2.2f, circles = new[] { -1.6f, 0f, 1.7f, 1.6f, 0f, 1.7f } },
             new Kind { mesh = "marker_smoke", length = 0.5f, height = -1f, circles = new float[0] },
             new Kind { mesh = "hedge", length = 8f, height = -1f, circles = new float[0] },   // placed by the hedge lines, which carry the collision
+            // the fifth batch: houses, a landmark, the field works and the water
+            new Kind { mesh = "house_normandy", length = 11f, height = 8f, circles = new[] { -2.8f, 0f, 3.2f, 2.8f, 0f, 3.2f } },
+            new Kind { mesh = "house_ruin", length = 11f, height = 7f, circles = new[] { -2.8f, 0f, 3.2f, 2.8f, 0f, 3.2f } },
+            new Kind { mesh = "izba", length = 10f, height = 6f, circles = new[] { -2.6f, 0f, 3.2f, 2.6f, 0f, 3.2f } },
+            new Kind { mesh = "windmill", length = 6f, height = 13f, circles = new[] { 0f, 0f, 2.6f } },
+            new Kind { mesh = "well_b", length = 2.6f, height = 3f, circles = new[] { 0f, 0f, 1.3f } },
+            new Kind { mesh = "truck_burnt", length = 6.5f, height = 2.6f, circles = new[] { -1.7f, 0f, 1.4f, 1.7f, 0f, 1.4f } },
+            new Kind { mesh = "barbed_wire", length = 6f, height = -1f, circles = new[] { 0f, 0f, 0.8f } },   // a hull flattens it
+            new Kind { mesh = "trench", length = 8f, height = -1f, circles = new float[0] },                   // dug in: driven across
+            new Kind { mesh = "bridge_stone", length = 16f, height = -1f, circles = new float[0] },
+            new Kind { mesh = "bridge_wood", length = 14f, height = -1f, circles = new float[0] },
+            new Kind { mesh = "tree_apple", length = 6f, height = -1f, circles = new[] { 0f, 0f, 0.5f } },
+            new Kind { mesh = "tree_birch", length = 5f, height = -1f, circles = new[] { 0f, 0f, 0.4f } },
+            new Kind { mesh = "tree_poplar_b", length = 4f, height = -1f, circles = new[] { 0f, 0f, 0.45f } },
             // Kursk: stand-ins for the Normandy models, and the steppe's own
             new Kind { mesh = "k_izba", length = 9f, height = 6f, circles = new[] { -2.4f, 0f, 3.2f, 2.4f, 0f, 3.2f } },
             new Kind { mesh = "k_khata", length = 9f, height = 5.5f, circles = new[] { -2.4f, 0f, 3.2f, 2.4f, 0f, 3.2f } },
@@ -96,8 +111,9 @@ namespace IronNight
                 prefabs[k.mesh] = pf;
                 var m = new Material(lit); m.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + k.mesh + "_tex")); m.SetColor("_BaseColor", Tint(k.mesh)); m.SetFloat("_Smoothness", 0.15f); m.SetFloat("_Cull", 0f);
                 materials[k.mesh] = m;
-                var rp = Resources.Load<GameObject>("Props/" + k.mesh + "_ruin");   // what it looks like knocked down, when there is a model of that
-                if (rp != null) { prefabs[k.mesh + "_ruin"] = rp; var rm = new Material(lit); rm.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + k.mesh + "_ruin_tex")); rm.SetColor("_BaseColor", Tint(k.mesh)); rm.SetFloat("_Smoothness", 0.15f); rm.SetFloat("_Cull", 0f); materials[k.mesh + "_ruin"] = rm; }
+                string ruinOf = k.mesh == "house_normandy" ? "house_ruin" : k.mesh + "_ruin";   // the Normandy house shelled is the ruined one
+                var rp = Resources.Load<GameObject>("Props/" + ruinOf);   // what it looks like knocked down, when there is a model of that
+                if (rp != null) { prefabs[k.mesh + "_ruin"] = rp; var rm = new Material(lit); rm.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + ruinOf + "_tex")); rm.SetColor("_BaseColor", Tint(k.mesh)); rm.SetFloat("_Smoothness", 0.15f); rm.SetFloat("_Cull", 0f); materials[k.mesh + "_ruin"] = rm; }
             }
             BuildGround();
             Material Decal(string tex, int queue) { var m = new Material(decal); m.SetTexture("_BaseMap", Resources.Load<Texture2D>("Textures/" + tex)); m.SetTexture("_BumpMap", Resources.Load<Texture2D>("Textures/" + tex + "_n")); m.SetColor("_BaseColor", new Color(0.95f, 0.95f, 0.95f)); m.renderQueue = queue; return m; }
@@ -113,6 +129,8 @@ namespace IronNight
             // the blobs under the leaves go dark: they are the shadowed inside of the bush
             hedgeMaterial.SetColor("_BaseColor", winter ? new Color(0.72f, 0.78f, 0.82f) : new Color(0.55f, 0.62f, 0.5f)); canopyMaterial.SetColor("_BaseColor", winter ? new Color(0.72f, 0.78f, 0.82f) : new Color(0.52f, 0.6f, 0.48f));
             lampTemplate = LampTemplate();
+            waterMaterial = new Material(lit); waterMaterial.SetColor("_BaseColor", winter ? new Color(0.5f, 0.55f, 0.6f) : new Color(0.05f, 0.07f, 0.08f)); waterMaterial.SetFloat("_Smoothness", winter ? 0.8f : 0.94f); waterMaterial.SetFloat("_Metallic", 0f);   // still dark water with the moon in it; ice in the Ardennes
+            bankMaterial = new Material(laneMaterial); bankMaterial.SetTextureScale("_BaseMap", new Vector2(1f, 1f)); bankMaterial.renderQueue = 2441;
             { string hm = Kursk ? "k_wattle" : "hedge"; if (prefabs.ContainsKey(hm) && PlayerPrefs.GetInt("quality", 1) != 0) Slices(hm, out _); }   // the hedge cut into its slices now, while the night loads
         }
 
@@ -138,11 +156,22 @@ namespace IronNight
         static bool Battery(int ix, int iz) => (ix == -1 && iz == 0) || (!Start(ix, iz) && !Farm(ix, iz) && Rnd(ix, iz, 940) < (SneakNight ? 0.32f : 0.16f));
         static bool Village(int ix, int iz) => (ix == 0 && iz == 3) || (!Start(ix, iz) && !Farm(ix, iz) && !Battery(ix, iz) && Rnd(ix, iz, 1100) < VillageChance);
         static bool HedgeX(int ix, int iz) { if (LaneX(ix)) return false; if (Farm(ix, iz) || Farm(ix + 1, iz)) return true; return Rnd(ix, iz, 920) < Mathf.Min(0.97f, (FieldType(ix, iz) != FieldType(ix + 1, iz) ? 0.85f : 0.3f) * HedgeBias); }
-        static bool HedgeZ(int ix, int iz) { if (LaneZ(iz)) return false; if (Farm(ix, iz) || Farm(ix, iz + 1)) return true; return Rnd(ix, iz, 921) < Mathf.Min(0.97f, (FieldType(ix, iz) != FieldType(ix, iz + 1) ? 0.85f : 0.3f) * HedgeBias); }
+        static bool HedgeZ(int ix, int iz) { if (LaneZ(iz) || StreamZ(iz)) return false; if (Farm(ix, iz) || Farm(ix, iz + 1)) return true; return Rnd(ix, iz, 921) < Mathf.Min(0.97f, (FieldType(ix, iz) != FieldType(ix, iz + 1) ? 0.85f : 0.3f) * HedgeBias); }
+        // a stream now and then along a line z = iz*40+20 where no lane runs, winding a few metres either side of it
+        static bool StreamZ(int iz) => iz != 0 && iz != -1 && !LaneZ(iz) && Hash(3, iz, 950) % 6 == 0;
+        static float StreamAt(int iz, float x) => iz * Cell + Half + Mathf.Sin(x * 0.045f + iz) * 5f + Mathf.Sin(x * 0.11f + iz * 2.3f) * 2f;
+        const float StreamHalf = 3.5f;
+        /// <summary>True within the water (and the margin round it) of a stream.</summary>
+        static bool InStream(Vector3 pos, float margin)
+        {
+            int iz = Mathf.RoundToInt((pos.z - Half) / Cell);
+            for (int k = iz - 1; k <= iz + 1; k++) if (StreamZ(k) && Mathf.Abs(pos.z - StreamAt(k, pos.x)) < StreamHalf + margin) return true;
+            return false;
+        }
         static Vector3 In(int ix, int iz, int salt, float r) => new Vector3((Rnd(ix, iz, salt) - 0.5f) * 2f * r, 0f, (Rnd(ix, iz, salt + 1) - 0.5f) * 2f * r);
 
         // the generated textures come out at different brightnesses; this evens them under the moon
-        static Color Tint(string mesh) { switch (mesh) { case "tree_poplar": case "tree_oak": case "spruce_snow": case "hedge": return new Color(0.42f, 0.5f, 0.4f); case "deadtree": return new Color(0.78f, 0.72f, 0.66f); case "haystack": return new Color(0.82f, 0.76f, 0.6f); case "k_birches": return new Color(0.58f, 0.64f, 0.54f); case "k_sunflowers": return new Color(0.7f, 0.68f, 0.56f); case "k_sheaves": return new Color(0.8f, 0.74f, 0.6f); case "sandbags": return new Color(0.78f, 0.74f, 0.66f); default: return new Color(0.8f, 0.78f, 0.74f); } }
+        static Color Tint(string mesh) { switch (mesh) { case "tree_poplar": case "tree_poplar_b": case "tree_apple": case "tree_birch": case "tree_oak": case "spruce_snow": case "hedge": return new Color(0.42f, 0.5f, 0.4f); case "deadtree": return new Color(0.78f, 0.72f, 0.66f); case "haystack": return new Color(0.82f, 0.76f, 0.6f); case "k_birches": return new Color(0.58f, 0.64f, 0.54f); case "k_sunflowers": return new Color(0.7f, 0.68f, 0.56f); case "k_sheaves": return new Color(0.8f, 0.74f, 0.6f); case "sandbags": return new Color(0.78f, 0.74f, 0.66f); default: return new Color(0.8f, 0.78f, 0.74f); } }
 
         Kind K(string mesh) { foreach (var k in Kinds) if (k.mesh == mesh) return k; return null; }
 
@@ -154,15 +183,17 @@ namespace IronNight
             {
                 case "farmhouse": return "k_izba"; case "cottage": return "k_khata"; case "church": return "k_church"; case "well": return "k_well";
                 case "wall_a": case "wall_b": return "k_wattle"; case "gate": return null;
-                case "tree_oak": case "tree_poplar": return "k_birches"; case "haystack": return "k_sheaves";
+                case "tree_oak": case "tree_poplar": case "tree_poplar_b": case "tree_apple": return "k_birches"; case "haystack": return "k_sheaves";
+                case "house_normandy": return "izba"; case "well_b": return "k_well";
                 default: return mesh;
             }
         }
 
-        Prop Place(List<Prop> list, string mesh, Vector3 pos, float yaw)
+        Prop Place(List<Prop> list, string mesh, Vector3 pos, float yaw, bool water = false)
         {
             mesh = Local(mesh); if (mesh == null) return null;
             var kind = K(mesh); if (kind == null || !prefabs.ContainsKey(mesh)) return null;
+            if (!water && InStream(pos, kind.length * 0.35f)) return null;   // nothing stands in a stream but its bridge
             foreach (var o in list) if (o.what == What.Model && (o.pos - pos).sqrMagnitude < 5f * 5f) return null;
             var p = new Prop { what = What.Model, kind = kind, pos = pos, yaw = yaw, height = kind.height, bound = kind.length };
             int n = kind.circles.Length / 3; p.circleCenters = new Vector2[n]; p.radii = new float[n];
@@ -177,11 +208,32 @@ namespace IronNight
         {
             var kind = K(mesh); if (kind == null || !prefabs.ContainsKey(mesh)) return;
             var list = CellProps(Mathf.RoundToInt(pos.x / Cell), Mathf.RoundToInt(pos.z / Cell));
-            var p = new Prop { what = What.Model, kind = kind, pos = pos, yaw = yaw, height = kind.height, bound = kind.length };
+            var p = new Prop { what = What.Model, kind = kind, pos = pos, yaw = yaw, height = kind.height, bound = kind.length, manned = true };
             int n = kind.circles.Length / 3; p.circleCenters = new Vector2[n]; p.radii = new float[n];
             var f = new Vector2(Mathf.Sin(yaw), Mathf.Cos(yaw)); var r = new Vector2(f.y, -f.x);
             for (int c = 0; c < n; c++) { p.circleCenters[c] = new Vector2(pos.x, pos.z) + f * kind.circles[c * 3] + r * kind.circles[c * 3 + 1]; p.radii[c] = kind.circles[c * 3 + 2]; }
             list.Add(p);
+        }
+
+        /// <summary>The field works between two distances that have no garrison yet, as the spots to put men in: two in
+        /// a length of trench, three in a sandbag nest, three round the outside of a searchlight's ring. Every searchlight
+        /// post and three in four of the rest are manned; each is asked once, so the dead are not replaced.</summary>
+        public List<(Vector3 pos, bool trench)> Unmanned(Vector3 from, float min, float max)
+        {
+            var spots = new List<(Vector3, bool)>();
+            foreach (var p in active)
+            {
+                if (p.what != What.Model || p.manned || p.state != 0 || (p.kind.mesh != "trench" && p.kind.mesh != "sandbags")) continue;
+                var d = p.pos - from; d.y = 0f; float len = d.magnitude; if (len < min || len > max) continue;
+                p.manned = true;
+                bool lamp = false; foreach (var q in active) if (q.what == What.Searchlight && (q.pos - p.pos).sqrMagnitude < 4f) { lamp = true; break; }
+                if (!lamp && Rnd(Mathf.RoundToInt(p.pos.x), Mathf.RoundToInt(p.pos.z), 1300) > 0.75f) continue;
+                var f = new Vector3(Mathf.Sin(p.yaw), 0f, Mathf.Cos(p.yaw)); var r = new Vector3(f.z, 0f, -f.x);
+                if (lamp) { foreach (float a in new[] { 90f, 210f, 330f }) spots.Add((p.pos + Quaternion.Euler(0f, a, 0f) * f * 4.3f, false)); continue; }   // the lamp fills its ring: its guard stands round the outside
+                if (p.kind.mesh == "trench") { spots.Add((p.pos - f * 2.2f, true)); spots.Add((p.pos + f * 2.2f, true)); }
+                else { spots.Add((p.pos + r * 0.9f, false)); spots.Add((p.pos - r * 0.9f, false)); spots.Add((p.pos + f * 0.9f, false)); }
+            }
+            return spots;
         }
 
         /// <summary>A hedgerow tree: the blob crown, cheap enough for a dozen a screen; the generated oak is for the few that stand alone.</summary>
@@ -195,6 +247,7 @@ namespace IronNight
         void Tree(List<Prop> list, Vector3 pos, int seed)
         {
             if (winter) { if (Place(list, seed % 3 == 0 ? "deadtree" : "spruce_snow", pos, (seed % 360) * Mathf.Deg2Rad) == null) Place(list, "deadtree", pos, (seed % 360) * Mathf.Deg2Rad); return; }   // firs and bare trees in the snow
+            if (Kursk && seed % 2 == 0 && Place(list, "tree_birch", pos, (seed % 360) * Mathf.Deg2Rad) != null) return;
             if (Place(list, "tree_oak", pos, (seed % 360) * Mathf.Deg2Rad) != null) return;
             list.Add(new Prop { what = What.Tree, pos = pos, seed = seed, yaw = (seed % 360) * Mathf.Deg2Rad, bound = 5f, circleCenters = new[] { new Vector2(pos.x, pos.z) }, radii = new[] { 0.8f } });
         }
@@ -253,7 +306,9 @@ namespace IronNight
             float yaw = (Rnd(ix, iz, 982) < 0.5f ? 0f : Mathf.PI / 2f) + (Rnd(ix, iz, 983) - 0.5f) * 0.2f;
             var f = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)); var r = new Vector3(f.z, 0f, -f.x);
             list.Add(new Prop { what = What.Decal, pos = o, yaw = yaw, size = 30f, seed = 0 });
-            Place(list, Rnd(ix, iz, 1110) < 0.35f ? "cottage" : "farmhouse", o - r * 7f, yaw);
+            float house = Rnd(ix, iz, 1110); Place(list, house < 0.3f ? "cottage" : house < 0.6f ? "house_normandy" : "farmhouse", o - r * 7f, yaw);
+            if (!winter && !Kursk && PlayerPrefs.GetInt("quality", 1) != 0 && Rnd(ix, iz, 1115) < 0.6f)   // the apple orchard: two rows of two past the house (each tree is some 44 000 triangles)
+                for (int row = 0; row < 2; row++) for (int k = 0; k < 2; k++) Place(list, "tree_apple", o - r * (14f + row * 5.5f) + f * (-5f + k * 7f + row * 3f) + In(ix, iz, 1116 + row * 8 + k * 2, 0.8f), Rnd(ix, iz, 1135 + row * 4 + k) * 6.28f);
             // a low wall closes the south side of the yard, with a gap for the gate
             Place(list, Rnd(ix, iz, 1111) < 0.5f ? "wall_a" : "wall_b", o - f * 13f - r * 4f, yaw + Mathf.PI / 2f); Place(list, Rnd(ix, iz, 1112) < 0.5f ? "wall_a" : "wall_b", o - f * 13f + r * 10f, yaw + Mathf.PI / 2f);
             if (Rnd(ix, iz, 1113) < 0.6f) Place(list, "cart", o + r * 4f - f * 4f, yaw + Rnd(ix, iz, 1114) * 6.28f);
@@ -273,11 +328,11 @@ namespace IronNight
             var f = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)); var r = new Vector3(f.z, 0f, -f.x);
             list.Add(new Prop { what = What.Decal, pos = o, yaw = yaw, size = 34f, seed = 0 });
             Place(list, "church", o + f * 4f, yaw);
-            Place(list, "cottage", o - r * 16f - f * 6f, yaw + Mathf.PI / 2f);
-            Place(list, "cottage", o + r * 16f - f * 2f, yaw - Mathf.PI / 2f);
+            Place(list, Rnd(ix, iz, 1129) < 0.5f ? "house_normandy" : "cottage", o - r * 16f - f * 6f, yaw + Mathf.PI / 2f);
+            Place(list, Rnd(ix, iz, 1130) < 0.45f ? "house_ruin" : "cottage", o + r * 16f - f * 2f, yaw - Mathf.PI / 2f);
             Place(list, Rnd(ix, iz, 1124) < 0.5f ? "wall_a" : "wall_b", o - f * 14f - r * 6f, yaw + Mathf.PI / 2f); Place(list, Rnd(ix, iz, 1125) < 0.5f ? "wall_a" : "wall_b", o - f * 14f + r * 8f, yaw + Mathf.PI / 2f);
             Place(list, "cart", o - r * 6f - f * 8f, yaw + Rnd(ix, iz, 1126) * 6.28f);
-            Place(list, "well", o - r * 4f - f * 12f, yaw);
+            Place(list, Rnd(ix, iz, 1131) < 0.5f ? "well_b" : "well", o - r * 4f - f * 12f, yaw);
             if (Rnd(ix, iz, 1127) < 0.6f) Place(list, "truck", o + r * 9f - f * 11f, yaw + 0.4f);
             Tree(list, o + r * 9f + f * 12f, (int)(Hash(ix, iz, 1128) & 0xffff));
         }
@@ -317,6 +372,21 @@ namespace IronNight
             for (int k = 0; k < craters; k++) list.Add(new Prop { what = What.Decal, seed = 1, pos = c + In(ix, iz, 1054 + k * 2, 16f), yaw = Rnd(ix, iz, 1060 + k) * 6.28f, size = 4f + Rnd(ix, iz, 1064 + k) * 3f });
             if (Rnd(ix, iz, 1070) < 0.05f) Place(list, "sandbags", c + In(ix, iz, 1071, 12f), Rnd(ix, iz, 1073) * 6.28f);
             if (Rnd(ix, iz, 1074) < 0.04f) Place(list, "wreck", c + In(ix, iz, 1075, 12f), Rnd(ix, iz, 1077) * 6.28f);
+            if (Rnd(ix, iz, 1240) < (Kursk ? 0.14f : Route == "open" ? 0.08f : 0.05f)) TrenchLine(list, ix, iz, c);
+            else if (Rnd(ix, iz, 1250) < (Route == "open" ? 0.05f : 0.025f)) Place(list, "windmill", c + In(ix, iz, 1251, 9f), Rnd(ix, iz, 1253) * 6.28f);
+            if (Rnd(ix, iz, 1254) < 0.04f) Place(list, "house_ruin", c + In(ix, iz, 1255, 11f), Rnd(ix, iz, 1257) < 0.5f ? 0f : Mathf.PI / 2f);
+            if (Rnd(ix, iz, 1258) < 0.06f) Place(list, "truck_burnt", c + In(ix, iz, 1259, 13f), Rnd(ix, iz, 1261) * 6.28f);
+        }
+
+        /// <summary>A dug-in line across the field: four lengths of trench zigzagging, wire on stakes seven metres out in
+        /// front, a sandbagged nest at one end where an anti-tank gun may wait.</summary>
+        void TrenchLine(List<Prop> list, int ix, int iz, Vector3 c)
+        {
+            float yaw = Rnd(ix, iz, 1241) * Mathf.PI; var f = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)); var r = new Vector3(f.z, 0f, -f.x);
+            var o = c + In(ix, iz, 1242, 4f);
+            for (int k = 0; k < 4; k++) Place(list, "trench", o + f * (-12f + k * 8f) + r * (k % 2 == 0 ? 0f : 1.6f), yaw + (k % 2 == 0 ? 0.18f : -0.18f));
+            for (int k = 0; k < 3; k++) Place(list, "barbed_wire", o + f * (-9f + k * 7f) + r * 7f, yaw + (Rnd(ix, iz, 1244 + k) - 0.5f) * 0.3f);
+            Place(list, "sandbags", o + f * (Rnd(ix, iz, 1248) < 0.5f ? 19f : -19f) - r * 1.5f, yaw);
         }
 
         List<Prop> CellProps(int ix, int iz)
@@ -327,10 +397,16 @@ namespace IronNight
             if (LaneX(ix)) { list.Add(new Prop { what = What.Lane, pos = c + new Vector3(Half, 0f, 0f), yaw = 0f, size = Cell }); foreach (var u in new[] { -12f, 8f }) Place(list, "pole", c + new Vector3(Half + 3.6f, 0f, u), 0f); }
             if (LaneZ(iz)) { list.Add(new Prop { what = What.Lane, pos = c + new Vector3(0f, 0f, Half), yaw = Mathf.PI / 2f, size = Cell }); foreach (var u in new[] { -12f, 8f }) Place(list, "pole", c + new Vector3(u, 0f, Half + 3.6f), Mathf.PI / 2f); }
             // a row of poplars on the other side of every third lane; a signpost where two lanes cross
-            if (LaneX(ix) && !winter && Rnd(ix, iz, 1140) < 0.35f) foreach (var u in new[] { -16f, -4f, 8f }) Place(list, "tree_poplar", c + new Vector3(Half - 4.2f, 0f, u + Rnd(ix, iz, 1141 + (int)u) * 2f), Rnd(ix, iz, 1150 + (int)u) * 6.28f);
-            if (LaneZ(iz) && !winter && Rnd(ix, iz, 1142) < 0.35f) foreach (var u in new[] { -16f, -4f, 8f }) Place(list, "tree_poplar", c + new Vector3(u + Rnd(ix, iz, 1143 + (int)u) * 2f, 0f, Half - 4.2f), Rnd(ix, iz, 1160 + (int)u) * 6.28f);
+            if (LaneX(ix) && !winter && Rnd(ix, iz, 1140) < 0.35f) foreach (var u in new[] { -16f, -4f, 8f }) Place(list, Rnd(ix, iz, 1170 + (int)u) < 0.5f ? "tree_poplar_b" : "tree_poplar", c + new Vector3(Half - 4.2f, 0f, u + Rnd(ix, iz, 1141 + (int)u) * 2f), Rnd(ix, iz, 1150 + (int)u) * 6.28f);
+            if (LaneZ(iz) && !winter && Rnd(ix, iz, 1142) < 0.35f) foreach (var u in new[] { -16f, -4f, 8f }) Place(list, Rnd(ix, iz, 1180 + (int)u) < 0.5f ? "tree_poplar_b" : "tree_poplar", c + new Vector3(u + Rnd(ix, iz, 1143 + (int)u) * 2f, 0f, Half - 4.2f), Rnd(ix, iz, 1160 + (int)u) * 6.28f);
             if (LaneX(ix) && LaneZ(iz)) Place(list, "signpost", c + new Vector3(Half + 4.5f, 0f, Half + 4.5f), Rnd(ix, iz, 1144) * 6.28f);
-            if (HedgeX(ix, iz)) Hedge(list, c + new Vector3(Half, 0f, -Half), c + new Vector3(Half, 0f, Half), LaneZ(iz - 1) ? 4f : 0f, LaneZ(iz) ? 4f : 0f, ix, iz, 0);
+            if (HedgeX(ix, iz)) Hedge(list, c + new Vector3(Half, 0f, -Half), c + new Vector3(Half, 0f, Half), StreamZ(iz - 1) ? 11f : LaneZ(iz - 1) ? 4f : 0f, StreamZ(iz) ? 11f : LaneZ(iz) ? 4f : 0f, ix, iz, 0);
+            if (StreamZ(iz))
+            {
+                list.Add(new Prop { what = What.Stream, pos = c + new Vector3(0f, 0f, Half), seed = iz, bound = Half + 8f });
+                // a bridge where a lane crosses it: stone in the west, timber on the steppe or now and then a sapper's one
+                if (LaneX(ix)) { float bx = c.x + Half, bz = StreamAt(iz, bx); var b = Place(list, Kursk || Rnd(ix, iz, 951) < 0.3f ? "bridge_wood" : "bridge_stone", new Vector3(bx, 0f, bz), 0f, true); if (b != null) { b.drivable = true; bridges.Add(b); } }
+            }
             if (HedgeZ(ix, iz)) Hedge(list, c + new Vector3(-Half, 0f, Half), c + new Vector3(Half, 0f, Half), LaneX(ix - 1) ? 4f : 0f, LaneX(ix) ? 4f : 0f, ix, iz, 1);
             if (Farm(ix, iz)) FarmYard(list, ix, iz, c);
             else if (Battery(ix, iz)) SearchlightPost(list, ix, iz, c);
@@ -471,6 +547,7 @@ namespace IronNight
                 case What.Hedge: SpawnHedge(p); break;
                 case What.Tree: SpawnTree(p); if (p.state == 1 && p.go != null) p.go.transform.rotation = Fallen(p); break;
                 case What.Searchlight: SpawnSearchlight(p); break;
+                case What.Stream: SpawnStream(p); break;
                 case What.Fire:
                 {
                     var go = new GameObject("FieldFire"); go.transform.SetParent(transform, false); go.transform.position = p.pos;
@@ -488,6 +565,8 @@ namespace IronNight
                     // trodden earth under it: a soft dark patch a little wider than the footprint
                     for (int c = 0; c < p.radii.Length; c++) { var q = Quad(go.transform, new Vector3(p.circleCenters[c].x, 0f, p.circleCenters[c].y), 0f, p.radii[c] * 2.4f, p.radii[c] * 2.4f, patchMaterial, 0.06f); q.GetComponent<Renderer>().receiveShadows = false; }
                     if (p.state == 1) go.transform.rotation = Fallen(p); else if (p.state == 2) go.transform.localScale = new Vector3(1f, 0.22f, 1f);
+                    else if (p.kind.mesh.StartsWith("bridge_")) go.transform.localScale = new Vector3(1f, BridgeFlat, 1f);
+                    else if (p.kind.mesh == "trench") { go.transform.localScale = new Vector3(1f, TrenchFlat, 1f); go.transform.position = p.pos + Vector3.up * TrenchSink; }
                     p.go = go; break;
                 }
             }
@@ -784,15 +863,18 @@ namespace IronNight
             if (p.what != What.Model) return 0;
             switch (p.kind.mesh)
             {
-                case "tree_oak": case "tree_poplar": case "deadtree": case "spruce_snow": case "k_birches": case "pole": case "signpost": return 1;
+                case "tree_oak": case "tree_poplar": case "tree_poplar_b": case "tree_apple": case "tree_birch": case "deadtree": case "spruce_snow": case "k_birches": case "pole": case "signpost": return 1;
+                case "barbed_wire": return 2;
+                case "house_normandy": case "house_ruin": case "izba": case "windmill": return 3;
+                case "well_b": return 4;
                 case "k_wattle": case "cart": case "barrels": case "haystack": case "k_sheaves": case "gate": case "k_well": case "k_sunflowers": return 2;
                 case "farmhouse": case "cottage": case "barn": case "church": case "k_khata": case "k_izba": case "k_church": case "bunker": case "truck": return 3;
                 case "wall_a": case "wall_b": case "sandbags": case "well": return 4;
                 default: return 0;
             }
         }
-        static float MaxHp(string mesh) { switch (mesh) { case "church": return 12f; case "k_church": return 9f; case "bunker": return 8f; case "farmhouse": return 6f; case "cottage": case "barn": case "k_izba": return 4f; case "k_khata": return 3f; case "truck": case "sandbags": return 1.5f; default: return 2f; } }
-        static bool Burns(string mesh) => mesh == "barn" || mesh == "cottage" || mesh == "k_khata" || mesh == "k_izba" || mesh == "truck" || mesh == "haystack" || mesh == "k_sheaves" || mesh == "cart";
+        static float MaxHp(string mesh) { switch (mesh) { case "windmill": return 7f; case "house_normandy": return 5f; case "izba": return 4f; case "house_ruin": return 3f; case "church": return 12f; case "k_church": return 9f; case "bunker": return 8f; case "farmhouse": return 6f; case "cottage": case "barn": case "k_izba": return 4f; case "k_khata": return 3f; case "truck": case "sandbags": return 1.5f; default: return 2f; } }
+        static bool Burns(string mesh) => mesh == "house_normandy" || mesh == "izba" || mesh == "barn" || mesh == "cottage" || mesh == "k_khata" || mesh == "k_izba" || mesh == "truck" || mesh == "haystack" || mesh == "k_sheaves" || mesh == "cart";
         static Vector3 FallDir(Prop p) => new Vector3(Mathf.Sin(p.fallYaw), 0f, Mathf.Cos(p.fallYaw));
         static Quaternion Fallen(Prop p) => Quaternion.AngleAxis(88f, Vector3.Cross(Vector3.up, FallDir(p))) * Quaternion.Euler(0f, p.yaw * Mathf.Rad2Deg, 0f);
 
@@ -828,7 +910,9 @@ namespace IronNight
             if (p.what == What.Tree) return 0.45f;
             switch (p.kind.mesh)
             {
-                case "tree_oak": case "tree_poplar": case "spruce_snow": case "k_birches": return 0.45f;
+                case "tree_oak": case "tree_poplar": case "tree_poplar_b": case "tree_apple": case "tree_birch": case "spruce_snow": case "k_birches": return 0.45f;
+                case "well_b": return 0.5f;
+                case "barbed_wire": return 0.9f;
                 case "deadtree": return 0.6f;
                 case "pole": case "signpost": return 0.85f;
                 case "wall_a": case "wall_b": return 0.4f;
@@ -846,6 +930,7 @@ namespace IronNight
         /// hedge is crossed at four fifths.</summary>
         public float Rough(Vector3 pos)
         {
+            if (InStream(pos, 0f) && Deck(pos) <= 0f) return 0.6f;
             foreach (var p in active)
             {
                 if (p.what == What.Hedge)
@@ -1138,6 +1223,66 @@ namespace IronNight
                 var lg = new GameObject("RuinFire"); lg.transform.SetParent(go.transform, false); lg.transform.localPosition = Vector3.up * 2.5f;
                 p.glow = lg.AddComponent<Light>(); p.glow.type = LightType.Point; p.glow.color = new Color(1f, 0.55f, 0.22f); p.glow.range = 16f; p.glow.intensity = 4f; p.glow.shadows = LightShadows.None;
             }
+        }
+
+        /// <summary>The height of a bridge's roadway under a point: up a ramp from either bank to the deck, 0 off it.</summary>
+        public float Deck(Vector3 pos)
+        {
+            float best = 0f;
+            foreach (var b in bridges)
+            {
+                var d = pos - b.pos; float along = Mathf.Abs(d.z), across = Mathf.Abs(d.x), half = b.kind.length * 0.5f;   // the bridges lie along +Z
+                if (along > half || across > 3.2f) continue;
+                best = Mathf.Max(best, BridgeDeck(b.kind.mesh) * Mathf.SmoothStep(0f, 1f, (half - along) / 3.5f));
+            }
+            return best;
+        }
+        static float BridgeDeck(string mesh) => mesh == "bridge_stone" ? StoneDeck : WoodDeck;
+        const float StoneDeck = 0.68f, WoodDeck = 0.66f, BridgeFlat = 0.25f;   // the roadway's height once the bridge is flattened to BridgeFlat of its own
+        readonly List<Prop> bridges = new List<Prop>();
+        const float TrenchFlat = 0.5f, TrenchSink = -0.45f;   // the trench model is a block of earth: squashed and sunk it reads as dug in
+
+        /// <summary>How deep a hull sits in a stream at a point: up to FordDepth mid-stream, shallowing to the banks.</summary>
+        static float Ford(Vector3 pos)
+        {
+            int iz = Mathf.RoundToInt((pos.z - Half) / Cell); float deep = 0f;
+            for (int k = iz - 1; k <= iz + 1; k++)
+            {
+                if (!StreamZ(k)) continue;
+                float off = Mathf.Abs(pos.z - StreamAt(k, pos.x)) / (StreamHalf + 1.5f); if (off < 1f) deep = Mathf.Max(deep, FordDepth * Mathf.SmoothStep(0f, 1f, 1f - off));
+            }
+            return deep;
+        }
+        const float FordDepth = 0.9f;
+
+        /// <summary>Lifts a vehicle onto a bridge's roadway, and lets it down into a stream it fords; the ground elsewhere.</summary>
+        public void Ride(Transform v)
+        {
+            var p = v.position; float y = Deck(p); if (y <= 0f) y = -Ford(p); if (Mathf.Abs(p.y - y) > 0.001f) v.position = new Vector3(p.x, Mathf.MoveTowards(p.y, y, 3f * Time.deltaTime), p.z);
+        }
+
+        /// <summary>The water and its muddy banks over one cell's forty metres of a stream: two strips following the
+        /// bends, the banks under the water and wider.</summary>
+        void SpawnStream(Prop p)
+        {
+            var go = new GameObject("Stream"); go.transform.SetParent(transform, false); go.transform.position = Vector3.zero;
+            p.mesh = Strip(p.pos.x - Half - 1f, p.pos.x + Half + 1f, p.seed, StreamHalf, 0.05f); p.leaves = Strip(p.pos.x - Half - 1f, p.pos.x + Half + 1f, p.seed, StreamHalf + 2.6f, 0.035f);   // the banks' mesh rides in the leaves slot, so Unload frees it too
+            var w = new GameObject("Water"); w.transform.SetParent(go.transform, false); w.AddComponent<MeshFilter>().sharedMesh = p.mesh; var wr = w.AddComponent<MeshRenderer>(); wr.sharedMaterial = waterMaterial; wr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            var bk = new GameObject("Banks"); bk.transform.SetParent(go.transform, false); bk.AddComponent<MeshFilter>().sharedMesh = p.leaves; var br = bk.AddComponent<MeshRenderer>(); br.sharedMaterial = bankMaterial; br.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            p.go = go;
+        }
+        Material waterMaterial, bankMaterial;
+
+        static Mesh Strip(float x0, float x1, int iz, float half, float y)
+        {
+            int n = Mathf.CeilToInt((x1 - x0) / 2f) + 1; var v = new Vector3[n * 2]; var uv = new Vector2[n * 2]; var nm = new Vector3[n * 2]; var t = new int[(n - 1) * 6];
+            for (int i = 0; i < n; i++)
+            {
+                float x = Mathf.Lerp(x0, x1, i / (float)(n - 1)), z = StreamAt(iz, x), w = half * (1f + 0.15f * Mathf.Sin(x * 0.21f + iz));
+                v[i * 2] = new Vector3(x, y, z - w); v[i * 2 + 1] = new Vector3(x, y, z + w); uv[i * 2] = new Vector2(0f, x / 6f); uv[i * 2 + 1] = new Vector2(1f, x / 6f); nm[i * 2] = nm[i * 2 + 1] = Vector3.up;
+                if (i < n - 1) { int k = i * 6, a = i * 2; t[k] = a; t[k + 1] = a + 1; t[k + 2] = a + 2; t[k + 3] = a + 2; t[k + 4] = a + 1; t[k + 5] = a + 3; }
+            }
+            var m = new Mesh { vertices = v, uv = uv, normals = nm, triangles = t }; m.RecalculateBounds(); return m;
         }
 
         public bool Blocks(Vector3 pos)

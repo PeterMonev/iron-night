@@ -231,7 +231,7 @@ namespace IronNight
             // the ground, the fields, lanes, hedges, farms and searchlight posts are Props, built cell by cell around the camera
             props = new GameObject("Props").AddComponent<Props>(); props.winter = winter; props.wet = weather == Weather.Rain && !winter; Vehicle.Wet = props.wet; props.Build(cam); props.fx = fx;
             tracks = new GameObject("Tracks").AddComponent<Tracks>(); tracks.Build();
-            infantry = new GameObject("Infantry").AddComponent<Infantry>(); infantry.Build(); veteran = Depot.Veteran || rule == "veteran" || (mapSector != null && mapSector.veteran);
+            infantry = new GameObject("Infantry").AddComponent<Infantry>(); infantry.Build(); infantry.gunSilenced = g => hud.Toast(g.spec.name + " crew down · the gun is silent", 2.4f); veteran = Depot.Veteran || rule == "veteran" || (mapSector != null && mapSector.veteran);
 
             // night: moonlight with soft shadows, a cold ambient, fog swallowing the distance
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat; RenderSettings.ambientLight = sky.ambient;
@@ -300,7 +300,7 @@ namespace IronNight
             {
                 var ray = cam.ScreenPointToRay(stick.TapAt); if (ray.direction.y < -0.01f) { var g = ray.origin + ray.direction * (-ray.origin.y / ray.direction.y); bool placed = !airArmed && StandPlace(g); bool called = !placed && airArmed; if (called) { airArmed = false; CallAir(g); } var pick = called || placed ? null : Nearest(foes, g, 9f);
                     if (!called && !placed && pick == null && objective != null && objective.kind == "dump" && new Vector2(g.x - objective.pos.x, g.z - objective.pos.z).magnitude < 10f) { point = objective.pos; pointLeft = 10f; hud.Toast("Shell the fuel dump", 1.6f); Sfx.Click(); }
-                    else if (!called && !placed && pick == null) { var mine = NearestMine(g, 4f); if (mine != null) { point = mine.pos; pointLeft = 5f; hud.Toast("Shell the mine", 1.6f); Sfx.Click(); } else { var man = infantry.Nearest(g, 7f); if (man != null) { point = man.pos; pointLeft = 6f; hud.Toast(man.still ? "Shell the observer" : "Shell the infantry", 1.6f); Sfx.Click(); } } }
+                    else if (!called && !placed && pick == null) { var mine = NearestMine(g, 4f); if (mine != null) { point = mine.pos; pointLeft = 5f; hud.Toast("Shell the mine", 1.6f); Sfx.Click(); } else { var man = infantry.Nearest(g, 7f); if (man != null) { point = man.pos; pointLeft = 6f; hud.Toast(man.gun != null ? "Shell the gun crew" : man.still ? "Shell the observer" : "Shell the infantry", 1.6f); Sfx.Click(); } } }
                     if (pick != null) { focus = pick; focusLeft = 8f; if (focusRing == null) focusRing = fx.Marker(pick.transform.position, new Color(1f, 0.55f, 0.3f), 7f); focusRing.gameObject.SetActive(true); hud.Toast("Focus fire · " + pick.spec.name, 1.6f); Sfx.Click(); } }
             }
             if (focus != null) { focusLeft -= dt; if (focus.dead || focusLeft <= 0f) { focus = null; if (focusRing != null) focusRing.gameObject.SetActive(false); } else focusRing.position = focus.transform.position; }
@@ -337,7 +337,7 @@ namespace IronNight
 
             Sfx.Turret(Mathf.Abs(Mathf.DeltaAngle(leaderTurret * Mathf.Rad2Deg, L.turretYaw * Mathf.Rad2Deg)) * Mathf.Deg2Rad / Mathf.Max(dt, 1e-4f));
             if (!sneak || sneakAlarm) foreach (var v in platoon) TickMg(v, dt);
-            infantry.Tick(dt, platoon, props, FireFaust);
+            infantry.Tick(dt, platoon, props, FireFaust, SmallArms);
             int crushed = infantry.Crush(platoon); if (crushed > 0) { InfantryKilled(crushed, L.transform.position); hud.Toast("Run down", 1.5f); }
 
             // enemies: close in, then hold and shoot
@@ -362,7 +362,7 @@ namespace IronNight
                 bool on = e.Aim(target.transform.position, dt);
                 if (e.spec.casemate) { if (dist > e.Range * 0.8f) e.turretYaw = e.yaw; else e.yaw = e.turretYaw; }   // the StuG aims with the whole hull
                 bool blind = smokeLeft > 0f && dist > 9f;                 // the smoke screen: they cannot see us from afar
-                if (on && !blind && e.reloadLeft <= 0f && dist <= e.Range && e.spec.damage > 0f) Fire(e, target);
+                if (on && !blind && e.reloadLeft <= 0f && dist <= e.Range && e.spec.damage > 0f && e.crew != 0) Fire(e, target);
                 e.Apply();
             }
 
@@ -371,6 +371,7 @@ namespace IronNight
             KeepApart();
             foreach (var v in platoon) { Bog(v, props.Ram(v.transform.position, v.spec.radius * 0.7f, v.Forward, dozer), dt); v.transform.position = props.PushOut(v.transform.position, v.spec.radius * 0.7f); }
             foreach (var e in foes) if (!e.spec.isGun) { Bog(e, props.Ram(e.transform.position, e.spec.radius * 0.7f, e.Forward, false), dt); e.transform.position = props.PushOut(e.transform.position, e.spec.radius * 0.7f); }
+            foreach (var v in platoon) props.Ride(v.transform); foreach (var e in foes) if (!e.spec.isGun) props.Ride(e.transform);
             foreach (var v in platoon) tracks.Mark(v); foreach (var e in foes) if (!e.spec.isGun) tracks.Mark(e);
             foreach (var v in platoon) Smoulder(v, dt); foreach (var e in foes) Smoulder(e, dt);
             props.platoon = L.transform.position; props.Tick();
@@ -663,8 +664,23 @@ namespace IronNight
             }
         }
 
+        /// <summary>Once a second: the trenches and sandbag nests coming up 35 to 95 metres off get their garrisons.</summary>
+        void TickGarrisons(float dt)
+        {
+            if ((garrisonLook -= dt) > 0f) return; garrisonLook = 1f;
+            var L = Leader; if (L == null) return;
+            var spots = props.Unmanned(L.transform.position, 35f, 95f);
+            for (int i = 0; i < spots.Count;)
+            {
+                // the men of one work go in together: a trench length is two spots, a nest three
+                int n = spots[i].trench ? 2 : 3; infantry.Garrison(spots.GetRange(i, Mathf.Min(n, spots.Count - i)), L.transform.position); i += n;
+            }
+        }
+        float garrisonLook;
+
         void TickSpawns(float dt)
         {
+            if (!stand && !sneak) TickGarrisons(dt);
             if (stand) { TickStand(dt); return; }
             if (convoy) { TickConvoy(dt); return; }
             if (sneak) { if (!sneakAlarm) { TickSneakQuiet(dt); return; } TickSneakLoud(dt); if (sneakDone) return; }
@@ -703,10 +719,10 @@ namespace IronNight
                 var L = Leader; float ahead = L.yaw + Random.Range(-1.7f, 1.7f);
                 var dir = new Vector3(Mathf.Sin(ahead), 0f, Mathf.Cos(ahead));
                 float roll = Random.value;
-                float infantryShare = route == "village" ? 0.3f : route == "bocage" ? 0.34f : 0.14f, gunShare = route == "village" ? 0.62f : route == "bocage" ? 0.5f : 0.3f;
+                float infantryShare = route == "village" ? 0.4f : route == "bocage" ? 0.44f : 0.22f, gunShare = route == "village" ? 0.62f : route == "bocage" ? 0.5f : 0.3f;
                 if (theatre == "kursk") gunShare = infantryShare + (gunShare - infantryShare) * 0.5f;   // the attacker does not dig in
                 if (rule == "hunters") { float gunPart = gunShare - infantryShare; infantryShare = Mathf.Min(0.6f, infantryShare * 2f); gunShare = infantryShare + gunPart * 0.7f; }
-                if (t > (rule == "hunters" ? 20f : route == "open" ? 45f : 30f) && roll < infantryShare && infantry.squads.Count < (route == "open" ? 3 : 4) + (rule == "hunters" ? 2 : 0))
+                if (t > (rule == "hunters" ? 20f : route == "open" ? 45f : 30f) && roll < infantryShare && infantry.Squads < (route == "open" ? 4 : 6) + (rule == "hunters" ? 2 : 0))
                 {
                     if (Random.value < 0.5f)
                     {
@@ -1904,7 +1920,7 @@ namespace IronNight
         /// <summary>An enemy vehicle into the fight; veteran nights give it half again the hits.</summary>
         Vehicle Foe(VehicleSpec spec, Vector3 pos, float yaw)
         {
-            var e = Vehicle.Create(spec, false, pos, yaw); e.turretYaw = e.yaw; if (veteran) e.hp *= 1.5f; if (debugWeak) e.hp = 0.3f; if (spec == VehicleSpec.PanzerIV && Random.value < 0.5f) e.flank = Random.value < 0.5f ? -1 : 1; foes.Add(e); return e;
+            var e = Vehicle.Create(spec, false, pos, yaw); e.turretYaw = e.yaw; if (spec.isGun) infantry.ManGun(e); if (veteran) e.hp *= 1.5f; if (debugWeak) e.hp = 0.3f; if (spec == VehicleSpec.PanzerIV && Random.value < 0.5f) e.flank = Random.value < 0.5f ? -1 : 1; foes.Add(e); return e;
         }
 
         /// <summary>The coaxial and bow machine guns: a burst at any tank hunter within 24 m in front of the gun or the
@@ -1927,6 +1943,17 @@ namespace IronNight
             if (n <= 0) return; nightInfantry += n; score += 20 * n; xp += n;
             hud.Popup(at + Vector3.up, "+" + 20 * n, new Color(0.85f, 0.85f, 0.8f));
             if (xp >= xpNeed) LevelUp(); else hud.SetLevel(level, (float)xp / xpNeed);
+        }
+
+        /// <summary>A rifle shot or one round of a machine-gun burst at a tank: a tracer from the man (low from the prone
+        /// gunner), now and then a spark off the armour. Small arms do a tank no harm; they are the fight around it.</summary>
+        void SmallArms(Infantry.Soldier m, Vehicle target)
+        {
+            bool mg = m.role == Infantry.Role.Mg; var from = m.pos + Vector3.up * (mg ? 0.45f : 1.1f) + m.face * 0.8f;
+            var aim = target.transform.position + Vector3.up * 1.4f + Random.insideUnitSphere * 1.6f; var dir = (aim - from).normalized;
+            fx.MgTracer(from, dir);
+            if (mg && m.burst == 5) Sfx.Mg(from);
+            if (Random.value < 0.25f) { var at = target.transform.position + Vector3.up * 1.3f - new Vector3(dir.x, 0f, dir.z) * target.spec.radius * 0.8f; fx.Spark(at, -dir); }
         }
 
         /// <summary>A Panzerfaust: a slow rocket from the man's shoulder, two hits when it lands, never a ricochet.</summary>

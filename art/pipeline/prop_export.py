@@ -1,14 +1,17 @@
 """Turns a TRELLIS prop GLB into a game asset: long axis along Z, base on the ground, centred, scaled to a real length in
 metres, exported as OBJ + texture into the Unity project. Usage: python prop_export.py <in.glb> <name> <size_m> [y]
-With "y" the size is the height (poles, trees, a standing figure) and the model is not turned."""
+With "y" the size is the height (poles, trees, a standing figure) and the model is not turned. turn=<deg> first turns it
+about the vertical, for a model TRELLIS left lying across the diagonal."""
 import sys, os
 import numpy as np
 import trimesh
 
 src, name, length = sys.argv[1], sys.argv[2], float(sys.argv[3]); by_height = len(sys.argv) > 4 and sys.argv[4] == 'y'
+turn = float(next((a[5:] for a in sys.argv[4:] if a.startswith("turn=")), 0))
 out = 'D:/Codes/Projects/lightswarm/unity/Assets/_Game/Resources/Props'
 os.makedirs(out, exist_ok=True)
 s = trimesh.load(src); m = list(s.geometry.values())[0] if isinstance(s, trimesh.Scene) else s
+if turn: m.apply_transform(trimesh.transformations.rotation_matrix(np.radians(turn), [0, 1, 0]))
 lo, hi = m.bounds; size = hi - lo
 if not by_height and size[0] > size[2]:  # long axis to Z
     m.apply_transform(trimesh.transformations.rotation_matrix(np.pi / 2, [0, 1, 0]))

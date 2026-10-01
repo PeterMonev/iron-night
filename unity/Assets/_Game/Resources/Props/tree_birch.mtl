@@ -1,0 +1,3 @@
+newmtl tree_birch
+Kd 1 1 1
+map_Kd tree_birch_tex.png
