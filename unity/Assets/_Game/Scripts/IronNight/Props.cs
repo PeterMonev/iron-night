@@ -447,7 +447,21 @@ namespace IronNight
             }
             return false;
         }
-        void KillLamp(Prop p) { if (p.shaft != null) p.shaft.gameObject.SetActive(false); if (p.lamp != null) p.lamp.gameObject.SetActive(false); }
+        /// <summary>Every searchlight whose post is within the radius of a blast on the ground goes out; returns where they stood.</summary>
+        public List<Vector3> BreakLamps(Vector3 at, float radius)
+        {
+            var hit = new List<Vector3>();
+            foreach (var p in active)
+            {
+                if (p.what != What.Searchlight || deadLamps.Contains(p.seed)) continue;
+                var d = p.pos - at; d.y = 0f; if (d.sqrMagnitude > radius * radius) continue;
+                deadLamps.Add(p.seed); KillLamp(p); hit.Add(p.drum != null ? p.drum.position : p.pos + Vector3.up * 2.4f);
+            }
+            return hit;
+        }
+
+        /// <summary>A searchlight put out: its beam and glow gone, the drum drooping on its yoke.</summary>
+        void KillLamp(Prop p) { if (p.shaft != null) p.shaft.gameObject.SetActive(false); if (p.lamp != null) p.lamp.gameObject.SetActive(false); if (p.drum != null) p.drum.localRotation = Quaternion.Euler(28f, 0f, 0f); }
 
         /// <summary>Moves the grid to the cell under the camera and recolours it: a corner deep inside a field is that
         /// field, a corner near a boundary is a mix of the two, so the textures cross-fade over five metres or so.</summary>

@@ -579,7 +579,7 @@ namespace IronNight
                 if (hit == null && !s.bounced && s.friendly && objective != null && objective.kind == "dump" && new Vector2(s.pos.x - objective.pos.x, s.pos.z - objective.pos.z).magnitude < 4.5f && s.pos.y < 4f) { DumpHit(s.pos); s.life = 0f; }
                 if (hit == null && !s.bounced && s.friendly && s.life > 0f && MineShot(s.pos)) s.life = 0f;
                 if (hit == null && !s.bounced && s.friendly) { int men = infantry.Blast(s.pos, 1.6f); if (men > 0) { InfantryKilled(men, s.pos); fx.Hit(s.pos, 0.7f); s.life = 0f; } }
-                if (hit == null && !s.bounced && s.friendly && props.HitLamp(s.pos)) { fx.Explosion(s.pos); Sfx.Explosion(s.pos); score += 150; hud.Popup(s.pos, "Searchlight out · +150", new Color(1f, 0.9f, 0.6f)); nightLamps++; s.life = 0f; }
+                if (hit == null && !s.bounced && s.friendly && props.HitLamp(s.pos)) { fx.Explosion(s.pos); Sfx.Explosion(s.pos); LampOut(s.pos); s.life = 0f; }
                 if (hit == null && !s.bounced && props.Blocks(s.pos)) { fx.Hit(s.pos, 0.6f); Sfx.Hit(s.pos); props.Strike(s.pos, s.he ? 1f : 0.35f); s.life = 0f; }
                 else if (hit == null && s.life <= 0f) { var g = new Vector3(s.pos.x, 0f, s.pos.z); fx.Dust(g); props.Crater(g, 2.2f); }   // spent: into the dirt
                 if (hit != null || s.life <= 0f) { fx.Release(s.vis); shells.RemoveAt(i); }
@@ -1601,7 +1601,11 @@ namespace IronNight
             foreach (var v in foes.ToArray()) if (!v.dead && Flat(v.transform.position - at) < 2.6f) Damage(v, 0.35f, at);
             foreach (var v in platoon.ToArray()) if (!v.dead && Flat(v.transform.position - at) < 2.6f) Damage(v, 0.35f, at);
             InfantryKilled(infantry.Blast(at, 2.5f), at);
+            foreach (var lamp in props.BreakLamps(at, 2.6f)) { fx.Hit(lamp, 0.8f); LampOut(lamp); }
         }
+
+        /// <summary>A searchlight put out by the platoon or its aircraft: paid and counted for the missions.</summary>
+        void LampOut(Vector3 at) { score += 150; hud.Popup(at, "Searchlight out · +150", new Color(1f, 0.9f, 0.6f)); nightLamps++; }
 
         /// <summary>Four rockets off the rails, two from each wing, into the line round the smoke.</summary>
         void Salvo(Transform plane, AirStrike s, float start, float off)
@@ -1625,6 +1629,7 @@ namespace IronNight
                 if (k < 1f) continue;
                 fx.Release(r.vis); rockets.RemoveAt(i);
                 fx.Explosion(r.to); Sfx.Explosion(r.to); props.Crater(r.to, 3f); props.Blast(r.to, 4.5f, 2f); shake = Mathf.Max(shake, 0.35f);
+                foreach (var lamp in props.BreakLamps(r.to, 4.5f)) LampOut(lamp);
                 if (Leader != null && Flat(Leader.transform.position - r.to) < 20f) Haptics.Boom();
                 foreach (var v in foes.ToArray()) if (!v.dead && Flat(v.transform.position - r.to) < 4.5f) Damage(v, 2.2f, r.to);
                 foreach (var v in platoon.ToArray()) if (!v.dead && Flat(v.transform.position - r.to) < 4.5f) Damage(v, 2.2f, r.to);
