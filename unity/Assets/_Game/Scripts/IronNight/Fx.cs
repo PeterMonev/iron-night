@@ -20,8 +20,9 @@ namespace IronNight
         }
 
         Material addGlow, addFlame, addSpark, smokeSoft, addRing;
-        Material addExplosion, smokeSheet, addSparks, blendFlak, blendDust, addMuzzle, addTracer, addObjective;   // the photographic sprites
+        Material addExplosion, smokeSheet, addSparks, blendFlak, blendDust, addMuzzle, addTracer;   // the photographic sprites
         Material leafFx;   // torn sprigs: the hedges' own lit, cut-out leaves sheet
+        Material paintRing;   // the tactical markers: a ring painted on the ground (Fx/paint_ring when there is one, else PaintedRing), lit like the ground
         Material[] puffMats;   // photographed smoke puffs (Fx/smoke_puff_1..4), white to be tinted; empty: the smoke sheet's grown frames stand in
         static readonly Vector3 Wind = new Vector3(0.7f, 0f, 0.35f);   // the night's breeze: smoke leans off with it
         static readonly int BaseMapST = Shader.PropertyToID("_BaseMap_ST"); static readonly Vector4 WholeSheet = new Vector4(1f, 1f, 0f, 0f);
@@ -44,8 +45,9 @@ namespace IronNight
             Texture2D Pic(string n) => Resources.Load<Texture2D>("Fx/" + n);
             addExplosion = Make(additive, Pic("fx_explosion")); smokeSheet = Make(smoke, Pic("fx_smoke")); addSparks = Make(additive, Pic("fx_sparks"));
             leafFx = new Material(Resources.Load<Material>("FoliageCut"));
+            paintRing = new Material(Resources.Load<Material>("GroundDecal")); var ringPic = Pic("paint_ring"); paintRing.SetTexture("_BaseMap", ringPic != null ? ringPic : PaintedRing(512)); paintRing.SetTexture("_BumpMap", null); paintRing.SetFloat("_Smoothness", 0.35f); paintRing.renderQueue = 2448;   // the keyword stays on: the variant without it is not in the build
             var pm = new List<Material>(); for (int i = 1; i <= 4; i++) { var t = Pic("smoke_puff_" + i); if (t != null) pm.Add(Make(smoke, t)); } puffMats = pm.ToArray();
-            addObjective = Make(additive, Resources.Load<Texture2D>("Textures/ring_objective")); blendFlak = Make(smoke, Pic("fx_flak")); blendDust = Make(smoke, Pic("fx_dust")); addMuzzle = Make(additive, Pic("fx_muzzle")); addTracer = Make(additive, Pic("fx_tracer"));
+            blendFlak = Make(smoke, Pic("fx_flak")); blendDust = Make(smoke, Pic("fx_dust")); addMuzzle = Make(additive, Pic("fx_muzzle")); addTracer = Make(additive, Pic("fx_tracer"));
         }
 
         /// <summary>A puff that shows one sheet of frames: all of them over its life, or one fixed frame.</summary>
@@ -72,6 +74,31 @@ namespace IronNight
                 tex.SetPixel(x, y, c);
             }
             tex.Apply(); return tex;
+        }
+
+        /// <summary>A ring of paint brushed onto the ground in one go round: white, to be tinted. The stroke wanders in and
+        /// out and swells and thins, the brush runs dry in places (gaps along the bristles), and a few spatters and runs lie
+        /// off it.</summary>
+        static Texture2D PaintedRing(int s)
+        {
+            var tex = new Texture2D(s, s, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[s * s]; float seed = Random.value * 50f;
+            var spat = new Vector3[22]; for (int i = 0; i < spat.Length; i++) { float a = Random.value * 6.283f, d = 0.4f + (Random.value - 0.5f) * 0.2f; spat[i] = new Vector3(0.5f + Mathf.Cos(a) * d, 0.5f + Mathf.Sin(a) * d, 0.004f + Random.value * 0.012f); }
+            for (int y = 0; y < s; y++) for (int x = 0; x < s; x++)
+            {
+                float u = (x + 0.5f) / s, v = (y + 0.5f) / s, dx = u - 0.5f, dy = v - 0.5f, r = Mathf.Sqrt(dx * dx + dy * dy), ang = Mathf.Atan2(dy, dx) / 6.283f + 0.5f;
+                // the stroke's middle and width wander round the circle (sampled on a circle in the noise, so they meet up)
+                float cx = Mathf.Cos(ang * 6.283f), cy = Mathf.Sin(ang * 6.283f);
+                float mid = 0.4f + (Mathf.PerlinNoise(seed + cx * 1.3f, seed + cy * 1.3f) - 0.5f) * 0.025f, half = 0.03f + Mathf.PerlinNoise(seed + 7f + cx * 2f, seed + 7f + cy * 2f) * 0.022f;
+                float across = (r - mid) / half, a = Mathf.Clamp01((1f - Mathf.Abs(across)) * 3.5f);
+                // the bristles: streaks along the stroke, broken where the brush ran dry
+                float bristle = Mathf.PerlinNoise(seed + 20f + across * 6f, seed + ang * 180f), dry = Mathf.PerlinNoise(seed + 40f + cx * 5f, seed + 40f + cy * 5f);
+                a *= Mathf.Clamp01((bristle - 0.25f) * 2.2f) * Mathf.Clamp01((dry - 0.22f) * 3f + 0.35f);
+                float grain = Mathf.PerlinNoise(u * 90f + seed, v * 90f); a *= 0.75f + 0.25f * grain;   // soaked into the dirt unevenly
+                foreach (var sp in spat) { float d = Mathf.Sqrt((u - sp.x) * (u - sp.x) + (v - sp.y) * (v - sp.y)); if (d < sp.z) a = Mathf.Max(a, Mathf.Clamp01((sp.z - d) / sp.z * 3f) * 0.85f); }
+                byte c = (byte)(215 + 40 * grain); px[y * s + x] = new Color32(c, c, c, (byte)(Mathf.Clamp01(a) * 255f));
+            }
+            tex.SetPixels32(px); tex.Apply(true); return tex;
         }
 
         static Texture2D Spark(int s)
@@ -292,7 +319,8 @@ namespace IronNight
         {
             var root = new GameObject("Marker").transform; root.SetParent(transform, false); root.position = pos;
             var q = Quad(); q.transform.SetParent(root, false); q.transform.localPosition = new Vector3(0f, 0.08f, 0f); q.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); q.transform.localScale = new Vector3(size, size, 1f);
-            var r = q.GetComponent<Renderer>(); r.sharedMaterial = tactical ? addObjective : addRing; mpb.SetVector(BaseMapST, WholeSheet); mpb.SetColor(BaseColor, color); r.SetPropertyBlock(mpb);
+            if (tactical) q.transform.localScale = new Vector3(size * 1.1f, size * 1.1f, 1f);   // the painted ring sits a little inside its picture
+            var r = q.GetComponent<Renderer>(); r.sharedMaterial = tactical ? paintRing : addRing; mpb.SetVector(BaseMapST, WholeSheet); mpb.SetColor(BaseColor, color); r.SetPropertyBlock(mpb);
             var l = new GameObject("Light").AddComponent<Light>(); l.transform.SetParent(root, false); l.transform.localPosition = Vector3.up * 2f; l.type = LightType.Point; l.color = color; l.intensity = 8f; l.range = 14f; l.shadows = LightShadows.None;
             return root;
         }
