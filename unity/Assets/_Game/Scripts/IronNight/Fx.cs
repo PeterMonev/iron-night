@@ -6,9 +6,9 @@ namespace IronNight
     /// <summary>
     /// Every light effect of the fight as camera-facing quads plus a few point lights: muzzle flashes with a flame
     /// tongue and a smoke puff, tracer trails, armour hits that spray sparks, explosions with a fireball, a shockwave
-    /// ring and falling debris, burning wrecks under a smoke column, the smoke screen, flak and artillery. Sprites
-    /// are procedural (a noisy flame, a ragged smoke ball, a hard spark); quads are pooled and coloured through
-    /// property blocks, so nothing but the puff records is allocated during a wave.
+    /// ring and falling debris, burning wrecks under a smoke column, the smoke screen, flak and artillery. The flame and
+    /// the spark are procedural, the smoke photographed (Billow); quads are pooled and coloured through property
+    /// blocks, so nothing but the puff records is allocated during a wave.
     /// </summary>
     public class Fx : MonoBehaviour
     {
@@ -19,11 +19,13 @@ namespace IronNight
             public int frames, cols, rows, frame0;   // a sprite sheet: frames stepped over the life, or one fixed frame
         }
 
-        Material addGlow, addFlame, addSpark, smokeSoft, smokeRagged, addRing;
+        Material addGlow, addFlame, addSpark, smokeSoft, addRing;
         Material addExplosion, smokeSheet, addSparks, blendFlak, blendDust, addMuzzle, addTracer, addObjective;   // the photographic sprites
         Material leafFx;   // torn sprigs: the hedges' own lit, cut-out leaves sheet
+        Material[] puffMats;   // photographed smoke puffs (Fx/smoke_puff_1..4), white to be tinted; empty: the smoke sheet's grown frames stand in
+        static readonly Vector3 Wind = new Vector3(0.7f, 0f, 0.35f);   // the night's breeze: smoke leans off with it
         static readonly int BaseMapST = Shader.PropertyToID("_BaseMap_ST"); static readonly Vector4 WholeSheet = new Vector4(1f, 1f, 0f, 0f);
-        Texture2D glowTex, flameTex, smokeTex, sparkTex, ringTex;
+        Texture2D glowTex, flameTex, sparkTex, ringTex;
         readonly List<Puff> puffs = new List<Puff>(); readonly Stack<GameObject> quadPool = new Stack<GameObject>();
         readonly List<Light> lights = new List<Light>(); readonly List<float> lightLife = new List<float>(); readonly List<float> lightMax = new List<float>();
         readonly MaterialPropertyBlock mpb = new MaterialPropertyBlock();
@@ -35,13 +37,14 @@ namespace IronNight
             cam = camera;
             var additive = Resources.Load<Material>("Additive"); var smoke = Resources.Load<Material>("Smoke");
             glowTex = Lightswarm.ProceduralSprites.Glow(128, 0.12f).texture; ringTex = Lightswarm.ProceduralSprites.Ring(128, 0.09f).texture;
-            flameTex = Ragged(128, 0.5f, 0.22f, 7f, true); smokeTex = Ragged(128, 0.62f, 0.3f, 5f, false); sparkTex = Spark(32);
+            flameTex = Ragged(128, 0.5f, 0.22f, 7f, true); sparkTex = Spark(32);
             Material Make(Material template, Texture2D tex) { var m = new Material(template); m.SetTexture("_BaseMap", tex); return m; }
             addGlow = Make(additive, glowTex); addFlame = Make(additive, flameTex); addSpark = Make(additive, sparkTex); addRing = Make(additive, ringTex);
-            smokeSoft = Make(smoke, Lightswarm.ProceduralSprites.GroundShadow(128).texture); smokeRagged = Make(smoke, smokeTex);
+            smokeSoft = Make(smoke, Lightswarm.ProceduralSprites.GroundShadow(128).texture);
             Texture2D Pic(string n) => Resources.Load<Texture2D>("Fx/" + n);
             addExplosion = Make(additive, Pic("fx_explosion")); smokeSheet = Make(smoke, Pic("fx_smoke")); addSparks = Make(additive, Pic("fx_sparks"));
             leafFx = new Material(Resources.Load<Material>("FoliageCut"));
+            var pm = new List<Material>(); for (int i = 1; i <= 4; i++) { var t = Pic("smoke_puff_" + i); if (t != null) pm.Add(Make(smoke, t)); } puffMats = pm.ToArray();
             addObjective = Make(additive, Resources.Load<Texture2D>("Textures/ring_objective")); blendFlak = Make(smoke, Pic("fx_flak")); blendDust = Make(smoke, Pic("fx_dust")); addMuzzle = Make(additive, Pic("fx_muzzle")); addTracer = Make(additive, Pic("fx_tracer"));
         }
 
@@ -90,9 +93,17 @@ namespace IronNight
         Puff Spawn(Material m, Vector3 pos, float size, Color color, float life, Vector3 vel, float grow = 0.8f, bool smoke = false)
         {
             var go = Quad(); var r = go.GetComponent<Renderer>(); r.sharedMaterial = m; mpb.SetVector(BaseMapST, WholeSheet); mpb.SetColor(BaseColor, color); r.SetPropertyBlock(mpb);
-            var p = new Puff { t = go.transform, r = r, life = life, age = 0f, size = size, color = color, smoke = smoke, vel = vel, grow = grow, spin = Random.Range(0f, 360f), alphaPow = smoke ? 2f : 1f, stretch = 1f };
+            var p = new Puff { t = go.transform, r = r, life = life, age = 0f, size = size, color = color, smoke = smoke, vel = vel, grow = grow, spin = Random.Range(0f, 360f), alphaPow = smoke ? 1.35f : 1f, stretch = 1f };
             p.t.position = pos; p.t.localScale = Vector3.one * size;
             puffs.Add(p); return p;
+        }
+
+        /// <summary>A puff of smoke: a photographed one, turned any way, tinted by the colour; it swells in, rises
+        /// slowing, leans off with the wind and thins away.</summary>
+        Puff Billow(Vector3 pos, float size, Color color, float life, Vector3 vel, float grow = 0.8f, bool smoke = true)
+        {
+            if (puffMats.Length > 0) return Spawn(puffMats[Random.Range(0, puffMats.Length)], pos, size, color, life, vel, grow, smoke);
+            return Sheet(Spawn(smokeSheet, pos, size * 1.25f, color, life, vel, grow, smoke), 4, 4, 1, Random.Range(4, 11));   // a frame of the sheet's puff in full: it fills less of its cell than the blob did
         }
 
         void Flash(Vector3 pos, Color color, float intensity, float range, float life)
@@ -110,7 +121,7 @@ namespace IronNight
         {
             Spawn(addGlow, pos + dir * 0.8f, 3f, new Color(1f, 0.95f, 0.8f, 1f), 0.06f, Vector3.zero, 0.3f);
             var tongue = Sheet(Spawn(addMuzzle, pos + dir * 2f, 3.2f, new Color(1f, 0.95f, 0.85f, 0.9f), 0.09f, dir * 5f, 0.4f), 3, 1, 1, Random.Range(0, 3)); tongue.aligned = true; tongue.axis = dir; tongue.stretch = 1.5f;
-            for (int i = 0; i < 3; i++) Spawn(smokeRagged, pos + dir * (1f + i * 1.1f) + Random.insideUnitSphere * 0.4f, 1.6f + Random.value, new Color(0.5f, 0.48f, 0.45f, 0.5f), 1.2f + Random.value * 0.6f, dir * (5f - i) + Vector3.up * 1.2f, 1.8f, true);
+            for (int i = 0; i < 3; i++) Billow(pos + dir * (1f + i * 1.1f) + Random.insideUnitSphere * 0.4f, 1.6f + Random.value, new Color(0.5f, 0.48f, 0.45f, 0.5f), 1.2f + Random.value * 0.6f, dir * (5f - i) + Vector3.up * 1.2f, 1.8f, true);
             for (int i = 0; i < 2; i++) Spawn(smokeSoft, new Vector3(pos.x, 0.3f, pos.z) + dir * 2f + Random.insideUnitSphere * 0.8f, 2.5f, new Color(0.38f, 0.33f, 0.26f, 0.5f), 1f, Vector3.up * 1.2f + dir * 2f, 1.5f, true);
             Flash(pos + dir * 1.2f + Vector3.up * 0.5f, new Color(1f, 0.8f, 0.5f), 45f, 16f, 0.1f);
         }
@@ -122,7 +133,7 @@ namespace IronNight
             Sheet(Spawn(addExplosion, pos + Vector3.up * 0.6f, 3.4f * power, Color.white, 0.6f, Vector3.up * 1.5f, 0.7f), 4, 4, 16);
             var spray = Spawn(addSparks, pos, 2.8f * power, new Color(1f, 0.9f, 0.7f, 1f), 0.32f, Vector3.up * 0.4f, 0.9f); spray.spin = Random.Range(0f, 360f);
             for (int i = 0; i < 9; i++) { var v = (Random.insideUnitSphere + Vector3.up * 0.8f).normalized * (9f + Random.value * 14f); var s = Spawn(addSpark, pos, 0.25f + Random.value * 0.25f, new Color(1f, 0.85f, 0.45f, 1f), 0.35f + Random.value * 0.45f, v, 0f); s.gravity = true; }
-            for (int i = 0; i < 4; i++) Spawn(smokeRagged, pos + Random.insideUnitSphere * 1f, 2f + Random.value * 2f, new Color(0.22f, 0.2f, 0.18f, 0.7f), 2.5f + Random.value, new Vector3(Random.Range(-0.6f, 0.6f), 1.6f + Random.value, Random.Range(-0.6f, 0.6f)), 2f, true);
+            for (int i = 0; i < 4; i++) Billow(pos + Random.insideUnitSphere * 1f, 2f + Random.value * 2f, new Color(0.22f, 0.2f, 0.18f, 0.7f), 2.5f + Random.value, new Vector3(Random.Range(-0.6f, 0.6f), 1.6f + Random.value, Random.Range(-0.6f, 0.6f)), 2f, true);
             Flash(pos + Vector3.up * 1.5f, new Color(1f, 0.6f, 0.3f), 60f * power, 18f, 0.3f);
         }
 
@@ -133,7 +144,7 @@ namespace IronNight
             Spawn(addGlow, pos, 3.2f, new Color(1f, 0.95f, 0.85f, 1f), 0.07f, Vector3.zero, 0.3f);
             Sheet(Spawn(addExplosion, pos + Vector3.up * 0.4f, 3.6f, Color.white, 0.4f, Vector3.up * 1.2f, 0.6f), 4, 4, 16);
             for (int i = 0; i < 12; i++) { var v = (Random.insideUnitSphere + Vector3.up * 0.5f).normalized * (10f + Random.value * 14f); var s = Spawn(addSpark, pos, 0.2f + Random.value * 0.2f, new Color(1f, 0.8f, 0.45f, 1f), 0.25f + Random.value * 0.35f, v, 0f); s.gravity = true; }
-            for (int i = 0; i < 3; i++) Spawn(smokeRagged, pos + Random.insideUnitSphere * 0.6f, 1.6f + Random.value * 1.2f, new Color(0.1f, 0.09f, 0.08f, 0.8f), 2.2f + Random.value, new Vector3(Random.Range(-0.5f, 0.5f), 1.4f + Random.value, Random.Range(-0.5f, 0.5f)), 1.8f, true);
+            for (int i = 0; i < 3; i++) Billow(pos + Random.insideUnitSphere * 0.6f, 1.6f + Random.value * 1.2f, new Color(0.1f, 0.09f, 0.08f, 0.8f), 2.2f + Random.value, new Vector3(Random.Range(-0.5f, 0.5f), 1.4f + Random.value, Random.Range(-0.5f, 0.5f)), 1.8f, true);
             Flash(pos + Vector3.up, new Color(1f, 0.6f, 0.3f), 70f, 14f, 0.18f);
         }
 
@@ -143,7 +154,7 @@ namespace IronNight
         {
             Spawn(addGlow, pos, 0.45f + 0.3f * heat, new Color(1f, 0.35f + 0.25f * heat, 0.08f, 0.85f), 0.16f, Vector3.zero, 0f);
             if (Random.value < 0.2f + 0.4f * heat) Spawn(addFlame, pos + Vector3.up * 0.25f, 0.55f + Random.value * 0.4f * heat, Warm(Random.value * 0.6f), 0.25f + Random.value * 0.15f, Vector3.up * (1.2f + Random.value), 0.5f);
-            if (Random.value < 0.3f) Spawn(smokeRagged, pos + Vector3.up * 0.6f, 0.8f + Random.value * 0.6f, new Color(0.12f, 0.11f, 0.1f, 0.5f), 1.8f + Random.value, new Vector3(Random.Range(-0.2f, 0.2f), 1.4f, Random.Range(-0.2f, 0.2f)), 1.8f, true);
+            if (Random.value < 0.3f) Billow(pos + Vector3.up * 0.6f, 0.8f + Random.value * 0.6f, new Color(0.12f, 0.11f, 0.1f, 0.5f), 1.8f + Random.value, new Vector3(Random.Range(-0.2f, 0.2f), 1.4f, Random.Range(-0.2f, 0.2f)), 1.8f, true);
         }
 
         /// <summary>Ammunition cooking off: a column of flame straight up out of the turret ring, sparks thrown with it,
@@ -153,7 +164,7 @@ namespace IronNight
             var f = Spawn(addFlame, pos + Vector3.up * (0.6f + Random.value * 0.8f), 1.8f + 2.4f * k, Warm(0.3f + Random.value * 0.5f), 0.22f + Random.value * 0.14f, Vector3.up * (9f + 9f * k), 0.35f);
             f.aligned = true; f.axis = Vector3.up; f.stretch = 2.2f;
             if (Random.value < 0.6f) { var s = Spawn(addSpark, pos + Vector3.up, 0.22f + Random.value * 0.25f, new Color(1f, 0.8f, 0.4f, 1f), 0.5f + Random.value * 0.4f, (Vector3.up * 2f + Random.insideUnitSphere).normalized * (10f + Random.value * 10f), 0f); s.gravity = true; }
-            if (Random.value < 0.25f) Spawn(smokeRagged, pos + Vector3.up * (3f + 2f * k), 2f + Random.value * 1.5f, new Color(0.1f, 0.09f, 0.08f, 0.7f), 2.5f + Random.value, Vector3.up * 3f, 2f, true);
+            if (Random.value < 0.25f) Billow(pos + Vector3.up * (3f + 2f * k), 2f + Random.value * 1.5f, new Color(0.1f, 0.09f, 0.08f, 0.7f), 2.5f + Random.value, Vector3.up * 3f, 2f, true);
             if (Random.value < 0.3f) Flash(pos + Vector3.up * 2f, new Color(1f, 0.6f, 0.25f), 20f + 80f * k, 20f, 0.12f);
         }
 
@@ -163,7 +174,7 @@ namespace IronNight
         {
             float r = Mathf.Clamp(size * 0.45f, 2f, 7f);
             for (int i = 0; i < 12; i++) { var d = Random.insideUnitCircle; Spawn(blendDust, pos + new Vector3(d.x * r, 0.6f + Random.value, d.y * r), 3.5f + Random.value * 3f, new Color(0.62f, 0.56f, 0.48f, 0.75f), 2.4f + Random.value * 1.6f, new Vector3(d.x * 3f, 1f + Random.value * 1.5f, d.y * 3f), 1.7f, true); }
-            for (int i = 0; i < 6; i++) Spawn(smokeRagged, pos + Random.insideUnitSphere * r * 0.6f + Vector3.up * 2.5f, 4f + Random.value * 3f, new Color(0.3f, 0.27f, 0.24f, 0.7f), 4f + Random.value * 2f, new Vector3(Random.Range(-0.5f, 0.5f), 1.8f + Random.value, Random.Range(-0.5f, 0.5f)), 2.2f, true);
+            for (int i = 0; i < 6; i++) Billow(pos + Random.insideUnitSphere * r * 0.6f + Vector3.up * 2.5f, 4f + Random.value * 3f, new Color(0.3f, 0.27f, 0.24f, 0.7f), 4f + Random.value * 2f, new Vector3(Random.Range(-0.5f, 0.5f), 1.8f + Random.value, Random.Range(-0.5f, 0.5f)), 2.2f, true);
             for (int i = 0; i < 18; i++) { var v = (Random.insideUnitSphere + Vector3.up * 1.3f).normalized * (5f + Random.value * 9f); var c = Spawn(blendDust, pos + Vector3.up * (1.5f + Random.value * 2f), 0.3f + Random.value * 0.35f, new Color(0.16f, 0.14f, 0.12f, 0.95f), 0.9f + Random.value * 0.6f, v, 0f, true); c.gravity = true; }
         }
 
@@ -186,7 +197,7 @@ namespace IronNight
             for (int i = 0; i < 3; i++) Spawn(addFlame, pos + Random.insideUnitSphere * 1.6f + Vector3.up * (1f + Random.value * 2f), 4.5f + Random.value * 4f, Warm(Random.value), 0.45f + Random.value * 0.35f, Vector3.up * (2f + Random.value * 3f), 1.2f);
             var ring = Spawn(addRing, new Vector3(pos.x, 0.3f, pos.z), 3f, new Color(1f, 0.8f, 0.55f, 0.8f), 0.4f, Vector3.zero, 5f); ring.flat = true;
             for (int i = 0; i < 10; i++) { var v = (Random.insideUnitSphere + Vector3.up * 1.4f).normalized * (10f + Random.value * 16f); var d = Spawn(addSpark, pos + Vector3.up, 0.4f + Random.value * 0.5f, new Color(1f, 0.6f, 0.25f, 1f), 0.8f + Random.value * 0.7f, v, 0f); d.gravity = true; }
-            for (int i = 0; i < 9; i++) Spawn(smokeRagged, pos + Random.insideUnitSphere * 2f + Vector3.up, 4f + Random.value * 4f, new Color(0.16f, 0.15f, 0.14f, 0.85f), 4f + Random.value * 3f, new Vector3(Random.Range(-1f, 1f), 2f + Random.value * 2f, Random.Range(-1f, 1f)), 2.4f, true);
+            for (int i = 0; i < 9; i++) Billow(pos + Random.insideUnitSphere * 2f + Vector3.up, 4f + Random.value * 4f, new Color(0.16f, 0.15f, 0.14f, 0.85f), 4f + Random.value * 3f, new Vector3(Random.Range(-1f, 1f), 2f + Random.value * 2f, Random.Range(-1f, 1f)), 2.4f, true);
             Flash(pos + Vector3.up * 2f, new Color(1f, 0.55f, 0.25f), 240f, 32f, 0.6f);
         }
 
@@ -195,14 +206,14 @@ namespace IronNight
         {
             Spawn(addFlame, pos + Vector3.up * 2f + Random.insideUnitSphere * 0.7f, 2f + Random.value * 1.6f, Warm(Random.value * 0.7f), 0.3f + Random.value * 0.15f, Vector3.up * (2f + Random.value * 1.5f), 0.6f);
             if (Random.value < 0.25f) Sheet(Spawn(smokeSheet, pos + Vector3.up * 3.5f + Random.insideUnitSphere * 0.5f, 4f + Random.value * 2f, new Color(0.28f, 0.27f, 0.26f, 0.6f), 5f + Random.value * 2f, new Vector3(Random.Range(-0.4f, 0.4f), 1.6f + Random.value, Random.Range(-0.4f, 0.4f)), 0.8f, true), 4, 4, 16);
-            else if (Random.value < 0.45f) Spawn(smokeRagged, pos + Vector3.up * 3f + Random.insideUnitSphere * 0.5f, 2.5f + Random.value * 2f, new Color(0.12f, 0.11f, 0.1f, 0.6f), 4.5f + Random.value * 2f, new Vector3(Random.Range(-0.4f, 0.4f), 1.8f + Random.value * 0.6f, Random.Range(-0.4f, 0.4f)), 2.6f, true);
+            else if (Random.value < 0.45f) Billow(pos + Vector3.up * 3f + Random.insideUnitSphere * 0.5f, 2.5f + Random.value * 2f, new Color(0.12f, 0.11f, 0.1f, 0.6f), 4.5f + Random.value * 2f, new Vector3(Random.Range(-0.4f, 0.4f), 1.8f + Random.value * 0.6f, Random.Range(-0.4f, 0.4f)), 2.6f, true);
         }
 
         /// <summary>A shell that missed everything and hit the dirt: a fountain of earth and a few clods.</summary>
         public void Dust(Vector3 pos)
         {
             for (int i = 0; i < 2; i++) Spawn(blendDust, pos + Vector3.up * 0.8f + Random.insideUnitSphere * 0.4f, 2.4f + Random.value * 1f, new Color(0.95f, 0.85f, 0.7f, 0.6f), 1.2f + Random.value * 0.5f, new Vector3(Random.Range(-1f, 1f), 2.8f + Random.value * 2f, Random.Range(-1f, 1f)), 1.5f, true);
-            Spawn(smokeRagged, pos + Vector3.up * 0.4f + Random.insideUnitSphere * 0.4f, 1.6f + Random.value * 0.8f, new Color(0.4f, 0.34f, 0.26f, 0.7f), 1.1f + Random.value * 0.5f, new Vector3(Random.Range(-1f, 1f), 3.5f + Random.value * 3f, Random.Range(-1f, 1f)), 1.6f, true);
+            Billow(pos + Vector3.up * 0.4f + Random.insideUnitSphere * 0.4f, 1.6f + Random.value * 0.8f, new Color(0.4f, 0.34f, 0.26f, 0.7f), 1.1f + Random.value * 0.5f, new Vector3(Random.Range(-1f, 1f), 3.5f + Random.value * 3f, Random.Range(-1f, 1f)), 1.6f, true);
             for (int i = 0; i < 4; i++) { var v = (Random.insideUnitSphere + Vector3.up * 1.6f).normalized * (5f + Random.value * 6f); var c = Spawn(smokeSoft, pos, 0.3f + Random.value * 0.2f, new Color(0.2f, 0.17f, 0.13f, 0.9f), 0.6f + Random.value * 0.4f, v, 0f, true); c.gravity = true; }
             Spawn(addGlow, pos + Vector3.up * 0.3f, 1.4f, new Color(1f, 0.8f, 0.5f, 0.8f), 0.05f, Vector3.zero, 0.2f);
         }
@@ -274,7 +285,7 @@ namespace IronNight
         }
 
         /// <summary>Signal smoke: a coloured puff rising slowly from a marker.</summary>
-        public void Signal(Vector3 pos, Color color) { Spawn(smokeRagged, pos, 2.2f + Random.value, color, 2.6f, new Vector3(Random.Range(-0.3f, 0.3f), 1.6f, Random.Range(-0.3f, 0.3f)), 1.8f, true); }
+        public void Signal(Vector3 pos, Color color) { Billow(pos, 2.2f + Random.value, color, 2.6f, new Vector3(Random.Range(-0.3f, 0.3f), 1.6f, Random.Range(-0.3f, 0.3f)), 1.8f, true); }
 
         /// <summary>A ring on the ground with a light over it: the objective marker, the landed supply crate.</summary>
         public Transform Marker(Vector3 pos, Color color, float size, bool tactical = false)
@@ -295,7 +306,7 @@ namespace IronNight
         }
 
         /// <summary>Engine smoke from a badly hit vehicle: a small dark puff off the deck.</summary>
-        public void EngineSmoke(Vector3 pos) { Spawn(smokeRagged, pos + Random.insideUnitSphere * 0.4f, 1.4f + Random.value * 0.8f, new Color(0.2f, 0.19f, 0.18f, 0.6f), 1.6f + Random.value * 0.8f, new Vector3(Random.Range(-0.3f, 0.3f), 1.3f, Random.Range(-0.3f, 0.3f)), 2f, true); }
+        public void EngineSmoke(Vector3 pos) { Billow(pos + Random.insideUnitSphere * 0.4f, 1.4f + Random.value * 0.8f, new Color(0.2f, 0.19f, 0.18f, 0.6f), 1.6f + Random.value * 0.8f, new Vector3(Random.Range(-0.3f, 0.3f), 1.3f, Random.Range(-0.3f, 0.3f)), 2f, true); }
 
         /// <summary>Recolours a marker's ring.</summary>
         public void Tint(Transform marker, Color color) { var r = marker.GetChild(0).GetComponent<Renderer>(); mpb.SetVector(BaseMapST, WholeSheet); mpb.SetColor(BaseColor, color); r.SetPropertyBlock(mpb); marker.GetComponentInChildren<Light>().color = color; }
@@ -312,6 +323,7 @@ namespace IronNight
                 var p = puffs[i]; p.age += dt; float q = p.age / p.life;
                 if (q >= 1f) { p.t.gameObject.SetActive(false); quadPool.Push(p.t.gameObject); puffs.RemoveAt(i); continue; }
                 if (p.gravity) p.vel += Vector3.down * (26f * dt);
+                else if (p.smoke) { p.vel *= 1f - Mathf.Min(1f, 0.55f * dt); p.vel += Wind * (0.8f * dt); }   // smoke loses its push and goes with the breeze
                 if (p.leaf)
                 {
                     // a sprig tumbling down, held up by the air, lying where it lands
@@ -322,6 +334,7 @@ namespace IronNight
                 float s = p.size * (1f + q * p.grow);
                 p.t.localScale = p.stretch > 1f ? new Vector3(s / Mathf.Sqrt(p.stretch), s * p.stretch, 1f) : Vector3.one * s;
                 var c = p.color; c.a = p.color.a * Mathf.Pow(1f - q, p.alphaPow);
+                if (p.smoke) c.a *= Mathf.SmoothStep(0f, 1f, q / 0.14f);   // swelling in, not popping up
                 mpb.SetColor(BaseColor, c); mpb.SetVector(BaseMapST, FrameST(p, q)); p.r.SetPropertyBlock(mpb);
                 if (p.flat) p.t.rotation = Quaternion.Euler(90f, p.spin, 0f);
                 else if (p.aligned) p.t.rotation = Quaternion.LookRotation(camFwd, p.axis);
