@@ -419,6 +419,7 @@ namespace IronNight
             frontLine = NewSource("Front"); frontLine.clip = front; frontLine.loop = true; frontLine.spatialBlend = 0f; frontLine.volume = 0.14f; if (front != null) frontLine.Play();
             ui = NewSource("Ui"); ui.spatialBlend = 0f;
             voice = NewSource("Voice"); voice.spatialBlend = 0f; voice.priority = 0;
+            foreach (var own in new[] { engine, idle, tracks, turret, enemyEngine }) own.priority = 8;   // the tank's own sounds are never the ones dropped in a crowd of blasts
             ambient = NewSource("Wind"); ambient.clip = wind; ambient.loop = true; ambient.spatialBlend = 0f; ambient.volume = 0.18f; ambient.Play();
         }
 
@@ -486,15 +487,15 @@ namespace IronNight
             if (!instance) return; bool far = (pos - instance.listener.position).magnitude > 45f;
             instance.PlayAt(far ? instance.shotFar : heavy ? instance.shotHeavy : instance.shot, pos, friendly ? 0.9f : 0.8f, (heavy ? 0.9f : 1f) * Random.Range(0.94f, 1.06f));
         }
-        public static void Hit(Vector3 pos) { if (instance) instance.PlayAt(Any(instance.hits), pos, 0.85f, Random.Range(0.9f, 1.1f)); }
+        public static void Hit(Vector3 pos) { if (instance) instance.PlayAt(Any(instance.hits), pos, 0.7f, Random.Range(0.9f, 1.1f)); }
         public static void Ricochet(Vector3 pos) { if (instance) instance.PlayAt(instance.ricochet2 != null && Random.value < 0.4f ? instance.ricochet2 : instance.ricochet, pos, 0.85f, Random.Range(0.92f, 1.1f)); }
-        public static void Explosion(Vector3 pos) { if (instance) instance.PlayAt(Any(instance.blasts), pos, 1f, Random.Range(0.92f, 1.05f)); }
+        public static void Explosion(Vector3 pos) { if (instance) instance.PlayAt(Any(instance.blasts), pos, 0.75f, Random.Range(0.92f, 1.05f)); }
         /// <summary>An artillery shell landing: a shorter, harder blast than a vehicle going up.</summary>
-        public static void Artillery(Vector3 pos) { if (instance) instance.PlayAt(Any(instance.shells), pos, 0.9f, Random.Range(0.95f, 1.1f)); }
+        public static void Artillery(Vector3 pos) { if (instance) instance.PlayAt(Any(instance.shells), pos, 0.7f, Random.Range(0.95f, 1.1f)); }
         /// <summary>The breech after one of ours fires: a clank half a second later, from the tank.</summary>
         public static void Reload(Vector3 pos) { if (instance && instance.reload != null) instance.PlayAt(instance.reload, pos, 0.5f, Random.Range(0.95f, 1.05f), 0.5f); }
         /// <summary>The leader's turret motor: audible while the turret swings, quiet when it rests.</summary>
-        public static void Turret(float swing) { if (!instance || instance.turretLoop == null) return; var t = instance.turret; t.volume = Mathf.Lerp(t.volume, Mathf.Clamp01(swing * 0.6f) * 0.12f, 0.2f); }
+        public static void Turret(float swing) { if (!instance || instance.turretLoop == null) return; var t = instance.turret; t.volume = Mathf.Lerp(t.volume, Mathf.Clamp01(swing * 0.6f) * 0.3f, 0.2f); }
         public static void StukaDive(Vector3 pos) { if (instance) instance.PlayAt(instance.stuka, pos, 1f, Random.Range(0.97f, 1.03f)); }
         public static void FighterPass(Vector3 pos) { if (instance) instance.PlayAt(instance.fighter, pos, 1f, Random.Range(0.96f, 1.04f)); }
         public static void Crunch(Vector3 pos) { if (instance) instance.PlayAt(instance.crunch, pos, 0.55f, Random.Range(0.85f, 1.15f)); }
@@ -547,19 +548,19 @@ namespace IronNight
             if (instance.idleLoop != null)
             {
                 // two layers: the idle fades out as the drive comes in, so a tank at rest idles
-                var id = instance.idle; id.volume = Mathf.Lerp(id.volume, 0.24f * (1f - throttle) + 0.03f, 0.1f); id.pitch = Mathf.Lerp(id.pitch, (0.95f + 0.15f * throttle) * instance.engineBase, 0.08f);
-                e.volume = Mathf.Lerp(e.volume, 0.04f + 0.34f * throttle, 0.1f); e.pitch = Mathf.Lerp(e.pitch, (0.88f + 0.22f * throttle) * instance.engineBase, 0.08f);
+                var id = instance.idle; id.volume = Mathf.Lerp(id.volume, 0.36f * (1f - throttle) + 0.06f, 0.1f); id.pitch = Mathf.Lerp(id.pitch, (0.95f + 0.15f * throttle) * instance.engineBase, 0.08f);
+                e.volume = Mathf.Lerp(e.volume, 0.08f + 0.5f * throttle, 0.1f); e.pitch = Mathf.Lerp(e.pitch, (0.88f + 0.22f * throttle) * instance.engineBase, 0.08f);
             }
             else { e.volume = Mathf.Lerp(e.volume, 0.12f + 0.3f * throttle, 0.1f); e.pitch = Mathf.Lerp(e.pitch, (0.85f + 0.45f * throttle) * instance.engineBase, 0.08f); }
             var dz = instance.diesel; if (dz != null) { dz.volume = Mathf.Lerp(dz.volume, instance.dieselLevel * (0.05f + 0.13f * throttle), 0.1f); dz.pitch = Mathf.Lerp(dz.pitch, 0.9f + 0.35f * throttle, 0.08f); }
-            var tr = instance.tracks; tr.volume = Mathf.Lerp(tr.volume, 0.16f * throttle, 0.15f); tr.pitch = Mathf.Lerp(tr.pitch, 0.8f + 0.4f * throttle, 0.1f);
+            var tr = instance.tracks; tr.volume = Mathf.Lerp(tr.volume, 0.24f * throttle, 0.15f); tr.pitch = Mathf.Lerp(tr.pitch, 0.8f + 0.4f * throttle, 0.1f);
         }
         /// <summary>The nearest enemy tank's engine: where it is, as loud as it is near the leader (closeness 1 beside him,
         /// 0 out of earshot); heavier tanks lower.</summary>
         public static void EnemyEngine(Vector3 pos, float closeness, float heavy)
         {
             if (!instance || instance.enemyLoop == null) return; var s = instance.enemyEngine; s.transform.position = pos;
-            s.volume = Mathf.Lerp(s.volume, 0.32f * Mathf.Clamp01(closeness), 0.06f); s.pitch = Mathf.Lerp(s.pitch, 1.05f - 0.2f * Mathf.Clamp01(heavy), 0.05f);
+            s.volume = Mathf.Lerp(s.volume, 0.45f * Mathf.Clamp01(closeness), 0.06f); s.pitch = Mathf.Lerp(s.pitch, 1.05f - 0.2f * Mathf.Clamp01(heavy), 0.05f);
         }
 
         public static void Quiet(bool q) { if (instance) { if (instance.idle != null) instance.idle.mute = q; if (instance.enemyEngine != null) instance.enemyEngine.mute = q; if (instance.diesel != null) instance.diesel.mute = q; instance.engine.mute = q; instance.tracks.mute = q; instance.turret.mute = q; instance.ambient.mute = q; instance.frontLine.mute = q; } }

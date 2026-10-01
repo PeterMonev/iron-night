@@ -1,6 +1,6 @@
 # Sound sources
 
-The real recordings (engines, tracks, turret, guns, the fighter) come from the Sonniss GDC Game Audio Bundles 2018,
+The real recordings (engines, tracks, turret, guns, machine guns, hits, ricochets, blasts, the fighter) come from the Sonniss GDC Game Audio Bundles 2018,
 2019 and 2020 (https://sonniss.com/gameaudiogdc/): royalty-free, commercial use in games, no attribution required, not to be
 used for AI/ML training; prepared by `art/pipeline/sonniss-prep.py`.
 
