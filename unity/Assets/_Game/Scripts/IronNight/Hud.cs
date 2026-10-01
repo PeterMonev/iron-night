@@ -1432,6 +1432,7 @@ namespace IronNight
             ((RectTransform)againBtn.transform).anchoredPosition = new Vector2(0f, -450f + lift);
             if (endDepotBtn != null) ((RectTransform)endDepotBtn.transform).anchoredPosition = new Vector2(0f, -586f + lift);
             if (holdBtn != null) ((RectTransform)holdBtn.transform).anchoredPosition = new Vector2(0f, -722f + lift);
+            PlacePaper();
         }
 
         /// <summary>The night's account on the end sheet: its four numbers large across the head and the line under them,
@@ -1620,7 +1621,7 @@ namespace IronNight
             }
             goalsText.text = line; goalsText.enabled = briefing == null || !briefing.activeSelf;   // under the briefing card while it is up
         }
-        public void ShowHold(bool on) { if (holdBtn != null) holdBtn.SetActive(on); }
+        public void ShowHold(bool on) { if (holdBtn != null) holdBtn.SetActive(on); PlacePaper(); }
 
         void ShowMedals()
         {

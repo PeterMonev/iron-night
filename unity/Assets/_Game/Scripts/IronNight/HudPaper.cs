@@ -1,4 +1,3 @@
-using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -8,12 +7,11 @@ namespace IronNight
     /// The morning paper's page (Battle.MorningPaper writes it): aged newsprint a little askew on the dark, the masthead in
     /// the display face over a double rule and the dateline, the headline in heavy condensed capitals, the sub, the night's
     /// picture printed in black and white through photo mode's look, its caption, the story, and a war bonds advertisement
-    /// in a ruled box. THE MORNING PAPER on the end sheet opens it; SAVE (SHARE on a phone) keeps the page like a photo,
-    /// CLOSE goes back to the end sheet.
+    /// in a ruled box. THE MORNING PAPER on the end sheet (under its last button) opens it; CLOSE goes back to the end sheet.
     /// </summary>
     public partial class Hud
     {
-        Battle.PaperStory paperStory; GameObject paperBtn, paperSheet, paperButtons; static Material paperPrint;
+        Battle.PaperStory paperStory; GameObject paperBtn, paperSheet; static Material paperPrint;
         static readonly Color Ink = new Color(0.1f, 0.09f, 0.08f), Newsprint = new Color(0.86f, 0.83f, 0.75f);
 
         /// <summary>The night's paper, ready as the end sheet comes up; its button appears on the end sheet.</summary>
@@ -25,7 +23,19 @@ namespace IronNight
                 paperBtn = MakeGhost(endSheet.transform, "The morning paper", new Vector2(0.5f, 0.5f), new Vector2(0, -590), new Vector2(880, 100), 30, ShowPaper);
                 paperBtn.transform.Find("Label").GetComponent<Text>().text = Spaced("THE MORNING PAPER");
             }
-            paperBtn.SetActive(story != null);
+            paperBtn.SetActive(story != null); PlacePaper();
+        }
+
+        /// <summary>The paper's button just under the lowest of the end sheet's buttons that is showing.</summary>
+        void PlacePaper()
+        {
+            if (paperBtn == null) return; float low = float.MaxValue;
+            foreach (var b in new[] { againBtn, endDepotBtn, holdBtn })
+            {
+                if (b == null || !b.activeSelf) continue; var rt = (RectTransform)b.transform; low = Mathf.Min(low, rt.anchoredPosition.y - rt.sizeDelta.y * 0.5f);
+            }
+            if (low == float.MaxValue) return;
+            ((RectTransform)paperBtn.transform).anchoredPosition = new Vector2(0f, low - 24f - 50f);
         }
 
         void ShowPaper()
@@ -65,27 +75,11 @@ namespace IronNight
             var ad2 = MakeText(inner.transform, "Line", new Vector2(0.5f, 1f), new Vector2(0f, -250f), TextAnchor.UpperCenter, 22, Ink); ad2.font = BoldFont(); ad2.text = "Every star you win this season brings the next reward closer."; ad2.rectTransform.sizeDelta = new Vector2(250f, 150f); Fit(ad2, 14);
             var ad3 = MakeText(inner.transform, "Foot", new Vector2(0.5f, 0f), new Vector2(0f, 26f), TextAnchor.LowerCenter, 20, Ink); ad3.font = LabelFont(); ad3.text = Spaced("AT YOUR DEPOT"); ad3.rectTransform.sizeDelta = new Vector2(260f, 30f);
 
-            paperButtons = new GameObject("Buttons", typeof(RectTransform)); paperButtons.transform.SetParent(paperSheet.transform, false); Stretch(paperButtons);
-            MakeGhost(paperButtons.transform, "Close", new Vector2(0.5f, 0f), new Vector2(-230f, 90f), new Vector2(400f, 100f), 30, () => { Destroy(paperSheet); paperSheet = null; });
-            MakePrimary(paperButtons.transform, Application.isMobilePlatform ? "Share" : "Save", new Vector2(0.5f, 0f), new Vector2(230f, 90f), new Vector2(400f, 100f), 32, () => StartCoroutine(KeepPaper()));
+            MakeGhost(paperSheet.transform, "Close", new Vector2(0.5f, 0f), new Vector2(0f, 90f), new Vector2(400f, 100f), 30, () => { Destroy(paperSheet); paperSheet = null; });
             Sfx.Whoosh();
         }
 
         void Rule(Transform page, float y, float h) => MakeImage(page, "Rule", new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(920f, h), Ink);
 
-        /// <summary>The page kept like a photo: the buttons hidden for a frame, the screen taken, saved (and on a phone offered to share).</summary>
-        IEnumerator KeepPaper()
-        {
-            if (paperButtons == null) yield break;
-            paperButtons.SetActive(false);
-            yield return new WaitForEndOfFrame();
-            var shot = ScreenCapture.CaptureScreenshotAsTexture(); var jpg = shot.EncodeToJPG(90); Destroy(shot);
-            if (paperButtons != null) paperButtons.SetActive(true);
-            string note = Battle.PhotoKeep(jpg, "IronNight_paper_" + System.DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".jpg", out bool share);
-            Ads.Say(note); Sfx.Shutter();
-#if UNITY_ANDROID && !UNITY_EDITOR
-            if (share) { try { PhotoGallery.Share(); } catch (System.Exception e) { Debug.LogWarning("Paper not shared: " + e.Message); } }
-#endif
-        }
     }
 }
