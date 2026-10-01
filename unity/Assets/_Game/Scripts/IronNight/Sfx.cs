@@ -14,7 +14,7 @@ namespace IronNight
         const int Rate = 44100;
         static Sfx instance;
         AudioClip shot, shotHeavy, shotFar, hit, explosion, artillery, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, front, whistle, rumble, ricochet, ricochet2, flak, reload, turretLoop, mg, faust, stuka, drone, crunch, brush, whoosh, fighter, shutter, crack, clatter;
-        readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, turret, ambient, frontLine, ui, weld, voice, diesel, idle, enemyEngine; AudioClip idleLoop, enemyLoop, mg42, shotEnemy; AudioClip[] hits, blasts, shells; float engineBase = 1f, dieselLevel; Transform listener; readonly Queue<AudioClip> voiceQueue = new Queue<AudioClip>();
+        readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, turret, ambient, frontLine, ui, weld, voice, diesel, idle, enemyEngine; AudioClip idleLoop, enemyLoop, mg42, shotEnemy; AudioClip[] hits, blasts, shells, brushes, crunches, timbers; AudioClip collapse; float crunchAt = -1f; float engineBase = 1f, dieselLevel; Transform listener; readonly Queue<AudioClip> voiceQueue = new Queue<AudioClip>();
 
         public static void Build(Camera cam)
         {
@@ -407,6 +407,7 @@ namespace IronNight
             mg42 = Resources.Load<AudioClip>("Audio/mg42"); shotEnemy = Resources.Load<AudioClip>("Audio/shotEnemy");
             hits = Takes(hit, "hit2", "hit3"); blasts = Takes(explosion, "explosion2", "explosion3"); shells = Takes(artillery, "artillery2", "artillery3");
             whistle = Load("whistle", MakeWhistle); stuka = Load("stuka", MakeStukaDive); drone = Load("drone", MakeDrone); crunch = Load("crunch", MakeCrunch); brush = Load("brush", MakeBrush); whoosh = Load("whoosh", MakeWhoosh); fighter = Load("fighter", MakeFighterPass); rumble = Load("shotFar", MakeRumble); wind = Load("wind", Wind); rain = Load("rain", Rain); front = Resources.Load<AudioClip>("Audio/front");
+            brushes = Takes(brush, "brush2", "brush3"); crunches = Takes(crunch, "crunch2", "crunch3"); timbers = Takes(Resources.Load<AudioClip>("Audio/timber"), "timber2", "timber3"); collapse = Resources.Load<AudioClip>("Audio/collapse");
             pickup = Load("pickup", () => Radio(new[] { 880f, 1320f }, 0.12f)); levelUp = Load("levelUp", () => Radio(new[] { 523f, 659f, 784f }, 0.2f)); click = Load("click", MakeClick); shutter = Load("shutter", MakeShutter); crack = Clip("crack", MakeCrack()); clatter = Clip("clatter", MakeClatter());
 
             for (int i = 0; i < 12; i++) { var s = NewSource("Voice " + i); s.spatialBlend = 0.75f; s.rolloffMode = AudioRolloffMode.Linear; s.minDistance = 12f; s.maxDistance = 140f; pool.Add(s); }
@@ -498,9 +499,14 @@ namespace IronNight
         public static void Turret(float swing) { if (!instance || instance.turretLoop == null) return; var t = instance.turret; t.volume = Mathf.Lerp(t.volume, Mathf.Clamp01(swing * 0.6f) * 0.3f, 0.2f); }
         public static void StukaDive(Vector3 pos) { if (instance) instance.PlayAt(instance.stuka, pos, 1f, Random.Range(0.97f, 1.03f)); }
         public static void FighterPass(Vector3 pos) { if (instance) instance.PlayAt(instance.fighter, pos, 1f, Random.Range(0.96f, 1.04f)); }
-        public static void Crunch(Vector3 pos) { if (instance) instance.PlayAt(instance.crunch, pos, 0.55f, Random.Range(0.85f, 1.15f)); }
+        /// <summary>Wood giving way under a hull; at most one every quarter second, however long the hull pushes.</summary>
+        public static void Crunch(Vector3 pos) { if (!instance || Time.time - instance.crunchAt < 0.25f) return; instance.crunchAt = Time.time; instance.PlayAt(Any(instance.crunches), pos, 0.6f, Random.Range(0.88f, 1.12f)); }
+        /// <summary>A tree going over: the trunk cracking, then the crash as it lands.</summary>
+        public static void TreeFall(Vector3 pos) { if (!instance || instance.timbers[0] == null) return; instance.PlayAt(Any(instance.timbers), pos, 0.8f, Random.Range(0.9f, 1.08f)); }
+        /// <summary>A house coming down: beams onto stone; the blast when there is no recording of it.</summary>
+        public static void Collapse(Vector3 pos) { if (!instance) return; instance.PlayAt(instance.collapse != null ? instance.collapse : Any(instance.blasts), pos, 0.85f, Random.Range(0.92f, 1.05f)); }
         public static void Whoosh() { if (instance && instance.whoosh != null) instance.ui.PlayOneShot(instance.whoosh, 0.28f); }
-        public static void Brush(Vector3 pos) { if (instance) instance.PlayAt(instance.brush, pos, 0.7f, Random.Range(0.88f, 1.12f)); }
+        public static void Brush(Vector3 pos) { if (instance) instance.PlayAt(Any(instance.brushes), pos, 0.75f, Random.Range(0.9f, 1.1f)); }
         public static void Drone(Vector3 pos) { if (instance) instance.PlayAt(instance.drone, pos, 0.9f, 1f); }
         public static void Whistle(Vector3 pos) { if (instance) instance.PlayAt(instance.whistle, pos, 0.7f, Random.Range(0.95f, 1.05f)); }
         public static void Mg(Vector3 pos) { if (instance) instance.PlayAt(instance.mg, pos, 0.55f, Random.Range(0.95f, 1.05f)); }

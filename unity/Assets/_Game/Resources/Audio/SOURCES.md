@@ -1,6 +1,6 @@
 # Sound sources
 
-The real recordings (engines, tracks, turret, guns, machine guns, hits, ricochets, blasts, the fighter) come from the Sonniss GDC Game Audio Bundles 2018,
+The real recordings (engines, tracks, turret, guns, machine guns, hits, ricochets, blasts, the fighter, hedges, wood, trees, collapses) come from the Sonniss GDC Game Audio Bundles 2018,
 2019 and 2020 (https://sonniss.com/gameaudiogdc/): royalty-free, commercial use in games, no attribution required, not to be
 used for AI/ML training; prepared by `art/pipeline/sonniss-prep.py`.
 
@@ -32,6 +32,16 @@ Sound Effects Free License (free for commercial use). Neither may be redistribut
 | artillery3 | Sonniss GDC 2019, "Distant Blast" 26 | Lukas Tvrdon |
 | whistle | Sonniss GDC 2020, "Tank - Explosion": shell trajectory 004, reversed | Bluezone |
 | shotEnemy | Sonniss GDC 2020, "Tank - Explosion": tank artillery cannon shot 012 | Bluezone |
+| brush | Sonniss GDC 2018, "Rustle Tones": green leaves and twigs, with branches crushed (BlueZone, "Wood", 2019) | Articulated Sounds |
+| brush2 | Sonniss GDC 2018, "Rustle Tones": green leaves and twigs | Articulated Sounds |
+| brush3 | Sonniss GDC 2018, "Foley Elements Foliage": leaves pile pick up | Soundrangers |
+| crunch | Sonniss GDC 2019, "Wooden Fence Destruction": destruction wooden 2 | InspectorJ |
+| crunch2 | Sonniss GDC 2019, "Wooden Fence Destruction": fence thud, woodpile dropping | InspectorJ |
+| crunch3 | Sonniss GDC 2019, "Wood Sound Effects": crushing branches, with wood debris (Matt Script) | BlueZone |
+| timber | Sonniss GDC 2018, "Foley Elements Foliage": tree falling, dead limb impact | Soundrangers |
+| timber2 | Sonniss GDC 2020, "Forest Creature": wood crack, heavy rumble | Bluezone |
+| timber3 | Sonniss GDC 2019, "Broken": wood break small | Rock The Speakerbox |
+| collapse | Sonniss GDC 2019, "Broken": beam, wood ceiling drop on concrete, with wood debris (Matt Script) | Rock The Speakerbox |
 | engine | Sonniss GDC 2018, "Sherman M4A3 Medium Tank" t3, on board, medium drive | Pole Position Production |
 | engine_idle | Sonniss GDC 2018, "Chaffee M24 Light Tank" t6, on board, idle in neutral | Pole Position Production |
 | engine_enemy | Sonniss GDC 2019, "Panzer IV Ausf. G" t10, outside, idle | Pole Position Production |

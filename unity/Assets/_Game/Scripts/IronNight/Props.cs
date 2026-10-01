@@ -1003,6 +1003,8 @@ namespace IronNight
         {
             if (p.state != 0) return;
             p.state = 1; p.radii = new float[0]; p.circleCenters = new Vector2[0]; p.fallYaw = Mathf.Atan2(dir.x, dir.z);
+            bool wood = p.what == What.Tree || (p.kind != null && (p.kind.mesh.StartsWith("tree_") || p.kind.mesh == "deadtree" || p.kind.mesh == "spruce_snow" || p.kind.mesh == "k_birches"));
+            if (wood) Sfx.TreeFall(p.pos); else Sfx.Crunch(p.pos);   // a tree cracks and crashes down; a pole or a signpost just snaps
             if (p.go != null) { TwoSided(p); falling.Add(new Falling { p = p, rot0 = p.go.transform.rotation, axis = Vector3.Cross(Vector3.up, FallDir(p)) }); }
         }
 
@@ -1038,6 +1040,7 @@ namespace IronNight
             if (byShell && Burns(p.kind.mesh)) p.burn = 12f + Random.value * 10f;
             if (p.go != null) p.go.transform.localScale = new Vector3(1f, 0.22f, 1f);
             if (fx != null) fx.Dust(p.pos);
+            Sfx.Crunch(p.pos);
         }
 
         /// <summary>A building coming down: it sinks into its own dust and a heap of rubble is left in its place.</summary>
@@ -1047,7 +1050,7 @@ namespace IronNight
             if (prefabs.ContainsKey(p.kind.mesh + "_ruin")) { p.height = 2.2f; for (int c = 0; c < p.radii.Length; c++) p.radii[c] *= 0.75f; }   // a ruin with walls standing: tanks go round it, low shells stop in it
             else { p.drivable = true; p.height = 1.2f; }   // a heap: driven over
             if (fx != null) fx.Collapse(p.pos, p.kind.length);
-            Sfx.Explosion(p.pos);
+            Sfx.Collapse(p.pos);
             if (p.go != null) StartCoroutine(Sink(p, p.go)); 
         }
 

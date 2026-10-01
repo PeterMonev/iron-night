@@ -122,3 +122,19 @@ cut('shotEnemy', BZ + 'Bluezone_BC0271_tank_artillery_cannon_shot_012.wav', leng
 # machine guns: ours is the Browning M1919 the Shermans carried, theirs the MG 42
 cut('mg', 'Super Thump - Weapons of World War II - Designed/STDSGN_WoWW2_Wep_MG_M1919_Machinegun_Auto-Burst_Shot_X6.wav', start=13.2, length=1.0, fade=0.35, peak=0.8)
 cut('mg42', 'Pole Position - MG 42 machine gun/MG 42, Firing, t1, Burst, Long, Mountain Top, D100.wav', start=8.6, length=1.3, fade=0.4, peak=0.8)
+# the country: a hull through a hedge (leaves and twigs, three takes, one with a branch snapping)
+RUSTLE = 'Articulated Sounds - Rustle Tones/RUSTLE Studio performed green leaves twigs brush moves.LR.wav'
+BRANCHES = ('BlueZone - Wood Sound Effects/Bluezone_BC0254_wood_crushing_branches_001_001.wav', 0.25, 0.8)
+cut('brush', RUSTLE, start=21.2, length=1.3, fade=0.5, peak=0.75, layer=BRANCHES)
+cut('brush2', RUSTLE, start=16.8, length=1.8, fade=0.6, peak=0.7)
+cut('brush3', 'Soundrangers - Foley Elements Foliage/leaves_pile_pick_up_04.wav', start=0.3, length=1.8, fade=0.6, peak=0.7)
+# wood giving way under the tracks: a fence smashed, planks thudding, branches and a woodpile
+cut('crunch', 'InspectorJ - Wooden Fence Destruction/Destruction_Wooden_2.wav', length=1.5, fade=0.6, peak=0.8)
+cut('crunch2', 'InspectorJ - Wooden Fence Destruction/WoodenFence_Thud_Multi_1.wav', length=1.0, fade=0.4, peak=0.8, layer=('InspectorJ - Wooden Fence Destruction/Dropping_WoodPile_79.wav', 0.1, 0.6))
+cut('crunch3', 'BlueZone - Wood Sound Effects/Bluezone_BC0254_wood_crushing_branches_001_001.wav', length=0.8, fade=0.3, peak=0.8, layer=('Matt Script - You Me & Debris/impact_wood_debris_fall_hit_02.wav', 0.15, 0.5))
+# a tree going over: the trunk cracking, then the crash as it lands, timed to the fall (1.1 s)
+cut('timber', 'Soundrangers - Foley Elements Foliage/tree_falling_04.wav', start=6.9, length=3.4, fade=1.2, peak=0.9, layer=('Soundrangers - Foley Elements Foliage/tree_dead_tree_limb_impact_05.wav', 0.0, 0.7))
+cut('timber2', 'Bluezone - Forest Creature Sound Effects/Bluezone_BC0269_creature_wood_texture_crack_heavy_rumble_006.wav', start=0.2, length=3.4, fade=1.2, peak=0.85)
+cut('timber3', 'Rock The Speakerbox - Broken/BROKEN - DESIGNED - WOOD Break Small.wav', start=12.0, length=3.0, fade=1.0, peak=0.85)
+# a house coming down: beams falling onto stone, and the wood after them
+cut('collapse', 'Rock The Speakerbox - Broken/BROKEN - CK - BEAM Wood Ceiling Drop On Concrete.wav', start=2.9, length=2.2, fade=0.9, peak=0.9, layer=('Matt Script - You Me & Debris/impact_wood_debris_fall_hit_02.wav', 0.6, 0.5))

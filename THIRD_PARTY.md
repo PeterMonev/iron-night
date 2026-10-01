@@ -43,7 +43,8 @@ The tank engines, tracks, turret, the guns, machine guns, armour hits, ricochets
 fighter's pass are cut from real recordings in the free Sonniss GDC Game Audio Bundles
 (https://sonniss.com/gameaudiogdc/): Pole Position Production (Sherman M4A3, Chaffee M24, Panzer IV Ausf. G, P-51D
 Mustang, MG 42), Airborne Sound (Battlefield Howitzers), BlueZone / Bluezone Corporation, Stefano Cremona, Olivier
-Girardot, Lukas Tvrdon and Super Thump. Royalty-free and commercially usable in games, no
+Girardot, Lukas Tvrdon, Super Thump, Articulated Sounds, Soundrangers, InspectorJ, Matt Script and Rock The Speakerbox
+(hedges, wood, falling trees, collapsing houses). Royalty-free and commercially usable in games, no
 attribution required; the sounds may not be used for AI/ML training. List per clip: unity/Assets/_Game/Resources/Audio/SOURCES.md.
 
 ## Fonts (SIL Open Font License 1.1)
