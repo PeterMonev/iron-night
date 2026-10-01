@@ -129,7 +129,7 @@ namespace IronNight
             // the blobs under the leaves go dark: they are the shadowed inside of the bush
             hedgeMaterial.SetColor("_BaseColor", winter ? new Color(0.72f, 0.78f, 0.82f) : new Color(0.55f, 0.62f, 0.5f)); canopyMaterial.SetColor("_BaseColor", winter ? new Color(0.72f, 0.78f, 0.82f) : new Color(0.52f, 0.6f, 0.48f));
             lampTemplate = LampTemplate();
-            waterMaterial = new Material(lit); waterMaterial.SetColor("_BaseColor", winter ? new Color(0.5f, 0.55f, 0.6f) : new Color(0.05f, 0.07f, 0.08f)); waterMaterial.SetFloat("_Smoothness", winter ? 0.8f : 0.94f); waterMaterial.SetFloat("_Metallic", 0f);   // still dark water with the moon in it; ice in the Ardennes
+            waterMaterial = new Material(lit); waterMaterial.SetColor("_BaseColor", winter ? new Color(0.5f, 0.55f, 0.6f) : new Color(0.05f, 0.07f, 0.08f)); waterMaterial.SetFloat("_Smoothness", winter ? 0.62f : 0.7f); waterMaterial.SetFloat("_Metallic", 0f);   // still dark water with a soft sheen: smoother, and the flare over the platoon showed in it as a second sun; ice in the Ardennes
             bankMaterial = new Material(laneMaterial); bankMaterial.SetTextureScale("_BaseMap", new Vector2(1f, 1f)); bankMaterial.renderQueue = 2441;
             { string hm = Kursk ? "k_wattle" : "hedge"; if (prefabs.ContainsKey(hm) && PlayerPrefs.GetInt("quality", 1) != 0) Slices(hm, out _); }   // the hedge cut into its slices now, while the night loads
         }
