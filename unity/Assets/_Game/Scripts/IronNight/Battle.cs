@@ -1958,7 +1958,7 @@ namespace IronNight
             bool mg = m.role == Infantry.Role.Mg; var from = m.pos + Vector3.up * (mg ? 0.45f : 1.1f) + m.face * 0.8f;
             var aim = target.transform.position + Vector3.up * 1.4f + Random.insideUnitSphere * 1.6f; var dir = (aim - from).normalized;
             fx.MgTracer(from, dir);
-            if (mg && m.burst == 5) Sfx.Mg(from);
+            if (mg && m.burst == 5) Sfx.Mg42(from);
             if (Random.value < 0.25f) { var at = target.transform.position + Vector3.up * 1.3f - new Vector3(dir.x, 0f, dir.z) * target.spec.radius * 0.8f; fx.Spark(at, -dir); }
         }
 

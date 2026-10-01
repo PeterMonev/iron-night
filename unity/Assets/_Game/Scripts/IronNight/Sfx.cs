@@ -14,7 +14,7 @@ namespace IronNight
         const int Rate = 44100;
         static Sfx instance;
         AudioClip shot, shotHeavy, shotFar, hit, explosion, artillery, pickup, click, levelUp, engineLoop, tracksLoop, wind, rain, front, whistle, rumble, ricochet, ricochet2, flak, reload, turretLoop, mg, faust, stuka, drone, crunch, brush, whoosh, fighter, shutter, crack, clatter;
-        readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, turret, ambient, frontLine, ui, weld, voice, diesel, idle, enemyEngine; AudioClip idleLoop, enemyLoop; float engineBase = 1f, dieselLevel; Transform listener; readonly Queue<AudioClip> voiceQueue = new Queue<AudioClip>();
+        readonly List<AudioSource> pool = new List<AudioSource>(); AudioSource engine, tracks, turret, ambient, frontLine, ui, weld, voice, diesel, idle, enemyEngine; AudioClip idleLoop, enemyLoop, mg42, shotEnemy; AudioClip[] hits, blasts, shells; float engineBase = 1f, dieselLevel; Transform listener; readonly Queue<AudioClip> voiceQueue = new Queue<AudioClip>();
 
         public static void Build(Camera cam)
         {
@@ -404,6 +404,8 @@ namespace IronNight
             explosion = Load("explosion", MakeExplosion); artillery = Load("artillery", MakeExplosion); hit = Load("hit", ArmourHit); ricochet = Load("ricochet", MakeRicochet); ricochet2 = Resources.Load<AudioClip>("Audio/ricochet2");
             engineLoop = Load("engine", MakeEngine); tracksLoop = Load("tracks", Tracks);
             idleLoop = Resources.Load<AudioClip>("Audio/engine_idle"); enemyLoop = Resources.Load<AudioClip>("Audio/engine_enemy");
+            mg42 = Resources.Load<AudioClip>("Audio/mg42"); shotEnemy = Resources.Load<AudioClip>("Audio/shotEnemy");
+            hits = Takes(hit, "hit2", "hit3"); blasts = Takes(explosion, "explosion2", "explosion3"); shells = Takes(artillery, "artillery2", "artillery3");
             whistle = Load("whistle", MakeWhistle); stuka = Load("stuka", MakeStukaDive); drone = Load("drone", MakeDrone); crunch = Load("crunch", MakeCrunch); brush = Load("brush", MakeBrush); whoosh = Load("whoosh", MakeWhoosh); fighter = Load("fighter", MakeFighterPass); rumble = Load("shotFar", MakeRumble); wind = Load("wind", Wind); rain = Load("rain", Rain); front = Resources.Load<AudioClip>("Audio/front");
             pickup = Load("pickup", () => Radio(new[] { 880f, 1320f }, 0.12f)); levelUp = Load("levelUp", () => Radio(new[] { 523f, 659f, 784f }, 0.2f)); click = Load("click", MakeClick); shutter = Load("shutter", MakeShutter); crack = Clip("crack", MakeCrack()); clatter = Clip("clatter", MakeClatter());
 
@@ -419,6 +421,14 @@ namespace IronNight
             voice = NewSource("Voice"); voice.spatialBlend = 0f; voice.priority = 0;
             ambient = NewSource("Wind"); ambient.clip = wind; ambient.loop = true; ambient.spatialBlend = 0f; ambient.volume = 0.18f; ambient.Play();
         }
+
+        /// <summary>A sound and the other takes of it that are there, to take turns so no two blasts sound the same.</summary>
+        static AudioClip[] Takes(AudioClip first, params string[] more)
+        {
+            var list = new List<AudioClip> { first }; foreach (var n in more) { var c = Resources.Load<AudioClip>("Audio/" + n); if (c != null) list.Add(c); }
+            return list.ToArray();
+        }
+        static AudioClip Any(AudioClip[] takes) => takes[Random.Range(0, takes.Length)];
 
         AudioSource NewSource(string name) { var go = new GameObject(name); go.transform.SetParent(transform, false); var s = go.AddComponent<AudioSource>(); s.playOnAwake = false; s.dopplerLevel = 0f; return s; }
 
@@ -449,7 +459,8 @@ namespace IronNight
                 default: heavy = false; pitch = 1f; snap = 0f; break;
             }
             bool far = (pos - instance.listener.position).magnitude > 45f;
-            instance.PlayAt(far ? instance.shotFar : heavy ? instance.shotHeavy : instance.shot, pos, friendly ? 0.9f : 0.8f, pitch * Random.Range(0.95f, 1.05f));
+            var clip = far ? instance.shotFar : !friendly && instance.shotEnemy != null && Random.value < 0.6f ? instance.shotEnemy : heavy ? instance.shotHeavy : instance.shot;   // the enemy's guns mostly their own report
+            instance.PlayAt(clip, pos, friendly ? 0.9f : 0.8f, pitch * Random.Range(0.95f, 1.05f));
             if (snap > 0f && !far && instance.crack != null) instance.PlayAt(instance.crack, pos, 0.7f * snap, Random.Range(0.94f, 1.06f));
         }
         /// <summary>The leader's engine by its make: the Sherman's radial, the light tanks' high whine, the heavy ones' growl,
@@ -475,15 +486,15 @@ namespace IronNight
             if (!instance) return; bool far = (pos - instance.listener.position).magnitude > 45f;
             instance.PlayAt(far ? instance.shotFar : heavy ? instance.shotHeavy : instance.shot, pos, friendly ? 0.9f : 0.8f, (heavy ? 0.9f : 1f) * Random.Range(0.94f, 1.06f));
         }
-        public static void Hit(Vector3 pos) { if (instance) instance.PlayAt(instance.hit, pos, 0.85f, Random.Range(0.9f, 1.1f)); }
+        public static void Hit(Vector3 pos) { if (instance) instance.PlayAt(Any(instance.hits), pos, 0.85f, Random.Range(0.9f, 1.1f)); }
         public static void Ricochet(Vector3 pos) { if (instance) instance.PlayAt(instance.ricochet2 != null && Random.value < 0.4f ? instance.ricochet2 : instance.ricochet, pos, 0.85f, Random.Range(0.92f, 1.1f)); }
-        public static void Explosion(Vector3 pos) { if (instance) instance.PlayAt(instance.explosion, pos, 1f, Random.Range(0.92f, 1.05f)); }
+        public static void Explosion(Vector3 pos) { if (instance) instance.PlayAt(Any(instance.blasts), pos, 1f, Random.Range(0.92f, 1.05f)); }
         /// <summary>An artillery shell landing: a shorter, harder blast than a vehicle going up.</summary>
-        public static void Artillery(Vector3 pos) { if (instance) instance.PlayAt(instance.artillery, pos, 0.9f, Random.Range(0.95f, 1.1f)); }
+        public static void Artillery(Vector3 pos) { if (instance) instance.PlayAt(Any(instance.shells), pos, 0.9f, Random.Range(0.95f, 1.1f)); }
         /// <summary>The breech after one of ours fires: a clank half a second later, from the tank.</summary>
         public static void Reload(Vector3 pos) { if (instance && instance.reload != null) instance.PlayAt(instance.reload, pos, 0.5f, Random.Range(0.95f, 1.05f), 0.5f); }
         /// <summary>The leader's turret motor: audible while the turret swings, quiet when it rests.</summary>
-        public static void Turret(float swing) { if (!instance || instance.turretLoop == null) return; var t = instance.turret; t.volume = Mathf.Lerp(t.volume, Mathf.Clamp01(swing * 0.6f) * 0.35f, 0.2f); }
+        public static void Turret(float swing) { if (!instance || instance.turretLoop == null) return; var t = instance.turret; t.volume = Mathf.Lerp(t.volume, Mathf.Clamp01(swing * 0.6f) * 0.12f, 0.2f); }
         public static void StukaDive(Vector3 pos) { if (instance) instance.PlayAt(instance.stuka, pos, 1f, Random.Range(0.97f, 1.03f)); }
         public static void FighterPass(Vector3 pos) { if (instance) instance.PlayAt(instance.fighter, pos, 1f, Random.Range(0.96f, 1.04f)); }
         public static void Crunch(Vector3 pos) { if (instance) instance.PlayAt(instance.crunch, pos, 0.55f, Random.Range(0.85f, 1.15f)); }
@@ -492,6 +503,8 @@ namespace IronNight
         public static void Drone(Vector3 pos) { if (instance) instance.PlayAt(instance.drone, pos, 0.9f, 1f); }
         public static void Whistle(Vector3 pos) { if (instance) instance.PlayAt(instance.whistle, pos, 0.7f, Random.Range(0.95f, 1.05f)); }
         public static void Mg(Vector3 pos) { if (instance) instance.PlayAt(instance.mg, pos, 0.55f, Random.Range(0.95f, 1.05f)); }
+        /// <summary>A German machine gunner's burst: the MG 42's tearing rattle, the tanks' own Browning when it is missing.</summary>
+        public static void Mg42(Vector3 pos) { if (instance) instance.PlayAt(instance.mg42 != null ? instance.mg42 : instance.mg, pos, 0.5f, Random.Range(0.96f, 1.04f)); }
         public static void Faust(Vector3 pos) { if (instance) instance.PlayAt(instance.faust, pos, 0.8f, Random.Range(0.95f, 1.05f)); }
         public static void Flak(Vector3 pos) { if (instance) instance.PlayAt(instance.flak, pos, 0.4f, Random.Range(1.1f, 1.3f)); }
         /// <summary>Distant barrage somewhere over the horizon.</summary>

@@ -1,7 +1,7 @@
 # Sound sources
 
-The real recordings (engines, tracks, turret, guns, the fighter) come from the Sonniss GDC Game Audio Bundles 2018 and
-2019 (https://sonniss.com/gameaudiogdc/): royalty-free, commercial use in games, no attribution required, not to be
+The real recordings (engines, tracks, turret, guns, the fighter) come from the Sonniss GDC Game Audio Bundles 2018,
+2019 and 2020 (https://sonniss.com/gameaudiogdc/): royalty-free, commercial use in games, no attribution required, not to be
 used for AI/ML training; prepared by `art/pipeline/sonniss-prep.py`.
 
 Library recordings, prepared by `art/pipeline/sfx-prep.py` (mono 44.1 kHz, trimmed, normalised, loops cross-faded).
@@ -16,14 +16,22 @@ Sound Effects Free License (free for commercial use). Neither may be redistribut
 | shotFar | Sonniss GDC 2019, "Battlefield Howitzers": M101 105 mm, distant, "Explode, Crack" | Airborne Sound |
 | flak | Pixabay 85147 "antiair" | freesound_community |
 | reload | Pixabay 47828 "Tank Reload" | freesound_community |
-| mg | Pixabay 43670 "Machine Gun Burst" | freesound_community |
+| mg | Sonniss GDC 2020, "Weapons of World War II - Designed": M1919 burst | Super Thump |
+| mg42 | Sonniss GDC 2020, "MG 42 machine gun": long burst, mountain top | Pole Position Production |
 | faust | Pixabay 307512 "Rocket Launcher" | 49053354 |
-| hit | Pixabay 454390 "Hammer Steel Impact" | Universfield |
-| ricochet | Pixabay 101553 "Ricochet 2" | freesound_community |
-| ricochet2 | Pixabay 41134 "Whizzby" | freesound_community |
-| explosion | Pixabay 369789 "Big Explosion sfx" | kave_msri |
-| artillery | Pixabay 100420 "Large Explosion" | freesound_community |
-| whistle | Pixabay 104653 "Incoming mortar 1" | freesound_community |
+| hit | Sonniss GDC 2018, "Heavy Metal Impact": large tank | BlueZone |
+| hit2 | Sonniss GDC 2018, "Heavy Metal Impact": metal plate, medium | BlueZone |
+| hit3 | Sonniss GDC 2020, "Cinematic Metal Impacts" 052 | Bluezone |
+| ricochet | Sonniss GDC 2018, "Metal Debris": metal whoosh 021, over the metal plate | Bluezone |
+| ricochet2 | Sonniss GDC 2018, "Metal Debris": metal whoosh 037, over the metal plate | Bluezone |
+| explosion | Sonniss GDC 2020, "Explosions": BigExplosion02, with falling debris (Bluezone, "Tank - Explosion") | Stefano Cremona |
+| explosion2 | Sonniss GDC 2018, "Guns & Explosions": Explosion 8, with the same debris | Olivier Girardot |
+| explosion3 | Sonniss GDC 2020, "Tank - Explosion": explosion outdoors large 005, with the same debris | Bluezone |
+| artillery | Sonniss GDC 2020, "Explosions": DeepExplosion02, with the same debris | Stefano Cremona |
+| artillery2 | Sonniss GDC 2020, "Explosions": FarExplosion03 | Stefano Cremona |
+| artillery3 | Sonniss GDC 2019, "Distant Blast" 26 | Lukas Tvrdon |
+| whistle | Sonniss GDC 2020, "Tank - Explosion": shell trajectory 004, reversed | Bluezone |
+| shotEnemy | Sonniss GDC 2020, "Tank - Explosion": tank artillery cannon shot 012 | Bluezone |
 | engine | Sonniss GDC 2018, "Sherman M4A3 Medium Tank" t3, on board, medium drive | Pole Position Production |
 | engine_idle | Sonniss GDC 2018, "Chaffee M24 Light Tank" t6, on board, idle in neutral | Pole Position Production |
 | engine_enemy | Sonniss GDC 2019, "Panzer IV Ausf. G" t10, outside, idle | Pole Position Production |
