@@ -4,13 +4,15 @@ namespace IronNight
 {
     /// <summary>
     /// The leader's crew, seat by seat: gunner, loader, driver, radio operator. Each nation has three men for every seat,
-    /// each with his own gift, and an ace (a woman with two gifts in one, dearer, listed once her portrait is in); the first of each serves from the start, the others are taken on for points. A man trains
+    /// each with his own gift, and an ace (a woman with two gifts in one, listed once her portrait is in); the first of each serves from the start, the others are taken on for points.
+    /// The aces are taken on for gold (Man.gold), but for the nation's gunner, who joins after Man.dawns nights held till dawn; an ace's two
+    /// gifts each grow at half the pace (AceLevel), so she is breadth and looks, not a stronger crew bought for money. A man trains
     /// through five levels with crew experience (Depot.CrewXp), each making his gift stronger, and keeps them if he leaves the seat. The commander keeps his
     /// own place (Depot.Commanders); the crew's nights together still count as they did (Depot.CrewNights).
     /// </summary>
     public static class Crew
     {
-        public class Man { public string id, nation, role, name, perk, gift, perk2, gift2; public int cost; }
+        public class Man { public string id, nation, role, name, perk, gift, perk2, gift2; public int cost, gold, dawns; }   // gold: an ace's price; dawns: the nights held that bring her for nothing
         public static readonly string[] Roles = { "gunner", "loader", "driver", "radio" };
         public static readonly int[] TrainCosts = { 0, 300, 600, 1000, 1500 };   // from level 1 to 2, 2 to 3, 3 to 4, 4 to 5
         public const int MaxLevel = 5;
@@ -44,14 +46,14 @@ namespace IronNight
             new Man { id = "su_radio_2", nation = "su", role = "radio", name = "Ryad. Yura Belyaev", perk = "signals", gift = "Signaller", cost = 1000 },
             new Man { id = "su_radio_3", nation = "su", role = "radio", name = "Serzh. Arkady Frolov", perk = "spot", gift = "Spotter", cost = 1200 },
             // the aces: a woman in every seat, two gifts in one
-            new Man { id = "us_gunner_4", nation = "us", role = "gunner", name = "Sgt. Maggie O'Hara", perk = "steady", gift = "Steady hand", perk2 = "eagle", gift2 = "Eagle eye", cost = 3000 },
-            new Man { id = "us_loader_4", nation = "us", role = "loader", name = "Cpl. Rosie Kowalski", perk = "hands", gift = "Quick hands", perk2 = "racks", gift2 = "Ammo handler", cost = 3000 },
-            new Man { id = "us_driver_4", nation = "us", role = "driver", name = "T/5 Dolly Reyes", perk = "foot", gift = "Lead foot", perk2 = "rough", gift2 = "Rough rider", cost = 3000 },
-            new Man { id = "us_radio_4", nation = "us", role = "radio", name = "Pvt. Grace Holloway", perk = "signals", gift = "Signaller", perk2 = "spot", gift2 = "Spotter", cost = 3000 },
-            new Man { id = "su_gunner_4", nation = "su", role = "gunner", name = "Ml. serzh. Anya Voronova", perk = "eagle", gift = "Eagle eye", perk2 = "snap", gift2 = "Snap shot", cost = 3000 },
-            new Man { id = "su_loader_4", nation = "su", role = "loader", name = "Ryad. Katya Smirnova", perk = "hands", gift = "Quick hands", perk2 = "he", gift2 = "HE expert", cost = 3000 },
-            new Man { id = "su_driver_4", nation = "su", role = "driver", name = "Serzh. Nadya Kuznetsova", perk = "foot", gift = "Lead foot", perk2 = "mech", gift2 = "Mechanic", cost = 3000 },
-            new Man { id = "su_radio_4", nation = "su", role = "radio", name = "Ml. serzh. Zoya Petrenko", perk = "bow", gift = "Bow gunner", perk2 = "spot", gift2 = "Spotter", cost = 3000 },
+            new Man { id = "us_gunner_4", nation = "us", role = "gunner", name = "Sgt. Maggie O'Hara", perk = "steady", gift = "Steady hand", perk2 = "eagle", gift2 = "Eagle eye", cost = 3000, dawns = 3 },
+            new Man { id = "us_loader_4", nation = "us", role = "loader", name = "Cpl. Rosie Kowalski", perk = "hands", gift = "Quick hands", perk2 = "racks", gift2 = "Ammo handler", cost = 3000, gold = 300 },
+            new Man { id = "us_driver_4", nation = "us", role = "driver", name = "T/5 Dolly Reyes", perk = "foot", gift = "Lead foot", perk2 = "rough", gift2 = "Rough rider", cost = 3000, gold = 300 },
+            new Man { id = "us_radio_4", nation = "us", role = "radio", name = "Pvt. Grace Holloway", perk = "signals", gift = "Signaller", perk2 = "spot", gift2 = "Spotter", cost = 3000, gold = 300 },
+            new Man { id = "su_gunner_4", nation = "su", role = "gunner", name = "Ml. serzh. Anya Voronova", perk = "eagle", gift = "Eagle eye", perk2 = "snap", gift2 = "Snap shot", cost = 3000, dawns = 3 },
+            new Man { id = "su_loader_4", nation = "su", role = "loader", name = "Ryad. Katya Smirnova", perk = "hands", gift = "Quick hands", perk2 = "he", gift2 = "HE expert", cost = 3000, gold = 300 },
+            new Man { id = "su_driver_4", nation = "su", role = "driver", name = "Serzh. Nadya Kuznetsova", perk = "foot", gift = "Lead foot", perk2 = "mech", gift2 = "Mechanic", cost = 3000, gold = 300 },
+            new Man { id = "su_radio_4", nation = "su", role = "radio", name = "Ml. serzh. Zoya Petrenko", perk = "bow", gift = "Bow gunner", perk2 = "spot", gift2 = "Spotter", cost = 3000, gold = 300 },
         };
 
         public static string RoleName(string role) => role == "gunner" ? "Gunner" : role == "loader" ? "Loader" : role == "driver" ? "Driver" : "Radio operator";
@@ -101,14 +103,20 @@ namespace IronNight
         }
         public static bool Ace(Man m) => m.perk2 != null;
         public static string GiftName(Man m) => Ace(m) ? m.gift + " + " + m.gift2 : m.gift;
-        public static string EffectOf(Man m, int l) => Ace(m) ? Short(m.perk, l) + " · " + Short(m.perk2, l) : Effect(m.perk, l);
+        public static string EffectOf(Man m, int l) => Ace(m) ? Short(m.perk, AceLevel(l)) + " · " + Short(m.perk2, AceLevel(l)) : Effect(m.perk, l);
+        /// <summary>The strength of each of an ace's two gifts at her level: half of it, rounded up (1, 1, 2, 2, 3).</summary>
+        public static int AceLevel(int l) => (l + 1) / 2;
+        /// <summary>Nights held till dawn, for the aces that come for nothing.</summary>
+        public static int Dawns => Depot.Total("crewNights");
         /// <summary>An ace is listed only once her own portrait is in.</summary>
         public static bool Seen(Man m) => !Ace(m) || Hud.UiSprite("crew_" + m.id) != null;
 
         static string K(string id, string what) => "crewman." + id + "." + what;
         public static Man Find(string id) { foreach (var m in Men) if (m.id == id) return m; return null; }
         public static Man First(string nation, string role) { foreach (var m in Men) if (m.nation == nation && m.role == role && m.cost == 0) return m; return null; }
-        public static bool Owns(Man m) => m.cost == 0 || PlayerPrefs.GetInt(K(m.id, "hired"), 0) == 1;
+        public static bool Owns(Man m) => (m.cost == 0 && !Ace(m)) || PlayerPrefs.GetInt(K(m.id, "hired"), 0) == 1 || (m.dawns > 0 && Dawns >= m.dawns);
+        /// <summary>Whether the man can be taken on now: points for a man, gold for an ace, the nights for the free one.</summary>
+        public static bool CanHire(Man m) => Owns(m) || (m.dawns > 0 ? Dawns >= m.dawns : m.gold > 0 ? Depot.Gold >= m.gold : Depot.Points >= m.cost);
         public static int Level(Man m) => Mathf.Clamp(PlayerPrefs.GetInt(K(m.id, "level"), 1), 1, MaxLevel);
         /// <summary>The next level's price, 0 at the top.</summary>
         public static int NextTrain(Man m) { int l = Level(m); return l >= MaxLevel ? 0 : TrainCosts[l]; }
@@ -124,7 +132,7 @@ namespace IronNight
         /// <summary>Takes a man on if he is not yet (for points) and puts him in his seat.</summary>
         public static bool Pick(Man m)
         {
-            if (!Owns(m)) { if (!Depot.Spend(m.cost)) return false; PlayerPrefs.SetInt(K(m.id, "hired"), 1); }
+            if (!Owns(m)) { if (m.dawns > 0 || !(m.gold > 0 ? Depot.SpendGold(m.gold) : Depot.Spend(m.cost))) return false; PlayerPrefs.SetInt(K(m.id, "hired"), 1); }
             PlayerPrefs.SetString("crew.pick." + m.nation + "." + m.role, m.id); PlayerPrefs.Save(); return true;
         }
 
@@ -136,7 +144,7 @@ namespace IronNight
         }
 
         /// <summary>The level of the man in the nation's crew who has this gift; 0 when none of them has it.</summary>
-        public static int Gift(string nation, string perk) { foreach (var r in Roles) { var m = Chosen(nation, r); if (m != null && (m.perk == perk || m.perk2 == perk)) return Level(m); } return 0; }
+        public static int Gift(string nation, string perk) { foreach (var r in Roles) { var m = Chosen(nation, r); if (m != null && (m.perk == perk || m.perk2 == perk)) return Ace(m) ? AceLevel(Level(m)) : Level(m); } return 0; }
 
         /// <summary>A man's portrait: his own when there is one, else his seat's.</summary>
         public static string Portrait(Man m) => Hud.UiSprite("crew_" + m.id) != null ? "crew_" + m.id : "crew_" + m.nation + "_" + m.role;

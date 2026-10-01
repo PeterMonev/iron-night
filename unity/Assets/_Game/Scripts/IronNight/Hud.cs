@@ -866,8 +866,9 @@ namespace IronNight
                 var now = MakeText(row.transform, "Now", new Vector2(0f, 1f), new Vector2(TextX, -132), TextAnchor.UpperLeft, 23, dim); now.text = "Level " + lvl + ": " + Crew.EffectOf(m, lvl); now.rectTransform.sizeDelta = new Vector2(580, 30); Fit(now, 18);
                 var nx = MakeText(row.transform, "Next", new Vector2(0f, 1f), new Vector2(TextX, -168), TextAnchor.UpperLeft, 23, lvl < Crew.MaxLevel ? ink : dim); nx.text = lvl < Crew.MaxLevel ? "Level " + (lvl + 1) + ": " + Crew.EffectOf(m, lvl + 1) : "Fully trained"; nx.rectTransform.sizeDelta = new Vector2(580, 30); Fit(nx, 18);
                 // the seat: assign, or hire first
-                bool canSeat = !seated && (owned || Depot.Points >= m.cost);
-                var sb = MakeButton(row.transform, seated ? "In the seat" : owned ? "Assign" : "Hire · " + m.cost.ToString("N0", En), new Vector2(1f, 0f), new Vector2(-165, 50), new Vector2(290, 70), 27, () => { if (Crew.Pick(man)) { Sfx.Pickup(); RefreshDepot(); if (garage != null) garage.RefreshCrew(); } });
+                bool canSeat = !seated && Crew.CanHire(m);
+                string price = m.dawns > 0 ? "Hold " + m.dawns + " dawns · " + Mathf.Min(Crew.Dawns, m.dawns) + "/" + m.dawns : m.gold > 0 ? "Hire · " + m.gold + " gold" : "Hire · " + m.cost.ToString("N0", En);
+                var sb = MakeButton(row.transform, seated ? "In the seat" : owned ? "Assign" : price, new Vector2(1f, 0f), new Vector2(-165, 50), new Vector2(290, 70), 27, () => { if (Crew.Pick(man)) { Sfx.Pickup(); RefreshDepot(); if (garage != null) garage.RefreshCrew(); } });
                 sb.GetComponent<Image>().color = seated ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : canSeat ? new Color(0.2f, 0.22f, 0.24f, 0.95f) : new Color(0.12f, 0.12f, 0.13f, 0.9f);
                 sb.transform.Find("Label").GetComponent<Text>().color = seated ? new Color(0.1f, 0.08f, 0.05f) : canSeat ? ink : new Color(0.5f, 0.48f, 0.45f); sb.GetComponent<Button>().interactable = canSeat;
                 // training: only for a man on the books

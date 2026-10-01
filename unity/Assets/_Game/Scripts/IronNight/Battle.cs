@@ -2091,6 +2091,7 @@ namespace IronNight
             string crewLine = dawn ? $"\nThe crew's {Depot.CrewNights}{(Depot.CrewNights == 1 ? "st" : Depot.CrewNights == 2 ? "nd" : Depot.CrewNights == 3 ? "rd" : "th")} night together · {Depot.CrewName}" : crewLostTonight && crewBefore > 0 ? $"\nThe crew got out, but {crewBefore} nights together are lost" : "";
             hud.SetEndNumbers(kills, $"{m}:{s:00}", acc, score * (doubled ? 2 : 1), nightInfantry + " infantry · level " + level + " · " + objectivesReached + (objectivesReached == 1 ? " objective" : " objectives"));
             string statLine = crewLine + careerLine + lines;
+            if (dawn) foreach (var ace in Crew.Men) if (ace.dawns > 0 && ace.nation == Depot.Nation && Crew.Dawns == ace.dawns) statLine += "\n" + ace.name + " joins the crew · " + Crew.RoleName(ace.role).ToLowerInvariant() + " at the depot";   // the nation's free ace, on the night that brings her
             OfferDoubles();
             if (testDrive) { var lent = System.Array.Find(Depot.Leaders, c => c.id == leaderId); if (lent != null && !Depot.OwnsLeader(lent)) statLine += "\n" + lent.name + " goes back to the depot · " + lent.cost.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " points to keep her"; }
             if (camoTrial) { var cm = System.Array.Find(Depot.Camos, c => c.id == Depot.NightCamo); if (cm != null && !Depot.OwnsCamo(cm)) statLine += "\n" + cm.name + " camouflage goes back to the stores · " + cm.cost.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " points to keep it"; }
