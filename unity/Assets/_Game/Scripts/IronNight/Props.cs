@@ -442,7 +442,7 @@ namespace IronNight
             var at = new Vector3(p.firs[fir].x, 0f, p.firs[fir].y);
             if (loud) Sfx.TreeFall(at);
             if (fx != null) { fx.Dust(at); fx.Leaves(at + Vector3.up * 3f, dir, new Color(0.84f, 0.87f, 0.9f)); }   // snow shaken off the branches
-            if (p.go != null) { var mf = p.go.GetComponent<MeshFilter>(); if (p.mesh != null) Destroy(p.mesh); p.mesh = ForestMesh(p); mf.sharedMesh = p.mesh; }
+            if (p.go != null) { var mf = p.go.GetComponent<MeshFilter>(); if (p.mesh != null) Destroy(p.mesh); p.mesh = ForestMesh(p); mf.sharedMesh = p.mesh; p.go.GetComponent<MeshRenderer>().sharedMaterials = FirMaterials(p.mesh); }
         }
 
         /// <summary>A dug-in line across the field: four lengths of trench zigzagging, wire on stakes seven metres out in
@@ -546,7 +546,7 @@ namespace IronNight
         }
 
         // ---- the firs: made here, four shapes, snow on their tiers; a forest is one mesh of them ----
-        Mesh[] firShapes; Mesh stumpShape; Material firMaterial, logMaterial;
+        Mesh[] firShapes, firCards; Mesh stumpShape; Material firMaterial, logMaterial, branchMaterial;   // firCards: each shape's ring of branch cards; null without the branch texture or on low quality
 
         /// <summary>The fir shapes and their material (a strip of bark, needles and snow along u), made the first time.</summary>
         void FirKit()
@@ -562,16 +562,19 @@ namespace IronNight
             tex.Apply(true);
             firMaterial = new Material(Resources.Load<Material>("VehicleLit")); firMaterial.SetTexture("_BaseMap", tex); firMaterial.SetColor("_BaseColor", new Color(0.85f, 0.88f, 0.9f)); firMaterial.SetFloat("_Smoothness", 0.12f); firMaterial.SetFloat("_Cull", 2f);
             logMaterial = new Material(trunkMaterial); logMaterial.SetColor("_BaseColor", new Color(0.33f, 0.26f, 0.19f));
-            firShapes = new Mesh[4]; var rng = new System.Random(7);
-            for (int s = 0; s < 4; s++) firShapes[s] = FirShape(rng, 10f, 2.6f + s * 0.15f);
+            var branch = Resources.Load<Texture2D>("Textures/fir_branch"); bool cards = branch != null && PlayerPrefs.GetInt("quality", 1) != 0;
+            if (cards) { branchMaterial = new Material(Resources.Load<Material>("FoliageCut")); branchMaterial.SetTexture("_BaseMap", branch); branchMaterial.SetColor("_BaseColor", new Color(0.82f, 0.86f, 0.9f)); branchMaterial.SetFloat("_Cull", 0f); }
+            firShapes = new Mesh[4]; firCards = cards ? new Mesh[4] : null; var rng = new System.Random(7);
+            for (int s = 0; s < 4; s++) { firShapes[s] = FirShape(rng, 10f, 2.6f + s * 0.15f, out var c); if (cards) firCards[s] = c; else Destroy(c); }
             stumpShape = Prism(0.3f, 1f, 7, 0.05f);
         }
 
         /// <summary>A fir H metres tall: a trunk and five tiers, each a drooping ring of branch tips (every other one drawn
         /// in) rising to its top, the lower half of a tier needles, the upper half snow.</summary>
-        static Mesh FirShape(System.Random rng, float H, float R)
+        static Mesh FirShape(System.Random rng, float H, float R, out Mesh cards)
         {
             var v = new List<Vector3>(); var uv = new List<Vector2>(); var t = new List<int>();
+            var cv = new List<Vector3>(); var cuv = new List<Vector2>(); var cn = new List<Vector3>(); var ct = new List<int>();
             void Add(Mesh m) { int o = v.Count; v.AddRange(m.vertices); uv.AddRange(m.uv); foreach (var i in m.triangles) t.Add(o + i); Destroy(m); }
             Add(Prism(0.22f, 1.6f, 6, 0.05f));
             const int T = 5, N = 9;
@@ -582,6 +585,18 @@ namespace IronNight
                 for (int k = 0; k < N; k++) { float a = spin + k * 6.283f / N, rr = r * (k % 2 == 0 ? 1f : 0.74f); v.Add(new Vector3(Mathf.Cos(a) * rr, y0 - 0.2f, Mathf.Sin(a) * rr)); uv.Add(new Vector2(0.2f, 0.5f)); }
                 for (int k = 0; k < N; k++) { float a = spin + (k + 0.5f) * 6.283f / N, rr = r * 0.5f; v.Add(new Vector3(Mathf.Cos(a) * rr, y0 + th * 0.45f, Mathf.Sin(a) * rr)); uv.Add(new Vector2(0.62f, 0.5f)); }
                 v.Add(new Vector3(0f, y0 + th, 0f)); uv.Add(new Vector2(0.98f, 0.5f)); int apex = v.Count - 1;
+                // the tier's branches: eight cards standing out from the trunk, base at the trunk (the picture's left edge),
+                // drooping to their tips; lit as if facing up and out, so a ring reads as one bough
+                for (int k = 0; k < 8; k++)
+                {
+                    float a = spin + (k + 0.25f) * 6.283f / 8f; var d = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)); float len = r * 1.08f, hgt = r * 0.5f;
+                    int o2 = cv.Count; var nrm = (Vector3.up + d * 0.4f).normalized;
+                    cv.Add(d * 0.12f * r + Vector3.up * (y0 + th * 0.28f)); cv.Add(d * 0.12f * r + Vector3.up * (y0 + th * 0.28f + hgt));
+                    cv.Add(d * len + Vector3.up * (y0 - 0.45f)); cv.Add(d * len + Vector3.up * (y0 - 0.45f + hgt));
+                    cuv.Add(new Vector2(0f, 0f)); cuv.Add(new Vector2(0f, 1f)); cuv.Add(new Vector2(1f, 0f)); cuv.Add(new Vector2(1f, 1f));
+                    for (int q = 0; q < 4; q++) cn.Add(nrm);
+                    ct.Add(o2); ct.Add(o2 + 1); ct.Add(o2 + 2); ct.Add(o2 + 2); ct.Add(o2 + 1); ct.Add(o2 + 3);
+                }
                 for (int k = 0; k < N; k++)
                 {
                     int a0 = o + k, a1 = o + (k + 1) % N, b0 = o + N + k, b1 = o + N + (k + 1) % N;
@@ -589,6 +604,7 @@ namespace IronNight
                     t.Add(b0); t.Add(apex); t.Add(b1);
                 }
             }
+            cards = new Mesh { name = "fir branches" }; cards.SetVertices(cv); cards.SetUVs(0, cuv); cards.SetNormals(cn); cards.SetTriangles(ct, 0); cards.RecalculateBounds();
             var m2 = new Mesh { name = "fir" }; m2.SetVertices(v); m2.SetUVs(0, uv); m2.SetTriangles(t, 0); m2.RecalculateNormals(); m2.RecalculateBounds(); return m2;
         }
 
@@ -606,39 +622,58 @@ namespace IronNight
         /// <summary>The forest as one mesh: its firs standing or lying the way they fell, and its stumps.</summary>
         Mesh ForestMesh(Prop p)
         {
-            var parts = new List<CombineInstance>(); var origin = p.pos;
+            var parts = new List<CombineInstance>(); var boughs = new List<CombineInstance>(); var origin = p.pos;
             for (int i = 0; i < p.firs.Length; i++)
             {
-                var f = p.firs[i]; var at = new Vector3(f.x, 0f, f.y) - origin; var turn = Quaternion.Euler(0f, f.w * Mathf.Rad2Deg, 0f); var shape = firShapes[(int)(f.w * 10f) % firShapes.Length];
-                if (p.down[i] < 0f) { parts.Add(new CombineInstance { mesh = shape, transform = Matrix4x4.TRS(at, turn, Vector3.one * f.z) }); continue; }
-                var dir = new Vector3(Mathf.Sin(p.down[i]), 0f, Mathf.Cos(p.down[i])); var lay = Quaternion.AngleAxis(84f, Vector3.Cross(Vector3.up, dir));
-                parts.Add(new CombineInstance { mesh = shape, transform = Matrix4x4.TRS(at + Vector3.up * 0.5f, lay * turn, Vector3.one * f.z) });
-                parts.Add(new CombineInstance { mesh = stumpShape, transform = Matrix4x4.TRS(at, turn, new Vector3(1.3f, 0.6f, 1.3f) * f.z) });
+                var f = p.firs[i]; var at = new Vector3(f.x, 0f, f.y) - origin; var turn = Quaternion.Euler(0f, f.w * Mathf.Rad2Deg, 0f); int si = (int)(f.w * 10f) % firShapes.Length;
+                Matrix4x4 m4;
+                if (p.down[i] < 0f) m4 = Matrix4x4.TRS(at, turn, Vector3.one * f.z);
+                else
+                {
+                    var dir = new Vector3(Mathf.Sin(p.down[i]), 0f, Mathf.Cos(p.down[i])); var lay = Quaternion.AngleAxis(84f, Vector3.Cross(Vector3.up, dir));
+                    m4 = Matrix4x4.TRS(at + Vector3.up * 0.5f, lay * turn, Vector3.one * f.z);
+                    parts.Add(new CombineInstance { mesh = stumpShape, transform = Matrix4x4.TRS(at, turn, new Vector3(1.3f, 0.6f, 1.3f) * f.z) });
+                }
+                parts.Add(new CombineInstance { mesh = firShapes[si], transform = m4 });
+                if (firCards != null) boughs.Add(new CombineInstance { mesh = firCards[si], transform = m4 });
             }
             foreach (var s in p.stumps) parts.Add(new CombineInstance { mesh = stumpShape, transform = Matrix4x4.TRS(new Vector3(s.x, 0f, s.z) - origin, Quaternion.Euler(0f, s.x * 37f, 0f), new Vector3(1.2f, s.y, 1.2f)) });
-            var m = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32, name = "forest" }; m.CombineMeshes(parts.ToArray(), true, true); m.RecalculateBounds(); return m;
+            return TwoParts(parts, boughs, "forest");
         }
+
+        /// <summary>One mesh of two parts: the solid insides (firMaterial), then the branch cards (branchMaterial), when there are any.</summary>
+        static Mesh TwoParts(List<CombineInstance> solid, List<CombineInstance> boughs, string name)
+        {
+            var a = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 }; a.CombineMeshes(solid.ToArray(), true, true);
+            if (boughs.Count == 0) { a.name = name; a.RecalculateBounds(); return a; }
+            var b = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 }; b.CombineMeshes(boughs.ToArray(), true, true);
+            var m = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32, name = name };
+            m.CombineMeshes(new[] { new CombineInstance { mesh = a, transform = Matrix4x4.identity }, new CombineInstance { mesh = b, transform = Matrix4x4.identity } }, false, true);
+            Destroy(a); Destroy(b); m.RecalculateBounds(); return m;
+        }
+        Material[] FirMaterials(Mesh m) => m.subMeshCount > 1 ? new[] { firMaterial, branchMaterial } : new[] { firMaterial };
 
         void SpawnForest(Prop p)
         {
             FirKit(); var go = new GameObject("Forest"); go.transform.SetParent(transform, false); go.transform.position = p.pos;
-            p.mesh = ForestMesh(p); go.AddComponent<MeshFilter>().sharedMesh = p.mesh; var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = firMaterial; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            p.mesh = ForestMesh(p); go.AddComponent<MeshFilter>().sharedMesh = p.mesh; var r = go.AddComponent<MeshRenderer>(); r.sharedMaterials = FirMaterials(p.mesh); r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             p.go = go;
         }
 
         /// <summary>Three firs felled across the lane, crossing; pressed into the snow once a hull has gone through.</summary>
         void SpawnAbatis(Prop p)
         {
-            FirKit(); var rng = new System.Random(p.seed); var parts = new List<CombineInstance>(); var f = new Vector3(Mathf.Sin(p.yaw), 0f, Mathf.Cos(p.yaw)); var r = new Vector3(f.z, 0f, -f.x);
+            FirKit(); var rng = new System.Random(p.seed); var parts = new List<CombineInstance>(); var boughs = new List<CombineInstance>(); var f = new Vector3(Mathf.Sin(p.yaw), 0f, Mathf.Cos(p.yaw)); var r = new Vector3(f.z, 0f, -f.x);
             for (int i = 0; i < 3; i++)
             {
                 float across = (i - 1) * 1.6f, ang = (i % 2 == 0 ? 70f : 110f) + (float)rng.NextDouble() * 14f; var dir = Quaternion.Euler(0f, ang, 0f) * f;
                 var lay = Quaternion.AngleAxis(86f, Vector3.Cross(Vector3.up, dir)); var at = f * across - dir * 4.5f + Vector3.up * (0.4f + i * 0.25f);
-                parts.Add(new CombineInstance { mesh = firShapes[i], transform = Matrix4x4.TRS(at, lay * Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f), Vector3.one * 0.9f) });
+                var m4 = Matrix4x4.TRS(at, lay * Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f), Vector3.one * 0.9f);
+                parts.Add(new CombineInstance { mesh = firShapes[i], transform = m4 }); if (firCards != null) boughs.Add(new CombineInstance { mesh = firCards[i], transform = m4 });
             }
             var go = new GameObject("Roadblock"); go.transform.SetParent(transform, false); go.transform.position = p.pos;
-            p.mesh = new Mesh { name = "roadblock" }; p.mesh.CombineMeshes(parts.ToArray(), true, true); p.mesh.RecalculateBounds();
-            go.AddComponent<MeshFilter>().sharedMesh = p.mesh; var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = firMaterial; mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            p.mesh = TwoParts(parts, boughs, "roadblock");
+            go.AddComponent<MeshFilter>().sharedMesh = p.mesh; var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterials = FirMaterials(p.mesh); mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             if (p.state == 2) go.transform.localScale = new Vector3(1f, 0.3f, 1f);
             p.go = go;
         }
