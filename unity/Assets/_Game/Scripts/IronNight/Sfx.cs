@@ -20,12 +20,33 @@ namespace IronNight
         {
             var go = new GameObject("Sfx"); instance = go.AddComponent<Sfx>();
             if (cam.GetComponent<AudioListener>() == null) cam.gameObject.AddComponent<AudioListener>();
-            instance.listener = cam.transform; instance.Make(); AudioListener.volume = Muted ? 0f : 1f;
+            instance.listener = cam.transform; instance.Make(); AudioListener.volume = 1f; instance.ApplyLevel();
         }
 
         /// <summary>The sound switch on the pause sheet; remembered between nights.</summary>
-        public static bool Muted { get => PlayerPrefs.GetInt("sound", 1) == 0; set { PlayerPrefs.SetInt("sound", value ? 0 : 1); PlayerPrefs.Save(); AudioListener.volume = value ? 0f : 1f; } }
-        public static bool MusicOff { get => PlayerPrefs.GetInt("music", 1) == 0; set { PlayerPrefs.SetInt("music", value ? 0 : 1); PlayerPrefs.Save(); if (instance != null) instance.MusicTick(0f); } }
+        public static bool Muted { get => SoundVolume <= 0.001f; set => SoundVolume = value ? 0f : Mathf.Max(0.2f, PlayerPrefs.GetFloat("sound.last", 1f)); }
+        public static bool MusicOff => MusicVolume <= 0.001f;
+        /// <summary>The level of every sound but the music, 0 to 1 (the settings' slider); the old on/off switch carries over.</summary>
+        public static float SoundVolume
+        {
+            get => PlayerPrefs.GetFloat("sound.volume", PlayerPrefs.GetInt("sound", 1) == 1 ? 1f : 0f);
+            set { value = Mathf.Clamp01(value); PlayerPrefs.SetFloat("sound.volume", value); if (value > 0.001f) PlayerPrefs.SetFloat("sound.last", value); PlayerPrefs.Save(); if (instance != null) instance.ApplyLevel(); }
+        }
+        /// <summary>The music's level, 0 to 1 (the settings' slider); 0 pauses it.</summary>
+        public static float MusicVolume
+        {
+            get => PlayerPrefs.GetFloat("music.volume", PlayerPrefs.GetInt("music", 1) == 1 ? 1f : 0f);
+            set { PlayerPrefs.SetFloat("music.volume", Mathf.Clamp01(value)); PlayerPrefs.Save(); if (instance != null) instance.MusicTick(0f); }
+        }
+        float level = 1f, ambientBase = 0.18f;   // level: the sound's, read once per change, not from the prefs every frame
+        /// <summary>The sound's level onto the sources that keep a steady volume (the one-shots and loops take it as they play).</summary>
+        void ApplyLevel()
+        {
+            level = SoundVolume;
+            if (ui != null) ui.volume = level; if (voice != null) voice.volume = level;
+            if (frontLine != null) frontLine.volume = 0.14f * level; if (ambient != null) ambient.volume = ambientBase * level;
+            foreach (var s in pool) s.mute = level <= 0.001f;
+        }
         // ---- the music: a theme for each part of the evening (Resources/Audio/music_<name>), on two decks that crossfade ----
         class Deck { public AudioSource src; public float want, rate; public bool on, held; }   // on: given a clip to play; held: paused by the music switch
         readonly Deck[] decks = new Deck[2]; int live = -1; string theme;
@@ -84,7 +105,7 @@ namespace IronNight
                 if (d == null || !d.on) continue;
                 if (off) { if (d.src.isPlaying) { d.src.Pause(); d.held = true; } continue; }
                 if (d.held) { d.src.UnPause(); d.held = false; }
-                d.src.volume = dt <= 0f ? d.want : Mathf.MoveTowards(d.src.volume, d.want, Mathf.Max(d.rate, 0.02f) * dt);
+                float goal = d.want * MusicVolume; d.src.volume = dt <= 0f ? goal : Mathf.MoveTowards(d.src.volume, goal, Mathf.Max(d.rate, 0.02f) * dt);
                 if ((d.want <= 0f && d.src.volume <= 0.001f) || !d.src.isPlaying) { d.src.Stop(); d.on = false; }   // faded out, or a theme played once has run to its end
             }
             if (off || live < 0 || theme == null) return;
@@ -438,7 +459,7 @@ namespace IronNight
         {
             AudioSource best = null; float oldest = float.MaxValue;
             foreach (var s in pool) { if (!s.isPlaying) { best = s; break; } if (s.time < oldest) { oldest = s.time; best = s; } }
-            best.transform.position = pos; best.clip = clip; best.volume = volume; best.pitch = pitch; if (delay > 0f) best.PlayDelayed(delay); else best.Play();
+            best.transform.position = pos; best.clip = clip; best.volume = volume * level; best.pitch = pitch; if (delay > 0f) best.PlayDelayed(delay); else best.Play();
         }
 
         /// <summary>A gun firing: the heavy clip for the 17-pounder, the 88 and the Tigers; the far clip when the listener is more than 45 m away.</summary>
@@ -505,7 +526,7 @@ namespace IronNight
         /// <summary>The breech after one of ours fires: a clank half a second later, from the tank.</summary>
         public static void Reload(Vector3 pos) { if (instance && instance.reload != null) instance.PlayAt(instance.reload, pos, 0.5f, Random.Range(0.95f, 1.05f), 0.5f); }
         /// <summary>The leader's turret motor: audible while the turret swings, quiet when it rests.</summary>
-        public static void Turret(float swing) { if (!instance || instance.turretLoop == null) return; var t = instance.turret; t.volume = Mathf.Lerp(t.volume, Mathf.Clamp01(swing * 0.6f) * 0.3f, 0.2f); }
+        public static void Turret(float swing) { if (!instance || instance.turretLoop == null) return; var t = instance.turret; t.volume = Mathf.Lerp(t.volume, Mathf.Clamp01(swing * 0.6f) * 0.3f * instance.level, 0.2f); }
         public static void StukaDive(Vector3 pos) { if (instance) instance.PlayAt(instance.stuka, pos, 1f, Random.Range(0.97f, 1.03f)); }
         public static void FighterPass(Vector3 pos) { if (instance) instance.PlayAt(instance.fighter, pos, 1f, Random.Range(0.96f, 1.04f)); }
         /// <summary>Wood giving way under a hull; at most one every quarter second, however long the hull pushes.</summary>
@@ -526,7 +547,7 @@ namespace IronNight
         /// <summary>Distant barrage somewhere over the horizon.</summary>
         public static void Rumble() { if (instance) { instance.ui.pitch = 0.75f; instance.ui.PlayOneShot(instance.rumble, 0.5f); instance.ui.pitch = 1f; } }
         /// <summary>The night's ambient bed: wind, or rain on the hull.</summary>
-        public static void Ambient(bool raining) { if (!instance) return; var a = instance.ambient; a.clip = raining ? instance.rain : instance.wind; a.volume = raining ? 0.32f : 0.18f; a.Play(); }
+        public static void Ambient(bool raining) { if (!instance) return; var a = instance.ambient; a.clip = raining ? instance.rain : instance.wind; instance.ambientBase = raining ? 0.32f : 0.18f; a.volume = instance.ambientBase * instance.level; a.Play(); }
         public static void Pickup() { if (instance) instance.ui.PlayOneShot(instance.pickup, 0.6f); }
         /// <summary>A welder in the hangar: 1 while the arc burns, 0 between. The loop is made the first time it is wanted.</summary>
         public static void Weld(float level)
@@ -537,7 +558,7 @@ namespace IronNight
                 if (level <= 0f) return;
                 s = instance.weld = instance.gameObject.AddComponent<AudioSource>(); s.clip = instance.Clip("weld", Crackle()); s.loop = true; s.playOnAwake = false; s.spatialBlend = 0f; s.volume = 0f; s.Play();
             }
-            s.volume = level * 0.14f;
+            s.volume = level * 0.14f * instance.level;
         }
         /// <summary>The arc's sound: the metal spitting (hundreds of short bright pops a second) over a hiss and the buzz of
         /// the current, in a loop whose seam falls on a whole number of the buzz's cycles.</summary>
@@ -563,19 +584,19 @@ namespace IronNight
             if (instance.idleLoop != null)
             {
                 // two layers: the idle fades out as the drive comes in, so a tank at rest idles
-                var id = instance.idle; id.volume = Mathf.Lerp(id.volume, 0.36f * (1f - throttle) + 0.06f, 0.1f); id.pitch = Mathf.Lerp(id.pitch, (0.95f + 0.15f * throttle) * instance.engineBase, 0.08f);
-                e.volume = Mathf.Lerp(e.volume, 0.08f + 0.5f * throttle, 0.1f); e.pitch = Mathf.Lerp(e.pitch, (0.88f + 0.22f * throttle) * instance.engineBase, 0.08f);
+                var id = instance.idle; id.volume = Mathf.Lerp(id.volume, (0.36f * (1f - throttle) + 0.06f) * instance.level, 0.1f); id.pitch = Mathf.Lerp(id.pitch, (0.95f + 0.15f * throttle) * instance.engineBase, 0.08f);
+                e.volume = Mathf.Lerp(e.volume, (0.08f + 0.5f * throttle) * instance.level, 0.1f); e.pitch = Mathf.Lerp(e.pitch, (0.88f + 0.22f * throttle) * instance.engineBase, 0.08f);
             }
-            else { e.volume = Mathf.Lerp(e.volume, 0.12f + 0.3f * throttle, 0.1f); e.pitch = Mathf.Lerp(e.pitch, (0.85f + 0.45f * throttle) * instance.engineBase, 0.08f); }
-            var dz = instance.diesel; if (dz != null) { dz.volume = Mathf.Lerp(dz.volume, instance.dieselLevel * (0.05f + 0.13f * throttle), 0.1f); dz.pitch = Mathf.Lerp(dz.pitch, 0.9f + 0.35f * throttle, 0.08f); }
-            var tr = instance.tracks; tr.volume = Mathf.Lerp(tr.volume, 0.24f * throttle, 0.15f); tr.pitch = Mathf.Lerp(tr.pitch, 0.8f + 0.4f * throttle, 0.1f);
+            else { e.volume = Mathf.Lerp(e.volume, (0.12f + 0.3f * throttle) * instance.level, 0.1f); e.pitch = Mathf.Lerp(e.pitch, (0.85f + 0.45f * throttle) * instance.engineBase, 0.08f); }
+            var dz = instance.diesel; if (dz != null) { dz.volume = Mathf.Lerp(dz.volume, instance.dieselLevel * (0.05f + 0.13f * throttle) * instance.level, 0.1f); dz.pitch = Mathf.Lerp(dz.pitch, 0.9f + 0.35f * throttle, 0.08f); }
+            var tr = instance.tracks; tr.volume = Mathf.Lerp(tr.volume, 0.24f * throttle * instance.level, 0.15f); tr.pitch = Mathf.Lerp(tr.pitch, 0.8f + 0.4f * throttle, 0.1f);
         }
         /// <summary>The nearest enemy tank's engine: where it is, as loud as it is near the leader (closeness 1 beside him,
         /// 0 out of earshot); heavier tanks lower.</summary>
         public static void EnemyEngine(Vector3 pos, float closeness, float heavy)
         {
             if (!instance || instance.enemyLoop == null) return; var s = instance.enemyEngine; s.transform.position = pos;
-            s.volume = Mathf.Lerp(s.volume, 0.45f * Mathf.Clamp01(closeness), 0.06f); s.pitch = Mathf.Lerp(s.pitch, 1.05f - 0.2f * Mathf.Clamp01(heavy), 0.05f);
+            s.volume = Mathf.Lerp(s.volume, 0.45f * Mathf.Clamp01(closeness) * instance.level, 0.06f); s.pitch = Mathf.Lerp(s.pitch, 1.05f - 0.2f * Mathf.Clamp01(heavy), 0.05f);
         }
 
         public static void Quiet(bool q) { if (instance) { if (instance.idle != null) instance.idle.mute = q; if (instance.enemyEngine != null) instance.enemyEngine.mute = q; if (instance.diesel != null) instance.diesel.mute = q; instance.engine.mute = q; instance.tracks.mute = q; instance.turret.mute = q; instance.ambient.mute = q; instance.frontLine.mute = q; } }
