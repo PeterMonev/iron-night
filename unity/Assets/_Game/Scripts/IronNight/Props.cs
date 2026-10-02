@@ -1327,6 +1327,20 @@ namespace IronNight
             var m = new Mesh { vertices = v, uv = uv, normals = nm, triangles = t }; m.RecalculateBounds(); return m;
         }
 
+        /// <summary>What the last thing Blocks found is made of: 0 stone or earth, 1 wood or leaves, 2 steel.</summary>
+        public int BlockerStuff()
+        {
+            var p = blocker; if (p == null) return 0;
+            if (p.what == What.Tree || p.what == What.Hedge) return 1;
+            if (p.what == What.Searchlight || p.kind == null) return 2;
+            switch (p.kind.mesh)
+            {
+                case "truck": case "truck_burnt": case "wreck": case "barrels": return 2;
+                case "cart": case "gate": case "pole": case "signpost": case "haystack": case "k_wattle": case "k_sheaves": case "k_sunflowers": case "barbed_wire": case "deadtree": case "spruce_snow": case "k_birches": return 1;
+                default: return p.kind.mesh.StartsWith("tree_") ? 1 : 0;
+            }
+        }
+
         public bool Blocks(Vector3 pos)
         {
             foreach (var p in active)

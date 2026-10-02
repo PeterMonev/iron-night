@@ -488,6 +488,15 @@ namespace IronNight
             if (!instance) return; bool far = (pos - instance.listener.position).magnitude > 45f;
             instance.PlayAt(far ? instance.shotFar : heavy ? instance.shotHeavy : instance.shot, pos, friendly ? 0.9f : 0.8f, (heavy ? 0.9f : 1f) * Random.Range(0.94f, 1.06f));
         }
+        /// <summary>A shell stopped by something on the field: 0 stone or earth (a dull blast, rubble falling), 1 wood (wood
+        /// cracking), 2 steel (the clang of a hit).</summary>
+        public static void Impact(Vector3 pos, int stuff)
+        {
+            if (!instance) return;
+            if (stuff == 2) { Hit(pos); return; }
+            if (stuff == 1) { instance.PlayAt(Any(instance.crunches), pos, 0.8f, Random.Range(0.85f, 1f)); return; }
+            instance.PlayAt(Any(instance.shells), pos, 0.55f, Random.Range(1.05f, 1.2f));   // a smaller, quicker blast than a shell landing in the open
+        }
         public static void Hit(Vector3 pos) { if (instance) instance.PlayAt(Any(instance.hits), pos, 0.7f, Random.Range(0.9f, 1.1f)); }
         public static void Ricochet(Vector3 pos) { if (instance) instance.PlayAt(instance.ricochet2 != null && Random.value < 0.4f ? instance.ricochet2 : instance.ricochet, pos, 0.85f, Random.Range(0.92f, 1.1f)); }
         public static void Explosion(Vector3 pos) { if (instance) instance.PlayAt(Any(instance.blasts), pos, 1f, Random.Range(0.92f, 1.05f)); }

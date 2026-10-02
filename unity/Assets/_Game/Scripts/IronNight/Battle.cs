@@ -581,7 +581,7 @@ namespace IronNight
                 if (hit == null && !s.bounced && s.friendly && s.life > 0f && MineShot(s.pos)) s.life = 0f;
                 if (hit == null && !s.bounced && s.friendly) { int men = infantry.Blast(s.pos, 1.6f); if (men > 0) { InfantryKilled(men, s.pos); fx.Hit(s.pos, 0.7f); s.life = 0f; } }
                 if (hit == null && !s.bounced && s.friendly && props.HitLamp(s.pos)) { fx.Explosion(s.pos); Sfx.Explosion(s.pos); LampOut(s.pos); s.life = 0f; }
-                if (hit == null && !s.bounced && props.Blocks(s.pos)) { fx.Hit(s.pos, 0.6f); Sfx.Hit(s.pos); props.Strike(s.pos, s.he ? 1f : 0.35f); s.life = 0f; }
+                if (hit == null && !s.bounced && props.Blocks(s.pos)) { fx.Hit(s.pos, 0.6f); Sfx.Impact(s.pos, props.BlockerStuff()); props.Strike(s.pos, s.he ? 1f : 0.35f); s.life = 0f; }
                 else if (hit == null && s.life <= 0f) { var g = new Vector3(s.pos.x, 0f, s.pos.z); fx.Dust(g); props.Crater(g, 2.2f); }   // spent: into the dirt
                 if (hit != null || s.life <= 0f) { fx.Release(s.vis); shells.RemoveAt(i); }
             }
