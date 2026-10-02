@@ -13,7 +13,7 @@ namespace IronNight
     public class Props : MonoBehaviour
     {
         class Kind { public string mesh; public float length, height; public float[] circles; }
-        enum What { Model, Lane, Hedge, Tree, Decal, Searchlight, Fire, Stream }
+        enum What { Model, Lane, Hedge, Tree, Decal, Searchlight, Fire, Stream, Forest, Abatis, Logs }
         class Prop
         {
             public What what; public Kind kind; public Vector3 pos; public float yaw, size, bound = 8f, height = -1f; public int seed;
@@ -21,6 +21,7 @@ namespace IronNight
             public Vector3 a, b; public float[] gaps; public float clearA, clearB;              // hedges: the line and its openings
             public GameObject go; public Mesh mesh, leaves; public float az, el = 42f; public LightShaft shaft; public Transform yoke, drum, lamp; public float flakTimer = 4f; public int burst; public Light glow;
             public int state; public float hp = -1f, fallYaw, burn; public bool drivable;   // 0 standing, 1 knocked over, 2 crushed, 3 ruined; a ruin is driven over
+            public Vector4[] firs; public float[] down; public int[] treeOf; public Vector3[] stumps;   // a forest: its firs (x, z, size, turn), each one's fall (-1 standing, else the way it lies), which fir each circle is; the stumps in its clearings
             public bool manned;   // trenches and nests: their garrison has been put in (or never will be: the player's own sandbags)
             public List<Vector3> trodden;   // hedges: where hulls went through, as (along the line, half the width pressed flat, the side it lies to)
         }
@@ -155,8 +156,12 @@ namespace IronNight
         static bool Farm(int ix, int iz) => (ix == 1 && iz == 1) || (!Start(ix, iz) && Rnd(ix, iz, 930) < FarmChance);
         static bool Battery(int ix, int iz) => (ix == -1 && iz == 0) || (!Start(ix, iz) && !Farm(ix, iz) && Rnd(ix, iz, 940) < (SneakNight ? 0.32f : 0.16f));
         static bool Village(int ix, int iz) => (ix == 0 && iz == 3) || (!Start(ix, iz) && !Farm(ix, iz) && !Battery(ix, iz) && Rnd(ix, iz, 1100) < VillageChance);
-        static bool HedgeX(int ix, int iz) { if (LaneX(ix)) return false; if (Farm(ix, iz) || Farm(ix + 1, iz)) return true; return Rnd(ix, iz, 920) < Mathf.Min(0.97f, (FieldType(ix, iz) != FieldType(ix + 1, iz) ? 0.85f : 0.3f) * HedgeBias); }
-        static bool HedgeZ(int ix, int iz) { if (LaneZ(iz) || StreamZ(iz)) return false; if (Farm(ix, iz) || Farm(ix, iz + 1)) return true; return Rnd(ix, iz, 921) < Mathf.Min(0.97f, (FieldType(ix, iz) != FieldType(ix, iz + 1) ? 0.85f : 0.3f) * HedgeBias); }
+        static bool Ardennes => Theatre == "ardennes";
+        static float ForestChance => Route == "bocage" ? 0.62f : Route == "open" ? 0.38f : 0.3f;
+        /// <summary>A cell of fir forest: the Ardennes only, never where the night starts, a farm, a post or a village stands.</summary>
+        static bool Forest(int ix, int iz) => Ardennes && !Start(ix, iz) && !(ix == 0 && iz == 1) && !Farm(ix, iz) && !Battery(ix, iz) && !Village(ix, iz) && Rnd(ix, iz, 1400) < ForestChance;
+        static bool HedgeX(int ix, int iz) { if (LaneX(ix) || Ardennes) return false; if (Farm(ix, iz) || Farm(ix + 1, iz)) return true; return Rnd(ix, iz, 920) < Mathf.Min(0.97f, (FieldType(ix, iz) != FieldType(ix + 1, iz) ? 0.85f : 0.3f) * HedgeBias); }
+        static bool HedgeZ(int ix, int iz) { if (LaneZ(iz) || StreamZ(iz) || Ardennes) return false; if (Farm(ix, iz) || Farm(ix, iz + 1)) return true; return Rnd(ix, iz, 921) < Mathf.Min(0.97f, (FieldType(ix, iz) != FieldType(ix, iz + 1) ? 0.85f : 0.3f) * HedgeBias); }
         // a stream now and then along a line z = iz*40+20 where no lane runs, winding a few metres either side of it
         static bool StreamZ(int iz) => iz != 0 && iz != -1 && !LaneZ(iz) && Hash(3, iz, 950) % 6 == 0;
         static float StreamAt(int iz, float x) => iz * Cell + Half + Mathf.Sin(x * 0.045f + iz) * 5f + Mathf.Sin(x * 0.11f + iz * 2.3f) * 2f;
@@ -378,6 +383,68 @@ namespace IronNight
             if (Rnd(ix, iz, 1258) < 0.06f) Place(list, "truck_burnt", c + In(ix, iz, 1259, 13f), Rnd(ix, iz, 1261) * 6.28f);
         }
 
+        /// <summary>Fir forest over the cell: a fir every five metres or so, jittered, a few gaps left as clearings with a stump
+        /// in them; clear of the lanes along its edges (six metres either side) and of any stream. A lane through it may be
+        /// blocked with felled firs, and logs are piled at its side.</summary>
+        void ForestCell(List<Prop> list, int ix, int iz, Vector3 c)
+        {
+            var firs = new List<Vector4>(); var stumps = new List<Vector3>(); int k = 0;
+            for (float gx = -Half + 2.5f; gx < Half; gx += 5.2f) for (float gz = -Half + 2.5f; gz < Half; gz += 5.2f, k++)
+            {
+                var pos = c + new Vector3(gx + (Rnd(ix, iz, 1500 + k) - 0.5f) * 3.4f, 0f, gz + (Rnd(ix, iz, 1700 + k) - 0.5f) * 3.4f);
+                if ((LaneX(ix) && Mathf.Abs(pos.x - (c.x + Half)) < 6f) || (LaneX(ix - 1) && Mathf.Abs(pos.x - (c.x - Half)) < 6f)) continue;
+                if ((LaneZ(iz) && Mathf.Abs(pos.z - (c.z + Half)) < 6f) || (LaneZ(iz - 1) && Mathf.Abs(pos.z - (c.z - Half)) < 6f)) continue;
+                if (InStream(pos, 1.5f)) continue;
+                if (Rnd(ix, iz, 1900 + k) < 0.12f) { if (Rnd(ix, iz, 2100 + k) < 0.6f) stumps.Add(new Vector3(pos.x, 0.7f + Rnd(ix, iz, 2300 + k) * 0.5f, pos.z)); continue; }   // a clearing: a stump, now and then
+                firs.Add(new Vector4(pos.x, pos.z, 0.8f + Rnd(ix, iz, 2500 + k) * 0.55f, Rnd(ix, iz, 2700 + k) * 6.28f));
+            }
+            if (firs.Count == 0) return;
+            var p = new Prop { what = What.Forest, pos = c, bound = Half + 6f, height = 9f, seed = (int)(Hash(ix, iz, 1401) & 0xffff), firs = firs.ToArray(), down = new float[firs.Count], stumps = stumps.ToArray() };
+            for (int i = 0; i < p.down.Length; i++) p.down[i] = -1f;
+            ForestCircles(p); list.Add(p);
+            // the lanes through it: felled firs across one now and then, logs at the side of another
+            if (LaneX(ix) && Rnd(ix, iz, 1410) < 0.35f) Roadblock(list, new Vector3(c.x + Half, 0f, c.z + (Rnd(ix, iz, 1411) - 0.5f) * 20f), 0f, ix, iz);
+            else if (LaneZ(iz) && Rnd(ix, iz, 1412) < 0.35f) Roadblock(list, new Vector3(c.x + (Rnd(ix, iz, 1413) - 0.5f) * 20f, 0f, c.z + Half), Mathf.PI / 2f, ix, iz);
+            if (LaneX(ix) && Rnd(ix, iz, 1414) < 0.4f) LogPile(list, new Vector3(c.x + Half - 4.8f, 0f, c.z + (Rnd(ix, iz, 1415) - 0.5f) * 24f), 0f);
+        }
+
+        /// <summary>Felled firs dragged across a lane, criss-cross: a hull pushes through slowly, flattening them.</summary>
+        void Roadblock(List<Prop> list, Vector3 at, float yaw, int ix, int iz)
+        {
+            var f = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)); var r = new Vector3(f.z, 0f, -f.x);
+            var p = new Prop { what = What.Abatis, pos = at, yaw = yaw, bound = 7f, height = 1.6f, seed = (int)(Hash(ix, iz, 1416) & 0xffff) };
+            p.circleCenters = new[] { new Vector2(at.x, at.z), new Vector2((at + r * 2.6f).x, (at + r * 2.6f).z), new Vector2((at - r * 2.6f).x, (at - r * 2.6f).z) }; p.radii = new[] { 1.5f, 1.4f, 1.4f };
+            list.Add(p);
+        }
+
+        /// <summary>Cut fir trunks stacked at the side of a forest lane.</summary>
+        void LogPile(List<Prop> list, Vector3 at, float yaw)
+        {
+            var f = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
+            var p = new Prop { what = What.Logs, pos = at, yaw = yaw, bound = 4f, height = 1.4f };
+            p.circleCenters = new[] { new Vector2((at + f * 1.4f).x, (at + f * 1.4f).z), new Vector2((at - f * 1.4f).x, (at - f * 1.4f).z) }; p.radii = new[] { 1.1f, 1.1f };
+            list.Add(p);
+        }
+
+        /// <summary>A forest's footprint: a small circle round every fir still standing, and which fir each is.</summary>
+        static void ForestCircles(Prop p)
+        {
+            var centers = new List<Vector2>(); var radii = new List<float>(); var of = new List<int>();
+            for (int i = 0; i < p.firs.Length; i++) { if (p.down[i] >= 0f) continue; centers.Add(new Vector2(p.firs[i].x, p.firs[i].y)); radii.Add(0.55f * p.firs[i].z); of.Add(i); }
+            p.circleCenters = centers.ToArray(); p.radii = radii.ToArray(); p.treeOf = of.ToArray();
+        }
+
+        /// <summary>A fir knocked down the given way: it lies in the forest from now on, and is heard going.</summary>
+        void FellFir(Prop p, int fir, Vector3 dir, bool loud)
+        {
+            if (p.down[fir] >= 0f) return;
+            p.down[fir] = Mathf.Repeat(Mathf.Atan2(dir.x, dir.z) + (Random.value - 0.5f) * 0.6f, 6.283f); ForestCircles(p);
+            var at = new Vector3(p.firs[fir].x, 0f, p.firs[fir].y);
+            if (loud) Sfx.TreeFall(at);
+            if (fx != null) { fx.Dust(at); fx.Leaves(at + Vector3.up * 3f, dir, new Color(0.84f, 0.87f, 0.9f)); }   // snow shaken off the branches
+            if (p.go != null) { var mf = p.go.GetComponent<MeshFilter>(); if (p.mesh != null) Destroy(p.mesh); p.mesh = ForestMesh(p); mf.sharedMesh = p.mesh; }
+        }
+
         /// <summary>A dug-in line across the field: four lengths of trench zigzagging, wire on stakes seven metres out in
         /// front, a sandbagged nest at one end where an anti-tank gun may wait.</summary>
         void TrenchLine(List<Prop> list, int ix, int iz, Vector3 c)
@@ -411,6 +478,7 @@ namespace IronNight
             if (Farm(ix, iz)) FarmYard(list, ix, iz, c);
             else if (Battery(ix, iz)) SearchlightPost(list, ix, iz, c);
             else if (Village(ix, iz)) VillageSquare(list, ix, iz, c);
+            else if (Forest(ix, iz)) ForestCell(list, ix, iz, c);
             else if (!Start(ix, iz)) Loose(list, ix, iz, c, FieldType(ix, iz));
             cells[key] = list; return list;
         }
@@ -476,6 +544,119 @@ namespace IronNight
             }
             groundMesh.colors = groundColors;
         }
+
+        // ---- the firs: made here, four shapes, snow on their tiers; a forest is one mesh of them ----
+        Mesh[] firShapes; Mesh stumpShape; Material firMaterial, logMaterial;
+
+        /// <summary>The fir shapes and their material (a strip of bark, needles and snow along u), made the first time.</summary>
+        void FirKit()
+        {
+            if (firShapes != null) return;
+            var tex = new Texture2D(64, 32, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+            for (int y = 0; y < 32; y++) for (int x = 0; x < 64; x++)
+            {
+                float u = x / 63f, n = Mathf.PerlinNoise(x * 0.37f, y * 0.41f);
+                Color c = u < 0.1f ? new Color(0.24f, 0.19f, 0.14f) : u < 0.55f ? Color.Lerp(new Color(0.07f, 0.12f, 0.09f), new Color(0.12f, 0.18f, 0.13f), n) : Color.Lerp(new Color(0.16f, 0.22f, 0.18f), new Color(0.86f, 0.89f, 0.93f), Mathf.SmoothStep(0.55f, 0.9f, u) * (0.75f + 0.25f * n));
+                tex.SetPixel(x, y, c);
+            }
+            tex.Apply(true);
+            firMaterial = new Material(Resources.Load<Material>("VehicleLit")); firMaterial.SetTexture("_BaseMap", tex); firMaterial.SetColor("_BaseColor", new Color(0.85f, 0.88f, 0.9f)); firMaterial.SetFloat("_Smoothness", 0.12f); firMaterial.SetFloat("_Cull", 2f);
+            logMaterial = new Material(trunkMaterial); logMaterial.SetColor("_BaseColor", new Color(0.33f, 0.26f, 0.19f));
+            firShapes = new Mesh[4]; var rng = new System.Random(7);
+            for (int s = 0; s < 4; s++) firShapes[s] = FirShape(rng, 10f, 2.6f + s * 0.15f);
+            stumpShape = Prism(0.3f, 1f, 7, 0.05f);
+        }
+
+        /// <summary>A fir H metres tall: a trunk and five tiers, each a drooping ring of branch tips (every other one drawn
+        /// in) rising to its top, the lower half of a tier needles, the upper half snow.</summary>
+        static Mesh FirShape(System.Random rng, float H, float R)
+        {
+            var v = new List<Vector3>(); var uv = new List<Vector2>(); var t = new List<int>();
+            void Add(Mesh m) { int o = v.Count; v.AddRange(m.vertices); uv.AddRange(m.uv); foreach (var i in m.triangles) t.Add(o + i); Destroy(m); }
+            Add(Prism(0.22f, 1.6f, 6, 0.05f));
+            const int T = 5, N = 9;
+            for (int i = 0; i < T; i++)
+            {
+                float y0 = 1.1f + i * (H - 1.1f) * 0.17f, th = (H - 1.1f) * (i == T - 1 ? 0.32f : 0.3f), r = R * (1f - i / (float)(T + 0.6f)) * (0.9f + 0.2f * (float)rng.NextDouble());
+                int o = v.Count; float spin = (float)rng.NextDouble() * 6.28f;
+                for (int k = 0; k < N; k++) { float a = spin + k * 6.283f / N, rr = r * (k % 2 == 0 ? 1f : 0.74f); v.Add(new Vector3(Mathf.Cos(a) * rr, y0 - 0.2f, Mathf.Sin(a) * rr)); uv.Add(new Vector2(0.2f, 0.5f)); }
+                for (int k = 0; k < N; k++) { float a = spin + (k + 0.5f) * 6.283f / N, rr = r * 0.5f; v.Add(new Vector3(Mathf.Cos(a) * rr, y0 + th * 0.45f, Mathf.Sin(a) * rr)); uv.Add(new Vector2(0.62f, 0.5f)); }
+                v.Add(new Vector3(0f, y0 + th, 0f)); uv.Add(new Vector2(0.98f, 0.5f)); int apex = v.Count - 1;
+                for (int k = 0; k < N; k++)
+                {
+                    int a0 = o + k, a1 = o + (k + 1) % N, b0 = o + N + k, b1 = o + N + (k + 1) % N;
+                    t.Add(a0); t.Add(b0); t.Add(a1); t.Add(a1); t.Add(b0); t.Add(b1);   // the lower ring up to the middle one
+                    t.Add(b0); t.Add(apex); t.Add(b1);
+                }
+            }
+            var m2 = new Mesh { name = "fir" }; m2.SetVertices(v); m2.SetUVs(0, uv); m2.SetTriangles(t, 0); m2.RecalculateNormals(); m2.RecalculateBounds(); return m2;
+        }
+
+        /// <summary>A short n-sided prism (a trunk, a stump) of radius r and height h, coloured as bark (u).</summary>
+        static Mesh Prism(float r, float h, int n, float u)
+        {
+            var v = new List<Vector3>(); var uv = new List<Vector2>(); var t = new List<int>();
+            for (int k = 0; k <= n; k++) { float a = k * 6.283f / n; var d = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)); v.Add(d * r); v.Add(d * r * 0.85f + Vector3.up * h); uv.Add(new Vector2(u, 0.2f)); uv.Add(new Vector2(u, 0.8f)); }
+            for (int k = 0; k < n; k++) { int a = k * 2; t.Add(a); t.Add(a + 1); t.Add(a + 2); t.Add(a + 2); t.Add(a + 1); t.Add(a + 3); }
+            int top = v.Count; v.Add(Vector3.up * h); uv.Add(new Vector2(0.12f, 0.5f));
+            for (int k = 0; k < n; k++) { t.Add(top); t.Add(k * 2 + 3); t.Add(k * 2 + 1); }
+            var m = new Mesh(); m.SetVertices(v); m.SetUVs(0, uv); m.SetTriangles(t, 0); m.RecalculateNormals(); return m;
+        }
+
+        /// <summary>The forest as one mesh: its firs standing or lying the way they fell, and its stumps.</summary>
+        Mesh ForestMesh(Prop p)
+        {
+            var parts = new List<CombineInstance>(); var origin = p.pos;
+            for (int i = 0; i < p.firs.Length; i++)
+            {
+                var f = p.firs[i]; var at = new Vector3(f.x, 0f, f.y) - origin; var turn = Quaternion.Euler(0f, f.w * Mathf.Rad2Deg, 0f); var shape = firShapes[(int)(f.w * 10f) % firShapes.Length];
+                if (p.down[i] < 0f) { parts.Add(new CombineInstance { mesh = shape, transform = Matrix4x4.TRS(at, turn, Vector3.one * f.z) }); continue; }
+                var dir = new Vector3(Mathf.Sin(p.down[i]), 0f, Mathf.Cos(p.down[i])); var lay = Quaternion.AngleAxis(84f, Vector3.Cross(Vector3.up, dir));
+                parts.Add(new CombineInstance { mesh = shape, transform = Matrix4x4.TRS(at + Vector3.up * 0.5f, lay * turn, Vector3.one * f.z) });
+                parts.Add(new CombineInstance { mesh = stumpShape, transform = Matrix4x4.TRS(at, turn, new Vector3(1.3f, 0.6f, 1.3f) * f.z) });
+            }
+            foreach (var s in p.stumps) parts.Add(new CombineInstance { mesh = stumpShape, transform = Matrix4x4.TRS(new Vector3(s.x, 0f, s.z) - origin, Quaternion.Euler(0f, s.x * 37f, 0f), new Vector3(1.2f, s.y, 1.2f)) });
+            var m = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32, name = "forest" }; m.CombineMeshes(parts.ToArray(), true, true); m.RecalculateBounds(); return m;
+        }
+
+        void SpawnForest(Prop p)
+        {
+            FirKit(); var go = new GameObject("Forest"); go.transform.SetParent(transform, false); go.transform.position = p.pos;
+            p.mesh = ForestMesh(p); go.AddComponent<MeshFilter>().sharedMesh = p.mesh; var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = firMaterial; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            p.go = go;
+        }
+
+        /// <summary>Three firs felled across the lane, crossing; pressed into the snow once a hull has gone through.</summary>
+        void SpawnAbatis(Prop p)
+        {
+            FirKit(); var rng = new System.Random(p.seed); var parts = new List<CombineInstance>(); var f = new Vector3(Mathf.Sin(p.yaw), 0f, Mathf.Cos(p.yaw)); var r = new Vector3(f.z, 0f, -f.x);
+            for (int i = 0; i < 3; i++)
+            {
+                float across = (i - 1) * 1.6f, ang = (i % 2 == 0 ? 70f : 110f) + (float)rng.NextDouble() * 14f; var dir = Quaternion.Euler(0f, ang, 0f) * f;
+                var lay = Quaternion.AngleAxis(86f, Vector3.Cross(Vector3.up, dir)); var at = f * across - dir * 4.5f + Vector3.up * (0.4f + i * 0.25f);
+                parts.Add(new CombineInstance { mesh = firShapes[i], transform = Matrix4x4.TRS(at, lay * Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f), Vector3.one * 0.9f) });
+            }
+            var go = new GameObject("Roadblock"); go.transform.SetParent(transform, false); go.transform.position = p.pos;
+            p.mesh = new Mesh { name = "roadblock" }; p.mesh.CombineMeshes(parts.ToArray(), true, true); p.mesh.RecalculateBounds();
+            go.AddComponent<MeshFilter>().sharedMesh = p.mesh; var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = firMaterial; mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            if (p.state == 2) go.transform.localScale = new Vector3(1f, 0.3f, 1f);
+            p.go = go;
+        }
+
+        /// <summary>Cut trunks stacked three, two and one, their ends to the lane.</summary>
+        void SpawnLogs(Prop p)
+        {
+            FirKit(); var parts = new List<CombineInstance>(); var cyl = LogShape();
+            int k = 0; for (int row = 0; row < 3; row++) for (int i = 0; i < 3 - row; i++, k++)
+                parts.Add(new CombineInstance { mesh = cyl, transform = Matrix4x4.TRS(new Vector3((i - (2 - row) * 0.5f) * 0.56f, 0.28f + row * 0.48f, (k % 2) * 0.2f), Quaternion.Euler(90f, 0f, 0f), new Vector3(0.55f, 2.7f, 0.55f)) });
+            var go = new GameObject("Logs"); go.transform.SetParent(transform, false); go.transform.position = p.pos; go.transform.rotation = Quaternion.Euler(0f, p.yaw * Mathf.Rad2Deg, 0f);
+            p.mesh = new Mesh { name = "logs" }; p.mesh.CombineMeshes(parts.ToArray(), true, true); p.mesh.RecalculateBounds();
+            go.AddComponent<MeshFilter>().sharedMesh = p.mesh; var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = logMaterial; mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            if (p.state == 2) go.transform.localScale = new Vector3(1f, 0.35f, 1f);
+            p.go = go;
+        }
+        static Mesh logShape;
+        static Mesh LogShape() { if (logShape == null) { var g = GameObject.CreatePrimitive(PrimitiveType.Cylinder); logShape = g.GetComponent<MeshFilter>().sharedMesh; Destroy(g); } return logShape; }
 
         /// <summary>One model for the battle to place itself (no collision): null when the model is not there.</summary>
         public GameObject Spawn(string mesh, Vector3 pos, float yawDeg)
@@ -562,6 +743,9 @@ namespace IronNight
                 case What.Tree: SpawnTree(p); if (p.state == 1 && p.go != null) p.go.transform.rotation = Fallen(p); break;
                 case What.Searchlight: SpawnSearchlight(p); break;
                 case What.Stream: SpawnStream(p); break;
+                case What.Forest: SpawnForest(p); break;
+                case What.Abatis: SpawnAbatis(p); break;
+                case What.Logs: SpawnLogs(p); break;
                 case What.Fire:
                 {
                     var go = new GameObject("FieldFire"); go.transform.SetParent(transform, false); go.transform.position = p.pos;
@@ -805,8 +989,8 @@ namespace IronNight
                 foreach (var p in active)
                 {
                     if (p.radii.Length == 0 || p.drivable) continue;
-                    bool tree = p.what == What.Tree || (p.kind != null && (p.kind.mesh.StartsWith("tree_") || p.kind.mesh.StartsWith("spruce")));
-                    float h = tree ? 12f : p.what == What.Hedge ? 3.2f : p.height > 0f ? p.height : 2.5f, crown = p.what == What.Tree ? 5f : p.kind != null ? Mathf.Max(3f, p.kind.length * 0.5f) : 3f; if (q.y > h) continue;
+                    bool tree = p.what == What.Tree || p.what == What.Forest || (p.kind != null && (p.kind.mesh.StartsWith("tree_") || p.kind.mesh.StartsWith("spruce")));
+                    float h = tree ? 12f : p.what == What.Hedge ? 3.2f : p.height > 0f ? p.height : 2.5f, crown = p.what == What.Tree ? 5f : p.what == What.Forest ? 2.4f : p.kind != null ? Mathf.Max(3f, p.kind.length * 0.5f) : 3f; if (q.y > h) continue;
                     float dx = p.pos.x - q.x, dz = p.pos.z - q.z, reach = p.bound + 4f; if (dx * dx + dz * dz > reach * reach) continue;
                     for (int c = 0; c < p.radii.Length; c++) { float rad = tree && q.y > 2f ? Mathf.Max(p.radii[c], crown) : p.radii[c]; if ((new Vector2(q.x, q.z) - p.circleCenters[c]).sqrMagnitude < rad * rad) return false; }
                 }
@@ -874,6 +1058,7 @@ namespace IronNight
         {
             if (p.what == What.Tree) return 1;
             if (p.what == What.Hedge) return 4;
+            if (p.what == What.Abatis || p.what == What.Logs) return 2;
             if (p.what != What.Model) return 0;
             switch (p.kind.mesh)
             {
@@ -902,6 +1087,16 @@ namespace IronNight
             {
                 var p = active[i]; if (p.radii.Length == 0 || p.drivable || p.state != 0) continue;
                 float reach = p.bound + radius + 1f; if ((p.pos - pos).sqrMagnitude > reach * reach) continue;
+                if (p.what == What.Forest)
+                {
+                    // into the forest: every fir the hull drives into goes down ahead of it, and each one holds it back
+                    for (int c = p.radii.Length - 1; c >= 0; c--)
+                    {
+                        float min = p.radii[c] + radius * 0.97f; if ((new Vector2(pos.x, pos.z) - p.circleCenters[c]).sqrMagnitude >= min * min) continue;
+                        keep = Mathf.Min(keep, 0.5f); FellFir(p, p.treeOf[c], forward, true); break;
+                    }
+                    continue;
+                }
                 int kind = BreakKind(p); bool hedge = p.what == What.Hedge; if (kind == 0 || kind == 3 || (kind == 4 && !dozer && !hedge)) continue;
                 for (int c = 0; c < p.radii.Length; c++)
                 {
@@ -922,6 +1117,8 @@ namespace IronNight
         {
             if (p.what == What.Hedge) return Kursk ? 0.72f : 0.58f;   // bushes and wattle give: a hull shoulders through
             if (p.what == What.Tree) return 0.45f;
+            if (p.what == What.Abatis) return 0.42f;
+            if (p.what == What.Logs) return 0.5f;
             switch (p.kind.mesh)
             {
                 case "tree_oak": case "tree_poplar": case "tree_poplar_b": case "tree_apple": case "tree_birch": case "spruce_snow": case "k_birches": return 0.45f;
@@ -968,14 +1165,27 @@ namespace IronNight
             {
                 var p = active[i]; if (p.state != 0) continue;
                 float reach = p.bound + radius; var d = p.pos - at; d.y = 0f; if (d.sqrMagnitude > reach * reach) continue;
+                if (p.what == What.Forest) { BlastForest(p, at, radius, dmg); continue; }
                 float near = p.radii.Length == 0 ? d.magnitude : float.MaxValue;
                 for (int c = 0; c < p.radii.Length; c++) near = Mathf.Min(near, (new Vector2(at.x, at.z) - p.circleCenters[c]).magnitude - p.radii[c]);
                 if (near > radius) continue;
                 float k = 1f - Mathf.Clamp01(near / radius) * 0.6f; int kind = BreakKind(p);   // full at contact, less at the edge
                 if (p.what == What.Hedge) { if (dmg >= 1.5f) Gap(p, at); }
                 else if (kind == 1) { if (dmg * k >= 0.8f) Fall(p, d.sqrMagnitude > 0.01f ? d.normalized : Vector3.forward); }
-                else if (kind == 2) { if (p.kind.mesh == "barrels") Explode(p); else Crush(p, true); }
+                else if (kind == 2) { if (p.kind != null && p.kind.mesh == "barrels") Explode(p); else Crush(p, true); }
                 else if (kind >= 3) Hurt(p, dmg * k, at);
+            }
+        }
+
+        /// <summary>Shells and barrages in the forest: the firs within half the blast go over, away from it (at most five; one
+        /// heard for them all), the others shed their snow.</summary>
+        void BlastForest(Prop p, Vector3 at, float radius, float dmg)
+        {
+            if (dmg < 0.8f) return; float reach = radius * 0.55f; int felled = 0;
+            for (int c = p.radii.Length - 1; c >= 0 && felled < 5; c--)
+            {
+                var cc = p.circleCenters[c]; var d = new Vector3(cc.x - at.x, 0f, cc.y - at.z); if (d.magnitude > reach) continue;
+                FellFir(p, p.treeOf[c], d.sqrMagnitude > 0.01f ? d.normalized : Vector3.forward, felled == 0); felled++;
             }
         }
 
@@ -984,6 +1194,7 @@ namespace IronNight
         public void Strike(Vector3 at, float dmg)
         {
             var p = blocker; blocker = null; if (p == null || p.state != 0) return;
+            if (p.what == What.Forest) { BlastForest(p, at, 3f, 1f); return; }   // a shell into a fir: it goes over
             int kind = BreakKind(p);
             if (p.what == What.Model && p.kind.mesh == "barrels") Explode(p);
             else if (kind == 2) Crush(p, true);
@@ -1037,7 +1248,9 @@ namespace IronNight
         {
             if (p.state != 0) return;
             p.state = 2; p.radii = new float[0]; p.circleCenters = new Vector2[0]; p.height = -1f;
-            if (byShell && Burns(p.kind.mesh)) p.burn = 12f + Random.value * 10f;
+            if (byShell && p.kind != null && Burns(p.kind.mesh)) p.burn = 12f + Random.value * 10f;
+            if (p.what == What.Abatis && p.go != null) { p.go.transform.localScale = new Vector3(1f, 0.3f, 1f); if (fx != null) fx.Dust(p.pos); Sfx.TreeFall(p.pos); return; }
+            if (p.what == What.Logs && p.go != null) { p.go.transform.localScale = new Vector3(1f, 0.35f, 1f); if (fx != null) fx.Dust(p.pos); Sfx.Crunch(p.pos); return; }
             if (p.go != null) p.go.transform.localScale = new Vector3(1f, 0.22f, 1f);
             if (fx != null) fx.Dust(p.pos);
             Sfx.Crunch(p.pos);
@@ -1331,7 +1544,7 @@ namespace IronNight
         public int BlockerStuff()
         {
             var p = blocker; if (p == null) return 0;
-            if (p.what == What.Tree || p.what == What.Hedge) return 1;
+            if (p.what == What.Tree || p.what == What.Hedge || p.what == What.Forest || p.what == What.Abatis || p.what == What.Logs) return 1;
             if (p.what == What.Searchlight || p.kind == null) return 2;
             switch (p.kind.mesh)
             {

@@ -944,6 +944,7 @@ namespace IronNight
         {
             float r = Random.value; weather = r < 0.45f ? Weather.Clear : r < 0.7f ? Weather.Overcast : r < 0.85f ? Weather.Fog : Weather.Rain;
             winter = theatre == "ardennes";
+            if (winter) weather = r < 0.22f ? Weather.Clear : r < 0.47f ? Weather.Overcast : r < 0.72f ? Weather.Fog : Weather.Rain;   // the Ardennes in December: fog and snow half the nights
             if (daily) { var w = Daily.Weather(dailyDay); weather = w == "fog" ? Weather.Fog : w == "rain" ? Weather.Rain : w == "overcast" ? Weather.Overcast : Weather.Clear; if (rule == "stukas") weather = Weather.Clear; } if (weekly && rule == "stukas") weather = Weather.Clear;
             if (mapSector != null) weather = mapSector.weather == "fog" ? Weather.Fog : mapSector.weather == "rain" ? Weather.Rain : mapSector.weather == "overcast" ? Weather.Overcast : Weather.Clear;   // the sector as the map shows it
             if (opNight > 0) weather = opN.weather == "fog" ? Weather.Fog : opN.weather == "rain" ? Weather.Rain : opN.weather == "overcast" ? Weather.Overcast : Weather.Clear;   // the night as it was briefed
