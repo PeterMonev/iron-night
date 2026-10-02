@@ -66,6 +66,17 @@ namespace IronNight
             new Kind { mesh = "tree_apple", length = 6f, height = -1f, circles = new[] { 0f, 0f, 0.5f } },
             new Kind { mesh = "tree_birch", length = 5f, height = -1f, circles = new[] { 0f, 0f, 0.4f } },
             new Kind { mesh = "tree_poplar_b", length = 4f, height = -1f, circles = new[] { 0f, 0f, 0.45f } },
+            // the sixth batch: the Ardennes
+            new Kind { mesh = "house_belgian", length = 10f, height = 8f, circles = new[] { -2.4f, 0f, 3.1f, 2.4f, 0f, 3.1f } },
+            new Kind { mesh = "farm_belgian", length = 15f, height = 7f, circles = new[] { -5f, 0f, 3.2f, 0f, 0f, 3.4f, 5f, 0f, 3.2f } },
+            new Kind { mesh = "sawmill", length = 10f, height = 4.5f, circles = new[] { -2.5f, 0f, 2.6f, 2.5f, 0f, 2.6f } },
+            new Kind { mesh = "foxhole_logs", length = 5f, height = -1f, circles = new[] { 0f, 0f, 1.4f } },
+            new Kind { mesh = "truck_snow", length = 6.5f, height = 2.8f, circles = new[] { -1.7f, 0f, 1.4f, 1.7f, 0f, 1.4f } },
+            new Kind { mesh = "chapel_wayside", length = 4.5f, height = 6f, circles = new[] { 0f, 0f, 2f } },
+            new Kind { mesh = "fir_snow", length = 6f, height = -1f, circles = new[] { 0f, 0f, 0.5f } },
+            new Kind { mesh = "fir_snow_b", length = 6f, height = -1f, circles = new[] { 0f, 0f, 0.5f } },
+            new Kind { mesh = "pine_snow", length = 6f, height = -1f, circles = new[] { 0f, 0f, 0.45f } },
+            new Kind { mesh = "fir_young", length = 3f, height = -1f, circles = new[] { 0f, 0f, 0.6f } },
             // Kursk: stand-ins for the Normandy models, and the steppe's own
             new Kind { mesh = "k_izba", length = 9f, height = 6f, circles = new[] { -2.4f, 0f, 3.2f, 2.4f, 0f, 3.2f } },
             new Kind { mesh = "k_khata", length = 9f, height = 5.5f, circles = new[] { -2.4f, 0f, 3.2f, 2.4f, 0f, 3.2f } },
@@ -107,7 +118,8 @@ namespace IronNight
             var lit = Resources.Load<Material>("VehicleLit"); var decal = Resources.Load<Material>("GroundDecal");
             foreach (var k in Kinds)
             {
-                if (k.mesh.StartsWith("k_") && !Kursk && k.mesh != "k_hedgehogs") continue;   // the hedgehogs are loaded on every front: a last stand digs them in anywhere
+                if (k.mesh.StartsWith("k_") && !Kursk && k.mesh != "k_hedgehogs") continue;
+                if (!Ardennes && ArdennesOnly(k.mesh)) continue;   // the Belgian houses and the snowy trees stay on disk elsewhere   // the hedgehogs are loaded on every front: a last stand digs them in anywhere
                 var pf = Resources.Load<GameObject>("Props/" + k.mesh); if (pf == null) continue;
                 prefabs[k.mesh] = pf;
                 var m = new Material(lit); m.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + k.mesh + "_tex")); m.SetColor("_BaseColor", Tint(k.mesh)); m.SetFloat("_Smoothness", 0.15f); m.SetFloat("_Cull", 0f);
@@ -157,6 +169,7 @@ namespace IronNight
         static bool Battery(int ix, int iz) => (ix == -1 && iz == 0) || (!Start(ix, iz) && !Farm(ix, iz) && Rnd(ix, iz, 940) < (SneakNight ? 0.32f : 0.16f));
         static bool Village(int ix, int iz) => (ix == 0 && iz == 3) || (!Start(ix, iz) && !Farm(ix, iz) && !Battery(ix, iz) && Rnd(ix, iz, 1100) < VillageChance);
         static bool Ardennes => Theatre == "ardennes";
+        static bool ArdennesOnly(string mesh) => mesh == "house_belgian" || mesh == "farm_belgian" || mesh == "sawmill" || mesh == "foxhole_logs" || mesh == "truck_snow" || mesh == "chapel_wayside" || mesh.StartsWith("fir_") || mesh == "pine_snow";
         static float ForestChance => Route == "bocage" ? 0.62f : Route == "open" ? 0.38f : 0.3f;
         /// <summary>A cell of fir forest: the Ardennes only, never where the night starts, a farm, a post or a village stands.</summary>
         static bool Forest(int ix, int iz) => Ardennes && !Start(ix, iz) && !(ix == 0 && iz == 1) && !Farm(ix, iz) && !Battery(ix, iz) && !Village(ix, iz) && Rnd(ix, iz, 1400) < ForestChance;
@@ -183,6 +196,8 @@ namespace IronNight
         /// <summary>What stands in for a Normandy model on the steppe; null when it has none (the gates).</summary>
         static string Local(string mesh)
         {
+            if (Ardennes)
+                switch (mesh) { case "farmhouse": return "farm_belgian"; case "cottage": case "house_normandy": return "house_belgian"; case "truck": return "truck_snow"; default: return mesh; }
             if (!Kursk) return mesh;
             switch (mesh)
             {
@@ -196,8 +211,9 @@ namespace IronNight
 
         Prop Place(List<Prop> list, string mesh, Vector3 pos, float yaw, bool water = false)
         {
-            mesh = Local(mesh); if (mesh == null) return null;
-            var kind = K(mesh); if (kind == null || !prefabs.ContainsKey(mesh)) return null;
+            string local = Local(mesh); if (local == null) return null;
+            if (Ardennes && !prefabs.ContainsKey(local) && prefabs.ContainsKey(mesh)) local = mesh;   // the Belgian model missing: the Norman one stands in
+            mesh = local; var kind = K(mesh); if (kind == null || !prefabs.ContainsKey(mesh)) return null;
             if (!water && InStream(pos, kind.length * 0.35f)) return null;   // nothing stands in a stream but its bridge
             foreach (var o in list) if (o.what == What.Model && (o.pos - pos).sqrMagnitude < 5f * 5f) return null;
             var p = new Prop { what = What.Model, kind = kind, pos = pos, yaw = yaw, height = kind.height, bound = kind.length };
@@ -228,7 +244,7 @@ namespace IronNight
             var spots = new List<(Vector3, bool)>();
             foreach (var p in active)
             {
-                if (p.what != What.Model || p.manned || p.state != 0 || (p.kind.mesh != "trench" && p.kind.mesh != "sandbags")) continue;
+                if (p.what != What.Model || p.manned || p.state != 0 || (p.kind.mesh != "trench" && p.kind.mesh != "sandbags" && p.kind.mesh != "foxhole_logs")) continue;
                 var d = p.pos - from; d.y = 0f; float len = d.magnitude; if (len < min || len > max) continue;
                 p.manned = true;
                 bool lamp = false; foreach (var q in active) if (q.what == What.Searchlight && (q.pos - p.pos).sqrMagnitude < 4f) { lamp = true; break; }
@@ -236,6 +252,7 @@ namespace IronNight
                 var f = new Vector3(Mathf.Sin(p.yaw), 0f, Mathf.Cos(p.yaw)); var r = new Vector3(f.z, 0f, -f.x);
                 if (lamp) { foreach (float a in new[] { 90f, 210f, 330f }) spots.Add((p.pos + Quaternion.Euler(0f, a, 0f) * f * 4.3f, false)); continue; }   // the lamp fills its ring: its guard stands round the outside
                 if (p.kind.mesh == "trench") { spots.Add((p.pos - f * 2.2f, true)); spots.Add((p.pos + f * 2.2f, true)); }
+                else if (p.kind.mesh == "foxhole_logs") { spots.Add((p.pos - r * 0.8f, true)); spots.Add((p.pos + r * 0.8f, true)); }
                 else { spots.Add((p.pos + r * 0.9f, false)); spots.Add((p.pos - r * 0.9f, false)); spots.Add((p.pos + f * 0.9f, false)); }
             }
             return spots;
@@ -251,6 +268,7 @@ namespace IronNight
 
         void Tree(List<Prop> list, Vector3 pos, int seed)
         {
+            if (winter && Place(list, seed % 4 == 0 ? "pine_snow" : seed % 4 == 1 ? "fir_snow_b" : "fir_snow", pos, (seed % 360) * Mathf.Deg2Rad) != null) return;
             if (winter) { if (Place(list, seed % 3 == 0 ? "deadtree" : "spruce_snow", pos, (seed % 360) * Mathf.Deg2Rad) == null) Place(list, "deadtree", pos, (seed % 360) * Mathf.Deg2Rad); return; }   // firs and bare trees in the snow
             if (Kursk && seed % 2 == 0 && Place(list, "tree_birch", pos, (seed % 360) * Mathf.Deg2Rad) != null) return;
             if (Place(list, "tree_oak", pos, (seed % 360) * Mathf.Deg2Rad) != null) return;
@@ -377,6 +395,7 @@ namespace IronNight
             for (int k = 0; k < craters; k++) list.Add(new Prop { what = What.Decal, seed = 1, pos = c + In(ix, iz, 1054 + k * 2, 16f), yaw = Rnd(ix, iz, 1060 + k) * 6.28f, size = 4f + Rnd(ix, iz, 1064 + k) * 3f });
             if (Rnd(ix, iz, 1070) < 0.05f) Place(list, "sandbags", c + In(ix, iz, 1071, 12f), Rnd(ix, iz, 1073) * 6.28f);
             if (Rnd(ix, iz, 1074) < 0.04f) Place(list, "wreck", c + In(ix, iz, 1075, 12f), Rnd(ix, iz, 1077) * 6.28f);
+            if (Ardennes) { int young = Rnd(ix, iz, 1600) < 0.55f ? 1 + (int)(Rnd(ix, iz, 1601) * 3f) : 0; for (int y = 0; y < young; y++) Place(list, "fir_young", c + In(ix, iz, 1602 + y * 2, 15f), Rnd(ix, iz, 1610 + y) * 6.28f); }
             if (Rnd(ix, iz, 1240) < (Kursk ? 0.14f : Route == "open" ? 0.08f : 0.05f)) TrenchLine(list, ix, iz, c);
             else if (Rnd(ix, iz, 1250) < (Route == "open" ? 0.05f : 0.025f)) Place(list, "windmill", c + In(ix, iz, 1251, 9f), Rnd(ix, iz, 1253) * 6.28f);
             if (Rnd(ix, iz, 1254) < 0.04f) Place(list, "house_ruin", c + In(ix, iz, 1255, 11f), Rnd(ix, iz, 1257) < 0.5f ? 0f : Mathf.PI / 2f);
@@ -389,12 +408,15 @@ namespace IronNight
         void ForestCell(List<Prop> list, int ix, int iz, Vector3 c)
         {
             var firs = new List<Vector4>(); var stumps = new List<Vector3>(); int k = 0;
+            Vector3? mill = null;
+            if (LaneX(ix) && Rnd(ix, iz, 1420) < 0.14f && prefabs.ContainsKey("sawmill")) { mill = new Vector3(c.x + Half - 11f, 0f, c.z + (Rnd(ix, iz, 1421) - 0.5f) * 16f); Place(list, "sawmill", mill.Value, 0f); }
             for (float gx = -Half + 2.5f; gx < Half; gx += 5.2f) for (float gz = -Half + 2.5f; gz < Half; gz += 5.2f, k++)
             {
                 var pos = c + new Vector3(gx + (Rnd(ix, iz, 1500 + k) - 0.5f) * 3.4f, 0f, gz + (Rnd(ix, iz, 1700 + k) - 0.5f) * 3.4f);
                 if ((LaneX(ix) && Mathf.Abs(pos.x - (c.x + Half)) < 6f) || (LaneX(ix - 1) && Mathf.Abs(pos.x - (c.x - Half)) < 6f)) continue;
                 if ((LaneZ(iz) && Mathf.Abs(pos.z - (c.z + Half)) < 6f) || (LaneZ(iz - 1) && Mathf.Abs(pos.z - (c.z - Half)) < 6f)) continue;
                 if (InStream(pos, 1.5f)) continue;
+                if (mill != null && (pos - mill.Value).sqrMagnitude < 9f * 9f) continue;   // the sawmill's yard
                 if (Rnd(ix, iz, 1900 + k) < 0.12f) { if (Rnd(ix, iz, 2100 + k) < 0.6f) stumps.Add(new Vector3(pos.x, 0.7f + Rnd(ix, iz, 2300 + k) * 0.5f, pos.z)); continue; }   // a clearing: a stump, now and then
                 firs.Add(new Vector4(pos.x, pos.z, 0.8f + Rnd(ix, iz, 2500 + k) * 0.55f, Rnd(ix, iz, 2700 + k) * 6.28f));
             }
@@ -451,7 +473,8 @@ namespace IronNight
         {
             float yaw = Rnd(ix, iz, 1241) * Mathf.PI; var f = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)); var r = new Vector3(f.z, 0f, -f.x);
             var o = c + In(ix, iz, 1242, 4f);
-            for (int k = 0; k < 4; k++) Place(list, "trench", o + f * (-12f + k * 8f) + r * (k % 2 == 0 ? 0f : 1.6f), yaw + (k % 2 == 0 ? 0.18f : -0.18f));
+            string dug = Ardennes && prefabs.ContainsKey("foxhole_logs") ? "foxhole_logs" : "trench";   // the Ardennes dug in under logs
+            for (int k = 0; k < 4; k++) Place(list, dug, o + f * (-12f + k * 8f) + r * (k % 2 == 0 ? 0f : 1.6f), yaw + (k % 2 == 0 ? 0.18f : -0.18f));
             for (int k = 0; k < 3; k++) Place(list, "barbed_wire", o + f * (-9f + k * 7f) + r * 7f, yaw + (Rnd(ix, iz, 1244 + k) - 0.5f) * 0.3f);
             Place(list, "sandbags", o + f * (Rnd(ix, iz, 1248) < 0.5f ? 19f : -19f) - r * 1.5f, yaw);
         }
@@ -467,6 +490,7 @@ namespace IronNight
             if (LaneX(ix) && !winter && Rnd(ix, iz, 1140) < 0.35f) foreach (var u in new[] { -16f, -4f, 8f }) Place(list, Rnd(ix, iz, 1170 + (int)u) < 0.5f ? "tree_poplar_b" : "tree_poplar", c + new Vector3(Half - 4.2f, 0f, u + Rnd(ix, iz, 1141 + (int)u) * 2f), Rnd(ix, iz, 1150 + (int)u) * 6.28f);
             if (LaneZ(iz) && !winter && Rnd(ix, iz, 1142) < 0.35f) foreach (var u in new[] { -16f, -4f, 8f }) Place(list, Rnd(ix, iz, 1180 + (int)u) < 0.5f ? "tree_poplar_b" : "tree_poplar", c + new Vector3(u + Rnd(ix, iz, 1143 + (int)u) * 2f, 0f, Half - 4.2f), Rnd(ix, iz, 1160 + (int)u) * 6.28f);
             if (LaneX(ix) && LaneZ(iz)) Place(list, "signpost", c + new Vector3(Half + 4.5f, 0f, Half + 4.5f), Rnd(ix, iz, 1144) * 6.28f);
+            if (Ardennes && LaneX(ix) && LaneZ(iz) && Rnd(ix, iz, 1620) < 0.45f) Place(list, "chapel_wayside", c + new Vector3(Half - 7.5f, 0f, Half - 7.5f), Mathf.PI * 0.25f);   // a wayside chapel at the crossing, facing it
             if (HedgeX(ix, iz)) Hedge(list, c + new Vector3(Half, 0f, -Half), c + new Vector3(Half, 0f, Half), StreamZ(iz - 1) ? 11f : LaneZ(iz - 1) ? 4f : 0f, StreamZ(iz) ? 11f : LaneZ(iz) ? 4f : 0f, ix, iz, 0);
             if (StreamZ(iz))
             {
@@ -1024,7 +1048,7 @@ namespace IronNight
                 foreach (var p in active)
                 {
                     if (p.radii.Length == 0 || p.drivable) continue;
-                    bool tree = p.what == What.Tree || p.what == What.Forest || (p.kind != null && (p.kind.mesh.StartsWith("tree_") || p.kind.mesh.StartsWith("spruce")));
+                    bool tree = p.what == What.Tree || p.what == What.Forest || (p.kind != null && (p.kind.mesh.StartsWith("tree_") || p.kind.mesh.StartsWith("spruce") || p.kind.mesh.StartsWith("fir_") || p.kind.mesh == "pine_snow"));
                     float h = tree ? 12f : p.what == What.Hedge ? 3.2f : p.height > 0f ? p.height : 2.5f, crown = p.what == What.Tree ? 5f : p.what == What.Forest ? 2.4f : p.kind != null ? Mathf.Max(3f, p.kind.length * 0.5f) : 3f; if (q.y > h) continue;
                     float dx = p.pos.x - q.x, dz = p.pos.z - q.z, reach = p.bound + 4f; if (dx * dx + dz * dz > reach * reach) continue;
                     for (int c = 0; c < p.radii.Length; c++) { float rad = tree && q.y > 2f ? Mathf.Max(p.radii[c], crown) : p.radii[c]; if ((new Vector2(q.x, q.z) - p.circleCenters[c]).sqrMagnitude < rad * rad) return false; }
@@ -1098,7 +1122,9 @@ namespace IronNight
             switch (p.kind.mesh)
             {
                 case "tree_oak": case "tree_poplar": case "tree_poplar_b": case "tree_apple": case "tree_birch": case "deadtree": case "spruce_snow": case "k_birches": case "pole": case "signpost": return 1;
-                case "barbed_wire": return 2;
+                case "barbed_wire": case "foxhole_logs": return 2;
+                case "fir_snow": case "fir_snow_b": case "pine_snow": case "fir_young": return 1;
+                case "house_belgian": case "farm_belgian": case "sawmill": case "chapel_wayside": case "truck_snow": return 3;
                 case "house_normandy": case "house_ruin": case "izba": case "windmill": return 3;
                 case "well_b": return 4;
                 case "k_wattle": case "cart": case "barrels": case "haystack": case "k_sheaves": case "gate": case "k_well": case "k_sunflowers": return 2;
@@ -1107,8 +1133,8 @@ namespace IronNight
                 default: return 0;
             }
         }
-        static float MaxHp(string mesh) { switch (mesh) { case "windmill": return 7f; case "house_normandy": return 5f; case "izba": return 4f; case "house_ruin": return 3f; case "church": return 12f; case "k_church": return 9f; case "bunker": return 8f; case "farmhouse": return 6f; case "cottage": case "barn": case "k_izba": return 4f; case "k_khata": return 3f; case "truck": case "sandbags": return 1.5f; default: return 2f; } }
-        static bool Burns(string mesh) => mesh == "house_normandy" || mesh == "izba" || mesh == "barn" || mesh == "cottage" || mesh == "k_khata" || mesh == "k_izba" || mesh == "truck" || mesh == "haystack" || mesh == "k_sheaves" || mesh == "cart";
+        static float MaxHp(string mesh) { switch (mesh) { case "farm_belgian": return 7f; case "house_belgian": return 5f; case "chapel_wayside": return 4f; case "sawmill": return 3f; case "truck_snow": return 1.5f; case "windmill": return 7f; case "house_normandy": return 5f; case "izba": return 4f; case "house_ruin": return 3f; case "church": return 12f; case "k_church": return 9f; case "bunker": return 8f; case "farmhouse": return 6f; case "cottage": case "barn": case "k_izba": return 4f; case "k_khata": return 3f; case "truck": case "sandbags": return 1.5f; default: return 2f; } }
+        static bool Burns(string mesh) => mesh == "sawmill" || mesh == "truck_snow" || mesh == "house_normandy" || mesh == "izba" || mesh == "barn" || mesh == "cottage" || mesh == "k_khata" || mesh == "k_izba" || mesh == "truck" || mesh == "haystack" || mesh == "k_sheaves" || mesh == "cart";
         static Vector3 FallDir(Prop p) => new Vector3(Mathf.Sin(p.fallYaw), 0f, Mathf.Cos(p.fallYaw));
         static Quaternion Fallen(Prop p) => Quaternion.AngleAxis(88f, Vector3.Cross(Vector3.up, FallDir(p))) * Quaternion.Euler(0f, p.yaw * Mathf.Rad2Deg, 0f);
 
@@ -1159,6 +1185,9 @@ namespace IronNight
                 case "tree_oak": case "tree_poplar": case "tree_poplar_b": case "tree_apple": case "tree_birch": case "spruce_snow": case "k_birches": return 0.45f;
                 case "well_b": return 0.5f;
                 case "barbed_wire": return 0.9f;
+                case "fir_snow": case "fir_snow_b": case "pine_snow": return 0.45f;
+                case "fir_young": return 0.75f;
+                case "foxhole_logs": return 0.55f;
                 case "deadtree": return 0.6f;
                 case "pole": case "signpost": return 0.85f;
                 case "wall_a": case "wall_b": return 0.4f;
@@ -1249,7 +1278,7 @@ namespace IronNight
         {
             if (p.state != 0) return;
             p.state = 1; p.radii = new float[0]; p.circleCenters = new Vector2[0]; p.fallYaw = Mathf.Atan2(dir.x, dir.z);
-            bool wood = p.what == What.Tree || (p.kind != null && (p.kind.mesh.StartsWith("tree_") || p.kind.mesh == "deadtree" || p.kind.mesh == "spruce_snow" || p.kind.mesh == "k_birches"));
+            bool wood = p.what == What.Tree || (p.kind != null && (p.kind.mesh.StartsWith("tree_") || p.kind.mesh.StartsWith("fir_") || p.kind.mesh == "pine_snow" || p.kind.mesh == "deadtree" || p.kind.mesh == "spruce_snow" || p.kind.mesh == "k_birches"));
             if (wood) Sfx.TreeFall(p.pos); else Sfx.Crunch(p.pos);   // a tree cracks and crashes down; a pole or a signpost just snaps
             if (p.go != null) { TwoSided(p); falling.Add(new Falling { p = p, rot0 = p.go.transform.rotation, axis = Vector3.Cross(Vector3.up, FallDir(p)) }); }
         }
@@ -1584,6 +1613,7 @@ namespace IronNight
             switch (p.kind.mesh)
             {
                 case "truck": case "truck_burnt": case "wreck": case "barrels": return 2;
+                case "fir_snow": case "fir_snow_b": case "pine_snow": case "fir_young": case "foxhole_logs": case "sawmill":
                 case "cart": case "gate": case "pole": case "signpost": case "haystack": case "k_wattle": case "k_sheaves": case "k_sunflowers": case "barbed_wire": case "deadtree": case "spruce_snow": case "k_birches": return 1;
                 default: return p.kind.mesh.StartsWith("tree_") ? 1 : 0;
             }

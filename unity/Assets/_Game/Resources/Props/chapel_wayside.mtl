@@ -1,0 +1,3 @@
+newmtl chapel_wayside
+Kd 1 1 1
+map_Kd chapel_wayside_tex.png

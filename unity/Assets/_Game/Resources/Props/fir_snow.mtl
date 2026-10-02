@@ -1,0 +1,3 @@
+newmtl fir_snow
+Kd 1 1 1
+map_Kd fir_snow_tex.png

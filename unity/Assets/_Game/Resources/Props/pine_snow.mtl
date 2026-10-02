@@ -1,0 +1,3 @@
+newmtl pine_snow
+Kd 1 1 1
+map_Kd pine_snow_tex.png

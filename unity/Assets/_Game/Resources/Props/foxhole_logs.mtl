@@ -1,0 +1,3 @@
+newmtl foxhole_logs
+Kd 1 1 1
+map_Kd foxhole_logs_tex.png
