@@ -21,7 +21,7 @@ namespace IronNight
             public Vector3 a, b; public float[] gaps; public float clearA, clearB;              // hedges: the line and its openings
             public GameObject go; public Mesh mesh, leaves; public float az, el = 42f; public LightShaft shaft; public Transform yoke, drum, lamp; public float flakTimer = 4f; public int burst; public Light glow;
             public int state; public float hp = -1f, fallYaw, burn; public bool drivable;   // 0 standing, 1 knocked over, 2 crushed, 3 ruined; a ruin is driven over
-            public Vector4[] firs; public float[] down; public int[] treeOf; public Vector3[] stumps;   // a forest: its firs (x, z, size, turn), each one's fall (-1 standing, else the way it lies), which fir each circle is; the stumps in its clearings
+            public Vector4[] firs; public float[] down; public int[] treeOf; public Vector3[] stumps; public HashSet<int> lying3D;   // lying3D: the felled firs lying as the model, not the card   // a forest: its firs (x, z, size, turn), each one's fall (-1 standing, else the way it lies), which fir each circle is; the stumps in its clearings
             public bool manned;   // trenches and nests: their garrison has been put in (or never will be: the player's own sandbags)
             public List<Vector3> trodden;   // hedges: where hulls went through, as (along the line, half the width pressed flat, the side it lies to)
         }
@@ -464,7 +464,49 @@ namespace IronNight
             var at = new Vector3(p.firs[fir].x, 0f, p.firs[fir].y);
             if (loud) Sfx.TreeFall(at);
             if (fx != null) { fx.Dust(at); fx.Leaves(at + Vector3.up * 3f, dir, new Color(0.84f, 0.87f, 0.9f)); }   // snow shaken off the branches
-            if (p.go != null) { var mf = p.go.GetComponent<MeshFilter>(); if (p.mesh != null) Destroy(p.mesh); p.mesh = ForestMesh(p); mf.sharedMesh = p.mesh; p.go.GetComponent<MeshRenderer>().sharedMaterials = FirMaterials(p.mesh); }
+            if (p.go != null && FirModel(fir, p) != null) { (p.lying3D ??= new HashSet<int>()).Add(fir); lyingFirs.Enqueue((p, fir)); FirFalling(p, fir, false); while (lyingFirs.Count > MaxLyingFirs) Flatten(lyingFirs.Dequeue()); }
+            RebuildForest(p);
+        }
+
+        /// <summary>The forest's mesh made again after a fir has gone over.</summary>
+        void RebuildForest(Prop p)
+        {
+            if (p.go == null) return; var mf = p.go.GetComponent<MeshFilter>(); if (p.mesh != null) Destroy(p.mesh);
+            p.mesh = ForestMesh(p); mf.sharedMesh = p.mesh; p.go.GetComponent<MeshRenderer>().sharedMaterials = FirMaterials(p.mesh);
+        }
+
+        const int MaxLyingFirs = 16;   // felled firs lying as the model at once, ~12 000 triangles each; older ones lie as their card
+        readonly Queue<(Prop p, int fir)> lyingFirs = new Queue<(Prop, int)>();
+        class FirFall { public Transform t; public Quaternion rot0; public Vector3 axis, tip; public float a; }
+        readonly List<FirFall> firFalls = new List<FirFall>();
+
+        /// <summary>The spruce model a fir's card was made from (the first two cards fir_snow, the others fir_snow_b), at
+        /// the card's size; null when it is not there.</summary>
+        GameObject FirModel(int fir, Prop p)
+        {
+            string m = ((int)(p.firs[fir].w * 10f) % FirCard.Length) < 2 ? "fir_snow" : "fir_snow_b"; return prefabs.TryGetValue(m, out var pf) ? pf : null;
+        }
+
+        /// <summary>The fir as the model, child of its forest: falling from upright (now) or already lying (built again with
+        /// its cell). Its mesh two-sided, so the underside it shows lying is lit.</summary>
+        void FirFalling(Prop p, int fir, bool lying)
+        {
+            var pf = FirModel(fir, p); if (pf == null || p.go == null) return;
+            var f = p.firs[fir]; var at = new Vector3(f.x, 0f, f.y);
+            var go = Instantiate(pf, p.go.transform); go.name = "Fir " + fir; go.transform.position = at; go.transform.localScale = Vector3.one * (f.z * CardScale);
+            var rot0 = Quaternion.Euler(0f, f.w * Mathf.Rad2Deg, 0f); var dir = new Vector3(Mathf.Sin(p.down[fir]), 0f, Mathf.Cos(p.down[fir])); var axis = Vector3.Cross(Vector3.up, dir);
+            foreach (var r in go.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = materials.TryGetValue(pf.name, out var mat) ? mat : materials["fir_snow"]; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+            TwoSidedGo(go);
+            if (lying) { go.transform.rotation = Quaternion.AngleAxis(86f, axis) * rot0; return; }
+            go.transform.rotation = rot0; firFalls.Add(new FirFall { t = go.transform, rot0 = rot0, axis = axis, tip = at + dir * (16f * f.z * CardScale) });
+        }
+
+        /// <summary>The oldest model lying turned back into its card, to keep the number of models down.</summary>
+        void Flatten((Prop p, int fir) old)
+        {
+            if (old.p.lying3D == null || !old.p.lying3D.Remove(old.fir)) return;
+            if (old.p.go != null) { var t = old.p.go.transform.Find("Fir " + old.fir); if (t != null) Destroy(t.gameObject); }
+            RebuildForest(old.p);
         }
 
         /// <summary>A dug-in line across the field: four lengths of trench zigzagging, wire on stakes seven metres out in
@@ -685,7 +727,7 @@ namespace IronNight
                 {
                     var f = p.firs[i]; var at = new Vector3(f.x, 0f, f.y) - origin; int ci = (int)(f.w * 10f) % FirCard.Length; var size = Vector3.one * (f.z * CardScale);
                     if (p.down[i] < 0f) { boughs.Add(new CombineInstance { mesh = cardStanding[ci], transform = Matrix4x4.TRS(at, Quaternion.identity, size) }); continue; }
-                    boughs.Add(new CombineInstance { mesh = cardLying[ci], transform = Matrix4x4.TRS(at, Quaternion.Euler(0f, p.down[i] * Mathf.Rad2Deg, 0f), size) });
+                    if (p.lying3D == null || !p.lying3D.Contains(i)) boughs.Add(new CombineInstance { mesh = cardLying[ci], transform = Matrix4x4.TRS(at, Quaternion.Euler(0f, p.down[i] * Mathf.Rad2Deg, 0f), size) });
                     parts.Add(new CombineInstance { mesh = stumpShape, transform = Matrix4x4.TRS(at, Quaternion.identity, new Vector3(1.3f, 0.6f, 1.3f) * f.z) });
                 }
                 foreach (var s in p.stumps) parts.Add(new CombineInstance { mesh = stumpShape, transform = Matrix4x4.TRS(new Vector3(s.x, 0f, s.z) - origin, Quaternion.Euler(0f, s.x * 37f, 0f), new Vector3(1.2f, s.y, 1.2f)) });
@@ -728,6 +770,7 @@ namespace IronNight
             FirKit(); var go = new GameObject("Forest"); go.transform.SetParent(transform, false); go.transform.position = p.pos;
             p.mesh = ForestMesh(p); go.AddComponent<MeshFilter>().sharedMesh = p.mesh; var r = go.AddComponent<MeshRenderer>(); r.sharedMaterials = FirMaterials(p.mesh); r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             p.go = go;
+            if (p.lying3D != null) foreach (var i in p.lying3D) FirFalling(p, i, true);   // the firs felled before, lying as they fell
         }
 
         /// <summary>Three firs felled across the lane, crossing; pressed into the snow once a hull has gone through.</summary>
@@ -788,6 +831,12 @@ namespace IronNight
             for (int i = active.Count - 1; i >= 0; i--) if (!wanted.Contains(active[i])) { Unload(active[i]); active.RemoveAt(i); }
             foreach (var p in wanted) if (p.go == null) { Spawn(p); active.Add(p); }
             float time = Time.time;
+            for (int i = firFalls.Count - 1; i >= 0; i--)
+            {
+                var ff = firFalls[i]; if (ff.t == null) { firFalls.RemoveAt(i); continue; }
+                ff.a = Mathf.Min(1f, ff.a + Time.deltaTime / 1.4f); ff.t.rotation = Quaternion.AngleAxis(86f * ff.a * ff.a, ff.axis) * ff.rot0;   // slow to start, fast at the end
+                if (ff.a >= 1f) { if (fx != null) { fx.Dust(ff.tip); fx.Leaves(ff.tip + Vector3.up * 1.5f, ff.axis, new Color(0.84f, 0.87f, 0.9f)); } firFalls.RemoveAt(i); }
+            }
             for (int i = falling.Count - 1; i >= 0; i--)
             {
                 var f = falling[i]; if (f.p.go == null) { falling.RemoveAt(i); continue; }
@@ -1329,6 +1378,9 @@ namespace IronNight
             if (wood) Sfx.TreeFall(p.pos); else Sfx.Crunch(p.pos);   // a tree cracks and crashes down; a pole or a signpost just snaps
             if (p.go != null) { TwoSided(p); falling.Add(new Falling { p = p, rot0 = p.go.transform.rotation, axis = Vector3.Cross(Vector3.up, FallDir(p)) }); }
         }
+
+        /// <summary>The two-sided mesh and back-culled material on any model (see TwoSided).</summary>
+        void TwoSidedGo(GameObject go) { var tmp = new Prop { what = What.Model, go = go }; TwoSided(tmp); }
 
         /// <summary>A model tree lying down: its mesh made two-sided (each face also the other way round, normal flipped)
         /// under a material that culls back faces, so whichever side of a leaf faces up is lit. Made once per model.</summary>
