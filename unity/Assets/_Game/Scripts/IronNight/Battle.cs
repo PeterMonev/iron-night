@@ -665,6 +665,44 @@ namespace IronNight
             }
         }
 
+        /// <summary>The enemies that count against the night's cap: all but the searchlight posts' own guns.</summary>
+        int FieldFoes { get { int n = 0; foreach (var e in foes) if (!e.post) n++; return n; } }
+
+        /// <summary>The searchlight batteries: a Flak 38 for every post coming within 95 m (once); each fires bursts of five
+        /// at the sky every few seconds, and on a tank within 30 m turns and fires at it, a little damage a round.</summary>
+        void TickPostGuns(float dt)
+        {
+            if (!VehicleSpec.Available(VehicleSpec.Flak38) || Leader == null) return;
+            props.postGuns = true;
+            if ((postLook -= dt) <= 0f)
+            {
+                postLook = 1f;
+                foreach (var (at, seed) in props.UnarmedPosts(Leader.transform.position, 95f, armedPosts)) { var g = Foe(VehicleSpec.Flak38, props.PushOut(at, 1.5f), Random.value * 6.28f); g.post = true; g.flakNext = Random.Range(1f, 6f); }
+            }
+            foreach (var g in foes)
+            {
+                if (!g.post || g.dead || g.crew == 0) continue;
+                var target = Nearest(platoon, g.transform.position, 30f); bool onTank = target != null;
+                if (onTank) g.Aim(target.transform.position, dt);
+                g.flakNext -= dt; if (g.flakNext > 0f) continue;
+                if (g.flakBurst <= 0) g.flakBurst = 5;
+                g.flakBurst--; g.flakNext = g.flakBurst > 0 ? 0.13f : onTank ? Random.Range(1.2f, 2f) : Random.Range(5f, 12f);
+                var from = g.MuzzlePosition;
+                if (onTank)
+                {
+                    var aim = target.transform.position + Vector3.up * 1.3f + Random.insideUnitSphere * 1.2f; var dir = (aim - from).normalized;
+                    fx.MgTracer(from, dir); if (g.flakBurst == 4) Sfx.Flak(from);
+                    if (Random.value < 0.6f) { if (target.hp - 0.06f <= 0f) Damage(target, 0.06f, aim); else target.Hit(0.06f); fx.Spark(aim, -dir); }   // a quiet nibble: the full hit (the toast, the shake, the radio) only for the round that finishes a tank
+                }
+                else
+                {
+                    var up = Quaternion.Euler(0f, g.yaw * Mathf.Rad2Deg + Random.Range(-25f, 25f), 0f) * Quaternion.Euler(-Random.Range(45f, 70f), 0f, 0f) * Vector3.forward;
+                    fx.Flak(from, (up + Random.insideUnitSphere * 0.05f).normalized); if (g.flakBurst == 4) Sfx.Flak(from);
+                }
+            }
+        }
+        float postLook; readonly HashSet<int> armedPosts = new HashSet<int>();
+
         /// <summary>Once a second: the trenches and sandbag nests coming up 35 to 95 metres off get their garrisons.</summary>
         void TickGarrisons(float dt)
         {
@@ -682,6 +720,7 @@ namespace IronNight
         void TickSpawns(float dt)
         {
             if (!stand && !sneak) TickGarrisons(dt);
+            TickPostGuns(dt);
             if (stand) { TickStand(dt); return; }
             if (convoy) { TickConvoy(dt); return; }
             if (sneak) { if (!sneakAlarm) { TickSneakQuiet(dt); return; } TickSneakLoud(dt); if (sneakDone) return; }
@@ -714,7 +753,7 @@ namespace IronNight
                 foreach (var sp in new[] { VehicleSpec.Hetzer, VehicleSpec.KingTiger, VehicleSpec.Flak38, VehicleSpec.Nebelwerfer, VehicleSpec.Kubelwagen }) if (VehicleSpec.Available(sp)) { var z = Foe(sp, L0.transform.position + f0 * (44f + 8f * System.Array.IndexOf(new[] { VehicleSpec.Hetzer, VehicleSpec.KingTiger, VehicleSpec.Flak38, VehicleSpec.Nebelwerfer, VehicleSpec.Kubelwagen }, sp)) - r0 * 14f, L0.yaw + Mathf.PI); z.hp = 999f; }
                 infantry.Spawn(L0.transform.position + f0 * 24f, -f0); hud.Toast("Zoo", 2f);
             }
-            if (spawnTimer <= 0f && foes.Count < (theatre == "kursk" ? 15 : 12))
+            if (spawnTimer <= 0f && FieldFoes < (theatre == "kursk" ? 15 : 12))
             {
                 spawnTimer = interval;
                 var L = Leader; float ahead = L.yaw + Random.Range(-1.7f, 1.7f);

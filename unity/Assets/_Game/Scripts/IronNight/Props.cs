@@ -869,7 +869,7 @@ namespace IronNight
                 p.shaft.Set(p.drum.position + p.drum.forward * 0.6f, p.drum.forward);
                 // the post's gun fires a burst at the sky now and then: five tracers climbing along the beam
                 p.flakTimer -= Time.deltaTime;
-                if (p.flakTimer <= 0f) { if (p.burst == 0) p.burst = 5; p.flakTimer = p.burst > 1 ? 0.13f : 7f + Rnd(p.seed, (int)(time * 10f), 3) * 12f; p.burst--; if (fx != null) { var from = p.pos + Quaternion.Euler(0f, p.yaw * Mathf.Rad2Deg, 0f) * new Vector3(5f, 1.2f, 1f); fx.Flak(from, (p.drum.forward + Random.insideUnitSphere * 0.06f).normalized); if (p.burst == 4) Sfx.Flak(from); } }
+                if (!postGuns && p.flakTimer <= 0f) { if (p.burst == 0) p.burst = 5; p.flakTimer = p.burst > 1 ? 0.13f : 7f + Rnd(p.seed, (int)(time * 10f), 3) * 12f; p.burst--; if (fx != null) { var from = p.pos + Quaternion.Euler(0f, p.yaw * Mathf.Rad2Deg, 0f) * new Vector3(5f, 1.2f, 1f); fx.Flak(from, (p.drum.forward + Random.insideUnitSphere * 0.06f).normalized); if (p.burst == 4) Sfx.Flak(from); } }
             }
         }
 
@@ -1167,6 +1167,23 @@ namespace IronNight
         }
 
         /// <summary>Searchlight posts ahead of a point: where a flak gun would stand.</summary>
+        /// <summary>The searchlight posts within reach that have no gun yet, as where their gun goes (beside the ring, away
+        /// from the lorry and the bunker) and its seed; each is given once.</summary>
+        public List<(Vector3 at, int seed)> UnarmedPosts(Vector3 from, float max, HashSet<int> armed)
+        {
+            var list = new List<(Vector3, int)>();
+            foreach (var p in active)
+            {
+                if (p.what != What.Searchlight || armed.Contains(p.seed)) continue;
+                var d = p.pos - from; d.y = 0f; if (d.magnitude > max) continue;
+                var f = new Vector3(Mathf.Sin(p.yaw), 0f, Mathf.Cos(p.yaw)); var r = new Vector3(f.z, 0f, -f.x);
+                armed.Add(p.seed); list.Add((p.pos - f * 4.5f - r * 5.5f, p.seed));
+            }
+            return list;
+        }
+        /// <summary>Set when the posts have guns of their own (the battle's): the lamps no longer fire tracers themselves.</summary>
+        public bool postGuns;
+
         public List<Vector3> Posts(Vector3 from, Vector3 dir, float min, float max)
         {
             var list = new List<Vector3>();
