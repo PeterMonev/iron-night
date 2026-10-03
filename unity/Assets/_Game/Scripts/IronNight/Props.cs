@@ -1217,12 +1217,14 @@ namespace IronNight
         /// <summary>Burnt ground under a wreck, tied to it so it goes when the wreck does.</summary>
         public void Scorch(Transform wreck, float size)
         {
+            if (InStream(wreck.position, 0.5f)) return;   // no burnt ground on water
             var q = Quad(transform, wreck.position, Random.value * 360f, size, size, scorchMaterial, 0.075f); q.name = "Scorch"; q.transform.SetParent(wreck, true);
         }
         Material scorchMaterial;
 
         public void Crater(Vector3 pos, float size)
         {
+            if (InStream(pos, 0.5f)) { if (fx != null) fx.WaterColumn(pos, size); return; }   // water keeps no crater
             GameObject q;
             if (craters.Count < 40) { q = Quad(transform, pos, Random.value * 360f, size, size, craterMaterial, 0.07f); q.name = "ShellCrater"; craters.Add(q); }
             else { q = craters[nextCrater]; nextCrater = (nextCrater + 1) % craters.Count; q.transform.position = new Vector3(pos.x, 0.07f, pos.z); q.transform.rotation = Quaternion.Euler(90f, Random.value * 360f, 0f); q.transform.localScale = new Vector3(size, size, 1f); }

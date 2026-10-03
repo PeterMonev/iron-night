@@ -339,6 +339,15 @@ namespace IronNight
         /// <summary>Recolours a marker's ring.</summary>
         public void Tint(Transform marker, Color color) { var r = marker.GetChild(0).GetComponent<Renderer>(); mpb.SetVector(BaseMapST, WholeSheet); mpb.SetColor(BaseColor, color); r.SetPropertyBlock(mpb); marker.GetComponentInChildren<Light>().color = color; }
 
+        /// <summary>A shell into water: a white column thrown up that falls back, spray low round it, a mist left hanging.</summary>
+        public void WaterColumn(Vector3 pos, float size)
+        {
+            float k = Mathf.Clamp(size / 4f, 0.6f, 1.6f); var foam = new Color(0.82f, 0.86f, 0.9f, 0.85f);
+            for (int i = 0; i < 9; i++) { var v = new Vector3(Random.Range(-1.2f, 1.2f), Random.Range(9f, 15f) * k, Random.Range(-1.2f, 1.2f)); var c = Billow(pos + Random.insideUnitSphere * 0.6f, (1.4f + Random.value) * k, foam, 1.2f + Random.value * 0.4f, v, 0.9f); c.gravity = true; }
+            for (int i = 0; i < 8; i++) { float a = i * Mathf.PI / 4f + Random.value * 0.4f; var v = new Vector3(Mathf.Cos(a), 0.6f, Mathf.Sin(a)) * (5f + Random.value * 3f) * k; var c = Billow(pos + Vector3.up * 0.3f, 1.1f * k, foam, 0.9f, v, 1.2f); c.gravity = true; }
+            for (int i = 0; i < 3; i++) Billow(pos + Vector3.up * (1f + i), (3f + Random.value * 2f) * k, new Color(0.7f, 0.74f, 0.78f, 0.35f), 3.5f + Random.value, new Vector3(Random.Range(-0.4f, 0.4f), 0.5f, Random.Range(-0.4f, 0.4f)) + Wind * 0.5f, 1.4f);
+        }
+
         /// <summary>A thin puff left behind a shell in flight.</summary>
         public void Trail(Vector3 pos) { Spawn(smokeSoft, pos, 0.9f, new Color(0.7f, 0.68f, 0.64f, 0.3f), 0.55f, Vector3.up * 0.3f, 1.6f, true); }
 
