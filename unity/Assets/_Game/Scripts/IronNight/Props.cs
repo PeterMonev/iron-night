@@ -496,7 +496,7 @@ namespace IronNight
             {
                 list.Add(new Prop { what = What.Stream, pos = c + new Vector3(0f, 0f, Half), seed = iz, bound = Half + 8f });
                 // a bridge where a lane crosses it: stone in the west, timber on the steppe or now and then a sapper's one
-                if (LaneX(ix)) { float bx = c.x + Half, bz = StreamAt(iz, bx); var b = Place(list, Kursk || Rnd(ix, iz, 951) < 0.3f ? "bridge_wood" : "bridge_stone", new Vector3(bx, 0f, bz), 0f, true); if (b != null) { b.drivable = true; bridges.Add(b); } }
+                if (LaneX(ix)) { float bx = c.x + Half, bz = StreamAt(iz, bx); var b = Place(list, Kursk || Rnd(ix, iz, 951) < 0.3f ? "bridge_wood" : "bridge_stone", new Vector3(bx, 0f, bz), 0f, true); if (b != null) { Parapets(b); bridges.Add(b); } }
             }
             if (HedgeZ(ix, iz)) Hedge(list, c + new Vector3(-Half, 0f, Half), c + new Vector3(Half, 0f, Half), LaneX(ix - 1) ? 4f : 0f, LaneX(ix) ? 4f : 0f, ix, iz, 1);
             if (Farm(ix, iz)) FarmYard(list, ix, iz, c);
@@ -866,8 +866,8 @@ namespace IronNight
                     var go = Instantiate(prefabs[p.kind.mesh], transform); go.name = p.kind.mesh;
                     go.transform.position = p.pos; go.transform.rotation = Quaternion.Euler(0f, yawDeg, 0f);
                     foreach (var r in go.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = materials[p.kind.mesh]; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
-                    // trodden earth under it: a soft dark patch a little wider than the footprint
-                    for (int c = 0; c < p.radii.Length; c++) { var q = Quad(go.transform, new Vector3(p.circleCenters[c].x, 0f, p.circleCenters[c].y), 0f, p.radii[c] * 2.4f, p.radii[c] * 2.4f, patchMaterial, 0.06f); q.GetComponent<Renderer>().receiveShadows = false; }
+                    // trodden earth under it: a soft dark patch a little wider than the footprint (not under a bridge's parapets, over the water)
+                    if (!p.kind.mesh.StartsWith("bridge_")) for (int c = 0; c < p.radii.Length; c++) { var q = Quad(go.transform, new Vector3(p.circleCenters[c].x, 0f, p.circleCenters[c].y), 0f, p.radii[c] * 2.4f, p.radii[c] * 2.4f, patchMaterial, 0.06f); q.GetComponent<Renderer>().receiveShadows = false; }
                     if (p.state == 1) { go.transform.rotation = Fallen(p); TwoSided(p); } else if (p.state == 2) go.transform.localScale = new Vector3(1f, 0.22f, 1f);
                     else if (p.kind.mesh.StartsWith("bridge_")) go.transform.localScale = new Vector3(1f, BridgeFlat, 1f);
                     else if (p.kind.mesh == "trench") { go.transform.localScale = new Vector3(1f, TrenchFlat, 1f); go.transform.position = p.pos + Vector3.up * TrenchSink; }
@@ -1589,6 +1589,15 @@ namespace IronNight
                 var lg = new GameObject("RuinFire"); lg.transform.SetParent(go.transform, false); lg.transform.localPosition = Vector3.up * 2.5f;
                 p.glow = lg.AddComponent<Light>(); p.glow.type = LightType.Point; p.glow.color = new Color(1f, 0.55f, 0.22f); p.glow.range = 16f; p.glow.intensity = 4f; p.glow.shadows = LightShadows.None;
             }
+        }
+
+        /// <summary>A bridge's sides: a circle every two metres along each parapet, but for the last three and a half metres
+        /// at either end where the lane comes on; set out wide enough that a hull on the roadway passes between them.</summary>
+        static void Parapets(Prop b)
+        {
+            float half = b.kind.length * 0.5f, side = b.kind.mesh == "bridge_stone" ? 3.4f : 2.6f; var centers = new List<Vector2>(); var radii = new List<float>();
+            for (float z = -half + 3.5f; z <= half - 3.5f + 0.01f; z += 2f) foreach (float s in new[] { -side, side }) { centers.Add(new Vector2(b.pos.x + s, b.pos.z + z)); radii.Add(0.35f); }   // the bridges lie along +Z
+            b.circleCenters = centers.ToArray(); b.radii = radii.ToArray();
         }
 
         /// <summary>The height of a bridge's roadway under a point: up a ramp from either bank to the deck, 0 off it.</summary>
