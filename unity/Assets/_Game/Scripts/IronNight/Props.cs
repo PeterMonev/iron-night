@@ -410,7 +410,7 @@ namespace IronNight
             var firs = new List<Vector4>(); var stumps = new List<Vector3>(); int k = 0;
             Vector3? mill = null;
             if (LaneX(ix) && Rnd(ix, iz, 1420) < 0.14f && prefabs.ContainsKey("sawmill")) { mill = new Vector3(c.x + Half - 11f, 0f, c.z + (Rnd(ix, iz, 1421) - 0.5f) * 16f); Place(list, "sawmill", mill.Value, 0f); }
-            for (float gx = -Half + 2.5f; gx < Half; gx += 5.2f) for (float gz = -Half + 2.5f; gz < Half; gz += 5.2f, k++)
+            for (float gx = -Half + 2.2f; gx < Half; gx += 4.6f) for (float gz = -Half + 2.2f; gz < Half; gz += 4.6f, k++)
             {
                 var pos = c + new Vector3(gx + (Rnd(ix, iz, 1500 + k) - 0.5f) * 3.4f, 0f, gz + (Rnd(ix, iz, 1700 + k) - 0.5f) * 3.4f);
                 if ((LaneX(ix) && Mathf.Abs(pos.x - (c.x + Half)) < 6f) || (LaneX(ix - 1) && Mathf.Abs(pos.x - (c.x - Half)) < 6f)) continue;
@@ -570,6 +570,13 @@ namespace IronNight
         }
 
         // ---- the firs: made here, four shapes, snow on their tiers; a forest is one mesh of them ----
+        static readonly Vector4[] FirCard =   // each card at size 1: its width and height in metres, the tree's foot on it (from the left, from the bottom)
+        {
+            new Vector4(9.09f, 16.53f, 0.500f, 0.069f), new Vector4(8.88f, 16.13f, 0.490f, 0.086f),
+            new Vector4(6.61f, 12.02f, 0.500f, 0.069f), new Vector4(6.71f, 12.30f, 0.498f, 0.067f),
+        };
+        const float CardScale = 0.75f;   // the forest's firs at three quarters of the models' height: some 12 to 22 m
+        Mesh[] cardStanding, cardLying; Material cardMaterial;
         Mesh[] firShapes, firCards; Mesh stumpShape; Material firMaterial, logMaterial, branchMaterial;   // firCards: each shape's ring of branch cards; null without the branch texture or on low quality
 
         /// <summary>The fir shapes and their material (a strip of bark, needles and snow along u), made the first time.</summary>
@@ -586,11 +593,35 @@ namespace IronNight
             tex.Apply(true);
             firMaterial = new Material(Resources.Load<Material>("VehicleLit")); firMaterial.SetTexture("_BaseMap", tex); firMaterial.SetColor("_BaseColor", new Color(0.85f, 0.88f, 0.9f)); firMaterial.SetFloat("_Smoothness", 0.12f); firMaterial.SetFloat("_Cull", 2f);
             logMaterial = new Material(trunkMaterial); logMaterial.SetColor("_BaseColor", new Color(0.33f, 0.26f, 0.19f));
+            var atlas = Resources.Load<Texture2D>("Textures/fir_cards");
+            if (atlas != null)
+            {
+                cardMaterial = new Material(Resources.Load<Material>("FoliageCut")); cardMaterial.SetTexture("_BaseMap", atlas); cardMaterial.SetColor("_BaseColor", new Color(0.8f, 0.83f, 0.88f)); cardMaterial.SetFloat("_Cull", 0f);
+                cardStanding = new Mesh[FirCard.Length]; cardLying = new Mesh[FirCard.Length];
+                for (int i = 0; i < FirCard.Length; i++) { cardStanding[i] = FirCardMesh(i, false); cardLying[i] = FirCardMesh(i, true); }
+            }
             var branch = Resources.Load<Texture2D>("Textures/fir_branch"); bool cards = branch != null && PlayerPrefs.GetInt("quality", 1) != 0;
             if (cards) { branchMaterial = new Material(Resources.Load<Material>("FoliageCut")); branchMaterial.SetTexture("_BaseMap", branch); branchMaterial.SetColor("_BaseColor", new Color(0.82f, 0.86f, 0.9f)); branchMaterial.SetFloat("_Cull", 0f); }
             firShapes = new Mesh[4]; firCards = cards ? new Mesh[4] : null; var rng = new System.Random(7);
             for (int s = 0; s < 4; s++) { firShapes[s] = FirShape(rng, 10f, 2.6f + s * 0.15f, out var c); if (cards) firCards[s] = c; else Destroy(c); }
             stumpShape = Prism(0.3f, 1f, 7, 0.05f);
+        }
+
+        /// <summary>A fir card: standing, upright to the camera's view (its up the screen's up, leaning away) and moved
+        /// towards the camera far enough that its lower edge clears the ground, which does not change where it is seen;
+        /// lying, flat on the ground along +Z, a little longer for the view's foreshortening. Lit as if facing up.</summary>
+        static Mesh FirCardMesh(int i, bool lying)
+        {
+            var c = FirCard[i]; float w = c.x, h = c.y, fu = c.z, fv = c.w;
+            var toCam = new Vector3(0f, 44f, -40f).normalized; Vector3 up, at;
+            if (!lying) { up = new Vector3(0f, 40f, 44f).normalized; at = toCam * (fv * h * up.y / toCam.y + 0.05f); }
+            else { up = Vector3.forward * 1.3f; at = Vector3.up * 0.3f; }
+            float u0 = i / (float)FirCard.Length, u1 = (i + 1) / (float)FirCard.Length;
+            var m = new Mesh { name = lying ? "fir card lying" : "fir card" };
+            m.vertices = new[] { at + Vector3.right * (-fu * w) + up * (-fv * h), at + Vector3.right * ((1f - fu) * w) + up * (-fv * h), at + Vector3.right * (-fu * w) + up * ((1f - fv) * h), at + Vector3.right * ((1f - fu) * w) + up * ((1f - fv) * h) };
+            m.uv = new[] { new Vector2(u0, 0f), new Vector2(u1, 0f), new Vector2(u0, 1f), new Vector2(u1, 1f) };
+            m.normals = new[] { Vector3.up, Vector3.up, Vector3.up, Vector3.up };
+            m.triangles = new[] { 0, 2, 1, 1, 2, 3 }; m.RecalculateBounds(); return m;
         }
 
         /// <summary>A fir H metres tall: a trunk and five tiers, each a drooping ring of branch tips (every other one drawn
@@ -647,6 +678,19 @@ namespace IronNight
         Mesh ForestMesh(Prop p)
         {
             var parts = new List<CombineInstance>(); var boughs = new List<CombineInstance>(); var origin = p.pos;
+            if (cardStanding != null)
+            {
+                // the cards: standing, facing the camera; felled, laid along the ground the way they went, a stump left
+                for (int i = 0; i < p.firs.Length; i++)
+                {
+                    var f = p.firs[i]; var at = new Vector3(f.x, 0f, f.y) - origin; int ci = (int)(f.w * 10f) % FirCard.Length; var size = Vector3.one * (f.z * CardScale);
+                    if (p.down[i] < 0f) { boughs.Add(new CombineInstance { mesh = cardStanding[ci], transform = Matrix4x4.TRS(at, Quaternion.identity, size) }); continue; }
+                    boughs.Add(new CombineInstance { mesh = cardLying[ci], transform = Matrix4x4.TRS(at, Quaternion.Euler(0f, p.down[i] * Mathf.Rad2Deg, 0f), size) });
+                    parts.Add(new CombineInstance { mesh = stumpShape, transform = Matrix4x4.TRS(at, Quaternion.identity, new Vector3(1.3f, 0.6f, 1.3f) * f.z) });
+                }
+                foreach (var s in p.stumps) parts.Add(new CombineInstance { mesh = stumpShape, transform = Matrix4x4.TRS(new Vector3(s.x, 0f, s.z) - origin, Quaternion.Euler(0f, s.x * 37f, 0f), new Vector3(1.2f, s.y, 1.2f)) });
+                return TwoParts(parts, boughs, "forest");
+            }
             for (int i = 0; i < p.firs.Length; i++)
             {
                 var f = p.firs[i]; var at = new Vector3(f.x, 0f, f.y) - origin; var turn = Quaternion.Euler(0f, f.w * Mathf.Rad2Deg, 0f); int si = (int)(f.w * 10f) % firShapes.Length;
@@ -666,16 +710,18 @@ namespace IronNight
         }
 
         /// <summary>One mesh of two parts: the solid insides (firMaterial), then the branch cards (branchMaterial), when there are any.</summary>
-        static Mesh TwoParts(List<CombineInstance> solid, List<CombineInstance> boughs, string name)
+        Mesh TwoParts(List<CombineInstance> solid, List<CombineInstance> boughs, string name)
         {
             var a = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 }; a.CombineMeshes(solid.ToArray(), true, true);
             if (boughs.Count == 0) { a.name = name; a.RecalculateBounds(); return a; }
+            if (solid.Count == 0) solid.Add(new CombineInstance { mesh = stumpShape, transform = Matrix4x4.TRS(Vector3.down * 5f, Quaternion.identity, Vector3.one * 0.01f) });   // the first part never empty: a speck out of sight
+            a.CombineMeshes(solid.ToArray(), true, true);
             var b = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 }; b.CombineMeshes(boughs.ToArray(), true, true);
             var m = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32, name = name };
             m.CombineMeshes(new[] { new CombineInstance { mesh = a, transform = Matrix4x4.identity }, new CombineInstance { mesh = b, transform = Matrix4x4.identity } }, false, true);
             Destroy(a); Destroy(b); m.RecalculateBounds(); return m;
         }
-        Material[] FirMaterials(Mesh m) => m.subMeshCount > 1 ? new[] { firMaterial, branchMaterial } : new[] { firMaterial };
+        Material[] FirMaterials(Mesh m) => m.subMeshCount > 1 ? new[] { firMaterial, cardStanding != null ? cardMaterial : branchMaterial } : new[] { firMaterial };
 
         void SpawnForest(Prop p)
         {
@@ -691,6 +737,7 @@ namespace IronNight
             for (int i = 0; i < 3; i++)
             {
                 float across = (i - 1) * 1.6f, ang = (i % 2 == 0 ? 70f : 110f) + (float)rng.NextDouble() * 14f; var dir = Quaternion.Euler(0f, ang, 0f) * f;
+                if (cardLying != null) { boughs.Add(new CombineInstance { mesh = cardLying[i % FirCard.Length], transform = Matrix4x4.TRS(f * across - dir * 5f + Vector3.up * (i * 0.15f), Quaternion.LookRotation(dir), Vector3.one * 0.7f) }); continue; }
                 var lay = Quaternion.AngleAxis(86f, Vector3.Cross(Vector3.up, dir)); var at = f * across - dir * 4.5f + Vector3.up * (0.4f + i * 0.25f);
                 var m4 = Matrix4x4.TRS(at, lay * Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f), Vector3.one * 0.9f);
                 parts.Add(new CombineInstance { mesh = firShapes[i], transform = m4 }); if (firCards != null) boughs.Add(new CombineInstance { mesh = firCards[i], transform = m4 });
