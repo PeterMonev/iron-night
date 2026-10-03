@@ -377,7 +377,7 @@ namespace IronNight
             foreach (var v in platoon) Smoulder(v, dt); foreach (var e in foes) Smoulder(e, dt);
             props.platoon = L.transform.position; props.Tick();
             flareLight.range = 34f + platoon.Count * 3f;
-            Sfx.Engine(stick.Active ? stick.Direction.magnitude : 0f);
+            Sfx.Engine(stick.Active ? stick.Direction.magnitude : 0f); TickTracks();
             { Vehicle near = null; float nd = 50f; foreach (var e in foes) { if (e.dead || e.spec.isGun) continue; float d = Dist(e, L); if (d < nd) { nd = d; near = e; } } if (near != null) Sfx.EnemyEngine(near.transform.position, 1f - nd / 50f, Mathf.InverseLerp(10f, 40f, near.spec.hp)); else Sfx.EnemyEngine(L.transform.position, 0f, 0f); }   // the nearest enemy tank rumbling in
             PlaceCamera(false);
             hud.Set(t, platoon.Count); hud.SetLeader(Mathf.CeilToInt(L.hp), Mathf.CeilToInt(Depot.LeaderHp)); hud.SetTally(kills, score);
@@ -474,7 +474,7 @@ namespace IronNight
                 if (on == null && convoy && !m.friendly) foreach (var tr in trucks) { if (tr.dead) continue; var d = tr.transform.position - m.pos; d.y = 0f; if (d.magnitude < 1.8f) { on = tr; break; } }
                 if (on == null) continue;
                 if (dozer && on.friendly) { Blow(m); mines.RemoveAt(i); hud.Popup(m.pos, "Ploughed", new Color(0.8f, 0.8f, 0.7f)); continue; }
-                Blow(m); mines.RemoveAt(i); on.trackOut = m.friendly ? 12f : 10f; Damage(on, m.friendly ? 2f : 1f, m.pos); if (!on.friendly) { nightTracked++; hud.Popup(m.pos, on.spec.name + " on a mine", new Color(1f, 0.8f, 0.5f)); } else hud.Toast(trucks.Contains(on) ? "A truck on a mine · the column halts" : "Mine! Track off", 2f);
+                Blow(m); mines.RemoveAt(i); on.trackOut = m.friendly ? 12f : 10f; ThrowTrack(on, m.pos - on.transform.position); Damage(on, m.friendly ? 2f : 1f, m.pos); if (!on.friendly) { nightTracked++; hud.Popup(m.pos, on.spec.name + " on a mine", new Color(1f, 0.8f, 0.5f)); } else hud.Toast(trucks.Contains(on) ? "A truck on a mine · the column halts" : "Mine! Track off", 2f);
                 if (phase != Phase.Play) return;
             }
         }
@@ -588,12 +588,46 @@ namespace IronNight
             }
         }
 
+        /// <summary>The track run off on the ground: fourteen dark links from the side that was hit, trailing back along the
+        /// hull in a loose curve, child of nothing so it stays where it fell while the tank is stuck; gone once it is back on.</summary>
+        void ThrowTrack(Vehicle v, Vector3 from)
+        {
+            if (thrownTracks.ContainsKey(v)) return;
+            if (trackLink == null) { trackLink = new Material(Resources.Load<Material>("BarrelLit")); trackLink.SetColor("_BaseColor", new Color(0.13f, 0.12f, 0.11f)); trackLink.SetFloat("_Smoothness", 0.3f); }
+            from.y = 0f; var right = new Vector3(v.Forward.z, 0f, -v.Forward.x); float side = Vector3.Dot(from, right) >= 0f ? 1f : -1f; float half = v.spec.radius * 0.62f;
+            var root = new GameObject("Thrown track").transform; root.position = v.transform.position;
+            var start = v.transform.position + right * (side * half) + v.Forward * (half * 0.6f); float bend = Random.Range(0.15f, 0.35f) * side;
+            for (int k = 0; k < 14; k++)
+            {
+                float u = k / 13f; var dir = Quaternion.Euler(0f, bend * 60f * u, 0f) * -v.Forward;
+                var at = start + dir * (k * 0.38f) + right * (side * u * u * 1.4f);
+                var link = GameObject.CreatePrimitive(PrimitiveType.Cube); Destroy(link.GetComponent<Collider>()); link.transform.SetParent(root, true);
+                link.transform.position = new Vector3(at.x, 0.06f + (k % 3 == 0 ? 0.04f : 0f), at.z); link.transform.rotation = Quaternion.LookRotation(dir) * Quaternion.Euler(Random.Range(-6f, 6f), 0f, Random.Range(-8f, 8f));
+                link.transform.localScale = new Vector3(0.62f, 0.09f, 0.34f); link.GetComponent<Renderer>().sharedMaterial = trackLink;
+            }
+            fx.Dust(start); thrownTracks[v] = root.gameObject;
+        }
+        readonly Dictionary<Vehicle, GameObject> thrownTracks = new Dictionary<Vehicle, GameObject>(); Material trackLink;
+
+        /// <summary>The thrown tracks put back on (or their tanks gone): their links taken away; TRACK OFF over the leader.</summary>
+        void TickTracks()
+        {
+            List<Vehicle> done = null;
+            foreach (var kv in thrownTracks) if (kv.Key == null || kv.Key.dead || kv.Key.trackOut <= 0f) (done ??= new List<Vehicle>()).Add(kv.Key);
+            if (done != null) foreach (var v in done) { if (thrownTracks[v] != null && (v == null || !v.dead)) Destroy(thrownTracks[v]); thrownTracks.Remove(v); }
+            var L = Leader; if (L == null) return;
+            if (L.trackOut > trackSeen + 0.01f) trackStart = L.trackOut;   // a new repair: its length is what it starts at
+            trackSeen = L.trackOut; hud.TrackPlate(L.transform.position + Vector3.up * 4.2f, cam, L.trackOut > 0f ? 1f - L.trackOut / Mathf.Max(0.1f, trackStart) : 1f);
+        }
+        float trackSeen, trackStart = 10f;
+
         /// <summary>A shell low on a tank's side, one time in five, throws a track: ten seconds stuck (the turret still works).</summary>
         void TrackHit(Vehicle v, Vector3 at)
         {
             if (v.dead || v.spec.isGun || v.trackOut > 0f || Random.value > 0.2f) return;
             var d = at - v.transform.position; d.y = 0f; if (Mathf.Abs(Vector3.Dot(d.normalized, v.Forward)) > 0.7f) return;   // from the side only
-            v.trackOut = v == Leader ? 10f * (1f - 0.15f * crewMech) : 10f; fx.Spark(new Vector3(at.x, 0.6f, at.z), d.normalized); Sfx.Ricochet(at); if (!v.friendly) nightTracked++;
+            v.trackOut = v == Leader ? 10f * (1f - 0.15f * crewMech) : 10f; fx.Spark(new Vector3(at.x, 0.6f, at.z), d.normalized); Sfx.Ricochet(at); Sfx.Hit(at); if (!v.friendly) nightTracked++;
+            ThrowTrack(v, d);
             if (v.friendly) { hud.Toast((v == Leader ? "Track knocked off · " : v.spec.name + " tracked · ") + "10 s", 2.8f); if (v == Leader) Buzz(); }
             else hud.Popup(v.transform.position, "Tracked", new Color(1f, 0.8f, 0.4f));
         }

@@ -1345,6 +1345,25 @@ namespace IronNight
             nameFill.rectTransform.sizeDelta = new Vector2(220f * Mathf.Clamp01(fraction), 8f);
         }
 
+        /// <summary>TRACK OFF over the leader, the bar under it filling as the crew puts the track back on; done = 1 hides it.</summary>
+        Text trackText; Image trackBar, trackFill;
+        public void TrackPlate(Vector3 world, Camera cam, float done)
+        {
+            if (trackText == null)
+            {
+                trackText = MakeText(hudGroup.transform, "TrackOff", new Vector2(0.5f, 0.5f), Vector2.zero, TextAnchor.LowerCenter, 28, new Color(1f, 0.6f, 0.3f)); trackText.font = BoldFont(); trackText.rectTransform.sizeDelta = new Vector2(400, 40); trackText.text = Spaced("TRACK OFF");
+                trackBar = MakeImage(hudGroup.transform, "TrackBar", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(200, 10), new Color(0.1f, 0.06f, 0.03f, 0.85f)); trackBar.sprite = Rounded(); trackBar.type = Image.Type.Sliced;
+                trackFill = MakeImage(hudGroup.transform, "TrackFill", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(200, 10), new Color(1f, 0.7f, 0.3f, 0.95f)); trackFill.sprite = Rounded(); trackFill.type = Image.Type.Sliced;
+            }
+            var vp = cam.WorldToViewportPoint(world); bool on = done < 1f && vp.z > 0f;
+            if (trackText.enabled != on) { trackText.enabled = on; trackBar.enabled = on; trackFill.enabled = on; }
+            if (!on) return;
+            var rect = canvas.GetComponent<RectTransform>().rect; var at = new Vector2((vp.x - 0.5f) * rect.width, (vp.y - 0.5f) * rect.height);
+            float blink = 0.75f + 0.25f * Mathf.Sin(Time.unscaledTime * 8f); trackText.color = new Color(1f, 0.6f, 0.3f, blink);
+            trackText.rectTransform.anchoredPosition = at + new Vector2(0f, 16f); trackBar.rectTransform.anchoredPosition = at;
+            trackFill.rectTransform.anchoredPosition = at - new Vector2(100f * (1f - Mathf.Clamp01(done)), 0f); trackFill.rectTransform.sizeDelta = new Vector2(200f * Mathf.Clamp01(done), 10f);
+        }
+
         public void SetTally(int kills, int score) { tally.text = kills == 0 && score == 0 ? "" : $"{kills} kills · {score}"; }
 
         // the reload arc: a ring under the leader that fills while the gun reloads, gone when it is ready
