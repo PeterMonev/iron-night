@@ -60,7 +60,7 @@ namespace IronNight
             new Kind { mesh = "well_b", length = 2.6f, height = 3f, circles = new[] { 0f, 0f, 1.3f } },
             new Kind { mesh = "truck_burnt", length = 6.5f, height = 2.6f, circles = new[] { -1.7f, 0f, 1.4f, 1.7f, 0f, 1.4f } },
             new Kind { mesh = "barbed_wire", length = 6f, height = -1f, circles = new[] { 0f, 0f, 0.8f } },   // a hull flattens it
-            new Kind { mesh = "trench", length = 8f, height = -1f, circles = new float[0] },                   // dug in: driven across
+            new Kind { mesh = "trench", length = 8f, height = -1f, circles = new[] { -3f, 0f, 0.9f, -1f, 0f, 0.9f, 1f, 0f, 0.9f, 3f, 0f, 0.9f } },   // caved in by the first hull across it
             new Kind { mesh = "bridge_stone", length = 16f, height = -1f, circles = new float[0] },
             new Kind { mesh = "bridge_wood", length = 14f, height = -1f, circles = new float[0] },
             new Kind { mesh = "tree_apple", length = 6f, height = -1f, circles = new[] { 0f, 0f, 0.5f } },
@@ -917,7 +917,8 @@ namespace IronNight
                     foreach (var r in go.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = materials[p.kind.mesh]; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
                     // trodden earth under it: a soft dark patch a little wider than the footprint (not under a bridge's parapets, over the water)
                     if (!p.kind.mesh.StartsWith("bridge_")) for (int c = 0; c < p.radii.Length; c++) { var q = Quad(go.transform, new Vector3(p.circleCenters[c].x, 0f, p.circleCenters[c].y), 0f, p.radii[c] * 2.4f, p.radii[c] * 2.4f, patchMaterial, 0.06f); q.GetComponent<Renderer>().receiveShadows = false; }
-                    if (p.state == 1) { go.transform.rotation = Fallen(p); TwoSided(p); } else if (p.state == 2) go.transform.localScale = new Vector3(1f, 0.22f, 1f);
+                    if (p.state == 1) { go.transform.rotation = Fallen(p); TwoSided(p); } else if (p.state == 2 && p.kind.mesh == "trench") CaveIn(p, go);
+                    else if (p.state == 2) go.transform.localScale = new Vector3(1f, 0.22f, 1f);
                     else if (p.kind.mesh.StartsWith("bridge_")) go.transform.localScale = new Vector3(1f, BridgeFlat, 1f);
                     else if (p.kind.mesh == "trench") { go.transform.localScale = new Vector3(1f, TrenchFlat, 1f); go.transform.position = p.pos + Vector3.up * TrenchSink; }
                     p.go = go; break;
@@ -1251,7 +1252,7 @@ namespace IronNight
             switch (p.kind.mesh)
             {
                 case "tree_oak": case "tree_poplar": case "tree_poplar_b": case "tree_apple": case "tree_birch": case "deadtree": case "spruce_snow": case "k_birches": case "pole": case "signpost": return 1;
-                case "barbed_wire": case "foxhole_logs": return 2;
+                case "barbed_wire": case "foxhole_logs": case "trench": return 2;
                 case "fir_snow": case "fir_snow_b": case "pine_snow": case "fir_young": return 1;
                 case "house_belgian": case "farm_belgian": case "sawmill": case "chapel_wayside": case "truck_snow": return 3;
                 case "house_normandy": case "house_ruin": case "izba": case "windmill": return 3;
@@ -1317,6 +1318,7 @@ namespace IronNight
                 case "fir_snow": case "fir_snow_b": case "pine_snow": return 0.45f;
                 case "fir_young": return 0.75f;
                 case "foxhole_logs": return 0.55f;
+                case "trench": return 0.7f;
                 case "deadtree": return 0.6f;
                 case "pole": case "signpost": return 0.85f;
                 case "wall_a": case "wall_b": return 0.4f;
@@ -1440,6 +1442,9 @@ namespace IronNight
         }
         readonly Dictionary<Mesh, Mesh> twoSided = new Dictionary<Mesh, Mesh>(); readonly Dictionary<Material, Material> backCulled = new Dictionary<Material, Material>();
 
+        /// <summary>A trench caved in: its walls sunk almost level with the field, a low broken line left showing.</summary>
+        static void CaveIn(Prop p, GameObject go) { go.transform.localScale = new Vector3(1.05f, TrenchFlat * 0.35f, 1.15f); go.transform.position = p.pos + Vector3.up * (TrenchSink * 0.4f); }
+
         void Crush(Prop p, bool byShell)
         {
             if (p.state != 0) return;
@@ -1447,6 +1452,13 @@ namespace IronNight
             if (byShell && p.kind != null && Burns(p.kind.mesh)) p.burn = 12f + Random.value * 10f;
             if (p.what == What.Abatis && p.go != null) { p.go.transform.localScale = new Vector3(1f, 0.3f, 1f); if (fx != null) fx.Dust(p.pos); Sfx.TreeFall(p.pos); return; }
             if (p.what == What.Logs && p.go != null) { p.go.transform.localScale = new Vector3(1f, 0.35f, 1f); if (fx != null) fx.Dust(p.pos); Sfx.Crunch(p.pos); return; }
+            if (p.kind != null && p.kind.mesh == "trench")
+            {
+                if (p.go != null) CaveIn(p, p.go);
+                var f = new Vector3(Mathf.Sin(p.yaw), 0f, Mathf.Cos(p.yaw));
+                if (fx != null) { fx.Dust(p.pos - f * 2.5f); fx.Dust(p.pos + f * 2.5f); }
+                Crater(p.pos - f * 2f, 3.6f); Crater(p.pos + f * 2f, 3.6f); Sfx.Crunch(p.pos); return;   // the earth churned where it was
+            }
             if (p.go != null) p.go.transform.localScale = new Vector3(1f, 0.22f, 1f);
             if (fx != null) fx.Dust(p.pos);
             Sfx.Crunch(p.pos);
