@@ -1181,6 +1181,22 @@ namespace IronNight
             }
             return list;
         }
+        /// <summary>The bunkers still standing within reach of a point: where their gun is (its slit, a metre up, on the side
+        /// towards the point) and a key to keep its bursts by.</summary>
+        public List<(Vector3 slit, int key)> Bunkers(Vector3 from, float max)
+        {
+            var list = new List<(Vector3, int)>();
+            foreach (var p in active)
+            {
+                if (p.what != What.Model || p.state != 0 || p.kind.mesh != "bunker") continue;
+                var d = from - p.pos; d.y = 0f; float len = d.magnitude; if (len > max || len < 0.1f) continue;
+                list.Add((p.pos + d / len * 2.6f + Vector3.up * 1.1f, Mathf.RoundToInt(p.pos.x) * 7919 + Mathf.RoundToInt(p.pos.z)));
+            }
+            return list;
+        }
+        /// <summary>A bunker brought down: the battle pays for it.</summary>
+        public System.Action<Vector3> bunkerDown;
+
         /// <summary>Set when the posts have guns of their own (the battle's): the lamps no longer fire tracers themselves.</summary>
         public bool postGuns;
 
@@ -1444,6 +1460,7 @@ namespace IronNight
             else { p.drivable = true; p.height = 1.2f; }   // a heap: driven over
             if (fx != null) fx.Collapse(p.pos, p.kind.length);
             Sfx.Collapse(p.pos);
+            if (p.kind.mesh == "bunker") bunkerDown?.Invoke(p.pos);
             if (p.go != null) StartCoroutine(Sink(p, p.go)); 
         }
 

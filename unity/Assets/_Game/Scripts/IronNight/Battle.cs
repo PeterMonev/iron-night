@@ -231,7 +231,8 @@ namespace IronNight
             // the ground, the fields, lanes, hedges, farms and searchlight posts are Props, built cell by cell around the camera
             props = new GameObject("Props").AddComponent<Props>(); props.winter = winter; props.wet = weather == Weather.Rain && !winter; Vehicle.Wet = props.wet; props.Build(cam); props.fx = fx;
             tracks = new GameObject("Tracks").AddComponent<Tracks>(); tracks.Build();
-            infantry = new GameObject("Infantry").AddComponent<Infantry>(); infantry.Build(); infantry.gunSilenced = g => hud.Toast(g.spec.name + " crew down · the gun is silent", 2.4f); veteran = Depot.Veteran || rule == "veteran" || (mapSector != null && mapSector.veteran);
+            infantry = new GameObject("Infantry").AddComponent<Infantry>(); infantry.Build(); infantry.gunSilenced = g => hud.Toast(g.spec.name + " crew down · the gun is silent", 2.4f);
+            props.bunkerDown = at => { score += 150; hud.Popup(at + Vector3.up * 2f, "+150", new Color(0.95f, 0.66f, 0.23f)); hud.Toast("Bunker silenced", 2f); }; veteran = Depot.Veteran || rule == "veteran" || (mapSector != null && mapSector.veteran);
 
             // night: moonlight with soft shadows, a cold ambient, fog swallowing the distance
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat; RenderSettings.ambientLight = sky.ambient;
@@ -703,6 +704,26 @@ namespace IronNight
         }
         float postLook; readonly HashSet<int> armedPosts = new HashSet<int>();
 
+        /// <summary>The bunkers' MG 42s: on the nearest tank within 35 m, bursts of eight with a pause of two to three and a
+        /// half seconds, a little harm a round (quiet, but for the round that finishes a tank).</summary>
+        void TickBunkers(float dt)
+        {
+            if (Leader == null) return;
+            foreach (var (slit, key) in props.Bunkers(Leader.transform.position, 60f))
+            {
+                var target = Nearest(platoon, slit, 35f); if (target == null) continue;
+                bunkerNext.TryGetValue(key, out float next); bunkerBurst.TryGetValue(key, out int burst);
+                next -= dt; if (next > 0f) { bunkerNext[key] = next; continue; }
+                if (burst <= 0) { burst = 8; Sfx.Mg42(slit); }
+                burst--; next = burst > 0 ? 0.09f : Random.Range(2f, 3.5f);
+                var aim = target.transform.position + Vector3.up * 1.2f + Random.insideUnitSphere * 1.4f; var dir = (aim - slit).normalized;
+                fx.MgTracer(slit, dir);
+                if (Random.value < 0.5f) { if (target.hp - 0.04f <= 0f) Damage(target, 0.04f, aim); else target.Hit(0.04f); if (Random.value < 0.5f) fx.Spark(aim, -dir); }
+                bunkerNext[key] = next; bunkerBurst[key] = burst;
+            }
+        }
+        readonly Dictionary<int, float> bunkerNext = new Dictionary<int, float>(); readonly Dictionary<int, int> bunkerBurst = new Dictionary<int, int>();
+
         /// <summary>Once a second: the trenches and sandbag nests coming up 35 to 95 metres off get their garrisons.</summary>
         void TickGarrisons(float dt)
         {
@@ -720,7 +741,7 @@ namespace IronNight
         void TickSpawns(float dt)
         {
             if (!stand && !sneak) TickGarrisons(dt);
-            TickPostGuns(dt);
+            TickPostGuns(dt); TickBunkers(dt);
             if (stand) { TickStand(dt); return; }
             if (convoy) { TickConvoy(dt); return; }
             if (sneak) { if (!sneakAlarm) { TickSneakQuiet(dt); return; } TickSneakLoud(dt); if (sneakDone) return; }
