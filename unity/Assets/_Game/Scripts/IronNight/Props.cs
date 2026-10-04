@@ -179,6 +179,23 @@ namespace IronNight
         static bool StreamZ(int iz) => iz != 0 && iz != -1 && !LaneZ(iz) && Hash(3, iz, 950) % 6 == 0;
         static float StreamAt(int iz, float x) => iz * Cell + Half + Mathf.Sin(x * 0.045f + iz) * 5f + Mathf.Sin(x * 0.11f + iz * 2.3f) * 2f;
         const float StreamHalf = 3.5f;
+        /// <summary>How far a model's footprint reaches from its centre, whichever way it is turned.</summary>
+        static float Reach(Kind k)
+        {
+            float r = 0f; for (int c = 0; c + 2 < k.circles.Length; c += 3) r = Mathf.Max(r, Mathf.Sqrt(k.circles[c] * k.circles[c] + k.circles[c + 1] * k.circles[c + 1]) + k.circles[c + 2]);
+            return r;
+        }
+
+        /// <summary>True when something reaching this far from a point would lie on a lane (three metres either side of its line).</summary>
+        static bool OnLane(Vector3 pos, float reach)
+        {
+            if (reach <= 0f) return false; float clear = 3f + reach;
+            int ix = Mathf.RoundToInt((pos.x - Half) / Cell), iz = Mathf.RoundToInt((pos.z - Half) / Cell);
+            for (int k = ix - 1; k <= ix + 1; k++) if (LaneX(k) && Mathf.Abs(pos.x - (k * Cell + Half)) < clear) return true;
+            for (int k = iz - 1; k <= iz + 1; k++) if (LaneZ(k) && Mathf.Abs(pos.z - (k * Cell + Half)) < clear) return true;
+            return false;
+        }
+
         /// <summary>True within the water (and the margin round it) of a stream.</summary>
         static bool InStream(Vector3 pos, float margin)
         {
@@ -215,6 +232,7 @@ namespace IronNight
             if (Ardennes && !prefabs.ContainsKey(local) && prefabs.ContainsKey(mesh)) local = mesh;   // the Belgian model missing: the Norman one stands in
             mesh = local; var kind = K(mesh); if (kind == null || !prefabs.ContainsKey(mesh)) return null;
             if (!water && InStream(pos, kind.length * 0.35f)) return null;   // nothing stands in a stream but its bridge
+            if (!water && OnLane(pos, Reach(kind))) return null;   // nor on a lane
             foreach (var o in list) if (o.what == What.Model && (o.pos - pos).sqrMagnitude < 5f * 5f) return null;
             var p = new Prop { what = What.Model, kind = kind, pos = pos, yaw = yaw, height = kind.height, bound = kind.length };
             int n = kind.circles.Length / 3; p.circleCenters = new Vector2[n]; p.radii = new float[n];
