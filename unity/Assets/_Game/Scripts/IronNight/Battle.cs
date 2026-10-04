@@ -2099,7 +2099,7 @@ namespace IronNight
         void PopSmoke()
         {
             smokeLeft = 6f; smokeCooldown = 30f; hud.Toast("Smoke!");
-            foreach (var v in platoon) for (int i = 0; i < 5; i++) { var o = Random.insideUnitCircle * 4.5f; fx.SmokeCloud(v.transform.position + new Vector3(o.x, 1.5f + Random.value * 1.5f, o.y), 5f + Random.value * 2f); }
+            foreach (var v in platoon) for (int i = 0; i < 4; i++) { var fan = Quaternion.Euler(0f, -54f + i * 36f + Random.Range(-8f, 8f), 0f) * v.GunDirection; fx.SmokePot(v.transform.position + fan * Random.Range(6f, 9f), 3.5f); }   // four canisters thrown in a fan ahead of the gun
         }
 
         /// <summary>The artillery card: every so often a salvo of four falls on the thickest group of enemies near the

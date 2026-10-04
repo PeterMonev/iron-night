@@ -220,7 +220,7 @@ namespace IronNight
         {
             Spawn(addGlow, pos + Vector3.up * 1.5f, 10f, new Color(1f, 0.95f, 0.85f, 1f), 0.1f, Vector3.zero, 0.5f);
             var ball = Sheet(Spawn(addExplosion, pos + Vector3.up * 3f, 11f, Color.white, 1.25f, Vector3.up * 1.8f, 0.6f), 4, 4, 16); ball.spin = Random.Range(-20f, 20f);
-            for (int i = 0; i < 3; i++) Sheet(Spawn(smokeSheet, pos + Random.insideUnitSphere * 2.5f + Vector3.up * 3f, 7f + Random.value * 4f, new Color(0.34f, 0.33f, 0.32f, 0.8f), 5f + Random.value * 3f, new Vector3(Random.Range(-0.8f, 0.8f), 1.6f + Random.value, Random.Range(-0.8f, 0.8f)), 0.9f, true), 4, 4, 16);
+            for (int i = 0; i < 3; i++) Billow(pos + Random.insideUnitSphere * 2.5f + Vector3.up * 3f, 5.5f + Random.value * 3f, new Color(0.34f, 0.33f, 0.32f, 0.8f), 5f + Random.value * 3f, new Vector3(Random.Range(-0.8f, 0.8f), 1.6f + Random.value, Random.Range(-0.8f, 0.8f)), 0.9f, true);
             for (int i = 0; i < 3; i++) Spawn(addFlame, pos + Random.insideUnitSphere * 1.6f + Vector3.up * (1f + Random.value * 2f), 4.5f + Random.value * 4f, Warm(Random.value), 0.45f + Random.value * 0.35f, Vector3.up * (2f + Random.value * 3f), 1.2f);
             var ring = Spawn(addRing, new Vector3(pos.x, 0.3f, pos.z), 3f, new Color(1f, 0.8f, 0.55f, 0.8f), 0.4f, Vector3.zero, 5f); ring.flat = true;
             for (int i = 0; i < 10; i++) { var v = (Random.insideUnitSphere + Vector3.up * 1.4f).normalized * (10f + Random.value * 16f); var d = Spawn(addSpark, pos + Vector3.up, 0.4f + Random.value * 0.5f, new Color(1f, 0.6f, 0.25f, 1f), 0.8f + Random.value * 0.7f, v, 0f); d.gravity = true; }
@@ -232,7 +232,7 @@ namespace IronNight
         public void Burn(Vector3 pos)
         {
             Spawn(addFlame, pos + Vector3.up * 2f + Random.insideUnitSphere * 0.7f, 2f + Random.value * 1.6f, Warm(Random.value * 0.7f), 0.3f + Random.value * 0.15f, Vector3.up * (2f + Random.value * 1.5f), 0.6f);
-            if (Random.value < 0.25f) Sheet(Spawn(smokeSheet, pos + Vector3.up * 3.5f + Random.insideUnitSphere * 0.5f, 4f + Random.value * 2f, new Color(0.28f, 0.27f, 0.26f, 0.6f), 5f + Random.value * 2f, new Vector3(Random.Range(-0.4f, 0.4f), 1.6f + Random.value, Random.Range(-0.4f, 0.4f)), 0.8f, true), 4, 4, 16);
+            if (Random.value < 0.25f) Billow(pos + Vector3.up * 3.5f + Random.insideUnitSphere * 0.5f, 3.2f + Random.value * 1.6f, new Color(0.28f, 0.27f, 0.26f, 0.6f), 5f + Random.value * 2f, new Vector3(Random.Range(-0.4f, 0.4f), 1.6f + Random.value, Random.Range(-0.4f, 0.4f)), 0.8f, true);
             else if (Random.value < 0.45f) Billow(pos + Vector3.up * 3f + Random.insideUnitSphere * 0.5f, 2.5f + Random.value * 2f, new Color(0.12f, 0.11f, 0.1f, 0.6f), 4.5f + Random.value * 2f, new Vector3(Random.Range(-0.4f, 0.4f), 1.8f + Random.value * 0.6f, Random.Range(-0.4f, 0.4f)), 2.6f, true);
         }
 
@@ -259,9 +259,30 @@ namespace IronNight
         }
 
         /// <summary>The smoke screen: a big slow grey cloud that hangs for a while.</summary>
-        public void SmokeCloud(Vector3 pos, float life)
+        public void SmokeCloud(Vector3 pos, float life) => SmokePot(pos, Mathf.Min(life, 3.5f));
+
+        /// <summary>A smoke canister on the ground: for the given seconds a puff every third of a second, low and wide,
+        /// swelling as it rises slowly and drifts; each lasts six to eight seconds, so the screen thickens and then thins.</summary>
+        public void SmokePot(Vector3 at, float seconds)
         {
-            Sheet(Spawn(smokeSheet, pos, 7f + Random.value * 4f, new Color(0.7f, 0.7f, 0.72f, 0.85f), life, new Vector3(Random.Range(-0.4f, 0.4f), 0.35f, Random.Range(-0.4f, 0.4f)), 0.7f, true), 4, 4, 16);
+            pots.Add(new Pot { at = new Vector3(at.x, 0.4f, at.z), left = seconds });
+            Spawn(addGlow, at + Vector3.up * 0.4f, 1.4f, new Color(1f, 0.85f, 0.6f, 0.7f), 0.12f, Vector3.zero, 0f);   // the canister going off
+        }
+        class Pot { public Vector3 at; public float left, next; }
+        readonly List<Pot> pots = new List<Pot>();
+        void TickPots(float dt)
+        {
+            for (int i = pots.Count - 1; i >= 0; i--)
+            {
+                var p = pots[i]; p.left -= dt; p.next -= dt;
+                if (p.next <= 0f)
+                {
+                    p.next = 0.32f; var off = Random.insideUnitCircle * 1.6f; float g = 0.66f + Random.value * 0.1f;
+                    Billow(p.at + new Vector3(off.x, Random.value * 0.6f, off.y), 3.2f + Random.value * 1.8f, new Color(g, g, g + 0.02f, 0.5f), 6f + Random.value * 2f,
+                        new Vector3(Random.Range(-0.5f, 0.5f), 0.5f + Random.value * 0.4f, Random.Range(-0.5f, 0.5f)) + Wind * 0.3f, 2.4f);
+                }
+                if (p.left <= 0f) pots.RemoveAt(i);
+            }
         }
 
         /// <summary>A machine-gun tracer: a short bright streak that is gone in a quarter second.</summary>
@@ -353,6 +374,7 @@ namespace IronNight
 
         public void Tick(float dt)
         {
+            TickPots(dt);
             var camRot = cam.transform.rotation; var camFwd = cam.transform.forward;
             for (int i = pendingBursts.Count - 1; i >= 0; i--) { pendingBursts[i].t -= dt; if (pendingBursts[i].t <= 0f) { FlakBurst(pendingBursts[i].at); pendingBursts.RemoveAt(i); } }
             for (int i = puffs.Count - 1; i >= 0; i--)
