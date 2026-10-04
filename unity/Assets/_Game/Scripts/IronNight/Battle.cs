@@ -27,7 +27,7 @@ namespace IronNight
         class ArtyShell { public Vector3 at; public float timer; }
         class Objective { public Vector3 pos; public Transform marker; public GameObject grenade; public float smokeTimer, held, salvo, clock; public int n, hits; public bool hold; public string kind = "reach"; public List<Vehicle> targets = new List<Vehicle>(); public List<GameObject> props = new List<GameObject>(); public List<Transform> figures = new List<Transform>(); }
         class Mine { public Vector3 pos; public Transform vis; public bool friendly; }   // friendly: laid in a last stand, set off by the enemy only
-        class Drop { public Vector3 pos; public float height, age, lift, top; public int kind; public Transform crate, chute, marker; public LineRenderer lines; public Mesh canopy; public Vector3[] rest; }   // lift: the crate origin above its base; top: where the shrouds tie
+        class Drop { public Vector3 pos; public float height, age, lift, top; public int kind; public Transform crate, chute, marker; public LineRenderer lines; public Mesh canopy; public Vector3[] rest, heap; public float spill = -1f; public Vector3 spillTo; }   // heap: the canopy on the ground; spill: how far it has fallen in (-1 not yet)   // lift: the crate origin above its base; top: where the shrouds tie
         class Mortar { public Vector3 at; public float timer; public Transform ring; public bool bomb; }   // bomb: a dive bomber's, heavier
         class Star { public Vector3 pos; public float height, life, puff; public Transform flare, chute; public Light light; }
         enum Phase { Title, Intro, Play, LevelUp, Pause, End, Photo }
@@ -1459,9 +1459,9 @@ namespace IronNight
                 var cratePf = Resources.Load<GameObject>("Props/crate");
                 if (cratePf != null) { d.crate = Instantiate(cratePf).transform; d.top = d.crate.GetComponentInChildren<Renderer>().bounds.max.y - d.crate.position.y + 0.06f; var cm = new Material(Resources.Load<Material>("VehicleLit")); cm.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/crate_tex")); cm.SetFloat("_Cull", 0f); foreach (var rr in d.crate.GetComponentsInChildren<Renderer>()) rr.sharedMaterial = cm; }
                 else { d.crate = GameObject.CreatePrimitive(PrimitiveType.Cube).transform; Destroy(d.crate.GetComponent<Collider>()); d.crate.localScale = new Vector3(1.3f, 1f, 1.3f); d.lift = 0.5f; d.top = 0.5f; d.crate.GetComponent<Renderer>().sharedMaterial = crateMaterial; }
-                d.canopy = Canopy(14, 6, 3.4f, 2.2f, out d.rest); d.chute = new GameObject("Canopy").transform; d.chute.gameObject.AddComponent<MeshFilter>().sharedMesh = d.canopy;
+                d.canopy = Canopy(ChuteGores, 8, ChuteRadius, ChuteHeight, out d.rest); d.chute = new GameObject("Canopy").transform; d.chute.gameObject.AddComponent<MeshFilter>().sharedMesh = d.canopy;
                 var cr = d.chute.gameObject.AddComponent<MeshRenderer>(); cr.sharedMaterial = new Material(chuteMaterial); cr.sharedMaterial.SetColor("_BaseColor", ChuteColour(d.kind)); cr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
-                d.lines = new GameObject("Shrouds").AddComponent<LineRenderer>(); d.lines.positionCount = 12; d.lines.startWidth = d.lines.endWidth = 0.05f; d.lines.material = chuteMaterial; d.lines.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                d.lines = new GameObject("Shrouds").AddComponent<LineRenderer>(); d.lines.positionCount = 2 + ChuteGores * 2; d.lines.startWidth = d.lines.endWidth = 0.09f; d.lines.material = ShroudMaterial(); d.lines.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 drops.Add(d); hud.Toast("Supply drop coming down, " + Clock(pos), 2.8f);
             }
             TickPlanes(dt);
@@ -1470,17 +1470,33 @@ namespace IronNight
                 var d = drops[i]; d.age += dt;
                 if (d.height > 0f)
                 {
-                    d.height = Mathf.Max(0f, d.height - 6f * dt); var sway = new Vector3(Mathf.Sin(d.age * 1.3f), 0f, Mathf.Cos(d.age * 0.9f)) * 0.6f;
-                    d.crate.position = d.pos + Vector3.up * (d.height + d.lift) + sway; d.chute.position = d.crate.position + Vector3.up * (4f + d.top); d.crate.rotation = Quaternion.Euler(0f, d.age * 9f, 0f);
-                    d.chute.rotation = Quaternion.Euler(-sway.z * 6f, d.age * 9f, sway.x * 6f); Ripple(d.canopy, d.rest, d.age, 0.09f);
-                    for (int k = 0; k < 6; k++) { float ang = k * Mathf.PI / 3f; d.lines.SetPosition(k * 2, d.crate.position + Vector3.up * d.top); d.lines.SetPosition(k * 2 + 1, d.chute.TransformPoint(new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang)) * 3.4f)); }
+                    d.height = Mathf.Max(0f, d.height - 6f * dt);
+                    // the crate swings under the canopy like a pendulum; the canopy drifts and leans the other way
+                    var swing = new Vector3(Mathf.Sin(d.age * 1.25f) * 9f, 0f, Mathf.Sin(d.age * 0.83f + 1f) * 6f); var drift = new Vector3(Mathf.Sin(d.age * 0.3f), 0f, Mathf.Cos(d.age * 0.23f)) * 0.8f;
+                    var hang = Quaternion.Euler(swing.z, 0f, -swing.x); float drop = ChuteLines + ChuteRiser;
+                    var crateAt = d.pos + Vector3.up * (d.height + d.lift) + drift; var confluenceAt = crateAt + Vector3.up * (d.top + ChuteRiser);
+                    d.chute.position = crateAt + Vector3.up * d.top + hang * (Vector3.up * drop); d.chute.rotation = hang * Quaternion.Euler(0f, d.age * 9f, 0f);
+                    d.crate.position = crateAt; d.crate.rotation = hang * Quaternion.Euler(0f, d.age * 9f, 0f); Ripple(d.canopy, d.rest, d.age, 0.12f);
+                    confluenceAt = d.crate.position + hang * (Vector3.up * (d.top + ChuteRiser));
+                    d.lines.SetPosition(0, d.crate.position + hang * (Vector3.up * d.top)); d.lines.SetPosition(1, confluenceAt);
+                    for (int k = 0; k < ChuteGores; k++) { d.lines.SetPosition(2 + k * 2, d.chute.TransformPoint(d.rest[d.rest.Length - ChuteGores * 2 + k * 2])); d.lines.SetPosition(3 + k * 2, confluenceAt); }   // a line from every seam at the skirt to the confluence
                     if (d.height <= 0f)
                     {
                         // landed: the canopy collapses in a heap beside the crate, a light marks it
-                        d.chute.position = d.pos + new Vector3(2.8f, 0.05f, 1.2f); d.chute.rotation = Quaternion.Euler(0f, d.age * 40f, 0f); Collapse(d.canopy, d.rest, d.kind); d.lines.enabled = false;
+                        d.heap = Heap(d.rest, d.kind); d.spill = 0f; d.spillTo = d.pos + new Vector3(4.2f, 0.05f, 2f); d.chute.rotation = Quaternion.Euler(0f, d.age * 40f, 0f);
                         d.marker = fx.Marker(d.pos, new Color(1f, 0.75f, 0.35f), 5f); d.age = 0f;
                     }
                     continue;
+                }
+                if (d.spill >= 0f && d.spill < 1f)
+                {
+                    // the canopy spilling its air: it sinks past the crate, falls in and slides off downwind; the lines go slack and are gone
+                    d.spill = Mathf.Min(1f, d.spill + dt / 1.2f); float k = d.spill * d.spill * (3f - 2f * d.spill);
+                    var from = d.crate.position + Vector3.up * (d.top + ChuteLines + ChuteRiser);
+                    d.chute.position = Vector3.Lerp(from, d.spillTo, k); Spill(d.canopy, d.rest, d.heap, k);
+                    var tie = d.crate.position + Vector3.up * d.top; var conf = Vector3.Lerp(tie + Vector3.up * ChuteRiser, tie, k); d.lines.SetPosition(0, tie); d.lines.SetPosition(1, conf);
+                    for (int g = 0; g < ChuteGores; g++) { int vi = d.rest.Length - ChuteGores * 2 + g * 2; d.lines.SetPosition(2 + g * 2, d.chute.TransformPoint(Vector3.Lerp(d.rest[vi], d.heap[vi], k))); d.lines.SetPosition(3 + g * 2, conf); }   // the lines follow the falling skirt, slack
+                    if (d.spill >= 1f) d.lines.enabled = false;
                 }
                 var toL = L.transform.position - d.pos; toL.y = 0f;
                 if (toL.magnitude < 4.5f)
@@ -1929,7 +1945,13 @@ namespace IronNight
 
         void RemoveDrop(Drop d) { Destroy(d.crate.gameObject); Destroy(d.chute.gameObject); Destroy(d.lines.gameObject); if (d.marker != null) Destroy(d.marker.gameObject); Destroy(d.canopy); }
 
-        static Color ChuteColour(int kind) { return new Color(1.7f, 1.7f, 1.6f); }   // white silk; the crate says what it carries   // repair white, ammunition red, smoke yellow, radio blue: the air force colour code
+        /// <summary>The canopy's dyed colour by what the crate carries, the troop carrier code faded by sun and wear: repair
+        /// white, ammunition red, smoke yellow, radio blue (above 1: the fabric texture is dark).</summary>
+        static Color ChuteColour(int kind) => kind == 1 ? new Color(1.5f, 0.62f, 0.52f) : kind == 2 ? new Color(1.55f, 1.35f, 0.62f) : kind == 3 ? new Color(0.7f, 0.95f, 1.45f) : new Color(1.6f, 1.6f, 1.5f);
+        // the A-5 cargo parachute: a 24-foot canopy of 24 gores, its rigging lines about as long as it is wide
+        const int ChuteGores = 24; const float ChuteRadius = 4.2f, ChuteHeight = 3.1f, ChuteLines = 6f, ChuteRiser = 1.2f;
+        Material shroudMaterial;
+        Material ShroudMaterial() { if (shroudMaterial == null) { shroudMaterial = new Material(Resources.Load<Material>("VehicleLit")); shroudMaterial.SetColor("_BaseColor", new Color(0.62f, 0.58f, 0.46f)); shroudMaterial.SetFloat("_Smoothness", 0.1f); } return shroudMaterial; }
 
         /// <summary>A parachute canopy: a dome of gores that bulge between their seams, the apex at the top, the skirt
         /// at y = 0. Rendered from both sides. The rest positions come back for the ripple and the collapse.</summary>
@@ -1937,17 +1959,17 @@ namespace IronNight
         {
             int seg = gores * 2; var v = new List<Vector3>(); var uv = new List<Vector2>(); var tri = new List<int>();
             v.Add(new Vector3(0f, height, 0f)); uv.Add(new Vector2(0.5f, 1f));
-            const float span = 1.35f; float c0 = Mathf.Cos(span), s0 = Mathf.Sin(span);
+            const float span = 1.45f, vent = 0.07f; float c0 = Mathf.Cos(span), s0 = Mathf.Sin(span);
             for (int r = 1; r <= rings; r++)
             {
-                float t = (float)r / rings, ang = t * span, y = height * (Mathf.Cos(ang) - c0) / (1f - c0), rad = radius * Mathf.Sin(ang) / s0;
+                float t = vent + (1f - vent) * (r - 1) / (rings - 1), ang = t * span, y = height * (Mathf.Cos(ang) - c0) / (1f - c0), rad = radius * Mathf.Sin(ang) / s0 * (r == rings ? 0.93f : 1f);   // the first ring round the vent; the skirt drawn in by the lines
                 for (int s = 0; s < seg; s++)
                 {
                     float phi = s * Mathf.PI * 2f / seg, bulge = 1f + 0.06f * t * Mathf.Cos(gores * phi);   // seams pulled in, gores puffed out
                     v.Add(new Vector3(Mathf.Cos(phi) * rad * bulge, y - 0.12f * t * (1f - Mathf.Cos(gores * phi)) * 0.5f, Mathf.Sin(phi) * rad * bulge)); uv.Add(new Vector2((float)s / seg, 1f - t));
                 }
             }
-            for (int s = 0; s < seg; s++) { tri.Add(0); tri.Add(1 + (s + 1) % seg); tri.Add(1 + s); }
+            // the crown: the vent left open (the apex point stays only as the rest positions' first entry)
             for (int r = 1; r < rings; r++) for (int s = 0; s < seg; s++)
             {
                 int a = 1 + (r - 1) * seg + s, b = 1 + (r - 1) * seg + (s + 1) % seg, c = a + seg, d = b + seg;
@@ -1963,21 +1985,24 @@ namespace IronNight
             rippleBuf.Clear();
             for (int i = 0; i < rest.Length; i++)
             {
-                var p = rest[i]; float skirt = 1f - Mathf.Clamp01(p.y / 2.2f); float w = Mathf.Sin(time * 5.5f + p.x * 1.7f + p.z * 1.3f) * amount * skirt;
+                var p = rest[i]; float skirt = 1f - Mathf.Clamp01(p.y / ChuteHeight); float w = Mathf.Sin(time * 5.5f + p.x * 1.7f + p.z * 1.3f) * amount * skirt;
                 rippleBuf.Add(new Vector3(p.x * (1f + w * 0.5f), p.y + w, p.z * (1f + w * 0.5f)));
             }
             m.SetVertices(rippleBuf);
         }
 
-        /// <summary>The canopy on the ground: flattened to a rumpled heap, a little off round.</summary>
-        static void Collapse(Mesh m, Vector3[] rest, int seed)
+        /// <summary>The canopy's shape lying on the ground, a little off round, rumpled.</summary>
+        static Vector3[] Heap(Vector3[] rest, int seed)
         {
-            rippleBuf.Clear();
-            for (int i = 0; i < rest.Length; i++)
-            {
-                var p = rest[i]; float n = Mathf.PerlinNoise(p.x * 0.9f + seed * 3f, p.z * 0.9f);
-                rippleBuf.Add(new Vector3(p.x * (0.75f + 0.25f * n), 0.05f + p.y * 0.12f + n * 0.35f, p.z * (0.7f + 0.3f * (1f - n))));
-            }
+            var h = new Vector3[rest.Length];
+            for (int i = 0; i < rest.Length; i++) { var p = rest[i]; float n = Mathf.PerlinNoise(p.x * 0.9f + seed * 3f, p.z * 0.9f); h[i] = new Vector3(p.x * (0.8f + 0.3f * n) + 1.2f, 0.05f + p.y * 0.1f + n * 0.4f, p.z * (0.65f + 0.3f * (1f - n))); }
+            return h;
+        }
+
+        /// <summary>The canopy part way from open to lying: k from 0 to 1.</summary>
+        static void Spill(Mesh m, Vector3[] rest, Vector3[] heap, float k)
+        {
+            rippleBuf.Clear(); for (int i = 0; i < rest.Length; i++) rippleBuf.Add(Vector3.Lerp(rest[i], heap[i], k));
             m.SetVertices(rippleBuf); m.RecalculateNormals(); m.RecalculateBounds();
         }
 
