@@ -1461,7 +1461,7 @@ namespace IronNight
                 else { d.crate = GameObject.CreatePrimitive(PrimitiveType.Cube).transform; Destroy(d.crate.GetComponent<Collider>()); d.crate.localScale = new Vector3(1.3f, 1f, 1.3f); d.lift = 0.5f; d.top = 0.5f; d.crate.GetComponent<Renderer>().sharedMaterial = crateMaterial; }
                 d.canopy = Canopy(ChuteGores, 8, ChuteRadius, ChuteHeight, out d.rest); d.chute = new GameObject("Canopy").transform; d.chute.gameObject.AddComponent<MeshFilter>().sharedMesh = d.canopy;
                 var cr = d.chute.gameObject.AddComponent<MeshRenderer>(); cr.sharedMaterial = new Material(chuteMaterial); cr.sharedMaterial.SetColor("_BaseColor", ChuteColour(d.kind)); cr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
-                d.lines = new GameObject("Shrouds").AddComponent<LineRenderer>(); d.lines.positionCount = 2 + ChuteGores * 2; d.lines.startWidth = d.lines.endWidth = 0.09f; d.lines.material = ShroudMaterial(); d.lines.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                d.lines = new GameObject("Shrouds").AddComponent<LineRenderer>(); d.lines.positionCount = 2 + ChuteGores * 2; d.lines.startWidth = d.lines.endWidth = 0.12f; d.lines.material = ShroudMaterial(); d.lines.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 drops.Add(d); hud.Toast("Supply drop coming down, " + Clock(pos), 2.8f);
             }
             TickPlanes(dt);
@@ -1483,7 +1483,7 @@ namespace IronNight
                     if (d.height <= 0f)
                     {
                         // landed: the canopy collapses in a heap beside the crate, a light marks it
-                        d.heap = Heap(d.rest, d.kind); d.spill = 0f; d.spillTo = d.pos + new Vector3(4.2f, 0.05f, 2f); d.chute.rotation = Quaternion.Euler(0f, d.age * 40f, 0f);
+                        d.heap = Heap(d.rest, d.kind); d.spill = 0f; d.spillTo = d.pos + new Vector3(6.5f, 0.05f, 3f); d.chute.rotation = Quaternion.Euler(0f, d.age * 40f, 0f);
                         d.marker = fx.Marker(d.pos, new Color(1f, 0.75f, 0.35f), 5f); d.age = 0f;
                     }
                     continue;
@@ -1945,11 +1945,11 @@ namespace IronNight
 
         void RemoveDrop(Drop d) { Destroy(d.crate.gameObject); Destroy(d.chute.gameObject); Destroy(d.lines.gameObject); if (d.marker != null) Destroy(d.marker.gameObject); Destroy(d.canopy); }
 
-        /// <summary>The canopy's dyed colour by what the crate carries, the troop carrier code faded by sun and wear: repair
-        /// white, ammunition red, smoke yellow, radio blue (above 1: the fabric texture is dark).</summary>
-        static Color ChuteColour(int kind) => kind == 1 ? new Color(1.5f, 0.62f, 0.52f) : kind == 2 ? new Color(1.55f, 1.35f, 0.62f) : kind == 3 ? new Color(0.7f, 0.95f, 1.45f) : new Color(1.6f, 1.6f, 1.5f);
-        // the A-5 cargo parachute: a 24-foot canopy of 24 gores, its rigging lines about as long as it is wide
-        const int ChuteGores = 24; const float ChuteRadius = 4.2f, ChuteHeight = 3.1f, ChuteLines = 6f, ChuteRiser = 1.2f;
+        /// <summary>The canopy's colour: olive drab, as most of the cargo chutes were, or now and then military white
+        /// (above 1: the fabric texture is dark).</summary>
+        static Color ChuteColour(int kind) => Random.value < 0.25f ? new Color(1.45f, 1.45f, 1.36f) : new Color(0.86f, 0.88f, 0.56f);
+        // the cargo parachute: 24 gores, its rigging lines about as long as it is wide
+        const int ChuteGores = 24; const float ChuteRadius = 6.5f, ChuteHeight = 4.8f, ChuteLines = 9f, ChuteRiser = 1.6f;   // larger than the A-5's 24 feet, to read from the camera
         Material shroudMaterial;
         Material ShroudMaterial() { if (shroudMaterial == null) { shroudMaterial = new Material(Resources.Load<Material>("VehicleLit")); shroudMaterial.SetColor("_BaseColor", new Color(0.62f, 0.58f, 0.46f)); shroudMaterial.SetFloat("_Smoothness", 0.1f); } return shroudMaterial; }
 
