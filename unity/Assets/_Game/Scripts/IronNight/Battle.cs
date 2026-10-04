@@ -232,6 +232,7 @@ namespace IronNight
             props = new GameObject("Props").AddComponent<Props>(); props.winter = winter; props.wet = weather == Weather.Rain && !winter; Vehicle.Wet = props.wet; props.Build(cam); props.fx = fx;
             tracks = new GameObject("Tracks").AddComponent<Tracks>(); tracks.Build();
             infantry = new GameObject("Infantry").AddComponent<Infantry>(); infantry.Build(); infantry.gunSilenced = g => hud.Toast(g.spec.name + " crew down · the gun is silent", 2.4f);
+            infantry.fightWon = at => { score += 200; hud.Popup(at + Vector3.up * 2f, "+200", new Color(0.85f, 0.9f, 0.7f)); hud.Toast(Depot.Nation == "su" ? "The riflemen wave their caps · thank you, tankists" : "The infantry wave · thanks for the help, tanks", 2.8f); };
             props.bunkerDown = at => { score += 150; hud.Popup(at + Vector3.up * 2f, "+150", new Color(0.95f, 0.66f, 0.23f)); hud.Toast("Bunker silenced", 2f); }; veteran = Depot.Veteran || rule == "veteran" || (mapSector != null && mapSector.veteran);
 
             // night: moonlight with soft shadows, a cold ambient, fog swallowing the distance
@@ -338,7 +339,7 @@ namespace IronNight
 
             Sfx.Turret(Mathf.Abs(Mathf.DeltaAngle(leaderTurret * Mathf.Rad2Deg, L.turretYaw * Mathf.Rad2Deg)) * Mathf.Deg2Rad / Mathf.Max(dt, 1e-4f));
             if (!sneak || sneakAlarm) foreach (var v in platoon) TickMg(v, dt);
-            infantry.Tick(dt, platoon, props, FireFaust, SmallArms);
+            infantry.Tick(dt, platoon, props, FireFaust, SmallArms, SmallArmsAt);
             int crushed = infantry.Crush(platoon); if (crushed > 0) { InfantryKilled(crushed, L.transform.position); hud.Toast("Run down", 1.5f); }
 
             // enemies: close in, then hold and shoot
@@ -775,6 +776,7 @@ namespace IronNight
         void TickSpawns(float dt)
         {
             if (!stand && !sneak) TickGarrisons(dt);
+            TickSkirmishes(dt);
             TickPostGuns(dt); TickBunkers(dt);
             if (stand) { TickStand(dt); return; }
             if (convoy) { TickConvoy(dt); return; }
@@ -2081,6 +2083,27 @@ namespace IronNight
             if (mg && m.burst == 5) Sfx.Mg42(from);
             if (Random.value < 0.25f) { var at = target.transform.position + Vector3.up * 1.3f - new Vector3(dir.x, 0f, dir.z) * target.spec.radius * 0.8f; fx.Spark(at, -dir); }
         }
+
+        /// <summary>A soldier firing on another in a fire fight: a tracer from him (low from a man on the ground); a machine
+        /// gun is heard at the start of its burst, ours a Browning, theirs an MG 42.</summary>
+        void SmallArmsAt(Infantry.Soldier m, Vector3 aim)
+        {
+            bool mg = m.role == Infantry.Role.Mg; var from = m.pos + Vector3.up * (mg ? 0.45f : 1.15f) + m.face * 0.7f;
+            fx.MgTracer(from, (aim - from).normalized);
+            if (mg && m.burst == 5) { if (m.ally) Sfx.Mg(from); else Sfx.Mg42(from); }
+        }
+
+        /// <summary>Now and then, ahead of the platoon off to one side, a squad of ours dug in against a squad of theirs.</summary>
+        void TickSkirmishes(float dt)
+        {
+            var L = Leader; if (L == null || stand || sneak) return;
+            if ((skirmishLeft -= dt) > 0f) return; skirmishLeft = 45f + Random.value * 35f;
+            string nation = theatre == "kursk" ? "su" : "us"; if (!infantry.CanFight(nation) || infantry.Fights >= 2) return;
+            float ang = L.yaw + Random.Range(-0.6f, 0.6f); var ahead = new Vector3(Mathf.Sin(ang), 0f, Mathf.Cos(ang)); var side = new Vector3(ahead.z, 0f, -ahead.x) * (Random.value < 0.5f ? 1f : -1f);
+            var ours = props.PushOut(L.transform.position + ahead * Random.Range(50f, 70f) - side * 8f, 2f); var theirs = props.PushOut(ours + side * 26f + ahead * Random.Range(-6f, 6f), 2f);
+            if (infantry.Skirmish(ours, theirs, nation)) hud.Toast((nation == "su" ? "Our riflemen in a fire fight, " : "Our infantry under fire, ") + Clock(ours), 2.6f);
+        }
+        float skirmishLeft = 40f;
 
         /// <summary>A Panzerfaust: a slow rocket from the man's shoulder, two hits when it lands, never a ricochet.</summary>
         void FireFaust(Infantry.Soldier m, Vehicle target)

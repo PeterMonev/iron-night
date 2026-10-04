@@ -20,7 +20,7 @@ namespace IronNight
         public class Soldier
         {
             public Transform t; public Vector3 pos; public float reload, phase, deadAge, cycle, stop; public bool dead, still; public Vector3 face = Vector3.forward;   // still: an observer or a gun crewman, he stays where he is and does not shoot
-            public Role role; public Vehicle gun; public int burst; public bool posable, dug; public MeshFilter mf; public MeshRenderer mr; public Transform fig;
+            public Role role; public Vehicle gun; public int burst; public bool posable, dug, ally; public string side; public MeshFilter mf; public MeshRenderer mr; public Transform fig;   // ally: one of ours in a fire fight; side: his nation's pose prefix (us, su)
         }
         public class Squad { public readonly List<Soldier> men = new List<Soldier>(); }
 
@@ -75,6 +75,7 @@ namespace IronNight
             walk = Gait.Load("inf_walk", 0.72f, lit); run = Gait.Load("inf_run", 1.15f, lit);
             frame = Resources.Load<GameObject>("Props/inf_walk_a");
             AddPose("faust", "inf_faust", 0f, lit); AddPose("rifle", "inf_rifle_kneel", 0f, lit); AddPose("mg", "inf_mg_prone", 0f, lit); AddPose("dead", "inf_dead", 0f, lit);
+            foreach (var n in new[] { "us", "su" }) foreach (var p in new[] { "kneel", "stand", "prone", "dead" }) AddPose(n + "_" + p, "ally_" + n + "_" + p, 0f, lit);
             AddPose("layer", "crew_layer", 0f, lit); AddPose("loader", "crew_loader", 0f, lit); AddPose("ammo", "crew_ammo", 0f, lit); AddPose("spotter", "crew_spotter", 0f, lit);
             if (!poses.ContainsKey("faust")) AddPose("faust", "soldier_b", 0f, lit);
             if (!poses.ContainsKey("rifle") && poses.ContainsKey("faust")) poses["rifle"] = poses["faust"];
@@ -89,7 +90,7 @@ namespace IronNight
         }
 
         /// <summary>The squads on foot, not counting the crews at their guns or the garrisons in the trenches.</summary>
-        public int Squads { get { int n = 0; foreach (var s in squads) if (s.men.Count == 0 || (s.men[0].gun == null && !s.men[0].dug)) n++; return n; } }
+        public int Squads { get { int n = 0; foreach (var s in squads) if (s.men.Count == 0 || (s.men[0].gun == null && !s.men[0].dug && !s.men[0].ally)) n++; return n; } }
 
         public int Alive { get { int n = 0; foreach (var s in squads) foreach (var m in s.men) if (!m.dead) n++; return n; } }
 
@@ -187,8 +188,9 @@ namespace IronNight
 
         /// <summary>Moves every man toward the nearest tank, shows him walking, running, kneeling or prone, and calls
         /// fire for the tank hunters in range and ready, and shoot for the riflemen and the machine gunner.</summary>
-        public void Tick(float dt, List<Vehicle> platoon, Props props, System.Action<Soldier, Vehicle> fire, System.Action<Soldier, Vehicle> shoot)
+        public void Tick(float dt, List<Vehicle> platoon, Props props, System.Action<Soldier, Vehicle> fire, System.Action<Soldier, Vehicle> shoot, System.Action<Soldier, Vector3> shootAt)
         {
+            TickFights(dt, shootAt);
             float time = Time.time;
             for (int i = runners.Count - 1; i >= 0; i--)
             {
@@ -204,6 +206,7 @@ namespace IronNight
                 {
                     if (m.dead) continue; any = true;
                     if (m.gun != null) { m.pos = m.t.position; continue; }   // a crewman goes round with his gun
+                    if (m.ally) continue;   // ours fight in TickFights
                     if (m.still) continue;
                     Vehicle target = null; float best = float.MaxValue;
                     foreach (var v in platoon) { if (v.dead) continue; var d = v.transform.position - m.pos; d.y = 0f; if (d.sqrMagnitude < best) { best = d.sqrMagnitude; target = v; } }
@@ -215,6 +218,7 @@ namespace IronNight
                         m.face = to; m.reload -= dt; m.t.rotation = Quaternion.LookRotation(m.face, Vector3.up);
                         if (m.role == Role.Faust) { if (dist < 15f && m.reload <= 0f) { m.reload = 9f + Random.value * 3f; fire(m, target); } }
                         else if (dist < m.stop + 4f) Shoot(m, target, dt, shoot);
+                        else { var foe = NearestOf(m.pos, 45f, true); if (foe != null) FightOn(m, foe, shootAt, 0.05f); }   // no tank near: the Germans of a fire fight shoot at ours
                         continue;
                     }
                     float backOff = m.role == Role.Faust ? 7f : 12f; bool ahead = dist > m.stop, back = dist < backOff;
@@ -275,11 +279,77 @@ namespace IronNight
             return keep;
         }
 
+        // ---- fire fights: ours against theirs ----
+        class Fight { public Squad ours, theirs; public bool over; }
+        readonly List<Fight> fights = new List<Fight>();
+        /// <summary>A fire fight won (the Germans in it all dead, some of ours alive): where ours are.</summary>
+        public System.Action<Vector3> fightWon;
+        public int Fights { get { int n = 0; foreach (var f in fights) if (!f.over) n++; return n; } }
+        /// <summary>Whether a nation's soldiers are there to fight.</summary>
+        public bool CanFight(string nation) => poses.ContainsKey(nation + "_kneel");
+
+        /// <summary>Four of ours at a point (two kneeling, one standing, one behind a machine gun on the ground) dug in
+        /// facing four Germans at another; false when there are no figures of ours.</summary>
+        public bool Skirmish(Vector3 at, Vector3 enemy, string nation)
+        {
+            if (!CanFight(nation)) return false;
+            var face = enemy - at; face.y = 0f; face.Normalize(); var side = new Vector3(face.z, 0f, -face.x); var ours = new Squad();
+            string[] poseOf = { "kneel", "stand", "kneel", "prone" };
+            for (int i = 0; i < 4; i++)
+            {
+                string key = nation + "_" + poseOf[i]; if (!poses.ContainsKey(key)) key = nation + "_kneel";
+                var m = Man(transform, at + side * ((i - 1.5f) * 3f) - face * (i == 3 ? 1.5f : 0f), face, poseOf[i] == "prone" ? Role.Mg : Role.Rifle, key);
+                m.ally = true; m.dug = true; m.side = nation; m.reload = Random.value * 2f; ours.men.Add(m);
+            }
+            squads.Add(ours);
+            var spots = new List<(Vector3, bool)>(); for (int i = 0; i < 4; i++) spots.Add((enemy + side * ((i - 1.5f) * 3f), true));
+            Garrison(spots, at); var theirs = squads[squads.Count - 1];
+            fights.Add(new Fight { ours = ours, theirs = theirs }); return true;
+        }
+
+        /// <summary>Ours fire on the nearest German within 45 m; a fight is over once one side is all down.</summary>
+        void TickFights(float dt, System.Action<Soldier, Vector3> shootAt)
+        {
+            foreach (var f in fights)
+            {
+                if (f.over) continue;
+                bool oursUp = false, theirsUp = false;
+                foreach (var m in f.theirs.men) if (!m.dead) theirsUp = true;
+                foreach (var m in f.ours.men)
+                {
+                    if (m.dead) continue; oursUp = true;
+                    var foe = NearestOf(m.pos, 45f, false); if (foe == null) continue;
+                    FightOn(m, foe, shootAt, 0.07f);
+                }
+                if (!theirsUp || !oursUp) { f.over = true; if (!theirsUp && oursUp) fightWon?.Invoke(f.ours.men[0].pos); }
+            }
+        }
+
+        /// <summary>One man firing on another: he turns to him, a rifleman a round every second or two, a machine gunner in
+        /// bursts of six; a round drops the man aimed at one time in so many (hit).</summary>
+        void FightOn(Soldier m, Soldier foe, System.Action<Soldier, Vector3> shootAt, float hit)
+        {
+            var to = foe.pos - m.pos; to.y = 0f; if (to.sqrMagnitude > 0.01f) { m.face = to.normalized; m.t.rotation = Quaternion.LookRotation(m.face, Vector3.up); }
+            m.reload -= Time.deltaTime; if (m.reload > 0f) return;
+            if (m.role == Role.Mg) { if (m.burst <= 0) m.burst = 6; m.burst--; m.reload = m.burst > 0 ? 0.11f : 2.5f + Random.value * 2f; hit *= 0.5f; }
+            else m.reload = 1.2f + Random.value * 1.4f;
+            shootAt(m, foe.pos + Vector3.up * (0.8f + Random.value * 0.6f) + Random.insideUnitSphere * 0.8f);
+            if (Random.value < hit) Kill(foe);
+        }
+
+        /// <summary>The nearest living soldier of one side to a point within reach: ours (true) or theirs.</summary>
+        Soldier NearestOf(Vector3 from, float reach, bool ours)
+        {
+            Soldier best = null; float bd = reach * reach;
+            foreach (var s in squads) foreach (var m in s.men) { if (m.dead || m.ally != ours || m.gun != null) continue; var d = m.pos - from; d.y = 0f; float q = d.sqrMagnitude; if (q < bd) { bd = q; best = m; } }
+            return best;
+        }
+
         /// <summary>The nearest living soldier to a point within reach, or null.</summary>
         public Soldier Nearest(Vector3 from, float reach)
         {
             Soldier best = null; float bd = reach * reach;
-            foreach (var s in squads) foreach (var m in s.men) { if (m.dead) continue; var d = m.pos - from; d.y = 0f; float q = d.sqrMagnitude; if (q < bd) { bd = q; best = m; } }
+            foreach (var s in squads) foreach (var m in s.men) { if (m.dead || m.ally) continue; var d = m.pos - from; d.y = 0f; float q = d.sqrMagnitude; if (q < bd) { bd = q; best = m; } }
             return best;
         }
 
@@ -290,6 +360,7 @@ namespace IronNight
             if (m.dead) return; m.dead = true; m.deadAge = 0f; fallen.Add(m);
             if (m.gun != null) { m.t.SetParent(transform, true); if (--m.gun.crew == 0 && !m.gun.dead) gunSilenced?.Invoke(m.gun); }
             foreach (var idle in m.t.GetComponentsInChildren<CrewIdle>()) { var sk = idle.GetComponentInChildren<SkinnedMeshRenderer>(); if (sk != null) Destroy(sk.gameObject); if (m.mr != null) m.mr.enabled = true; Destroy(idle); }
+            if (m.ally && m.mf != null && poses.TryGetValue(m.side + "_dead", out var ad)) { m.mf.sharedMesh = ad.mesh; m.mr.sharedMaterial = ad.mat; m.t.position = new Vector3(m.pos.x, 0f, m.pos.z); m.t.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f); if (m.fig != null) m.fig.localRotation = Quaternion.identity; return; }
             if (m.mf != null && poses.TryGetValue("dead", out var d))
             {
                 m.mf.sharedMesh = d.mesh; m.mr.sharedMaterial = d.mat; m.t.position = new Vector3(m.pos.x, 0f, m.pos.z); m.t.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
@@ -303,7 +374,7 @@ namespace IronNight
         public int Blast(Vector3 at, float radius)
         {
             int n = 0;
-            foreach (var s in squads) foreach (var m in s.men) { if (m.dead) continue; var d = m.pos - at; d.y = 0f; if (d.magnitude < radius) { Kill(m); n++; } }
+            foreach (var s in squads) foreach (var m in s.men) { if (m.dead || m.ally) continue; var d = m.pos - at; d.y = 0f; if (d.magnitude < radius) { Kill(m); n++; } }
             return n;
         }
 
@@ -313,7 +384,7 @@ namespace IronNight
             int n = 0;
             foreach (var s in squads) foreach (var m in s.men)
             {
-                if (m.dead) continue;
+                if (m.dead || m.ally) continue;   // ours step aside
                 foreach (var v in vehicles) { if (v.dead || v.spec.isGun) continue; var d = m.pos - v.transform.position; d.y = 0f; if (d.magnitude < v.spec.radius * 0.7f) { Kill(m); n++; break; } }
             }
             return n;
