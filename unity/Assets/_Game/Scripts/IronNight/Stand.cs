@@ -51,7 +51,7 @@ namespace IronNight
         {
             string nation = Depot.Nation == "su" ? "su" : "us"; if (!infantry.CanFight(nation)) return;
             var sq = infantry.Paratroops(100000f); var out1 = at - standAt; out1.y = 0f; out1 = out1.sqrMagnitude > 0.1f ? out1.normalized : Vector3.forward;
-            for (int i = 0; i < 4; i++) { float a = (i - 1.5f) * 0.55f; infantry.Land(sq, at + Quaternion.Euler(0f, a * Mathf.Rad2Deg, 0f) * out1 * 1.3f, out1, nation); }
+            for (int i = 0; i < 4; i++) { float a = (i - 1.5f) * 0.55f; infantry.Land(sq, at + Quaternion.Euler(0f, a * Mathf.Rad2Deg, 0f) * out1 * 1.3f, out1, nation, i == 0 ? "at" : null); }   // the first is the anti-tank man
             nests.Add(new Nest { squad = sq, at = at, reload = 3f }); hud.Toast(nation == "su" ? "Riflemen with an anti-tank rifle in the sandbags" : "A bazooka team in the sandbags", 1.8f);
         }
 
@@ -61,11 +61,12 @@ namespace IronNight
             foreach (var n in nests)
             {
                 if ((n.reload -= dt) > 0f) continue;
-                Infantry.Soldier man = null; foreach (var m in n.squad.men) if (!m.dead) { man = m; break; } if (man == null) continue;
+                var man = n.squad.men.Count > 0 ? n.squad.men[0] : null; if (man == null || man.dead) continue;   // the anti-tank man; with him down the ring has none
                 Vehicle best = null; float bd = 32f; foreach (var e in foes) { if (e.dead) continue; var d = e.transform.position - n.at; d.y = 0f; if (d.magnitude < bd) { bd = d.magnitude; best = e; } }
                 if (best == null) { n.reload = 0.5f; continue; }
                 n.reload = 7f + Random.value * 3f;
-                var from = man.pos + Vector3.up * 1.3f; var dir = best.transform.position - man.pos; dir.y = 0f; dir.Normalize(); dir = Quaternion.Euler(0f, Random.Range(-2f, 2f), 0f) * dir;
+                var dir = best.transform.position - man.pos; dir.y = 0f; dir.Normalize(); man.face = dir; man.t.rotation = Quaternion.LookRotation(dir, Vector3.up);
+                var from = man.pos + Vector3.up * (Depot.Nation == "su" ? 0.4f : 1.15f) + dir * 0.8f; dir = Quaternion.Euler(0f, Random.Range(-2f, 2f), 0f) * dir;   // from the bazooka on his shoulder, or the PTRD on the ground
                 var vis = fx.Tracer(new Color(1f, 0.85f, 0.6f, 1f), new Color(1f, 0.55f, 0.3f, 0.6f)); vis.position = from; vis.rotation = Quaternion.LookRotation(cam.transform.forward, dir);
                 shells.Add(new Shell { pos = from, vel = dir * 34f, friendly = true, faust = true, dmg = 1.5f, life = 1.1f, vis = vis });
                 fx.MuzzleFlash(from, dir); fx.MuzzleFlash(from - dir * 1.2f, -dir); Sfx.Faust(from);   // the back-blast too

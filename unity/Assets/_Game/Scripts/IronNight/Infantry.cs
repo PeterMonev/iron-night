@@ -76,6 +76,7 @@ namespace IronNight
             frame = Resources.Load<GameObject>("Props/inf_walk_a");
             AddPose("faust", "inf_faust", 0f, lit); AddPose("rifle", "inf_rifle_kneel", 0f, lit); AddPose("mg", "inf_mg_prone", 0f, lit); AddPose("dead", "inf_dead", 0f, lit);
             foreach (var n in new[] { "us", "su" }) foreach (var p in new[] { "kneel", "stand", "prone", "dead" }) AddPose(n + "_" + p, "ally_" + n + "_" + p, 0f, lit);
+            AddPose("us_at", "ally_us_bazooka", 0f, lit); AddPose("su_at", "ally_su_ptrd", 0f, lit);   // the anti-tank men: a bazooka, a PTRD
             AddPose("layer", "crew_layer", 0f, lit); AddPose("loader", "crew_loader", 0f, lit); AddPose("ammo", "crew_ammo", 0f, lit); AddPose("spotter", "crew_spotter", 0f, lit);
             if (!poses.ContainsKey("faust")) AddPose("faust", "soldier_b", 0f, lit);
             if (!poses.ContainsKey("rifle") && poses.ContainsKey("faust")) poses["rifle"] = poses["faust"];
@@ -318,9 +319,9 @@ namespace IronNight
         }
 
         /// <summary>A paratrooper down: one of ours dug in where he landed, facing on.</summary>
-        public void Land(Squad sq, Vector3 at, Vector3 face, string nation)
+        public void Land(Squad sq, Vector3 at, Vector3 face, string nation, string pose = null)
         {
-            string[] poseOf = { "kneel", "stand", "prone" }; string pose = poseOf[sq.men.Count % 3], key = nation + "_" + pose; if (!poses.ContainsKey(key)) key = nation + "_kneel";
+            string[] poseOf = { "kneel", "stand", "prone" }; pose ??= poseOf[sq.men.Count % 3]; string key = nation + "_" + pose; if (!poses.ContainsKey(key)) key = nation + "_kneel";
             var m = Man(transform, at, face, pose == "prone" ? Role.Mg : Role.Rifle, key); m.ally = true; m.dug = true; m.side = nation; m.reload = 1f + Random.value * 2f; sq.men.Add(m);
         }
 
