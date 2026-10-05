@@ -63,7 +63,7 @@ namespace IronNight
             var ti = MakeText(b, "Title", new Vector2(0.5f, 1f), new Vector2(0, -186), TextAnchor.MiddleCenter, 100, OpInk); ti.text = Campaign.Victory ? "VICTORY" : "WAR MAP"; Engrave(ti); ti.rectTransform.sizeDelta = new Vector2(900, 130); ti.verticalOverflow = VerticalWrapMode.Overflow;
             var st = MakeText(b, "State", new Vector2(0.5f, 1f), new Vector2(0, -300), TextAnchor.MiddleCenter, 24, OpDim); st.rectTransform.sizeDelta = new Vector2(1000, 36);
             var counter = Campaign.Counter;
-            st.text = "West " + Campaign.TakenOn("west") + " of " + Campaign.WestCount + " · East " + Campaign.TakenOn("east") + " of " + Campaign.EastCount + (Campaign.Victory ? " · Berlin taken" : counter != null ? " · counterattack at " + counter.name + ", " + Campaign.CounterLeft + " left" : "");
+            st.text = "West " + Campaign.TakenOn("west") + " of " + Campaign.WestCount + " · East " + Campaign.TakenOn("east") + " of " + Campaign.EastCount + " · Italy " + Campaign.TakenOn("south") + " of " + Campaign.SouthCount + (Campaign.Victory ? " · Berlin taken" : counter != null ? " · counterattack at " + counter.name + ", " + Campaign.CounterLeft + " left" : "");
             if (counter != null) st.color = MapRed;
 
             // the map to drag sideways
@@ -132,11 +132,11 @@ namespace IronNight
             var card = MakeCard(mapCardRoot, "Sector", new Vector2(0.5f, 1f), Vector2.zero, new Vector2(1000f, 380f), new Color(0.07f, 0.07f, 0.08f, 0.97f), 0.2f); card.rectTransform.pivot = new Vector2(0.5f, 1f); var t = card.transform;
             bool taken = Campaign.Taken(s), open = Campaign.Open(s), hit = Campaign.Counter == s;
             if (hit || open) card.transform.Find("Edge").GetComponent<Image>().color = hit ? new Color(MapRed.r, MapRed.g, MapRed.b, 0.9f) : new Color(1f, 0.78f, 0.35f, 0.8f);
-            int total = s.road == "west" ? Campaign.WestCount : Campaign.EastCount;
+            int total = Campaign.Count(s.road);
             var ey = MakeText(t, "Eyebrow", new Vector2(0f, 1f), new Vector2(36, -26), TextAnchor.UpperLeft, 22, OpAmber); ey.font = BoldFont(); ey.rectTransform.sizeDelta = new Vector2(900, 32);
-            ey.text = Spaced(s.road == "both" ? "WHERE THE ROADS MEET" : (s.road == "west" ? "WESTERN ROAD" : "EASTERN ROAD") + " · SECTOR " + (s.depth + 1) + " OF " + total);
+            ey.text = Spaced(s.road == "both" ? "WHERE THE ROADS MEET" : (s.road == "west" ? "WESTERN ROAD" : s.road == "south" ? "ITALIAN ROAD" : "EASTERN ROAD") + " · SECTOR " + (s.depth + 1) + " OF " + total);
             var nm = MakeText(t, "Name", new Vector2(0f, 1f), new Vector2(34, -58), TextAnchor.UpperLeft, 76, OpInk); nm.text = s.name.ToUpperInvariant(); Engrave(nm, true, 0.72f); nm.rectTransform.sizeDelta = new Vector2(920, 96); nm.verticalOverflow = VerticalWrapMode.Overflow;
-            string way = s.route == "village" ? "village" : s.route == "bocage" ? (s.theatre == "kursk" ? "tree belts" : "bocage") : (s.theatre == "kursk" ? "steppe" : "open fields");
+            string way = s.route == "village" ? (s.theatre == "italy" ? "hill town" : "village") : s.route == "bocage" ? (s.theatre == "kursk" ? "tree belts" : s.theatre == "italy" ? "olive groves" : "bocage") : (s.theatre == "kursk" ? "steppe" : s.theatre == "italy" ? "the valley" : "open fields");
             var ln = MakeText(t, "Line", new Vector2(0f, 1f), new Vector2(36, -160), TextAnchor.UpperLeft, 24, OpDim); ln.rectTransform.sizeDelta = new Vector2(930, 36);
             ln.text = s.when.Substring(0, 1) + s.when.Substring(1).ToLowerInvariant() + " · " + way + " · " + s.weather + (s.theatre == "ardennes" ? " · snow" : "") + (s.veteran ? " · veteran enemy" : "") + (s.road == "east" || s.id == "berlin" ? " · Soviet tanks" : " · American tanks");
             var pay = MakeText(t, "Pay", new Vector2(0f, 1f), new Vector2(36, -200), TextAnchor.UpperLeft, 24, GoldInk); pay.rectTransform.sizeDelta = new Vector2(930, 36); pay.text = taken && !hit ? "Liberated" : hit ? "Beat it off: +800 points · a supply crate · +1 star" : Campaign.Pay(s);
@@ -164,7 +164,7 @@ namespace IronNight
         {
             if (opsCount == null) return;
             var c = Campaign.Counter;
-            opsCount.text = Campaign.Victory ? "victory in Europe" : c != null ? "counterattack · " + c.name.ToLowerInvariant() : "west " + Campaign.TakenOn("west") + "/" + Campaign.WestCount + " · east " + Campaign.TakenOn("east") + "/" + Campaign.EastCount;
+            opsCount.text = Campaign.Victory ? "victory in Europe" : c != null ? "counterattack · " + c.name.ToLowerInvariant() : "west " + Campaign.TakenOn("west") + "/" + Campaign.WestCount + " · east " + Campaign.TakenOn("east") + "/" + Campaign.EastCount + " · italy " + Campaign.TakenOn("south") + "/" + Campaign.SouthCount;
             opsCount.color = c != null ? MapRed : OpAmber;
         }
 

@@ -49,17 +49,27 @@ namespace IronNight
             S("warsaw", "Warsaw", "east", 6, "JANUARY 1945", "kursk", "village", "fog", 900f, 438f, "lvov", "supply"),
             S("poznan", "Poznań", "east", 7, "FEBRUARY 1945", "kursk", "village", "overcast", 795f, 390f, "warsaw", null, true),
             S("seelow", "Seelow Heights", "east", 8, "APRIL 1945", "kursk", "bocage", "fog", 688f, 372f, "poznan", null, true),
+            // the southern road: up Italy, American tanks
+            S("anzio", "Anzio", "south", 0, "JANUARY 1944", "italy", "open", "clear", 605f, 978f, null),
+            S("cassino", "Monte Cassino", "south", 1, "MAY 1944", "italy", "village", "rain", 640f, 965f, "anzio"),
+            S("rome", "Rome", "south", 2, "JUNE 1944", "italy", "village", "clear", 595f, 948f, "cassino", "supply"),
+            S("florence", "Florence", "south", 3, "AUGUST 1944", "italy", "village", "clear", 572f, 893f, "rome"),
+            S("gothic", "The Gothic Line", "south", 4, "SEPTEMBER 1944", "italy", "bocage", "fog", 598f, 868f, "florence"),
+            S("bologna", "Bologna", "south", 5, "APRIL 1945", "italy", "village", "overcast", 592f, 840f, "gothic", null, true),
+            S("po", "The Po Valley", "south", 6, "APRIL 1945", "italy", "open", "clear", 585f, 812f, "bologna", "officer", true),
             // where the roads meet
             S("berlin", "Berlin", "both", 11, "APRIL 1945", "kursk", "village", "overcast", 632f, 368f, "magdeburg,seelow", "officer", true),
         };
-        public static readonly int WestCount = 11, EastCount = 9;
+        public static readonly int WestCount = 11, EastCount = 9, SouthCount = 7;
+        /// <summary>A road's length in sectors.</summary>
+        public static int Count(string road) => road == "west" ? WestCount : road == "south" ? SouthCount : EastCount;
         public static Sector ById(string id) { foreach (var s in All) if (s.id == id) return s; return null; }
 
         public static bool Taken(Sector s) => PlayerPrefs.GetInt("map.taken." + s.id, 0) == 1;
         public static int TakenOn(string road) { int n = 0; foreach (var s in All) if (s.road == road && Taken(s)) n++; return n; }
         public static bool Victory => Taken(ById("berlin"));
         /// <summary>The eastern road waits for the Kursk front to open (a first dawn).</summary>
-        public static bool RoadOpen(Sector s) => s.road != "east" || Depot.TheatreOpen("kursk");
+        public static bool RoadOpen(Sector s) => s.road == "east" ? Depot.TheatreOpen("kursk") : s.road == "south" ? Depot.TheatreOpen("italy") : true;   // the southern road with the Italian front
         /// <summary>A sector that can be attacked now: not taken, its road open, everything before it taken.</summary>
         public static bool Open(Sector s)
         {
@@ -96,7 +106,7 @@ namespace IronNight
             if (c != null || Ticks("map.counterNext") == System.DateTime.MinValue || Now < Ticks("map.counterNext")) return null;
             // the front line of each road: the deepest sector taken, never the landing or Kursk itself
             var fronts = new List<Sector>();
-            foreach (var road in new[] { "west", "east" }) { Sector deepest = null; foreach (var s in All) if (s.road == road && Taken(s) && s.depth >= 1 && (deepest == null || s.depth > deepest.depth)) deepest = s; if (deepest != null) fronts.Add(deepest); }
+            foreach (var road in new[] { "west", "east", "south" }) { Sector deepest = null; foreach (var s in All) if (s.road == road && Taken(s) && s.depth >= 1 && (deepest == null || s.depth > deepest.depth)) deepest = s; if (deepest != null) fronts.Add(deepest); }
             if (fronts.Count == 0) return null;
             var hit = fronts[Random.Range(0, fronts.Count)];
             PlayerPrefs.SetString("map.counter", hit.id); SetTicks("map.counterUntil", Now.AddHours(CounterHours)); PlayerPrefs.Save();
