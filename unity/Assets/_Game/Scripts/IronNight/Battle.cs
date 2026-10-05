@@ -182,8 +182,9 @@ namespace IronNight
             hud.OnTheatre = t => theatre = t;
             hud.OnDailyChallenge = () => { PlayerPrefs.SetString("daily.launch", Daily.Today); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); };
             hud.OnWeekly = () => { PlayerPrefs.SetString("weekly.launch", "1"); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); };
-            hud.OnPara = () => { if (!paraUp || paraCool > 0f || phase != Phase.Play || paraSquad != null) return; paraArmed = !paraArmed; paraArmedLeft = 8f; airArmed = false; hud.Toast(paraArmed ? "Tap the drop zone" : "Drop called off", 2f); Sfx.Click(); };
-            hud.OnAir = () => { if (!airUp || airCool > 0f || phase != Phase.Play || strike != null) return; airArmed = !airArmed; airArmedLeft = 8f; paraArmed = false; hud.Toast(airArmed ? "Tap the target" : "Air strike called off", 2f); Sfx.Click(); };
+            hud.OnSupply = () => { if (!supplyUp || supplyCool > 0f || phase != Phase.Play) return; supplyArmed = !supplyArmed; supplyArmedLeft = 8f; airArmed = false; paraArmed = false; hud.Toast(supplyArmed ? "Tap where the crate should land" : "Supply drop called off", 2f); Sfx.Click(); };
+            hud.OnPara = () => { if (!paraUp || paraCool > 0f || phase != Phase.Play || paraSquad != null) return; paraArmed = !paraArmed; paraArmedLeft = 8f; airArmed = false; supplyArmed = false; hud.Toast(paraArmed ? "Tap the drop zone" : "Drop called off", 2f); Sfx.Click(); };
+            hud.OnAir = () => { if (!airUp || airCool > 0f || phase != Phase.Play || strike != null) return; airArmed = !airArmed; airArmedLeft = 8f; paraArmed = false; supplyArmed = false; hud.Toast(airArmed ? "Tap the target" : "Air strike called off", 2f); Sfx.Click(); };
             hud.OnAd = () => { if (phase == Phase.End) Ads.Rewarded("end", EndReward); };
             hud.OnGoldAd = () => { if (phase != Phase.End) return; if (Depot.SpendGold(Depot.GoldRepair)) EndReward(); else hud.ShowShop(); };   // not enough gold: the shop
             hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
@@ -301,7 +302,7 @@ namespace IronNight
             // a tap on an enemy: every gun onto it for eight seconds
             if (stick.ConsumeTap() && phase == Phase.Play)
             {
-                var ray = cam.ScreenPointToRay(stick.TapAt); if (ray.direction.y < -0.01f) { var g = ray.origin + ray.direction * (-ray.origin.y / ray.direction.y); bool placed = !airArmed && !paraArmed && StandPlace(g); bool called = !placed && (airArmed || paraArmed); if (called) { if (airArmed) { airArmed = false; CallAir(g); } else { paraArmed = false; CallPara(g); } } var pick = called || placed ? null : Nearest(foes, g, 9f);
+                var ray = cam.ScreenPointToRay(stick.TapAt); if (ray.direction.y < -0.01f) { var g = ray.origin + ray.direction * (-ray.origin.y / ray.direction.y); bool placed = !airArmed && !paraArmed && !supplyArmed && StandPlace(g); bool called = !placed && (airArmed || paraArmed || supplyArmed); if (called) { if (airArmed) { airArmed = false; CallAir(g); } else if (paraArmed) { paraArmed = false; CallPara(g); } else { supplyArmed = false; CallSupply(g); } } var pick = called || placed ? null : Nearest(foes, g, 9f);
                     if (!called && !placed && pick == null && objective != null && objective.kind == "dump" && new Vector2(g.x - objective.pos.x, g.z - objective.pos.z).magnitude < 10f) { point = objective.pos; pointLeft = 10f; hud.Toast("Shell the fuel dump", 1.6f); Sfx.Click(); }
                     else if (!called && !placed && pick == null) { var mine = NearestMine(g, 4f); if (mine != null) { point = mine.pos; pointLeft = 5f; hud.Toast("Shell the mine", 1.6f); Sfx.Click(); } else { var man = infantry.Nearest(g, 7f); if (man != null) { point = man.pos; pointLeft = 6f; hud.Toast(man.gun != null ? "Shell the gun crew" : man.still ? "Shell the observer" : "Shell the infantry", 1.6f); Sfx.Click(); } } }
                     if (pick != null) { focus = pick; focusLeft = 8f; if (focusRing == null) focusRing = fx.Marker(pick.transform.position, new Color(1f, 0.55f, 0.3f), 7f); focusRing.gameObject.SetActive(true); hud.Toast("Focus fire · " + pick.spec.name, 1.6f); Sfx.Click(); } }
@@ -385,7 +386,7 @@ namespace IronNight
             hud.Set(t, platoon.Count); hud.SetLeader(Mathf.CeilToInt(L.hp), Mathf.CeilToInt(Depot.LeaderHp)); hud.SetTally(kills, score);
             hud.ReloadArc(L.transform.position + Vector3.up * 0.2f, L.reloadLeft <= 0f ? 1f : 1f - L.reloadLeft / Mathf.Max(0.1f, L.spec.reload * L.reloadMul), cam);
             hud.Indicators(foes, cam);
-            TickObjective(dt); TickDrops(dt); TickPara(dt); TickSalvage(dt); TickHoles(dt); TickTosses(dt); if (!sneak || sneakAlarm) { TickMortars(dt); TickStar(dt); TickRaid(dt); }
+            TickObjective(dt); TickDrops(dt); TickPara(dt); TickSupply(dt); TickSalvage(dt); TickHoles(dt); TickTosses(dt); if (!sneak || sneakAlarm) { TickMortars(dt); TickStar(dt); TickRaid(dt); }
             if (ammoLeft > 0f) { ammoLeft -= dt; if (ammoLeft <= 0f) { ammoMul = 1f; hud.Toast("APCR spent"); } }
             hud.Radar(foes, platoon, L.transform.position, objective != null ? objective.pos : Vector3.zero, objective != null, cratePos);   // the commander's spotting shows them all: the markers are placed when it is called
             hud.HpBars(foes, cam, boss);
@@ -1462,6 +1463,20 @@ namespace IronNight
             hud.Toast("Counterattack from the rear, 6 o'clock", 3f);
         }
 
+        /// <summary>A crate under its canopy at 55 m over a point, a C-47 going over: repair, ammunition, smoke or a radio.</summary>
+        void SpawnDrop(Vector3 pos)
+        {
+            var d = new Drop { pos = pos, height = 55f, kind = Random.Range(0, 4) }; Flyover(pos);
+            if (crateMaterial == null) { crateMaterial = new Material(Resources.Load<Material>("BarrelLit")); crateMaterial.SetColor("_BaseColor", new Color(0.45f, 0.36f, 0.22f)); crateMaterial.SetFloat("_Metallic", 0f); crateMaterial.SetFloat("_Smoothness", 0.2f); } ChuteMaterial();
+            var cratePf = Resources.Load<GameObject>("Props/crate");
+            if (cratePf != null) { d.crate = Instantiate(cratePf).transform; d.top = d.crate.GetComponentInChildren<Renderer>().bounds.max.y - d.crate.position.y + 0.06f; var cm = new Material(Resources.Load<Material>("VehicleLit")); cm.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/crate_tex")); cm.SetFloat("_Cull", 0f); foreach (var rr in d.crate.GetComponentsInChildren<Renderer>()) rr.sharedMaterial = cm; }
+            else { d.crate = GameObject.CreatePrimitive(PrimitiveType.Cube).transform; Destroy(d.crate.GetComponent<Collider>()); d.crate.localScale = new Vector3(1.3f, 1f, 1.3f); d.lift = 0.5f; d.top = 0.5f; d.crate.GetComponent<Renderer>().sharedMaterial = crateMaterial; }
+            d.canopy = Canopy(ChuteGores, 8, ChuteRadius, ChuteHeight, out d.rest); d.chute = new GameObject("Canopy").transform; d.chute.gameObject.AddComponent<MeshFilter>().sharedMesh = d.canopy;
+            var cr = d.chute.gameObject.AddComponent<MeshRenderer>(); cr.sharedMaterial = new Material(chuteMaterial); cr.sharedMaterial.SetColor("_BaseColor", ChuteColour(d.kind)); cr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            d.lines = new GameObject("Shrouds").AddComponent<LineRenderer>(); d.lines.positionCount = 2 + ChuteGores * 2; d.lines.startWidth = d.lines.endWidth = 0.12f; d.lines.material = ShroudMaterial(); d.lines.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            drops.Add(d);
+        }
+
         /// <summary>Supply drops: a crate under a parachute comes down near the platoon every minute or so. The leader
         /// drives over it: repair, APCR ammunition for a while, a smoke screen, or a radio that calls the guns.</summary>
         void TickDrops(float dt)
@@ -1471,15 +1486,7 @@ namespace IronNight
             {
                 dropTimer = 50f + Random.value * 25f;
                 float a = Random.value * Mathf.PI * 2f; var pos = props.PushOut(L.transform.position + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * (16f + Random.value * 14f), 3f);
-                var d = new Drop { pos = pos, height = 55f, kind = Random.Range(0, 4) }; Flyover(pos);
-                if (crateMaterial == null) { crateMaterial = new Material(Resources.Load<Material>("BarrelLit")); crateMaterial.SetColor("_BaseColor", new Color(0.45f, 0.36f, 0.22f)); crateMaterial.SetFloat("_Metallic", 0f); crateMaterial.SetFloat("_Smoothness", 0.2f); } ChuteMaterial();
-                var cratePf = Resources.Load<GameObject>("Props/crate");
-                if (cratePf != null) { d.crate = Instantiate(cratePf).transform; d.top = d.crate.GetComponentInChildren<Renderer>().bounds.max.y - d.crate.position.y + 0.06f; var cm = new Material(Resources.Load<Material>("VehicleLit")); cm.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/crate_tex")); cm.SetFloat("_Cull", 0f); foreach (var rr in d.crate.GetComponentsInChildren<Renderer>()) rr.sharedMaterial = cm; }
-                else { d.crate = GameObject.CreatePrimitive(PrimitiveType.Cube).transform; Destroy(d.crate.GetComponent<Collider>()); d.crate.localScale = new Vector3(1.3f, 1f, 1.3f); d.lift = 0.5f; d.top = 0.5f; d.crate.GetComponent<Renderer>().sharedMaterial = crateMaterial; }
-                d.canopy = Canopy(ChuteGores, 8, ChuteRadius, ChuteHeight, out d.rest); d.chute = new GameObject("Canopy").transform; d.chute.gameObject.AddComponent<MeshFilter>().sharedMesh = d.canopy;
-                var cr = d.chute.gameObject.AddComponent<MeshRenderer>(); cr.sharedMaterial = new Material(chuteMaterial); cr.sharedMaterial.SetColor("_BaseColor", ChuteColour(d.kind)); cr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
-                d.lines = new GameObject("Shrouds").AddComponent<LineRenderer>(); d.lines.positionCount = 2 + ChuteGores * 2; d.lines.startWidth = d.lines.endWidth = 0.12f; d.lines.material = ShroudMaterial(); d.lines.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                drops.Add(d); hud.Toast("Supply drop coming down, " + Clock(pos), 2.8f);
+                SpawnDrop(pos); hud.Toast("Supply drop coming down, " + Clock(pos), 2.8f);
             }
             TickPlanes(dt);
             for (int i = drops.Count - 1; i >= 0; i--)
@@ -1807,6 +1814,28 @@ namespace IronNight
         readonly List<Jumper> jumpers = new List<Jumper>(); Infantry.Squad paraSquad; string paraNation; float paraCool, paraArmedLeft, paraHold; bool paraUp, paraArmed;
         const float ParaCoolFull = 90f, ParaFight = 60f, ParaScale = 0.66f, ParaLines = 7f;   // ParaScale: the crate's canopy cut down for a man (about 11 m across: the T-5's 28 feet read too small from the camera)
         static bool ParaRank => Depot.RankLevel >= 3;   // a sergeant: ten nights fought
+
+        // ---- a supply drop on call ----
+        float supplyCool, supplyArmedLeft; bool supplyUp, supplyArmed;
+        const float SupplyCoolFull = 120f;
+        static bool SupplyRank => Depot.RankLevel >= 2;   // a corporal: five nights fought
+
+        /// <summary>The SUPPLY button: there from 0:45 for a corporal and up, ready every 120 s; armed, it waits eight
+        /// seconds for a tap.</summary>
+        void TickSupply(float dt)
+        {
+            if (!supplyUp && SupplyRank && t >= 45f) { supplyUp = true; hud.Toast("Supply planes on call · press SUPPLY", 3.2f); }
+            if (supplyCool > 0f) supplyCool = Mathf.Max(0f, supplyCool - dt);
+            if (supplyArmed) { supplyArmedLeft -= dt; if (supplyArmedLeft <= 0f) { supplyArmed = false; hud.Toast("Supply drop called off", 1.6f); } }
+            hud.SetSupply(supplyUp, 1f - supplyCool / SupplyCoolFull, supplyArmed ? "MARK" : supplyCool > 0f ? Mathf.CeilToInt(supplyCool) + " s" : "READY", supplyArmed);
+        }
+
+        /// <summary>A crate called down where the player tapped, clear of buildings and water.</summary>
+        void CallSupply(Vector3 at)
+        {
+            at.y = 0f; at = props.PushOut(at, 3f); if (Props.InStream(at, 3f)) at = props.PushOut(at + Vector3.forward * 10f, 3f);
+            SpawnDrop(at); supplyCool = SupplyCoolFull; hud.Toast("Supplies inbound, " + Clock(at), 2.6f); Sfx.Click();
+        }
 
         /// <summary>The PARA button: there from 1:30 for a sergeant and up (not on a night without air), ready every 90 s
         /// once the last stick is out of the fight; armed, it waits eight seconds for a tap.</summary>

@@ -130,7 +130,7 @@ namespace IronNight
         public class Card { public string id, title, desc; public bool rare; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain, OnStart, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder, OnAir, OnPara, OnDailyChallenge, OnStandReady; public System.Action<string> OnRoute, OnTheatre, OnStand, OnStandItem, OnConvoy, OnSneak; public System.Action<string, int> OnOperation; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[3]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], routePays = new Text[3], theatreLabels = new Text[3]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, airBtn, routeSheet, trainBtn; Text xpLine, depotXp; static readonly Color XpBlue = new Color(0.56f, 0.76f, 0.98f), XpDeep = new Color(0.22f, 0.43f, 0.74f, 0.96f); Text airLabel; Image airFill; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
+        public System.Action OnAd, OnAgain, OnStart, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder, OnAir, OnPara, OnSupply, OnDailyChallenge, OnStandReady; public System.Action<string> OnRoute, OnTheatre, OnStand, OnStandItem, OnConvoy, OnSneak; public System.Action<string, int> OnOperation; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[3]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], routePays = new Text[3], theatreLabels = new Text[3]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, airBtn, routeSheet, trainBtn; Text xpLine, depotXp; static readonly Color XpBlue = new Color(0.56f, 0.76f, 0.98f), XpDeep = new Color(0.22f, 0.43f, 0.74f, 0.96f); Text airLabel; Image airFill; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
 
         Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel, setQuality, setVibe, rankLine, pointsLine, ordersCount; GameObject settingsSheet, ordersSheet; RawImage titleBackdrop, depotBackdrop; GarageDrag depotDrag; readonly List<RectTransform> embers = new List<RectTransform>(); readonly List<float> emberPhase = new List<float>(); GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         public System.Action OnSuppliesAd; public bool SuppliesGranted; bool suppliesOffer; Text cardsEyebrow;
@@ -241,11 +241,11 @@ namespace IronNight
             {
                 // the console: a dark plate fading up from the bottom edge behind every control; it takes no taps
                 var console = MakeImage(hudGroup.transform, "Console", new Vector2(0.5f, 0f), Vector2.zero, new Vector2(1600, 400), new Color(0.015f, 0.02f, 0.025f, 0.9f)); console.sprite = Fade(); console.rectTransform.pivot = new Vector2(0.5f, 0f); console.raycastTarget = false; console.transform.SetAsFirstSibling();
-                ammoBtn = MakeButton(hudGroup.transform, "", new Vector2(0f, 0f), new Vector2(330, 268), new Vector2(190, 120), 22, () => OnAmmo?.Invoke());
+                ammoBtn = MakeButton(hudGroup.transform, "", new Vector2(0f, 0f), new Vector2(300, 268), new Vector2(155, 120), 22, () => OnAmmo?.Invoke());
                 ammoBtn.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.11f, 0.85f);
-                var ae = MakeImage(ammoBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190, 120), new Color(1f, 1f, 1f, 0.2f)); ae.sprite = Outline(); ae.type = Image.Type.Sliced; ae.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-                ammoKind = MakeText(ammoBtn.transform, "Kind", new Vector2(0.5f, 1f), new Vector2(0, -12), TextAnchor.UpperCenter, 30, new Color(0.96f, 0.68f, 0.24f)); ammoKind.font = BoldFont(); ammoKind.rectTransform.sizeDelta = new Vector2(190, 40);
-                ammoLabel = MakeText(ammoBtn.transform, "Count", new Vector2(0.5f, 0f), new Vector2(0, 12), TextAnchor.LowerCenter, 26, new Color(0.85f, 0.83f, 0.78f)); ammoLabel.rectTransform.sizeDelta = new Vector2(190, 60);
+                var ae = MakeImage(ammoBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(155, 120), new Color(1f, 1f, 1f, 0.2f)); ae.sprite = Outline(); ae.type = Image.Type.Sliced; ae.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                ammoKind = MakeText(ammoBtn.transform, "Kind", new Vector2(0.5f, 1f), new Vector2(0, -12), TextAnchor.UpperCenter, 30, new Color(0.96f, 0.68f, 0.24f)); ammoKind.font = BoldFont(); ammoKind.rectTransform.sizeDelta = new Vector2(155, 40);
+                ammoLabel = MakeText(ammoBtn.transform, "Count", new Vector2(0.5f, 0f), new Vector2(0, 12), TextAnchor.LowerCenter, 26, new Color(0.85f, 0.83f, 0.78f)); ammoLabel.rectTransform.sizeDelta = new Vector2(155, 60);
                 ammoBtn.transform.Find("Label").GetComponent<Text>().text = "";
                 abilityBtn = MakeButton(hudGroup.transform, "", new Vector2(0f, 0f), new Vector2(130, 298), new Vector2(180, 180), 20, () => OnAbility?.Invoke());
                 abilityBtn.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.11f, 0.9f);
@@ -255,27 +255,35 @@ namespace IronNight
                 var be = MakeImage(abilityBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(180, 180), new Color(0.96f, 0.68f, 0.24f, 0.5f)); be.sprite = Outline(); be.type = Image.Type.Sliced; be.rectTransform.pivot = new Vector2(0.5f, 0.5f);
                 abilityBtn.transform.Find("Label").GetComponent<Text>().text = "";
                 abilityBtn.SetActive(false);
-                orderBtn = MakeButton(hudGroup.transform, "FOLLOW", new Vector2(0f, 0f), new Vector2(530, 268), new Vector2(190, 120), 26, () => OnOrder?.Invoke());
+                orderBtn = MakeButton(hudGroup.transform, "FOLLOW", new Vector2(0f, 0f), new Vector2(461, 268), new Vector2(155, 120), 26, () => OnOrder?.Invoke());
                 orderBtn.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.11f, 0.85f);
-                var oe = MakeImage(orderBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190, 120), new Color(1f, 1f, 1f, 0.2f)); oe.sprite = Outline(); oe.type = Image.Type.Sliced; oe.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-                var ot = MakeText(orderBtn.transform, "Top", new Vector2(0.5f, 1f), new Vector2(0, -12), TextAnchor.UpperCenter, 20, new Color(0.66f, 0.64f, 0.59f)); ot.text = Spaced("WINGMEN"); ot.rectTransform.sizeDelta = new Vector2(190, 30);
+                var oe = MakeImage(orderBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(155, 120), new Color(1f, 1f, 1f, 0.2f)); oe.sprite = Outline(); oe.type = Image.Type.Sliced; oe.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                var ot = MakeText(orderBtn.transform, "Top", new Vector2(0.5f, 1f), new Vector2(0, -12), TextAnchor.UpperCenter, 20, new Color(0.66f, 0.64f, 0.59f)); ot.text = Spaced("WINGMEN"); ot.rectTransform.sizeDelta = new Vector2(155, 30);
                 orderLabel = orderBtn.transform.Find("Label").GetComponent<Text>(); orderLabel.alignment = TextAnchor.MiddleCenter; orderLabel.rectTransform.anchoredPosition = new Vector2(0, -12); orderLabel.fontSize = 30; orderLabel.color = new Color(0.96f, 0.68f, 0.24f);
                 // air support: fills while the next strike is being readied
-                airBtn = MakeButton(hudGroup.transform, "", new Vector2(0f, 0f), new Vector2(730, 268), new Vector2(190, 120), 26, () => OnAir?.Invoke());
+                airBtn = MakeButton(hudGroup.transform, "", new Vector2(0f, 0f), new Vector2(622, 268), new Vector2(155, 120), 26, () => OnAir?.Invoke());
                 airBtn.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.11f, 0.85f);
-                airFill = MakeImage(airBtn.transform, "Cool", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190, 120), new Color(0.02f, 0.02f, 0.03f, 0.78f)); airFill.rectTransform.pivot = new Vector2(0.5f, 0.5f); airFill.sprite = Rounded(); airFill.type = Image.Type.Filled; airFill.fillMethod = Image.FillMethod.Vertical; airFill.fillOrigin = (int)Image.OriginVertical.Top;
-                var airEdge = MakeImage(airBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190, 120), new Color(0.96f, 0.68f, 0.24f, 0.5f)); airEdge.sprite = Outline(); airEdge.type = Image.Type.Sliced; airEdge.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-                var atop = MakeText(airBtn.transform, "Top", new Vector2(0.5f, 1f), new Vector2(0, -12), TextAnchor.UpperCenter, 20, new Color(0.66f, 0.64f, 0.59f)); atop.text = Spaced("AIR"); atop.rectTransform.sizeDelta = new Vector2(190, 30);
+                airFill = MakeImage(airBtn.transform, "Cool", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(155, 120), new Color(0.02f, 0.02f, 0.03f, 0.78f)); airFill.rectTransform.pivot = new Vector2(0.5f, 0.5f); airFill.sprite = Rounded(); airFill.type = Image.Type.Filled; airFill.fillMethod = Image.FillMethod.Vertical; airFill.fillOrigin = (int)Image.OriginVertical.Top;
+                var airEdge = MakeImage(airBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(155, 120), new Color(0.96f, 0.68f, 0.24f, 0.5f)); airEdge.sprite = Outline(); airEdge.type = Image.Type.Sliced; airEdge.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                var atop = MakeText(airBtn.transform, "Top", new Vector2(0.5f, 1f), new Vector2(0, -12), TextAnchor.UpperCenter, 20, new Color(0.66f, 0.64f, 0.59f)); atop.text = Spaced("AIR"); atop.rectTransform.sizeDelta = new Vector2(155, 30);
                 airLabel = airBtn.transform.Find("Label").GetComponent<Text>(); airLabel.alignment = TextAnchor.MiddleCenter; airLabel.rectTransform.anchoredPosition = new Vector2(0, -12); airLabel.fontSize = 28; airLabel.color = new Color(0.96f, 0.68f, 0.24f);
                 airLabel.transform.SetAsLastSibling(); atop.transform.SetAsLastSibling(); airBtn.SetActive(false);
                 // paratroopers: the same, beside it
-                paraBtn = MakeButton(hudGroup.transform, "", new Vector2(0f, 0f), new Vector2(930, 268), new Vector2(190, 120), 26, () => OnPara?.Invoke());
+                paraBtn = MakeButton(hudGroup.transform, "", new Vector2(0f, 0f), new Vector2(783, 268), new Vector2(155, 120), 26, () => OnPara?.Invoke());
                 paraBtn.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.11f, 0.85f);
-                paraFill = MakeImage(paraBtn.transform, "Cool", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190, 120), new Color(0.02f, 0.02f, 0.03f, 0.78f)); paraFill.rectTransform.pivot = new Vector2(0.5f, 0.5f); paraFill.sprite = Rounded(); paraFill.type = Image.Type.Filled; paraFill.fillMethod = Image.FillMethod.Vertical; paraFill.fillOrigin = (int)Image.OriginVertical.Top;
-                var paraEdge = MakeImage(paraBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190, 120), new Color(0.96f, 0.68f, 0.24f, 0.5f)); paraEdge.sprite = Outline(); paraEdge.type = Image.Type.Sliced; paraEdge.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-                var ptop = MakeText(paraBtn.transform, "Top", new Vector2(0.5f, 1f), new Vector2(0, -12), TextAnchor.UpperCenter, 20, new Color(0.66f, 0.64f, 0.59f)); ptop.text = Spaced("PARA"); ptop.rectTransform.sizeDelta = new Vector2(190, 30);
+                paraFill = MakeImage(paraBtn.transform, "Cool", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(155, 120), new Color(0.02f, 0.02f, 0.03f, 0.78f)); paraFill.rectTransform.pivot = new Vector2(0.5f, 0.5f); paraFill.sprite = Rounded(); paraFill.type = Image.Type.Filled; paraFill.fillMethod = Image.FillMethod.Vertical; paraFill.fillOrigin = (int)Image.OriginVertical.Top;
+                var paraEdge = MakeImage(paraBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(155, 120), new Color(0.96f, 0.68f, 0.24f, 0.5f)); paraEdge.sprite = Outline(); paraEdge.type = Image.Type.Sliced; paraEdge.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                var ptop = MakeText(paraBtn.transform, "Top", new Vector2(0.5f, 1f), new Vector2(0, -12), TextAnchor.UpperCenter, 20, new Color(0.66f, 0.64f, 0.59f)); ptop.text = Spaced("PARA"); ptop.rectTransform.sizeDelta = new Vector2(155, 30);
                 paraLabel = paraBtn.transform.Find("Label").GetComponent<Text>(); paraLabel.alignment = TextAnchor.MiddleCenter; paraLabel.rectTransform.anchoredPosition = new Vector2(0, -12); paraLabel.fontSize = 28; paraLabel.color = new Color(0.96f, 0.68f, 0.24f);
                 paraLabel.transform.SetAsLastSibling(); ptop.transform.SetAsLastSibling(); paraBtn.SetActive(false);
+                // a supply drop: the same again, last in the row
+                supplyBtn = MakeButton(hudGroup.transform, "", new Vector2(0f, 0f), new Vector2(944, 268), new Vector2(155, 120), 26, () => OnSupply?.Invoke());
+                supplyBtn.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.11f, 0.85f);
+                supplyFill = MakeImage(supplyBtn.transform, "Cool", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(155, 120), new Color(0.02f, 0.02f, 0.03f, 0.78f)); supplyFill.rectTransform.pivot = new Vector2(0.5f, 0.5f); supplyFill.sprite = Rounded(); supplyFill.type = Image.Type.Filled; supplyFill.fillMethod = Image.FillMethod.Vertical; supplyFill.fillOrigin = (int)Image.OriginVertical.Top;
+                var supplyEdge = MakeImage(supplyBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(155, 120), new Color(0.96f, 0.68f, 0.24f, 0.5f)); supplyEdge.sprite = Outline(); supplyEdge.type = Image.Type.Sliced; supplyEdge.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                var stop = MakeText(supplyBtn.transform, "Top", new Vector2(0.5f, 1f), new Vector2(0, -12), TextAnchor.UpperCenter, 20, new Color(0.66f, 0.64f, 0.59f)); stop.text = Spaced("SUPPLY"); stop.rectTransform.sizeDelta = new Vector2(155, 30);
+                supplyLabel = supplyBtn.transform.Find("Label").GetComponent<Text>(); supplyLabel.alignment = TextAnchor.MiddleCenter; supplyLabel.rectTransform.anchoredPosition = new Vector2(0, -12); supplyLabel.fontSize = 28; supplyLabel.color = new Color(0.96f, 0.68f, 0.24f);
+                supplyLabel.transform.SetAsLastSibling(); stop.transform.SetAsLastSibling(); supplyBtn.SetActive(false);
             }
             arrowSprite = ArrowSprite(); objectiveArrow.sprite = arrowSprite;
             var root = canvasGo.transform;
@@ -1053,7 +1061,7 @@ namespace IronNight
         /// <summary>What is in the racks, and which round is loaded.</summary>
         /// <summary>The stick must let these buttons have their own presses.</summary>
         TouchStick handStick;   // the stick, for the buttons made later to be kept out of its taps
-        public void HandTo(TouchStick stick) { if (stick == null) return; handStick = stick; stick.Blockers.Add(ammoBtn.GetComponent<RectTransform>()); stick.Blockers.Add(abilityBtn.GetComponent<RectTransform>()); stick.Blockers.Add(orderBtn.GetComponent<RectTransform>()); stick.Blockers.Add(pauseBtnRect); stick.Blockers.Add(airBtn.GetComponent<RectTransform>()); stick.Blockers.Add(paraBtn.GetComponent<RectTransform>()); }
+        public void HandTo(TouchStick stick) { if (stick == null) return; handStick = stick; stick.Blockers.Add(ammoBtn.GetComponent<RectTransform>()); stick.Blockers.Add(abilityBtn.GetComponent<RectTransform>()); stick.Blockers.Add(orderBtn.GetComponent<RectTransform>()); stick.Blockers.Add(pauseBtnRect); stick.Blockers.Add(airBtn.GetComponent<RectTransform>()); stick.Blockers.Add(paraBtn.GetComponent<RectTransform>()); stick.Blockers.Add(supplyBtn.GetComponent<RectTransform>()); }
 
         public void SetOrder(string text) { if (orderLabel != null) orderLabel.text = text; }
 
@@ -1328,6 +1336,16 @@ namespace IronNight
         /// <summary>The commander's button: his portrait, the cooldown draining down it, a glow while his order lasts.</summary>
         /// <summary>The AIR button: hidden until the planes are on station, filling while the next strike is readied,
         /// lit while it waits for a tap on the target.</summary>
+        GameObject supplyBtn; Image supplyFill; Text supplyLabel;
+        public void SetSupply(bool has, float charged, string label, bool armed)
+        {
+            if (supplyBtn == null) return;
+            if (supplyBtn.activeSelf != has) supplyBtn.SetActive(has);
+            if (!has) return;
+            supplyFill.fillAmount = 1f - Mathf.Clamp01(charged); if (supplyLabel.text != label) supplyLabel.text = label;
+            supplyBtn.transform.Find("Edge").GetComponent<Image>().color = armed ? new Color(1f, 0.85f, 0.4f, 0.95f) : charged >= 1f ? new Color(0.96f, 0.68f, 0.24f, 0.85f) : new Color(0.96f, 0.68f, 0.24f, 0.3f);
+        }
+
         GameObject paraBtn; Image paraFill; Text paraLabel;
         public void SetPara(bool has, float charged, string label, bool armed)
         {
