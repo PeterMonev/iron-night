@@ -20,6 +20,7 @@ namespace IronNight
         public class Soldier
         {
             public Transform t; public Vector3 pos; public float reload, phase, deadAge, cycle, stop; public bool dead, still; public Vector3 face = Vector3.forward;   // still: an observer or a gun crewman, he stays where he is and does not shoot
+            public Vector3 cover; public bool bounding; public float pause;   // going in bounds: the next cover, running to it, crouched in it
             public Role role; public Vehicle gun; public int burst; public bool posable, dug, ally; public string side; public MeshFilter mf; public MeshRenderer mr; public Transform fig;   // ally: one of ours in a fire fight; side: his nation's pose prefix (us, su)
         }
         public class Squad { public readonly List<Soldier> men = new List<Soldier>(); }
@@ -223,6 +224,16 @@ namespace IronNight
                         continue;
                     }
                     float backOff = m.role == Role.Faust ? 7f : 12f; bool ahead = dist > m.stop, back = dist < backOff;
+                    if (ahead && dist < 45f)
+                    {
+                        // under our guns they go in bounds: run to the next cover a few metres nearer, crouch there, then on
+                        if (m.pause > 0f) { m.pause -= dt; ahead = false; }
+                        else
+                        {
+                            if (!m.bounding && props.Cover(m.pos, target.transform.position, 12f, 0.5f, 0.3f, out var cv)) { var cvT = target.transform.position - cv; cvT.y = 0f; if (cvT.magnitude < dist - 4f) { m.cover = cv; m.bounding = true; } }
+                            if (m.bounding) { var tc = m.cover - m.pos; tc.y = 0f; if (tc.magnitude < 0.7f) { m.bounding = false; m.pause = Random.Range(1.5f, 3.5f); ahead = false; } else to = tc.normalized; }
+                        }
+                    }
                     var gait = ahead && dist > 45f ? walk : ahead ? run : walk;   // walking up out of the dark, running in, stepping back from a tank
                     float speed = ahead ? (dist > 45f ? 1.5f : 2.8f) : back ? 1.6f : 0f;
                     if (ahead) m.pos += to * (speed * dt); else if (back) m.pos -= to * (speed * dt);

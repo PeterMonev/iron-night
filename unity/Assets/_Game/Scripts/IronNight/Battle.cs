@@ -359,7 +359,17 @@ namespace IronNight
                 float dist = Dist(e, target); if (SneakAsleep(e, dist, dt)) continue;
                 if (e.spec.transport) { TickTransport(e, target, dist, dt); continue; }
                 if (!e.spec.isGun && !e.spec.casemate && e.hp <= 1f && e.spec.hp >= 3f && e.fallBack <= 0f && e.fallenBack < 1 && dist < e.Range * 0.8f) { e.fallBack = 6f; e.fallenBack++; hud.Toast(e.spec.name + " falling back", 2f); }
-                if (e.fallBack > 0f)
+                if (e.aiWait <= 0f && !e.aiWaited && !stand && e != ace && e != boss && !e.spec.isGun && !e.spec.transport && dist < e.Range * 1.2f && Alone(e))
+                {
+                    e.aiWaited = true; e.aiWait = 20f; if (Time.time > waitSaid) { waitSaid = Time.time + 20f; hud.Toast(e.spec.name + " pulls back · waiting for support", 2.2f); }
+                }
+                if (e.aiWait > 0f)
+                {
+                    // alone: back out of reach and hold there till a friend joins him or his patience runs out
+                    e.aiWait -= dt; if (!Alone(e)) e.aiWait = 0f;
+                    if (dist < e.Range * 1.3f) { var away = e.transform.position - target.transform.position; away.y = 0f; e.Drive(Steer(e, new Vector2(away.x, away.z)), dt); }
+                }
+                else if (e.fallBack > 0f)
                 {
                     // reversing out of range, gun still on us
                     e.fallBack -= dt; var away = e.transform.position - target.transform.position; away.y = 0f; e.Drive(Steer(e, new Vector2(away.x, away.z)), dt);
@@ -372,10 +382,22 @@ namespace IronNight
                 }
                 else if (!e.spec.isGun && !e.spec.casemate)
                 {
-                    // in range: never a sitting duck; a few seconds one way or the other, now and then still, backing off when too close
-                    e.aiTimer -= dt; if (e.aiTimer <= 0f) { e.aiTimer = Random.Range(2.5f, 5f); e.aiSide = Random.value < 0.35f ? 0f : Random.value < 0.5f ? -1f : 1f; }
-                    var to = target.transform.position - e.transform.position; to.y = 0f; to.Normalize(); float back = dist < e.Range * 0.45f ? -0.7f : 0f;
-                    if (e.aiSide != 0f || back < 0f) { var w = new Vector3(to.z, 0f, -to.x) * e.aiSide + to * back; e.Drive(Steer(e, new Vector2(w.x, w.z)) * 0.55f, dt); }
+                    // in range: into the lee of a house or a wall and fire round its corner; another one every 7-11 s or when
+                    // hit; with no cover, never a sitting duck: a few seconds one way or the other, backing off when too close
+                    if (e.lastHit > e.aiHitSeen) { e.aiHitSeen = e.lastHit; e.aiTimer = Mathf.Min(e.aiTimer, 0.3f); }
+                    e.aiTimer -= dt;
+                    if (e.aiTimer <= 0f)
+                    {
+                        e.aiInCover = false; var tp = target.transform.position;
+                        if (props.Cover(e.transform.position, tp, 22f, e.spec.radius * 0.8f, 0.7f, out var cv)) { float cd = new Vector2(cv.x - tp.x, cv.z - tp.z).magnitude; if (cd <= e.Range * 0.95f && cd > e.Range * 0.35f) { e.aiInCover = true; e.aiCover = cv; } }
+                        e.aiTimer = e.aiInCover ? Random.Range(7f, 11f) : Random.Range(2.5f, 5f); e.aiSide = Random.value < 0.35f ? 0f : Random.value < 0.5f ? -1f : 1f;
+                    }
+                    if (e.aiInCover) { var dc = e.aiCover - e.transform.position; dc.y = 0f; if (dc.magnitude > 1.5f) e.Drive(Steer(e, new Vector2(dc.x, dc.z)) * 0.8f, dt); }
+                    else
+                    {
+                        var to = target.transform.position - e.transform.position; to.y = 0f; to.Normalize(); float back = dist < e.Range * 0.45f ? -0.7f : 0f;
+                        if (e.aiSide != 0f || back < 0f) { var w = new Vector3(to.z, 0f, -to.x) * e.aiSide + to * back; e.Drive(Steer(e, new Vector2(w.x, w.z)) * 0.55f, dt); }
+                    }
                 }
                 float lead = firstNight ? 0f : e == ace ? 1f : 0.7f;   // where he will be when the round gets there
                 bool on = e.Aim(target.transform.position + target.vel * (dist / EnemyShellSpeed) * lead, dt);
@@ -550,7 +572,20 @@ namespace IronNight
             return L.transform.position + r * lat - f * back;
         }
 
-        int flankTurn;
+        int flankTurn; float waitSaid;
+
+        /// <summary>An enemy tank on its own: no other tank of theirs within 35 m, while there are others about (within
+        /// 150 m) to wait for.</summary>
+        bool Alone(Vehicle e)
+        {
+            bool others = false;
+            foreach (var o in foes)
+            {
+                if (o == e || o.dead || o.spec.isGun || o.spec.transport) continue; var d = o.transform.position - e.transform.position; d.y = 0f; float m = d.magnitude;
+                if (m < 35f) return false; if (m < 150f) others = true;
+            }
+            return others;
+        }
 
         /// <summary>Which of ours an enemy fights: the nearest, but in its reach a wounded one comes before a sound one and
         /// one just hit before the rest, so they finish what they started.</summary>

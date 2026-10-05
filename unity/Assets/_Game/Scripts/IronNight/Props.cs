@@ -1197,6 +1197,28 @@ namespace IronNight
             return pos;
         }
 
+        /// <summary>The nearest spot within search of a point in the lee of something solid enough to stop a shell (from
+        /// the threat's side), out from it by the radius, and a little to one side by peek (0..1 of the thing's width) to
+        /// see round it; false when there is none.</summary>
+        public bool Cover(Vector3 from, Vector3 threat, float search, float radius, float peek, out Vector3 spot)
+        {
+            spot = from; float best = float.MaxValue;
+            foreach (var p in active)
+            {
+                if (p.radii.Length == 0 || p.drivable || p.height < 1.6f) continue; float reach = search + p.bound; if ((p.pos - from).sqrMagnitude > reach * reach) continue;
+                for (int c = 0; c < p.radii.Length; c++)
+                {
+                    var cc = new Vector3(p.circleCenters[c].x, 0f, p.circleCenters[c].y); var away = cc - threat; away.y = 0f; float ad = away.magnitude; if (ad < 1f) continue; away /= ad;
+                    var side = new Vector3(away.z, 0f, -away.x) * (c % 2 == 0 ? 1f : -1f);
+                    var s = cc + away * (p.radii[c] + radius + 0.6f) + side * (p.radii[c] * peek); s.y = 0f;
+                    float d = (s - new Vector3(from.x, 0f, from.z)).magnitude; if (d > search || d >= best) continue;
+                    best = d; spot = s;
+                }
+            }
+            if (best == float.MaxValue) return false;
+            spot = PushOut(spot, radius); return true;
+        }
+
         /// <summary>True when a vehicle of this radius could stand at the point without overlapping anything solid.</summary>
         public bool Free(Vector3 pos, float radius)
         {
