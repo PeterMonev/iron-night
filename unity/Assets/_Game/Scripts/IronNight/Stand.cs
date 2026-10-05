@@ -42,8 +42,39 @@ namespace IronNight
         }
 
         /// <summary>The stand's own clock: the break to dig in, the wave coming in by ones and twos, dawn after the tenth.</summary>
+        /// <summary>A sandbag ring of ours: its men (a squad in a fight with no end) and the bazooka's reload.</summary>
+        class Nest { public Infantry.Squad squad; public Vector3 at; public float reload; }
+        readonly List<Nest> nests = new List<Nest>();
+
+        /// <summary>Four of ours into a new sandbag ring, facing out from the crossroads; one has a bazooka.</summary>
+        void ManNest(Vector3 at)
+        {
+            string nation = Depot.Nation == "su" ? "su" : "us"; if (!infantry.CanFight(nation)) return;
+            var sq = infantry.Paratroops(100000f); var out1 = at - standAt; out1.y = 0f; out1 = out1.sqrMagnitude > 0.1f ? out1.normalized : Vector3.forward;
+            for (int i = 0; i < 4; i++) { float a = (i - 1.5f) * 0.55f; infantry.Land(sq, at + Quaternion.Euler(0f, a * Mathf.Rad2Deg, 0f) * out1 * 1.3f, out1, nation); }
+            nests.Add(new Nest { squad = sq, at = at, reload = 3f }); hud.Toast(nation == "su" ? "Riflemen with an anti-tank rifle in the sandbags" : "A bazooka team in the sandbags", 1.8f);
+        }
+
+        /// <summary>The bazooka in each manned ring: at the nearest enemy tank within 32 m, while one of its men is up.</summary>
+        void TickNests(float dt)
+        {
+            foreach (var n in nests)
+            {
+                if ((n.reload -= dt) > 0f) continue;
+                Infantry.Soldier man = null; foreach (var m in n.squad.men) if (!m.dead) { man = m; break; } if (man == null) continue;
+                Vehicle best = null; float bd = 32f; foreach (var e in foes) { if (e.dead) continue; var d = e.transform.position - n.at; d.y = 0f; if (d.magnitude < bd) { bd = d.magnitude; best = e; } }
+                if (best == null) { n.reload = 0.5f; continue; }
+                n.reload = 7f + Random.value * 3f;
+                var from = man.pos + Vector3.up * 1.3f; var dir = best.transform.position - man.pos; dir.y = 0f; dir.Normalize(); dir = Quaternion.Euler(0f, Random.Range(-2f, 2f), 0f) * dir;
+                var vis = fx.Tracer(new Color(1f, 0.85f, 0.6f, 1f), new Color(1f, 0.55f, 0.3f, 0.6f)); vis.position = from; vis.rotation = Quaternion.LookRotation(cam.transform.forward, dir);
+                shells.Add(new Shell { pos = from, vel = dir * 34f, friendly = true, faust = true, dmg = 1.5f, life = 1.1f, vis = vis });
+                fx.MuzzleFlash(from, dir); fx.MuzzleFlash(from - dir * 1.2f, -dir); Sfx.Faust(from);   // the back-blast too
+            }
+        }
+
         void TickStand(float dt)
         {
+            TickNests(dt);
             if (boss != null && !boss.dead) hud.SetBoss(boss.hp / boss.spec.hp);
             if (standWon)
             {
@@ -142,7 +173,7 @@ namespace IronNight
             if (off.magnitude > StandHold) { hud.Toast("Inside the ring", 1.4f); return true; }
             int cost = StandCost(standArmed); if (standSupply < cost) { standArmed = null; return true; }
             var face = off.magnitude > 1f ? off.normalized : Leader.Forward; var side = new Vector3(face.z, 0f, -face.x); float yaw = Mathf.Atan2(face.x, face.z);
-            if (standArmed == "bags") { props.AddModel("sandbags", g, yaw); standBags.Add(g); hud.Popup(g, "Sandbags", new Color(0.85f, 0.8f, 0.6f)); }
+            if (standArmed == "bags") { props.AddModel("sandbags", g, yaw); standBags.Add(g); hud.Popup(g, "Sandbags", new Color(0.85f, 0.8f, 0.6f)); ManNest(g); }
             else if (standArmed == "hogs") { foreach (var k in new[] { -3.8f, 0f, 3.8f }) props.AddModel("k_hedgehogs", g + side * k, Random.value * 6.28f); hud.Popup(g, "Hedgehogs", new Color(0.8f, 0.8f, 0.75f)); }
             else { foreach (var k in new[] { -2.4f, 0f, 2.4f }) LayMine(g + side * k, true); hud.Popup(g, "Mines", new Color(1f, 0.8f, 0.5f)); }
             standSupply -= cost; standArmed = null; fx.Dust(g); Sfx.Pickup(); hud.SetStandKit(standSupply, null, standBreak > 0f);
