@@ -188,20 +188,39 @@ namespace IronNight
 
         /// <summary>A field with a fire fight in it: about one in eight of the open fields (not where the night starts, a
         /// farm, a post, a village or a forest).</summary>
-        static bool FightCell(int ix, int iz) => !Start(ix, iz) && !(ix == 0 && iz == 1) && !Farm(ix, iz) && !Battery(ix, iz) && !Village(ix, iz) && !Forest(ix, iz) && Rnd(ix, iz, 1800) < 0.12f;
+        static bool FightCell(int ix, int iz)
+        {
+            if (Start(ix, iz) || (ix == 0 && iz == 1) || (ix == 1 && iz == 1) || Battery(ix, iz)) return false;
+            float p = Village(ix, iz) ? 0.5f : Farm(ix, iz) ? 0.4f : Forest(ix, iz) ? 0.3f : TrenchCell(ix, iz) ? 0.6f : 0.04f;   // where the fighting was: houses, yards, woods, trenches; seldom the open field
+            return Rnd(ix, iz, 1800) < p;
+        }
+        /// <summary>A field with a trench line across it (TrenchLine).</summary>
+        static bool TrenchCell(int ix, int iz) => !Start(ix, iz) && !Farm(ix, iz) && !Battery(ix, iz) && !Village(ix, iz) && !Forest(ix, iz) && Rnd(ix, iz, 1240) < (Kursk ? 0.14f : Route == "open" ? 0.08f : 0.05f);
 
         /// <summary>The fire fights in the fields within reach of a point: where ours lie, where theirs do, and the field's
         /// key; ours and theirs some 26 m apart across the field, clear of the lanes.</summary>
-        public List<(Vector3 ours, Vector3 theirs, long key)> FightSpots(Vector3 from, float max)
+        public List<(Vector3 ours, Vector3 theirs, long key, bool trench)> FightSpots(Vector3 from, float max)
         {
-            var list = new List<(Vector3, Vector3, long)>(); int cx = Mathf.RoundToInt(from.x / Cell), cz = Mathf.RoundToInt(from.z / Cell), n = Mathf.CeilToInt(max / Cell);
+            var list = new List<(Vector3, Vector3, long, bool)>(); int cx = Mathf.RoundToInt(from.x / Cell), cz = Mathf.RoundToInt(from.z / Cell), n = Mathf.CeilToInt(max / Cell);
             for (int ix = cx - n; ix <= cx + n; ix++) for (int iz = cz - n; iz <= cz + n; iz++)
             {
                 if (!FightCell(ix, iz)) continue;
-                var c = new Vector3(ix * Cell, 0f, iz * Cell); float a = Rnd(ix, iz, 1801) * 6.283f; var dir = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
-                var ours = c + In(ix, iz, 1802, 4f) - dir * 13f; var theirs = ours + dir * 26f;
-                if ((c - from).magnitude > max || OnLane(ours, 2f) || OnLane(theirs, 2f) || InStream(ours, 2f) || InStream(theirs, 2f)) continue;
-                list.Add((ours, theirs, ((long)ix << 32) ^ (uint)iz));
+                var c = new Vector3(ix * Cell, 0f, iz * Cell); if ((c - from).magnitude > max) continue;
+                Vector3 ours, theirs; bool trench = TrenchCell(ix, iz);
+                if (trench)
+                {
+                    // the trench line as TrenchLine lays it: theirs in it and just behind, ours coming from the wire side
+                    float yaw = Rnd(ix, iz, 1241) * Mathf.PI; var f = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)); var r = new Vector3(f.z, 0f, -f.x); var o = c + In(ix, iz, 1242, 4f);
+                    theirs = o - r * 2.5f; ours = o + r * 28f;
+                }
+                else
+                {
+                    float a = Rnd(ix, iz, 1801) * 6.283f; var dir = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
+                    ours = c + In(ix, iz, 1802, 4f) - dir * 15f; theirs = ours + dir * 30f;
+                    if (!Village(ix, iz) && !Farm(ix, iz) && (OnLane(ours, 2f) || OnLane(theirs, 2f))) continue;   // in a village the lanes run between the houses
+                }
+                if (InStream(ours, 2f) || InStream(theirs, 2f)) continue;
+                list.Add((ours, theirs, ((long)ix << 32) ^ (uint)iz, trench));
             }
             return list;
         }

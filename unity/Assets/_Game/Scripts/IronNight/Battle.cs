@@ -420,10 +420,24 @@ namespace IronNight
         }
         readonly List<Light> dumpFires = new List<Light>();
 
+        /// <summary>One gore of the canopy, repeated round it: pale cloth a shade lighter in the middle of the panel,
+        /// darker at the seams, a little darker toward the skirt; smooth so it does not shimmer from far off.</summary>
+        static Texture2D GoreCloth()
+        {
+            const int W = 64, H = 32; var tx = new Texture2D(W, H, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 4, name = "GoreCloth" };
+            var px = new Color[W * H];
+            for (int y = 0; y < H; y++) for (int x = 0; x < W; x++)
+            {
+                float u = (x + 0.5f) / W, panel = Mathf.Sin(u * Mathf.PI), seam = Mathf.SmoothStep(0f, 1f, Mathf.Min(u, 1f - u) / 0.06f), v = (y + 0.5f) / H;
+                float g = (0.72f + 0.16f * panel) * (0.7f + 0.3f * seam) * (0.88f + 0.12f * v); px[y * W + x] = new Color(g, g, g * 0.97f, 1f);
+            }
+            tx.SetPixels(px); tx.Apply(true); return tx;
+        }
+
         /// <summary>The parachute fabric, made once; the star shell's canopy used to come before the first supply drop and showed pink for want of it.</summary>
         Material ChuteMaterial()
         {
-            if (chuteMaterial == null) { chuteMaterial = new Material(Resources.Load<Material>("VehicleLit")); chuteMaterial.SetTexture("_BaseMap", Resources.Load<Texture2D>("Fx/chute_fabric")); chuteMaterial.SetTextureScale("_BaseMap", new Vector2(3f, 1f)); chuteMaterial.SetColor("_BaseColor", new Color(1.3f, 1.3f, 1.2f)); chuteMaterial.SetFloat("_Cull", 0f); chuteMaterial.SetFloat("_Smoothness", 0.12f); }
+            if (chuteMaterial == null) { chuteMaterial = new Material(Resources.Load<Material>("VehicleLit")); chuteMaterial.SetTexture("_BaseMap", GoreCloth()); chuteMaterial.SetTextureScale("_BaseMap", Vector2.one); chuteMaterial.SetColor("_BaseColor", new Color(1.3f, 1.3f, 1.2f)); chuteMaterial.SetFloat("_Cull", 0f); chuteMaterial.SetFloat("_Smoothness", 0.12f); }
             return chuteMaterial;
         }
 
@@ -1791,7 +1805,7 @@ namespace IronNight
         // ---- paratroopers on call ----
         class Jumper { public Transform fig, chute; public LineRenderer lines; public Mesh canopy; public Vector3[] rest, heap; public Vector3 pos, face; public float height, wait, age, spill = -1f; public int seed; }
         readonly List<Jumper> jumpers = new List<Jumper>(); Infantry.Squad paraSquad; string paraNation; float paraCool, paraArmedLeft, paraHold; bool paraUp, paraArmed;
-        const float ParaCoolFull = 90f, ParaFight = 60f, ParaScale = 0.62f, ParaLines = 5.5f;   // ParaScale: the crate's canopy cut to a man's (about 8 m across, the T-5's 28 feet)
+        const float ParaCoolFull = 90f, ParaFight = 60f, ParaScale = 0.85f, ParaLines = 7f;   // ParaScale: the crate's canopy cut down for a man (about 11 m across: the T-5's 28 feet read too small from the camera)
         static bool ParaRank => Depot.RankLevel >= 3;   // a sergeant: ten nights fought
 
         /// <summary>The PARA button: there from 1:30 for a sergeant and up (not on a night without air), ready every 90 s
@@ -2023,7 +2037,7 @@ namespace IronNight
 
         /// <summary>The canopy's colour: olive drab, as most of the cargo chutes were, or now and then military white
         /// (above 1: the fabric texture is dark).</summary>
-        static Color ChuteColour(int kind) => Random.value < 0.25f ? new Color(1.45f, 1.45f, 1.36f) : new Color(0.86f, 0.88f, 0.56f);
+        static Color ChuteColour(int kind) => Random.value < 0.25f ? new Color(1.25f, 1.24f, 1.16f) : new Color(0.62f, 0.6f, 0.4f);   // white, or olive drab (not lime: the cloth is pale grey, not green)
         // the cargo parachute: 24 gores, its rigging lines about as long as it is wide
         const int ChuteGores = 24; const float ChuteRadius = 6.5f, ChuteHeight = 4.8f, ChuteLines = 9f, ChuteRiser = 1.6f;   // larger than the A-5's 24 feet, to read from the camera
         Material shroudMaterial;
@@ -2042,7 +2056,7 @@ namespace IronNight
                 for (int s = 0; s < seg; s++)
                 {
                     float phi = s * Mathf.PI * 2f / seg, bulge = 1f + 0.06f * t * Mathf.Cos(gores * phi);   // seams pulled in, gores puffed out
-                    v.Add(new Vector3(Mathf.Cos(phi) * rad * bulge, y - 0.12f * t * (1f - Mathf.Cos(gores * phi)) * 0.5f, Mathf.Sin(phi) * rad * bulge)); uv.Add(new Vector2((float)s / seg, 1f - t));
+                    v.Add(new Vector3(Mathf.Cos(phi) * rad * bulge, y - 0.12f * t * (1f - Mathf.Cos(gores * phi)) * 0.5f, Mathf.Sin(phi) * rad * bulge)); uv.Add(new Vector2(s % 2 == 0 ? 0.5f : 0f, 1f - t));   // the gore's middle, or a seam: every gore the whole cloth picture, no seam where the ring closes
                 }
             }
             // the crown: the vent left open (the apex point stays only as the rest positions' first entry)
@@ -2174,10 +2188,10 @@ namespace IronNight
             var L = Leader; if (L == null || stand || sneak) return;
             if ((skirmishLook -= dt) > 0f) return; skirmishLook = 1f;
             string nation = theatre == "kursk" ? "su" : "us"; if (!infantry.CanFight(nation)) return;
-            foreach (var (ours, theirs, key) in props.FightSpots(L.transform.position, 100f))
+            foreach (var (ours, theirs, key, trench) in props.FightSpots(L.transform.position, 100f))
             {
                 if (foughtFields.Contains(key) || infantry.Fights >= 3) continue; foughtFields.Add(key);
-                if (infantry.Skirmish(props.PushOut(ours, 1.5f), props.PushOut(theirs, 1.5f), nation)) hud.Toast((nation == "su" ? "Our riflemen in a fire fight, " : "Our infantry in a fire fight, ") + Clock(ours), 2.6f);
+                if (infantry.Skirmish(props.PushOut(ours, 1.5f), trench ? theirs : props.PushOut(theirs, 1.5f), nation, trench, p => props.PushOut(p, 0.8f))) hud.Toast((nation == "su" ? "Our riflemen in a fire fight, " : "Our infantry in a fire fight, ") + Clock(ours), 2.6f);
             }
         }
         float skirmishLook; readonly HashSet<long> foughtFields = new HashSet<long>();

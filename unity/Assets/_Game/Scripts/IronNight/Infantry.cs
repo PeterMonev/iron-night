@@ -288,21 +288,24 @@ namespace IronNight
         /// <summary>Whether a nation's soldiers are there to fight.</summary>
         public bool CanFight(string nation) => poses.ContainsKey(nation + "_kneel");
 
-        /// <summary>Four of ours at a point (two kneeling, one standing, one behind a machine gun on the ground) dug in
-        /// facing four Germans at another; false when there are no figures of ours.</summary>
-        public bool Skirmish(Vector3 at, Vector3 enemy, string nation)
+        /// <summary>Eight of ours at a point (kneeling, standing, two behind machine guns on the ground) in a loose line
+        /// facing eight Germans at another (in a trench: on its line), each man put clear of buildings and trees on his own
+        /// (clear); false when there are no figures of ours.</summary>
+        public bool Skirmish(Vector3 at, Vector3 enemy, string nation, bool trench, System.Func<Vector3, Vector3> clear)
         {
             if (!CanFight(nation)) return false;
+            const int Men = 8;
             var face = enemy - at; face.y = 0f; face.Normalize(); var side = new Vector3(face.z, 0f, -face.x); var ours = new Squad();
-            string[] poseOf = { "kneel", "stand", "kneel", "prone" };
-            for (int i = 0; i < 4; i++)
+            string[] poseOf = { "kneel", "stand", "kneel", "prone", "stand", "kneel", "prone", "kneel" };
+            for (int i = 0; i < Men; i++)
             {
                 string key = nation + "_" + poseOf[i]; if (!poses.ContainsKey(key)) key = nation + "_kneel";
-                var m = Man(transform, at + side * ((i - 1.5f) * 3f) - face * (i == 3 ? 1.5f : 0f), face, poseOf[i] == "prone" ? Role.Mg : Role.Rifle, key);
+                var at1 = clear(at + side * ((i - 3.5f) * 3.4f + Random.Range(-0.8f, 0.8f)) - face * Random.Range(-2.5f, 2.5f));
+                var m = Man(transform, at1, face, poseOf[i] == "prone" ? Role.Mg : Role.Rifle, key);
                 m.ally = true; m.dug = true; m.side = nation; m.reload = Random.value * 2f; ours.men.Add(m);
             }
             squads.Add(ours);
-            var spots = new List<(Vector3, bool)>(); for (int i = 0; i < 4; i++) spots.Add((enemy + side * ((i - 1.5f) * 3f), true));
+            var spots = new List<(Vector3, bool)>(); for (int i = 0; i < Men; i++) spots.Add((trench ? enemy + side * ((i - 3.5f) * 3.2f) - face * (i % 2 == 0 ? 0f : 3f) : clear(enemy + side * ((i - 3.5f) * 3.4f + Random.Range(-0.8f, 0.8f)) + face * Random.Range(-2.5f, 2.5f)), true));
             Garrison(spots, at); var theirs = squads[squads.Count - 1];
             fights.Add(new Fight { ours = ours, theirs = theirs }); return true;
         }
