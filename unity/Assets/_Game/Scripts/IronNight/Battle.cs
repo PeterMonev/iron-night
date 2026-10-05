@@ -358,6 +358,7 @@ namespace IronNight
             for (int i = 0; i < foes.Count; i++)
             {
                 var e = foes[i]; e.reloadLeft -= dt; if (e.trackOut > 0f) e.trackOut -= dt;
+                if (e.post) continue;   // a searchlight post's flak: its own (TickPostGuns)
                 var target = PickTarget(e); if (convoy) target = ConvoyTarget(e, target); if (target == null) continue; e.rangeMul = enemyRangeMul * (lit ? 1.2f : 1f);
                 float dist = Dist(e, target); if (SneakAsleep(e, dist, dt)) continue;
                 if (e.spec.transport) { TickTransport(e, target, dist, dt); continue; }
@@ -865,13 +866,15 @@ namespace IronNight
             if ((postLook -= dt) <= 0f)
             {
                 postLook = 1f;
-                foreach (var (at, seed) in props.UnarmedPosts(Leader.transform.position, 95f, armedPosts)) { var g = Foe(VehicleSpec.Flak38, props.PushOut(at, 1.5f), Random.value * 6.28f); g.post = true; g.flakNext = Random.Range(1f, 6f); }
+                foreach (var (at, seed) in props.UnarmedPosts(Leader.transform.position, 95f, armedPosts)) { var g = Foe(VehicleSpec.Flak38, props.PushOut(at, 1.5f), Random.value * 6.28f); g.post = true; g.hidden = false; g.flakTurn = Random.value * 6.28f; g.flakNext = Random.Range(1f, 6f); }
             }
             foreach (var g in foes)
             {
                 if (!g.post || g.dead || g.crew == 0) continue;
                 var target = Nearest(platoon, g.transform.position, 30f); bool onTank = target != null;
                 if (onTank) g.Aim(target.transform.position, dt);
+                else { float sweep = g.yaw + Mathf.Sin(Time.time * 0.12f + g.flakTurn) * 0.9f; g.turretYaw = Mathf.MoveTowardsAngle(g.turretYaw * Mathf.Rad2Deg, sweep * Mathf.Rad2Deg, 25f * dt) * Mathf.Deg2Rad; }   // watching the sky, slowly round
+                g.Apply();
                 g.flakNext -= dt; if (g.flakNext > 0f) continue;
                 if (g.flakBurst <= 0) g.flakBurst = 5;
                 g.flakBurst--; g.flakNext = g.flakBurst > 0 ? 0.13f : onTank ? Random.Range(1.2f, 2f) : Random.Range(5f, 12f);
@@ -884,7 +887,7 @@ namespace IronNight
                 }
                 else
                 {
-                    var up = Quaternion.Euler(0f, g.yaw * Mathf.Rad2Deg + Random.Range(-25f, 25f), 0f) * Quaternion.Euler(-Random.Range(45f, 70f), 0f, 0f) * Vector3.forward;
+                    var up = Quaternion.Euler(0f, g.turretYaw * Mathf.Rad2Deg + Random.Range(-10f, 10f), 0f) * Quaternion.Euler(-Random.Range(45f, 70f), 0f, 0f) * Vector3.forward;
                     fx.Flak(from, (up + Random.insideUnitSphere * 0.05f).normalized); if (g.flakBurst == 4) Sfx.Flak(from);
                 }
             }
