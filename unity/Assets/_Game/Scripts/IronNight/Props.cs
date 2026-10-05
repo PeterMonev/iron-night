@@ -158,8 +158,9 @@ namespace IronNight
         /// out, so the hedges do not box in every single cell.</summary>
         static int FieldType(int ix, int iz) => Rnd(ix, iz, 902) < 0.2f ? (int)(Hash(ix, iz, 903) % 4) : (int)(Hash(FloorDiv(ix, 2), FloorDiv(iz, 2), 901) % 4);
         static bool LaneX(int ix) => ix == 0 || Hash(ix, 1, 910) % 3 == 0;                    // a lane on the line x = ix*40+20
-        static bool LaneZ(int iz) => Hash(1, iz, 911) % 4 == 0;                               // a lane on the line z = iz*40+20
+        static bool LaneZ(int iz) => (Stand && iz == 0) || Hash(1, iz, 911) % 4 == 0;   // a last stand: always the lane past the start, for the crossroads                               // a lane on the line z = iz*40+20
         public static bool SneakNight;   // a night raid: more flak posts near the depot (their beams still keep to the sky)
+        public static bool Stand;   // a last stand: the night is held at the crossroads at (20, 20)
         public static string Route = "open";   // "village", "open" or "bocage": set before the night is built
         static float FarmChance => Route == "village" ? 0.17f : Route == "bocage" ? 0.08f : 0.07f;
         static float VillageChance => Route == "village" ? 0.24f : Route == "bocage" ? 0.03f : 0.04f;
@@ -403,6 +404,20 @@ namespace IronNight
         }
 
         /// <summary>A shelled village: the church, two cottages, a bit of wall, a cart, on a trodden square.</summary>
+        /// <summary>The crossroads' point where the two lanes cross on a last stand night.</summary>
+        public static readonly Vector3 Crossroads = new Vector3(Half, 0f, Half);
+
+        /// <summary>One corner of the crossroads, in the cell that has it: a house a few metres off both lanes turned to
+        /// the one in front of it, a wall along the other, a cart or a lorry by it.</summary>
+        void StandCorner(List<Prop> list, int ix, int iz)
+        {
+            float sx = ix == 0 ? -1f : 1f, sz = iz == 0 ? -1f : 1f; var x = Crossroads;
+            Place(list, Rnd(ix, iz, 1700) < 0.3f ? "house_ruin" : Rnd(ix, iz, 1701) < 0.5f ? "farmhouse" : "cottage", x + new Vector3(sx * 12f, 0f, sz * 11f), sz > 0f ? Mathf.PI : 0f);   // its front to the lane it stands by
+            Place(list, Rnd(ix, iz, 1702) < 0.5f ? "wall_a" : "wall_b", x + new Vector3(sx * 6f, 0f, sz * 21f), 0f);
+            Place(list, Rnd(ix, iz, 1703) < 0.5f ? "cart" : "truck", x + new Vector3(sx * 21f, 0f, sz * 6.5f), Mathf.PI / 2f + (Rnd(ix, iz, 1704) - 0.5f) * 0.4f);
+            if (Rnd(ix, iz, 1705) < 0.5f) Tree(list, x + new Vector3(sx * 22f, 0f, sz * 19f), (int)(Hash(ix, iz, 1706) & 0xffff));
+        }
+
         void VillageSquare(List<Prop> list, int ix, int iz, Vector3 c)
         {
             var o = c + In(ix, iz, 1120, 2f); float yaw = (Rnd(ix, iz, 1122) < 0.5f ? 0f : Mathf.PI / 2f) + (Rnd(ix, iz, 1123) - 0.5f) * 0.2f;
@@ -604,6 +619,7 @@ namespace IronNight
             else if (Village(ix, iz)) VillageSquare(list, ix, iz, c);
             else if (Forest(ix, iz)) ForestCell(list, ix, iz, c);
             else if (!Start(ix, iz)) Loose(list, ix, iz, c, FieldType(ix, iz));
+            if (Stand && (ix == 0 || ix == 1) && (iz == 0 || iz == 1) && !Farm(ix, iz)) StandCorner(list, ix, iz);
             cells[key] = list; return list;
         }
 

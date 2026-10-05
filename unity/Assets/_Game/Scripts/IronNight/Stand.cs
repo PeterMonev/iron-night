@@ -26,7 +26,7 @@ namespace IronNight
         /// <summary>The position at the start: the full platoon, the ring on the ground, the kit on the screen.</summary>
         void StandBuild()
         {
-            var L = Leader; standAt = L.transform.position; standBreak = 12f; var f = L.Forward; var r = new Vector3(f.z, 0f, -f.x);
+            var L = Leader; L.transform.position = new Vector3(Props.Crossroads.x, L.transform.position.y, Props.Crossroads.z); standAt = L.transform.position; standBreak = 12f; var f = L.Forward; var r = new Vector3(f.z, 0f, -f.x);   // on the crossing itself
             foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg.StartsWith("--standwave=")) standWave = Mathf.Clamp(int.Parse(arg.Substring(12)), 1, StandWaves) - 1;   // test switch: the first wave is this one
             foreach (var side in new[] { -1f, 1f })
             {

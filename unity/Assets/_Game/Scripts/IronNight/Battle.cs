@@ -137,7 +137,7 @@ namespace IronNight
             // a night raid slips through the searchlight line on the chosen front
             var nl = PlayerPrefs.GetString("sneak.launch", ""); PlayerPrefs.DeleteKey("sneak.launch"); foreach (var arg in System.Environment.GetCommandLineArgs()) if (arg == "--nightraid") nl = theatre;   // test switch: --nightraid (--raid is the Stukas)
             if (opNight == 0 && !daily && !weekly && !stand && !convoy && nl.Length > 0) { sneak = true; theatre = nl; route = "open"; }
-            builtRoute = route; Props.Route = route; Props.SneakNight = sneak; routePay = stand ? 0.5f : convoy ? 0.9f : sneak ? 1f : route == "village" ? 1.2f : route == "bocage" ? 1.15f : 1.1f;   // the country is built for this way in
+            builtRoute = route; Props.Route = route; Props.Stand = stand; Props.SneakNight = sneak; routePay = stand ? 0.5f : convoy ? 0.9f : sneak ? 1f : route == "village" ? 1.2f : route == "bocage" ? 1.15f : 1.1f;   // the country is built for this way in
             PickWeather(); weatherTurn = NightLength * Random.Range(0.35f, 0.62f);
             builtTheatre = theatre; Props.Theatre = theatre; if (theatre == "kursk") routePay *= 1.15f; if (opNight > 0 || daily || weekly) weatherTurn = 0f; string nation = theatre == "kursk" ? "su" : "us"; if (Depot.Nation != nation) Depot.Nation = nation;
             BuildWorld();
