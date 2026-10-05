@@ -23,7 +23,7 @@ namespace IronNight
         Material addExplosion, smokeSheet, addSparks, blendFlak, blendDust, addMuzzle, addTracer;   // the photographic sprites
         Material leafFx;   // torn sprigs: the hedges' own lit, cut-out leaves sheet
         Material paintRing;   // the tactical markers: a ring painted on the ground (Fx/paint_ring when there is one, else PaintedRing), lit like the ground
-        Material[] puffMats;   // photographed smoke puffs (Fx/smoke_puff_1..4), white to be tinted; empty: the smoke sheet's grown frames stand in
+        Material[] puffMats, flameMats;   // flameMats: photographed flames (Fx/flame_1..4); empty: the procedural flame stands in   // photographed smoke puffs (Fx/smoke_puff_1..4), white to be tinted; empty: the smoke sheet's grown frames stand in
         static readonly Vector3 Wind = new Vector3(0.7f, 0f, 0.35f);   // the night's breeze: smoke leans off with it
         static readonly int BaseMapST = Shader.PropertyToID("_BaseMap_ST"); static readonly Vector4 WholeSheet = new Vector4(1f, 1f, 0f, 0f);
         Texture2D glowTex, flameTex, sparkTex, ringTex;
@@ -46,6 +46,7 @@ namespace IronNight
             addExplosion = Make(additive, Pic("fx_explosion")); smokeSheet = Make(smoke, Pic("fx_smoke")); addSparks = Make(additive, Pic("fx_sparks"));
             leafFx = new Material(Resources.Load<Material>("FoliageCut"));
             paintRing = new Material(Resources.Load<Material>("GroundDecal")); var ringPic = Pic("paint_ring"); paintRing.SetTexture("_BaseMap", ringPic != null ? ringPic : PaintedRing(512)); paintRing.SetTexture("_BumpMap", null); paintRing.SetFloat("_Smoothness", 0.35f); paintRing.renderQueue = 2448;   // the keyword stays on: the variant without it is not in the build
+            var fm = new List<Material>(); for (int i = 1; i <= 4; i++) { var t = Pic("flame_" + i); if (t != null) fm.Add(Make(additive, t)); } flameMats = fm.ToArray();
             var pm = new List<Material>(); for (int i = 1; i <= 4; i++) { var t = Pic("smoke_puff_" + i); if (t != null) pm.Add(Make(smoke, t)); } puffMats = pm.ToArray();
             blendFlak = Make(smoke, Pic("fx_flak")); blendDust = Make(smoke, Pic("fx_dust")); addMuzzle = Make(additive, Pic("fx_muzzle")); addTracer = Make(additive, Pic("fx_tracer"));
         }
@@ -127,6 +128,14 @@ namespace IronNight
 
         /// <summary>A puff of smoke: a photographed one, turned any way, tinted by the colour; it swells in, rises
         /// slowing, leans off with the wind and thins away.</summary>
+        /// <summary>A flame: a photographed one, upright within fifteen degrees, its colour only warmed a little (the picture
+        /// has its own); the procedural flame while there are no pictures.</summary>
+        Puff Flame(Vector3 pos, float size, Color color, float life, Vector3 vel, float grow = 0.8f)
+        {
+            if (flameMats.Length == 0) return Spawn(addFlame, pos, size, color, life, vel, grow);
+            var p = Spawn(flameMats[Random.Range(0, flameMats.Length)], pos + Vector3.up * size * 0.3f, size * 1.3f, Color.Lerp(Color.white, color, 0.3f), life, vel, grow); p.spin = Random.Range(-15f, 15f); return p;
+        }
+
         Puff Billow(Vector3 pos, float size, Color color, float life, Vector3 vel, float grow = 0.8f, bool smoke = true)
         {
             if (puffMats.Length > 0) return Spawn(puffMats[Random.Range(0, puffMats.Length)], pos, size, color, life, vel, grow, smoke);
@@ -180,7 +189,7 @@ namespace IronNight
         public void Ember(Vector3 pos, float heat)
         {
             Spawn(addGlow, pos, 0.45f + 0.3f * heat, new Color(1f, 0.35f + 0.25f * heat, 0.08f, 0.85f), 0.16f, Vector3.zero, 0f);
-            if (Random.value < 0.2f + 0.4f * heat) Spawn(addFlame, pos + Vector3.up * 0.25f, 0.55f + Random.value * 0.4f * heat, Warm(Random.value * 0.6f), 0.25f + Random.value * 0.15f, Vector3.up * (1.2f + Random.value), 0.5f);
+            if (Random.value < 0.2f + 0.4f * heat) Flame(pos + Vector3.up * 0.25f, 0.55f + Random.value * 0.4f * heat, Warm(Random.value * 0.6f), 0.25f + Random.value * 0.15f, Vector3.up * (1.2f + Random.value), 0.5f);
             if (Random.value < 0.3f) Billow(pos + Vector3.up * 0.6f, 0.8f + Random.value * 0.6f, new Color(0.12f, 0.11f, 0.1f, 0.5f), 1.8f + Random.value, new Vector3(Random.Range(-0.2f, 0.2f), 1.4f, Random.Range(-0.2f, 0.2f)), 1.8f, true);
         }
 
@@ -188,7 +197,7 @@ namespace IronNight
         /// black smoke rolling off the top. k is how much is left burning, 1 at the start.</summary>
         public void Jet(Vector3 pos, float k)
         {
-            var f = Spawn(addFlame, pos + Vector3.up * (0.6f + Random.value * 0.8f), 1.8f + 2.4f * k, Warm(0.3f + Random.value * 0.5f), 0.22f + Random.value * 0.14f, Vector3.up * (9f + 9f * k), 0.35f);
+            var f = Flame(pos + Vector3.up * (0.6f + Random.value * 0.8f), 1.8f + 2.4f * k, Warm(0.3f + Random.value * 0.5f), 0.22f + Random.value * 0.14f, Vector3.up * (9f + 9f * k), 0.35f);
             f.aligned = true; f.axis = Vector3.up; f.stretch = 2.2f;
             if (Random.value < 0.6f) { var s = Spawn(addSpark, pos + Vector3.up, 0.22f + Random.value * 0.25f, new Color(1f, 0.8f, 0.4f, 1f), 0.5f + Random.value * 0.4f, (Vector3.up * 2f + Random.insideUnitSphere).normalized * (10f + Random.value * 10f), 0f); s.gravity = true; }
             if (Random.value < 0.25f) Billow(pos + Vector3.up * (3f + 2f * k), 2f + Random.value * 1.5f, new Color(0.1f, 0.09f, 0.08f, 0.7f), 2.5f + Random.value, Vector3.up * 3f, 2f, true);
@@ -221,7 +230,7 @@ namespace IronNight
             Spawn(addGlow, pos + Vector3.up * 1.5f, 10f, new Color(1f, 0.95f, 0.85f, 1f), 0.1f, Vector3.zero, 0.5f);
             var ball = Sheet(Spawn(addExplosion, pos + Vector3.up * 3f, 11f, Color.white, 1.25f, Vector3.up * 1.8f, 0.6f), 4, 4, 16); ball.spin = Random.Range(-20f, 20f);
             for (int i = 0; i < 3; i++) Billow(pos + Random.insideUnitSphere * 2.5f + Vector3.up * 3f, 5.5f + Random.value * 3f, new Color(0.34f, 0.33f, 0.32f, 0.8f), 5f + Random.value * 3f, new Vector3(Random.Range(-0.8f, 0.8f), 1.6f + Random.value, Random.Range(-0.8f, 0.8f)), 0.9f, true);
-            for (int i = 0; i < 3; i++) Spawn(addFlame, pos + Random.insideUnitSphere * 1.6f + Vector3.up * (1f + Random.value * 2f), 4.5f + Random.value * 4f, Warm(Random.value), 0.45f + Random.value * 0.35f, Vector3.up * (2f + Random.value * 3f), 1.2f);
+            for (int i = 0; i < 3; i++) Flame(pos + Random.insideUnitSphere * 1.6f + Vector3.up * (1f + Random.value * 2f), 4.5f + Random.value * 4f, Warm(Random.value), 0.45f + Random.value * 0.35f, Vector3.up * (2f + Random.value * 3f), 1.2f);
             var ring = Spawn(addRing, new Vector3(pos.x, 0.3f, pos.z), 3f, new Color(1f, 0.8f, 0.55f, 0.8f), 0.4f, Vector3.zero, 5f); ring.flat = true;
             for (int i = 0; i < 10; i++) { var v = (Random.insideUnitSphere + Vector3.up * 1.4f).normalized * (10f + Random.value * 16f); var d = Spawn(addSpark, pos + Vector3.up, 0.4f + Random.value * 0.5f, new Color(1f, 0.6f, 0.25f, 1f), 0.8f + Random.value * 0.7f, v, 0f); d.gravity = true; }
             for (int i = 0; i < 9; i++) Billow(pos + Random.insideUnitSphere * 2f + Vector3.up, 4f + Random.value * 4f, new Color(0.16f, 0.15f, 0.14f, 0.85f), 4f + Random.value * 3f, new Vector3(Random.Range(-1f, 1f), 2f + Random.value * 2f, Random.Range(-1f, 1f)), 2.4f, true);
@@ -231,7 +240,7 @@ namespace IronNight
         /// <summary>Flames licking from a wreck and, every other call, a puff into the smoke column above it.</summary>
         public void Burn(Vector3 pos)
         {
-            Spawn(addFlame, pos + Vector3.up * 2f + Random.insideUnitSphere * 0.7f, 2f + Random.value * 1.6f, Warm(Random.value * 0.7f), 0.3f + Random.value * 0.15f, Vector3.up * (2f + Random.value * 1.5f), 0.6f);
+            Flame(pos + Vector3.up * 2f + Random.insideUnitSphere * 0.7f, 2f + Random.value * 1.6f, Warm(Random.value * 0.7f), 0.3f + Random.value * 0.15f, Vector3.up * (2f + Random.value * 1.5f), 0.6f);
             if (Random.value < 0.25f) Billow(pos + Vector3.up * 3.5f + Random.insideUnitSphere * 0.5f, 3.2f + Random.value * 1.6f, new Color(0.28f, 0.27f, 0.26f, 0.6f), 5f + Random.value * 2f, new Vector3(Random.Range(-0.4f, 0.4f), 1.6f + Random.value, Random.Range(-0.4f, 0.4f)), 0.8f, true);
             else if (Random.value < 0.45f) Billow(pos + Vector3.up * 3f + Random.insideUnitSphere * 0.5f, 2.5f + Random.value * 2f, new Color(0.12f, 0.11f, 0.1f, 0.6f), 4.5f + Random.value * 2f, new Vector3(Random.Range(-0.4f, 0.4f), 1.8f + Random.value * 0.6f, Random.Range(-0.4f, 0.4f)), 2.6f, true);
         }
