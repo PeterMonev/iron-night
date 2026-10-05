@@ -27,7 +27,7 @@ namespace IronNight
         class ArtyShell { public Vector3 at; public float timer; }
         class Objective { public Vector3 pos; public Transform marker; public GameObject grenade; public float smokeTimer, held, salvo, clock; public int n, hits; public bool hold; public string kind = "reach"; public List<Vehicle> targets = new List<Vehicle>(); public List<GameObject> props = new List<GameObject>(); public List<Transform> figures = new List<Transform>(); }
         class Mine { public Vector3 pos; public Transform vis; public bool friendly; }   // friendly: laid in a last stand, set off by the enemy only
-        class Drop { public Vector3 pos; public float height, age, lift, top; public int kind; public Transform crate, chute, marker; public LineRenderer lines; public Mesh canopy; public Vector3[] rest, heap; public float spill = -1f; public Vector3 spillTo; }   // heap: the canopy on the ground; spill: how far it has fallen in (-1 not yet)   // lift: the crate origin above its base; top: where the shrouds tie
+        class Drop { public Vector3 pos; public float height, age, lift, top, wait; public int kind; public Transform crate, chute, marker; public LineRenderer lines; public Mesh canopy; public Vector3[] rest, heap; public float spill = -1f; public Vector3 spillTo; }   // heap: the canopy on the ground; spill: how far it has fallen in (-1 not yet)   // lift: the crate origin above its base; top: where the shrouds tie
         class Mortar { public Vector3 at; public float timer; public Transform ring; public bool bomb; }   // bomb: a dive bomber's, heavier
         class Star { public Vector3 pos; public float height, life, puff; public Transform flare, chute; public Light light; }
         enum Phase { Title, Intro, Play, LevelUp, Pause, End, Photo }
@@ -1466,7 +1466,7 @@ namespace IronNight
         /// <summary>A crate under its canopy at 55 m over a point, a C-47 going over: repair, ammunition, smoke or a radio.</summary>
         void SpawnDrop(Vector3 pos)
         {
-            var d = new Drop { pos = pos, height = 55f, kind = Random.Range(0, 4) }; Flyover(pos);
+            var d = new Drop { pos = pos, height = FlyHeight - 2f, kind = Random.Range(0, 4), wait = FlyIn }; Flyover(pos);   // out of its belly as it passes over
             if (crateMaterial == null) { crateMaterial = new Material(Resources.Load<Material>("BarrelLit")); crateMaterial.SetColor("_BaseColor", new Color(0.45f, 0.36f, 0.22f)); crateMaterial.SetFloat("_Metallic", 0f); crateMaterial.SetFloat("_Smoothness", 0.2f); } ChuteMaterial();
             var cratePf = Resources.Load<GameObject>("Props/crate");
             if (cratePf != null) { d.crate = Instantiate(cratePf).transform; d.top = d.crate.GetComponentInChildren<Renderer>().bounds.max.y - d.crate.position.y + 0.06f; var cm = new Material(Resources.Load<Material>("VehicleLit")); cm.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/crate_tex")); cm.SetFloat("_Cull", 0f); foreach (var rr in d.crate.GetComponentsInChildren<Renderer>()) rr.sharedMaterial = cm; }
@@ -1474,7 +1474,7 @@ namespace IronNight
             d.canopy = Canopy(ChuteGores, 8, ChuteRadius, ChuteHeight, out d.rest); d.chute = new GameObject("Canopy").transform; d.chute.gameObject.AddComponent<MeshFilter>().sharedMesh = d.canopy;
             var cr = d.chute.gameObject.AddComponent<MeshRenderer>(); cr.sharedMaterial = new Material(chuteMaterial); cr.sharedMaterial.SetColor("_BaseColor", ChuteColour(d.kind)); cr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             d.lines = new GameObject("Shrouds").AddComponent<LineRenderer>(); d.lines.positionCount = 2 + ChuteGores * 2; d.lines.startWidth = d.lines.endWidth = 0.12f; d.lines.material = ShroudMaterial(); d.lines.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            drops.Add(d);
+            d.crate.gameObject.SetActive(false); d.chute.gameObject.SetActive(false); d.lines.enabled = false; drops.Add(d);
         }
 
         /// <summary>Supply drops: a crate under a parachute comes down near the platoon every minute or so. The leader
@@ -1491,10 +1491,13 @@ namespace IronNight
             TickPlanes(dt);
             for (int i = drops.Count - 1; i >= 0; i--)
             {
-                var d = drops[i]; d.age += dt;
+                var d = drops[i];
+                if (d.wait > 0f) { d.wait -= dt; if (d.wait > 0f) continue; d.crate.gameObject.SetActive(true); d.chute.gameObject.SetActive(true); d.lines.enabled = true; }
+                d.age += dt;
                 if (d.height > 0f)
                 {
-                    d.height = Mathf.Max(0f, d.height - 6f * dt);
+                    float open = Mathf.SmoothStep(0f, 1f, d.age / 1.3f); d.chute.localScale = Vector3.one * Mathf.Lerp(0.12f, 1f, open);   // the canopy opening out of its bundle
+                    d.height = Mathf.Max(0f, d.height - Mathf.Lerp(15f, 6f, open) * dt);
                     // the crate swings under the canopy like a pendulum; the canopy drifts and leans the other way
                     var swing = new Vector3(Mathf.Sin(d.age * 1.25f) * 9f, 0f, Mathf.Sin(d.age * 0.83f + 1f) * 6f); var drift = new Vector3(Mathf.Sin(d.age * 0.3f), 0f, Mathf.Cos(d.age * 0.23f)) * 0.8f;
                     var hang = Quaternion.Euler(swing.z, 0f, -swing.x); float drop = ChuteLines + ChuteRiser;
@@ -1808,6 +1811,7 @@ namespace IronNight
 
         // the transport that drops the crate: crosses the sky over the drop point and is gone
         class Plane { public Transform t; public Vector3 from, dir; public float age; }
+        const float FlyHeight = 34f, FlySpeed = 65f, FlyIn = 4f;   // under the camera's 52 m so it is seen; over the drop point FlyIn seconds after it is called
 
         // ---- paratroopers on call ----
         class Jumper { public Transform fig, chute; public LineRenderer lines; public Mesh canopy; public Vector3[] rest, heap; public Vector3 pos, face; public float height, wait, age, spill = -1f; public int seed; }
@@ -1855,7 +1859,8 @@ namespace IronNight
                 j.age += dt;
                 if (j.height > 0f)
                 {
-                    j.height = Mathf.Max(0f, j.height - 6.5f * dt);
+                    float open = Mathf.SmoothStep(0f, 1f, j.age / 1.1f); j.chute.localScale = Vector3.one * ParaScale * Mathf.Lerp(0.12f, 1f, open);   // out of the door, the canopy opening
+                    j.height = Mathf.Max(0f, j.height - Mathf.Lerp(16f, 6.5f, open) * dt);
                     // the man swings under the canopy like the crates do, less; the canopy drifts
                     var swing = new Vector3(Mathf.Sin(j.age * 1.4f + j.seed) * 7f, 0f, Mathf.Sin(j.age * 0.9f + j.seed * 0.7f) * 5f); var drift = new Vector3(Mathf.Sin(j.age * 0.3f + j.seed), 0f, Mathf.Cos(j.age * 0.23f)) * 0.6f;
                     var hang = Quaternion.Euler(swing.z, 0f, -swing.x); var turn = Quaternion.LookRotation(j.face, Vector3.up);
@@ -1893,7 +1898,7 @@ namespace IronNight
             for (int i = 0; i < 6; i++)
             {
                 var at = props.PushOut(target + dir * ((i - 2.5f) * 4f) + side * Random.Range(-2f, 2f), 1.5f); if (Props.InStream(at, 1.5f)) at = props.PushOut(at + side * 8f, 1.5f);
-                var j = new Jumper { pos = at, face = dir, height = 52f, wait = 3.4f + i * 0.35f, seed = Random.Range(0, 1000) };
+                var j = new Jumper { pos = at, face = dir, height = FlyHeight - 3f, wait = FlyIn + (i - 2.5f) * 4f / FlySpeed, seed = Random.Range(0, 1000) };
                 j.fig = Instantiate(pf).transform; foreach (var r in j.fig.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = skin; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
                 j.canopy = Canopy(ChuteGores, 8, ChuteRadius, ChuteHeight, out j.rest); j.chute = new GameObject("ParaCanopy").transform; j.chute.localScale = Vector3.one * ParaScale; j.chute.gameObject.AddComponent<MeshFilter>().sharedMesh = j.canopy;
                 var cr = j.chute.gameObject.AddComponent<MeshRenderer>(); cr.sharedMaterial = new Material(chuteMaterial); cr.sharedMaterial.SetColor("_BaseColor", ChuteColour(0)); cr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
@@ -1909,16 +1914,16 @@ namespace IronNight
             var pf = Resources.Load<GameObject>("Models/c47_hull"); if (pf == null) return Vector3.forward;
             if (planeMaterial == null) { planeMaterial = new Material(Resources.Load<Material>("VehicleLit")); planeMaterial.SetTexture("_BaseMap", Resources.Load<Texture2D>("Models/c47")); planeMaterial.SetColor("_BaseColor", new Color(0.8f, 0.8f, 0.82f)); planeMaterial.SetFloat("_Cull", 0f); }
             var root = new GameObject("C-47").transform; var body = Instantiate(pf, root); body.transform.localScale = Vector3.one * 1.5f; body.transform.localRotation = Quaternion.Euler(0f, -62f, 0f);   // the model's nose, measured
-            foreach (var r in body.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = planeMaterial; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; }
+            foreach (var r in body.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = planeMaterial; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
             float a = Random.value * Mathf.PI * 2f; var dir = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
-            var p = new Plane { t = root, from = over - dir * 260f + Vector3.up * 95f, dir = dir }; root.position = p.from; root.rotation = Quaternion.LookRotation(dir); planes.Add(p);
+            var p = new Plane { t = root, from = over - dir * (FlyIn * FlySpeed) + Vector3.up * FlyHeight, dir = dir }; root.position = p.from; root.rotation = Quaternion.LookRotation(dir); planes.Add(p);
             Sfx.Rumble(); return dir;
         }
         void TickPlanes(float dt)
         {
             for (int i = planes.Count - 1; i >= 0; i--)
             {
-                var p = planes[i]; p.age += dt; p.t.position = p.from + p.dir * (65f * p.age) + Vector3.up * Mathf.Sin(p.age * 0.7f) * 2f;
+                var p = planes[i]; p.age += dt; p.t.position = p.from + p.dir * (FlySpeed * p.age) + Vector3.up * Mathf.Sin(p.age * 0.7f) * 0.6f;
                 if (p.age > 9f) { Destroy(p.t.gameObject); planes.RemoveAt(i); }
             }
         }
