@@ -27,7 +27,7 @@ namespace IronNight
         class ArtyShell { public Vector3 at; public float timer; }
         class Objective { public Vector3 pos; public Transform marker; public GameObject grenade; public float smokeTimer, held, salvo, clock; public int n, hits; public bool hold; public string kind = "reach"; public List<Vehicle> targets = new List<Vehicle>(); public List<GameObject> props = new List<GameObject>(); public List<Transform> figures = new List<Transform>(); }
         class Mine { public Vector3 pos; public Transform vis; public bool friendly; }   // friendly: laid in a last stand, set off by the enemy only
-        class Drop { public Vector3 pos; public float height, age, lift, top, wait; public int kind; public Transform crate, chute, marker; public LineRenderer lines; public Mesh canopy; public Vector3[] rest, heap; public float spill = -1f; public Vector3 spillTo; }   // heap: the canopy on the ground; spill: how far it has fallen in (-1 not yet)   // lift: the crate origin above its base; top: where the shrouds tie
+        class Drop { public Plane plane; public Vector3 pos; public float height, age, lift, top, wait; public int kind; public Transform crate, chute, marker; public LineRenderer lines; public Mesh canopy; public Vector3[] rest, heap; public float spill = -1f; public Vector3 spillTo; }   // heap: the canopy on the ground; spill: how far it has fallen in (-1 not yet)   // lift: the crate origin above its base; top: where the shrouds tie
         class Mortar { public Vector3 at; public float timer; public Transform ring; public bool bomb; }   // bomb: a dive bomber's, heavier
         class Star { public Vector3 pos; public float height, life, puff; public Transform flare, chute; public Light light; public LineRenderer lines; }
         enum Phase { Title, Intro, Play, LevelUp, Pause, End, Photo }
@@ -358,7 +358,7 @@ namespace IronNight
             for (int i = 0; i < foes.Count; i++)
             {
                 var e = foes[i]; e.reloadLeft -= dt; if (e.trackOut > 0f) e.trackOut -= dt;
-                if (e.post) continue;   // a searchlight post's flak: its own (TickPostGuns)
+                if (e.post || e.aaBusy) continue;   // a searchlight post's flak: its own (TickPostGuns); any flak firing at our planes: at them
                 var target = PickTarget(e); if (convoy) target = ConvoyTarget(e, target); if (target == null) continue; e.rangeMul = enemyRangeMul * (lit ? 1.2f : 1f);
                 float dist = Dist(e, target); if (SneakAsleep(e, dist, dt)) continue;
                 if (e.spec.transport) { TickTransport(e, target, dist, dt); continue; }
@@ -870,7 +870,9 @@ namespace IronNight
             }
             foreach (var g in foes)
             {
-                if (!g.post || g.dead || g.crew == 0) continue;
+                g.aaBusy = false; if (g.dead || g.crew == 0 || (g.spec != VehicleSpec.Flak38 && g.spec != VehicleSpec.Flak88)) continue;
+                if (FlakAtPlanes(g, dt)) continue;   // our planes overhead come first
+                if (!g.post) continue;
                 var target = Nearest(platoon, g.transform.position, 30f); bool onTank = target != null;
                 if (onTank) g.Aim(target.transform.position, dt);
                 else { float sweep = g.yaw + Mathf.Sin(Time.time * 0.12f + g.flakTurn) * 0.9f; g.turretYaw = Mathf.MoveTowardsAngle(g.turretYaw * Mathf.Rad2Deg, sweep * Mathf.Rad2Deg, 25f * dt) * Mathf.Deg2Rad; }   // watching the sky, slowly round
@@ -893,6 +895,33 @@ namespace IronNight
             }
         }
         float postLook; readonly HashSet<int> armedPosts = new HashSet<int>();
+
+        /// <summary>A flak gun at one of our planes within 110 m (a C-47, a fighter of the air strike): the gun swings
+        /// onto it and fires bursts, tracers climbing after it; after a burst one time in six it hits. False when there is
+        /// no plane of ours in reach.</summary>
+        bool FlakAtPlanes(Vehicle g, float dt)
+        {
+            Transform aim = null; Plane hitPlane = null; int slot = 0; float best = 110f; var at = g.transform.position;
+            void Consider(Transform t, Plane p, int s) { if (t == null || !t.gameObject.activeInHierarchy) return; var d = t.position - at; d.y = 0f; if (d.magnitude < best) { best = d.magnitude; aim = t; hitPlane = p; slot = s; } }
+            foreach (var p in planes) if (!p.hit) Consider(p.t, p, 0);
+            if (strike != null) { if (!strike.down1) Consider(strike.p1, null, 1); if (!strike.down2) Consider(strike.p2, null, 2); }
+            if (aim == null) return false;
+            g.aaBusy = true; var to = aim.position - at; to.y = 0f;
+            g.turretYaw = Mathf.MoveTowardsAngle(g.turretYaw * Mathf.Rad2Deg, Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg, 120f * dt) * Mathf.Deg2Rad; g.Apply();
+            g.flakNext -= dt; if (g.flakNext > 0f) return true;
+            if (g.flakBurst <= 0) g.flakBurst = g.spec == VehicleSpec.Flak88 ? 2 : 5;
+            g.flakBurst--; g.flakNext = g.flakBurst > 0 ? (g.spec == VehicleSpec.Flak88 ? 0.9f : 0.13f) : Random.Range(1f, 1.6f);
+            var from = g.MuzzlePosition; var dir = (aim.position + Random.insideUnitSphere * 3f - from).normalized;
+            fx.MgTracer(from, dir); fx.Flak(from, dir); if (g.flakBurst == (g.spec == VehicleSpec.Flak88 ? 1 : 4)) Sfx.Flak(from);
+            if (g.flakBurst == 0 && Random.value < 0.17f)
+            {
+                bool su = Depot.Nation == "su";
+                if (slot == 1) { strike.down1 = true; hud.Toast((su ? "Il-2" : "P-47") + " hit by flak · it breaks off", 2.4f); }
+                else if (slot == 2) { strike.down2 = true; hud.Toast((su ? "Il-2" : "P-47") + " hit by flak · it breaks off", 2.4f); }
+                else if (hitPlane != null) { hitPlane.hit = true; hud.Toast("C-47 hit by flak · the drop scatters", 2.4f); }
+            }
+            return true;
+        }
 
         /// <summary>The bunkers' MG 42s: on the nearest tank within 35 m, bursts of eight with a pause of two to three and a
         /// half seconds, a little harm a round (quiet, but for the round that finishes a tank).</summary>
@@ -1613,7 +1642,7 @@ namespace IronNight
         /// <summary>A crate under its canopy at 55 m over a point, a C-47 going over: repair, ammunition, smoke or a radio.</summary>
         void SpawnDrop(Vector3 pos)
         {
-            var d = new Drop { pos = pos, height = FlyHeight - 2f, kind = Random.Range(0, 4), wait = FlyIn }; Flyover(pos);   // out of its belly as it passes over
+            var d = new Drop { pos = pos, height = FlyHeight - 2f, kind = Random.Range(0, 4), wait = FlyIn }; Flyover(pos); d.plane = lastPlane;   // out of its belly as it passes over
             if (crateMaterial == null) { crateMaterial = new Material(Resources.Load<Material>("BarrelLit")); crateMaterial.SetColor("_BaseColor", new Color(0.45f, 0.36f, 0.22f)); crateMaterial.SetFloat("_Metallic", 0f); crateMaterial.SetFloat("_Smoothness", 0.2f); } ChuteMaterial();
             var cratePf = Resources.Load<GameObject>("Props/crate");
             if (cratePf != null) { d.crate = Instantiate(cratePf).transform; d.top = d.crate.GetComponentInChildren<Renderer>().bounds.max.y - d.crate.position.y + 0.06f; var cm = new Material(Resources.Load<Material>("VehicleLit")); cm.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/crate_tex")); cm.SetFloat("_Cull", 0f); foreach (var rr in d.crate.GetComponentsInChildren<Renderer>()) rr.sharedMaterial = cm; }
@@ -1640,7 +1669,7 @@ namespace IronNight
             for (int i = drops.Count - 1; i >= 0; i--)
             {
                 var d = drops[i];
-                if (d.wait > 0f) { d.wait -= dt; if (d.wait > 0f) continue; d.crate.gameObject.SetActive(true); d.chute.gameObject.SetActive(true); d.lines.enabled = true; }
+                if (d.wait > 0f) { d.wait -= dt; if (d.wait > 0f) continue; if (d.plane != null && d.plane.hit) { var o = Random.insideUnitCircle * 9f; d.pos = props.PushOut(d.pos + new Vector3(o.x, 0f, o.y), 3f); } d.crate.gameObject.SetActive(true); d.chute.gameObject.SetActive(true); d.lines.enabled = true; }
                 d.age += dt;
                 if (d.height > 0f)
                 {
@@ -1754,7 +1783,7 @@ namespace IronNight
 
         class Raid { public float t; public Vector3 a, b, dir, last; public bool lit, siren, marked, shown, whistled; public Transform plane, glow; }
         Raid raid; float raidTimer = 150f; Material stukaMaterial, stukaGlow;
-        class AirStrike { public Vector3 target, dir; public float t, smoke, gun1, gun2; public bool roar, shown, fired1, fired2; public Transform p1, p2, g1, g2; }
+        class AirStrike { public Vector3 target, dir; public float t, smoke, gun1, gun2; public bool roar, shown, fired1, fired2, down1, down2; public Transform p1, p2, g1, g2; }
         class Rocket { public Transform vis; public Vector3 from, to; public float t, flight; }
         AirStrike strike; readonly List<Rocket> rockets = new List<Rocket>(); float airCool; bool airUp, airArmed, airTested; float airArmedLeft; Material allyMaterial, stripeWhite, stripeBlack;
 
@@ -1851,9 +1880,10 @@ namespace IronNight
             if (!s.shown && s.t >= 1.6f) { s.shown = true; s.p1 = Ally(su, out s.g1); s.p2 = Ally(su, out s.g2); }
             if (!s.roar && s.t >= 1.8f) { s.roar = true; Sfx.FighterPass(s.target - s.dir * 10f + Vector3.up * 20f); }
             FlyAlly(s.p1, s.g1, s, s.t - 1.6f, 0f); FlyAlly(s.p2, s.g2, s, s.t - 2.3f, 7f);
-            Guns(s, s.p1, s.t - 2.5f, ref s.gun1, 0f, dt); Guns(s, s.p2, s.t - 3.2f, ref s.gun2, 7f, dt);
-            if (!s.fired1 && s.t >= 2.9f) { s.fired1 = true; Salvo(s.p1, s, -6f, 0f); }
-            if (!s.fired2 && s.t >= 3.6f) { s.fired2 = true; Salvo(s.p2, s, 2f, 7f); }
+            if (!s.down1) Guns(s, s.p1, s.t - 2.5f, ref s.gun1, 0f, dt); if (!s.down2) Guns(s, s.p2, s.t - 3.2f, ref s.gun2, 7f, dt);
+            if (!s.fired1 && s.t >= 2.9f) { s.fired1 = true; if (!s.down1) Salvo(s.p1, s, -6f, 0f); }
+            if (!s.fired2 && s.t >= 3.6f) { s.fired2 = true; if (!s.down2) Salvo(s.p2, s, 2f, 7f); }
+            if (s.down1 && s.p1 != null && s.p1.gameObject.activeSelf) fx.EngineSmoke(s.p1.position); if (s.down2 && s.p2 != null && s.p2.gameObject.activeSelf) fx.EngineSmoke(s.p2.position);   // hit by flak: smoking
             if (s.t > 7f) { if (s.p1 != null) Destroy(s.p1.gameObject); if (s.p2 != null) Destroy(s.p2.gameObject); strike = null; }
         }
 
@@ -1961,11 +1991,12 @@ namespace IronNight
         }
 
         // the transport that drops the crate: crosses the sky over the drop point and is gone
-        class Plane { public Transform t; public Vector3 from, dir; public float age; }
+        class Plane { public Transform t; public Vector3 from, dir; public float age; public bool hit; }   // hit: by flak, trailing smoke
+        Plane lastPlane;   // the C-47 the last Flyover sent
         const float FlyHeight = 34f, FlySpeed = 65f, FlyIn = 4f;   // under the camera's 52 m so it is seen; over the drop point FlyIn seconds after it is called
 
         // ---- paratroopers on call ----
-        class Jumper { public Transform fig, chute; public LineRenderer lines; public Mesh canopy; public Vector3[] rest, heap; public Vector3 pos, face; public float height, wait, age, spill = -1f; public int seed; }
+        class Jumper { public Plane plane; public Transform fig, chute; public LineRenderer lines; public Mesh canopy; public Vector3[] rest, heap; public Vector3 pos, face; public float height, wait, age, spill = -1f; public int seed; }
         readonly List<Jumper> jumpers = new List<Jumper>(); Infantry.Squad paraSquad; string paraNation; float paraCool, paraArmedLeft, paraHold; bool paraUp, paraArmed;
         const float ParaCoolFull = 90f, ParaFight = 60f, ParaScale = 0.66f, ParaLines = 7f;   // ParaScale: the crate's canopy cut down for a man (about 11 m across: the T-5's 28 feet read too small from the camera)
         static bool ParaRank => Depot.RankLevel >= 3;   // a sergeant: ten nights fought
@@ -2007,7 +2038,7 @@ namespace IronNight
             for (int i = jumpers.Count - 1; i >= 0; i--)
             {
                 var j = jumpers[i];
-                if (j.wait > 0f) { j.wait -= dt; if (j.wait <= 0f) { j.fig.gameObject.SetActive(true); j.chute.gameObject.SetActive(true); j.lines.enabled = true; } else continue; }
+                if (j.wait > 0f) { j.wait -= dt; if (j.wait <= 0f) { if (j.plane != null && j.plane.hit) { var o = Random.insideUnitCircle * 7f; j.pos = props.PushOut(j.pos + new Vector3(o.x, 0f, o.y), 1.5f); } j.fig.gameObject.SetActive(true); j.chute.gameObject.SetActive(true); j.lines.enabled = true; } else continue; }
                 j.age += dt;
                 if (j.height > 0f)
                 {
@@ -2055,7 +2086,7 @@ namespace IronNight
                 j.canopy = Canopy(ChuteGores, 8, ChuteRadius, ChuteHeight, out j.rest); j.chute = new GameObject("ParaCanopy").transform; j.chute.localScale = Vector3.one * ParaScale; j.chute.gameObject.AddComponent<MeshFilter>().sharedMesh = j.canopy;
                 var cr = j.chute.gameObject.AddComponent<MeshRenderer>(); cr.sharedMaterial = new Material(chuteMaterial); cr.sharedMaterial.SetColor("_BaseColor", ChuteColour(0)); cr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
                 j.lines = new GameObject("ParaShrouds").AddComponent<LineRenderer>(); j.lines.positionCount = 2 + ChuteGores * 2; j.lines.startWidth = j.lines.endWidth = 0.07f; j.lines.material = ShroudMaterial(); j.lines.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                j.fig.gameObject.SetActive(false); j.chute.gameObject.SetActive(false); j.lines.enabled = false; jumpers.Add(j);
+                j.plane = lastPlane; j.fig.gameObject.SetActive(false); j.chute.gameObject.SetActive(false); j.lines.enabled = false; jumpers.Add(j);
             }
             hud.Toast((paraNation == "su" ? "Desantniki" : "Paratroopers") + " inbound, " + Clock(target), 2.6f); Sfx.Click();
         }
@@ -2063,19 +2094,20 @@ namespace IronNight
         /// <summary>A C-47 over a point, from any side; its heading (any when there is no model).</summary>
         Vector3 Flyover(Vector3 over)
         {
+            lastPlane = null;
             var pf = Resources.Load<GameObject>("Models/c47_hull"); if (pf == null) return Vector3.forward;
             if (planeMaterial == null) { planeMaterial = new Material(Resources.Load<Material>("VehicleLit")); planeMaterial.SetTexture("_BaseMap", Resources.Load<Texture2D>("Models/c47")); planeMaterial.SetColor("_BaseColor", new Color(0.8f, 0.8f, 0.82f)); planeMaterial.SetFloat("_Cull", 0f); }
             var root = new GameObject("C-47").transform; var body = Instantiate(pf, root); body.transform.localScale = Vector3.one * 1.5f; body.transform.localRotation = Quaternion.Euler(0f, -62f, 0f);   // the model's nose, measured
             foreach (var r in body.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = planeMaterial; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
             float a = Random.value * Mathf.PI * 2f; var dir = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
-            var p = new Plane { t = root, from = over - dir * (FlyIn * FlySpeed) + Vector3.up * FlyHeight, dir = dir }; root.position = p.from; root.rotation = Quaternion.LookRotation(dir); planes.Add(p);
+            var p = new Plane { t = root, from = over - dir * (FlyIn * FlySpeed) + Vector3.up * FlyHeight, dir = dir }; root.position = p.from; root.rotation = Quaternion.LookRotation(dir); planes.Add(p); lastPlane = p;
             Sfx.Rumble(); return dir;
         }
         void TickPlanes(float dt)
         {
             for (int i = planes.Count - 1; i >= 0; i--)
             {
-                var p = planes[i]; p.age += dt; p.t.position = p.from + p.dir * (FlySpeed * p.age) + Vector3.up * Mathf.Sin(p.age * 0.7f) * 0.6f;
+                var p = planes[i]; p.age += dt; if (p.hit) fx.EngineSmoke(p.t.position); p.t.position = p.from + p.dir * (FlySpeed * p.age) + Vector3.up * Mathf.Sin(p.age * 0.7f) * 0.6f;
                 if (p.age > 9f) { Destroy(p.t.gameObject); planes.RemoveAt(i); }
             }
         }

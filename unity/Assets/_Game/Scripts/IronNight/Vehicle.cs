@@ -28,6 +28,7 @@ namespace IronNight
         public Vector3 aiPrev, vel;   // the enemy's mind: its next move and which way; ours: where it was, how fast it goes
         public bool hidden, aiCalled, aiRetreat; public float smokedUntil, aiHold;   // hidden: an ambush not yet sprung; smokedUntil: behind its own smoke
         public bool Unseen => hidden || Time.time < smokedUntil;
+        public bool aaBusy;   // a flak gun firing at our planes this moment (the ground fight leaves it alone)
         public float crewDownUntil, flakTurn;   // flakTurn: a post gun's own phase in its sweep of the sky   // a gun: its crew down behind the shield till then, not firing
         public Vector3 Forward => new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
         public Vector3 GunDirection => new Vector3(Mathf.Sin(turretYaw), 0f, Mathf.Cos(turretYaw));
