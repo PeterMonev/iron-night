@@ -206,6 +206,12 @@ namespace IronNight
             for (int q = squads.Count - 1; q >= 0; q--)
             {
                 var sq = squads[q]; bool any = false;
+                if (!sq.mobile && !sq.surrendered && sq.men.Count >= 2 && sq.men[0].dug && !sq.men[0].ally)
+                {
+                    // the last man of a trench or a nest, one of our tanks on top of him: he gives up
+                    int up = 0; Soldier one = null; foreach (var m in sq.men) if (!m.dead) { up++; one = m; }
+                    if (up == 1) foreach (var v in platoon) { if (v.dead) continue; var d = v.transform.position - one.pos; d.y = 0f; if (d.magnitude < 15f) { sq.surrendered = true; one.surrender = true; one.t.position = one.pos; if (walk != null) Show(one, "rifle"); surrendered?.Invoke(one.pos); break; } }
+                }
                 if (sq.mobile && !sq.surrendered)
                 {
                     // down to two with one of our tanks close: they give up
@@ -216,16 +222,25 @@ namespace IronNight
                 foreach (var m in sq.men)
                 {
                     if (m.dead) continue; any = true;
-                    if (m.gun != null) { m.pos = m.t.position; continue; }   // a crewman goes round with his gun
+                    if (m.gun != null && m.gun.dead) { Dismount(m, sq); }   // the gun knocked out under him: he is a man on foot now
+                    if (m.gun != null)
+                    {
+                        // a crewman goes round with his gun; under our gun he gets down behind the shield, and the gun is silent
+                        bool down = Duck(m, platoon, dt); m.t.localPosition = new Vector3(m.t.localPosition.x, down ? -0.35f : 0f, m.t.localPosition.z); m.pos = m.t.position;
+                        if (down) m.gun.crewDownUntil = Time.time + 0.15f;
+                        continue;
+                    }
                     if (m.ally) continue;   // ours fight in TickFights
                     if (m.still || m.surrender) continue;
                     Vehicle target = null; float best = float.MaxValue;
                     foreach (var v in platoon) { if (v.dead) continue; var d = v.transform.position - m.pos; d.y = 0f; if (d.sqrMagnitude < best) { best = d.sqrMagnitude; target = v; } }
                     if (target == null) continue;
                     var to = target.transform.position - m.pos; to.y = 0f; float dist = to.magnitude; to /= Mathf.Max(dist, 0.01f);
+                    if (m.dug && Duck(m, platoon, dt)) { m.t.position = m.pos - Vector3.up * 0.35f; continue; }   // down below the parapet
                     if (m.dug)
                     {
                         // a garrison holds its trench: it turns to the tank and fights from where it is
+                        m.t.position = m.pos;
                         m.face = to; m.reload -= dt; m.t.rotation = Quaternion.LookRotation(m.face, Vector3.up);
                         if (m.role == Role.Faust) { if (dist < 15f && m.reload <= 0f) { m.reload = 9f + Random.value * 3f; fire(m, target); } }
                         else if (dist < m.stop + 4f) Shoot(m, target, dt, shoot);
@@ -426,7 +441,7 @@ namespace IronNight
         public void Kill(Soldier m)
         {
             if (m.dead) return; m.dead = true; m.deadAge = 0f; fallen.Add(m);
-            if (!m.ally && m.gun == null) foreach (var s in squads) if (s.men.Contains(m)) { foreach (var o in s.men) if (!o.dead && !o.dug && (o.pos - m.pos).sqrMagnitude < 100f) { o.pause = Mathf.Max(o.pause, Random.Range(1.5f, 2.5f)); o.bounding = false; } break; }   // a man falls: the ones by him go to ground
+            if (!m.ally) foreach (var s in squads) if (s.men.Contains(m)) { foreach (var o in s.men) if (!o.dead && (o.pos - m.pos).sqrMagnitude < 100f) { o.pause = Mathf.Max(o.pause, Random.Range(1.5f, 2.5f)); o.bounding = false; } break; }   // a man falls: the ones by him go to ground
             if (m.gun != null) { m.t.SetParent(transform, true); if (--m.gun.crew == 0 && !m.gun.dead) gunSilenced?.Invoke(m.gun); }
             foreach (var idle in m.t.GetComponentsInChildren<CrewIdle>()) { var sk = idle.GetComponentInChildren<SkinnedMeshRenderer>(); if (sk != null) Destroy(sk.gameObject); if (m.mr != null) m.mr.enabled = true; Destroy(idle); }
             if (m.ally && !poses.ContainsKey(m.side + "_dead")) { m.t.position = m.pos + Vector3.up * 0.25f; m.t.rotation = Quaternion.LookRotation(m.face, Vector3.up) * Quaternion.Euler(-90f, 0f, Random.Range(-30f, 30f)); return; }   // no fallen figure of ours: he goes over where he stood
@@ -438,6 +453,29 @@ namespace IronNight
                 return;
             }
             m.t.position = m.pos + Vector3.up * 0.25f; m.t.rotation = Quaternion.LookRotation(m.face, Vector3.up) * Quaternion.Euler(-90f, 0f, Random.Range(-30f, 30f));
+        }
+
+        /// <summary>A man in a fixed place (a crewman, a man dug in) under one of our guns swinging onto him (within 12
+        /// degrees, 35 m) goes down for 2-3 s; true while he is down.</summary>
+        bool Duck(Soldier m, List<Vehicle> platoon, float dt)
+        {
+            if (m.pause <= 0f)
+                foreach (var v in platoon)
+                {
+                    if (v.dead) continue; var fromV = m.pos - v.transform.position; fromV.y = 0f; float dv = fromV.magnitude; if (dv < 0.1f || dv > 35f) continue;
+                    if (Vector3.Dot(v.GunDirection, fromV / dv) > 0.978f) { m.pause = Random.Range(1.8f, 3f); break; }
+                }
+            if (m.pause > 0f) { m.pause -= dt; return true; }
+            return false;
+        }
+
+        /// <summary>A crewman whose gun is knocked out: off it, a rifleman on foot in a squad on foot (he will make for
+        /// cover, or give up).</summary>
+        void Dismount(Soldier m, Squad sq)
+        {
+            m.t.SetParent(transform, true); m.t.position = new Vector3(m.t.position.x, 0f, m.t.position.z); m.pos = m.t.position;
+            foreach (var idle in m.t.GetComponentsInChildren<CrewIdle>()) { var sk = idle.GetComponentInChildren<SkinnedMeshRenderer>(); if (sk != null) Destroy(sk.gameObject); if (m.mr != null) m.mr.enabled = true; Destroy(idle); }
+            m.gun = null; m.still = false; m.role = Role.Rifle; m.stop = Random.Range(18f, 24f); m.pause = 1.5f; sq.mobile = true;
         }
 
         /// <summary>The men who gave up within reach of a point, taken prisoner (gone from the field); how many.</summary>

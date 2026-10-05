@@ -434,7 +434,7 @@ namespace IronNight
                 bool on = e.Aim(target.transform.position + target.vel * (dist / EnemyShellSpeed) * lead, dt);
                 if (e.spec.casemate) { if (dist > e.Range * 0.8f) e.turretYaw = e.yaw; else e.yaw = e.turretYaw; }   // the StuG aims with the whole hull
                 bool blind = smokeLeft > 0f && dist > 9f;                 // the smoke screen: they cannot see us from afar
-                if (on && !blind && e.reloadLeft <= 0f && dist <= e.Range && e.spec.damage > 0f && e.crew != 0) Fire(e, target);
+                if (on && !blind && e.reloadLeft <= 0f && dist <= e.Range && e.spec.damage > 0f && e.crew != 0 && Time.time > e.crewDownUntil) Fire(e, target);
                 e.Apply();
             }
 
