@@ -73,9 +73,32 @@ namespace IronNight
             }
         }
 
+        /// <summary>The German tanks shelling the manned rings: an HE round from one within 45 m every 6-10 s, when the ring
+        /// is nearer to it than our nearest tank or one time in three anyway; men within 2.2 m of the burst fall.</summary>
+        void TickNestShelling(float dt)
+        {
+            foreach (var e in foes)
+            {
+                if (e.dead) continue;
+                if (!nestShot.TryGetValue(e, out var wait)) wait = 3f + Random.value * 4f; wait -= dt; nestShot[e] = wait; if (wait > 0f) continue;
+                Nest aim = null; float ad = 45f;
+                foreach (var n in nests) { bool up = false; foreach (var m in n.squad.men) if (!m.dead) up = true; if (!up) continue; var d = n.at - e.transform.position; d.y = 0f; if (d.magnitude < ad) { ad = d.magnitude; aim = n; } }
+                if (aim == null) { nestShot[e] = 1f; continue; }
+                float near = float.MaxValue; foreach (var v in platoon) if (!v.dead) { var d = v.transform.position - e.transform.position; d.y = 0f; near = Mathf.Min(near, d.magnitude); }
+                if (ad > near && Random.value > 0.33f) { nestShot[e] = 2f; continue; }
+                nestShot[e] = 6f + Random.value * 4f;
+                var dir = aim.at - e.transform.position; dir.y = 0f; dir.Normalize(); var muzzle = e.transform.position + Vector3.up * 2.1f + dir * 3.2f;
+                fx.MuzzleFlash(muzzle, dir); Sfx.Shot(muzzle, false, e.spec.hp >= 6f);
+                var hit = aim.at + new Vector3(Random.Range(-1.6f, 1.6f), 0f, Random.Range(-1.6f, 1.6f));
+                fx.Hit(hit + Vector3.up * 0.4f, 1.4f); Sfx.Hit(hit); props.Crater(hit, 1.6f);
+                foreach (var m in aim.squad.men) { if (m.dead) continue; var d = m.pos - hit; d.y = 0f; if (d.magnitude < 2.2f && Random.value < 0.65f) infantry.Kill(m); }
+            }
+        }
+        readonly Dictionary<Vehicle, float> nestShot = new Dictionary<Vehicle, float>();
+
         void TickStand(float dt)
         {
-            TickNests(dt);
+            TickNests(dt); TickNestShelling(dt);
             if (boss != null && !boss.dead) hud.SetBoss(boss.hp / boss.spec.hp);
             if (standWon)
             {

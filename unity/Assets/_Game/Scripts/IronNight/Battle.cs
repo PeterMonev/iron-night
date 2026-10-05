@@ -1319,7 +1319,8 @@ namespace IronNight
             var L = Leader; nem = Nemesis.Pick(); var spec = Nemesis.Tank(nem); nemWingmen = 0; nemLeader = false; nemReported = false; nemEscaped = false;
             float a = (Random.value - 0.5f) * 1.2f; var at = L.transform.position + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * 62f;
             ace = Foe(spec, props.PushOut(at, 3f), Mathf.Atan2(L.transform.position.x - at.x, L.transform.position.z - at.z));
-            ace.hp *= Nemesis.HpMul(nem); aceHpMax = ace.hp; aceName = nem.Title + " · " + spec.name; bool back = nem.met > 0; Nemesis.Met(nem, NightPlace);
+            ace.hp *= Nemesis.HpMul(nem); aceHpMax = ace.hp; ace.damageMul *= 1.5f; ace.reloadMul *= 0.7f; ace.rangeMul *= 1.2f;   // and he hits harder, quicker, from further
+            aceName = nem.Title + " · " + spec.name; bool back = nem.met > 0; Nemesis.Met(nem, NightPlace);
             hud.Toast(back ? nem.Title + (string.IsNullOrEmpty(nem.nick) ? "" : ", " + nem.nick + ",") + " is back · " + Clock(at) : aceName + " · an ace is on the field, " + Clock(at), 3.4f); Voices.Callout("ace", ClockHour(at)); Sfx.Whistle(at); if (Random.value < 0.7f) Radio("hit");
             if (back) NemesisCam(ace, nem);   // an old enemy: the camera goes to him
             fx.Marker(at, new Color(1f, 0.3f, 0.25f), 7f, true);

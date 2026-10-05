@@ -43,7 +43,7 @@ namespace IronNight
             if (!VehicleSpec.Available(s)) s = a.level >= 3 && VehicleSpec.Available(VehicleSpec.Tiger) ? VehicleSpec.Tiger : VehicleSpec.PanzerIV;
             return s;
         }
-        public static float HpMul(Ace a) => 1.7f + 0.3f * (a.level - 1);
+        public static float HpMul(Ace a) => 2.6f + 0.5f * (a.level - 1);   // the most wanted: hard to kill, harder each time he comes back
         public static int BountyPoints(Ace a) => 600 + 500 * (a.level - 1);
         public static int BountyGold(Ace a) => 10 * (a.level - 1);
 
