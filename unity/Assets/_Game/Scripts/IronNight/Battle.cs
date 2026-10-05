@@ -349,11 +349,13 @@ namespace IronNight
             infantry.Tick(dt, platoon, props, FireFaust, SmallArms, SmallArmsAt);
             int crushed = infantry.Crush(platoon); if (crushed > 0) { InfantryKilled(crushed, L.transform.position); hud.Toast("Run down", 1.5f); }
 
-            // enemies: close in, then hold and shoot
+            // ours: how fast each one moves, for the enemy to lead its shot
+            foreach (var v in platoon) { var p = v.transform.position; v.vel = v.aiPrev == Vector3.zero || dt <= 0f ? Vector3.zero : (p - v.aiPrev) / dt; v.vel.y = 0f; v.aiPrev = p; }
+            // enemies: pick one of ours, come round his side, keep moving in range, lead the shot
             for (int i = 0; i < foes.Count; i++)
             {
                 var e = foes[i]; e.reloadLeft -= dt; if (e.trackOut > 0f) e.trackOut -= dt;
-                var target = Nearest(platoon, e.transform.position, 1000f); if (convoy) target = ConvoyTarget(e, target); if (target == null) continue; e.rangeMul = enemyRangeMul * (lit ? 1.2f : 1f);
+                var target = PickTarget(e); if (convoy) target = ConvoyTarget(e, target); if (target == null) continue; e.rangeMul = enemyRangeMul * (lit ? 1.2f : 1f);
                 float dist = Dist(e, target); if (SneakAsleep(e, dist, dt)) continue;
                 if (e.spec.transport) { TickTransport(e, target, dist, dt); continue; }
                 if (!e.spec.isGun && !e.spec.casemate && e.hp <= 1f && e.spec.hp >= 3f && e.fallBack <= 0f && e.fallenBack < 1 && dist < e.Range * 0.8f) { e.fallBack = 6f; e.fallenBack++; hud.Toast(e.spec.name + " falling back", 2f); }
@@ -365,10 +367,18 @@ namespace IronNight
                 else if (!e.spec.isGun && dist > e.Range * 0.8f)
                 {
                     var goal = target.transform.position;
-                    if (e.flank != 0 && dist > 20f) { var toT = goal - e.transform.position; toT.y = 0f; toT.Normalize(); goal += new Vector3(toT.z, 0f, -toT.x) * (e.flank * 18f); }   // a Panzer IV works round the side
+                    if (e.flank != 0 && dist > 20f) { var tf = target.Forward; goal += new Vector3(tf.z, 0f, -tf.x) * (e.flank * 18f) - tf * 4f; }   // round to his side, where the armour is thin
                     var d = goal - e.transform.position; e.Drive(Steer(e, new Vector2(d.x, d.z)), dt);
                 }
-                bool on = e.Aim(target.transform.position, dt);
+                else if (!e.spec.isGun && !e.spec.casemate)
+                {
+                    // in range: never a sitting duck; a few seconds one way or the other, now and then still, backing off when too close
+                    e.aiTimer -= dt; if (e.aiTimer <= 0f) { e.aiTimer = Random.Range(2.5f, 5f); e.aiSide = Random.value < 0.35f ? 0f : Random.value < 0.5f ? -1f : 1f; }
+                    var to = target.transform.position - e.transform.position; to.y = 0f; to.Normalize(); float back = dist < e.Range * 0.45f ? -0.7f : 0f;
+                    if (e.aiSide != 0f || back < 0f) { var w = new Vector3(to.z, 0f, -to.x) * e.aiSide + to * back; e.Drive(Steer(e, new Vector2(w.x, w.z)) * 0.55f, dt); }
+                }
+                float lead = firstNight ? 0f : e == ace ? 1f : 0.7f;   // where he will be when the round gets there
+                bool on = e.Aim(target.transform.position + target.vel * (dist / EnemyShellSpeed) * lead, dt);
                 if (e.spec.casemate) { if (dist > e.Range * 0.8f) e.turretYaw = e.yaw; else e.yaw = e.turretYaw; }   // the StuG aims with the whole hull
                 bool blind = smokeLeft > 0f && dist > 9f;                 // the smoke screen: they cannot see us from afar
                 if (on && !blind && e.reloadLeft <= 0f && dist <= e.Range && e.spec.damage > 0f && e.crew != 0) Fire(e, target);
@@ -538,6 +548,22 @@ namespace IronNight
                 default: lat = 6f * i; back = 5.5f * i; break;
             }
             return L.transform.position + r * lat - f * back;
+        }
+
+        int flankTurn;
+
+        /// <summary>Which of ours an enemy fights: the nearest, but in its reach a wounded one comes before a sound one and
+        /// one just hit before the rest, so they finish what they started.</summary>
+        Vehicle PickTarget(Vehicle e)
+        {
+            Vehicle best = null; float bs = float.MaxValue;
+            foreach (var v in platoon)
+            {
+                if (v.dead) continue; float d = Dist(e, v), s = d;
+                if (d <= e.Range) { s += 12f * Mathf.Clamp01(v.hp / Mathf.Max(1f, v.spec.hp)); if (Time.time - v.lastHit < 4f) s -= 6f; }
+                if (s < bs) { bs = s; best = v; }
+            }
+            return best;
         }
 
         static float Dist(Vehicle a, Vehicle b) { var d = a.transform.position - b.transform.position; d.y = 0f; return d.magnitude; }
@@ -2197,7 +2223,7 @@ namespace IronNight
         /// <summary>An enemy vehicle into the fight; veteran nights give it half again the hits.</summary>
         Vehicle Foe(VehicleSpec spec, Vector3 pos, float yaw)
         {
-            var e = Vehicle.Create(spec, false, pos, yaw); e.turretYaw = e.yaw; if (spec.isGun) infantry.ManGun(e); if (veteran) e.hp *= 1.5f; if (debugWeak) e.hp = 0.3f; if (spec == VehicleSpec.PanzerIV && Random.value < 0.5f) e.flank = Random.value < 0.5f ? -1 : 1; foes.Add(e); return e;
+            var e = Vehicle.Create(spec, false, pos, yaw); e.turretYaw = e.yaw; if (spec.isGun) infantry.ManGun(e); if (veteran) e.hp *= 1.5f; if (debugWeak) e.hp = 0.3f; if (!spec.isGun && !spec.casemate && !spec.transport) { e.flank = (flankTurn % 3) - 1; flankTurn++; } foes.Add(e); return e;   // every second tank works round a side, left and right in turn
         }
 
         /// <summary>The coaxial and bow machine guns: a burst at any tank hunter within 24 m in front of the gun or the

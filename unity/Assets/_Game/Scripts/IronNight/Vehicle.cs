@@ -24,6 +24,7 @@ namespace IronNight
         public float smokeTimer;
         static Material vehicleTemplate, vehicleTemplateN, barrelMaterial; public static bool Wet;   // a rainy night: the armour shines
 
+        public float aiTimer, aiSide; public Vector3 aiPrev, vel;   // the enemy's mind: its next move and which way; ours: where it was, how fast it goes
         public Vector3 Forward => new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
         public Vector3 GunDirection => new Vector3(Mathf.Sin(turretYaw), 0f, Mathf.Cos(turretYaw));
         public Vector3 MuzzlePosition => muzzle != null ? muzzle.position : transform.position + Vector3.up * 2f;
