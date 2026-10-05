@@ -138,7 +138,7 @@ namespace IronNight
         class Rising { public Text t; public float life; public Vector3 world; }
         readonly List<Rising> popups = new List<Rising>(); readonly Stack<Text> popupPool = new Stack<Text>(); RectTransform canvasRect;
         Image radar, objectiveArrow; Text objectiveLabel; readonly List<Image> radarDots = new List<Image>(); readonly List<Image> hpBars = new List<Image>(); readonly List<Image> hpFills = new List<Image>(); Transform cardRoot, depotRows; Image rankBadge; GameObject opsTile, againBtn; public Garage garage; int depotTab; readonly Button[] depotTabs = new Button[3]; Image opsPic, briefingPic; GameObject briefing; Text briefingTitle, briefingText; float briefingLeft; ScrollRect depotScroll; Canvas canvas; Text depotPoints, titleStats, endPoints, reserveNote, bossName; Image bossFill; GameObject bossBar;
-        Image formIcon; Text formLabel; int formIdx;
+        Image formIcon; Text formLabel; int formIdx; readonly Image[] formPips = new Image[4];
         static readonly Formation[] FormOrder = { Formation.Wedge, Formation.Column, Formation.Line, Formation.Echelon };
         static readonly string[] FormNames = { "WEDGE", "COLUMN", "LINE", "ECHELON" };
         readonly List<Image> arrows = new List<Image>(); Sprite arrowSprite;
@@ -198,9 +198,10 @@ namespace IronNight
 
             // the formation: one button bottom left, a tap goes on to the next (wedge, column, line, echelon)
             {
-                var b = MakeButton(t, "", new Vector2(0f, 0f), new Vector2(240, 118), new Vector2(380, 96), 30, () => { formIdx = (formIdx + 1) % 4; OnFormation?.Invoke(FormOrder[formIdx]); Highlight(formIdx); });
+                var b = MakeButton(t, "", new Vector2(0f, 0f), new Vector2(532, 116), new Vector2(985, 88), 30, () => { formIdx = (formIdx + 1) % 4; OnFormation?.Invoke(FormOrder[formIdx]); Highlight(formIdx); });   // as wide as the row of cards above it
                 b.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.11f, 0.85f);
-                var fe = MakeImage(b.transform, "Edge", mid, Vector2.zero, new Vector2(380, 96), new Color(0.96f, 0.68f, 0.24f, 0.5f)); fe.sprite = Outline(); fe.type = Image.Type.Sliced; fe.rectTransform.pivot = mid;
+                for (int i = 0; i < 4; i++) { formPips[i] = MakeImage(b.transform, "Pip", new Vector2(1f, 0.5f), new Vector2(-150 + i * 34, 0), new Vector2(14, 14), Color.white); formPips[i].sprite = Lightswarm.ProceduralSprites.Glow(16, 0.9f); formPips[i].rectTransform.pivot = mid; }   // which of the four it is
+                var fe = MakeImage(b.transform, "Edge", mid, Vector2.zero, new Vector2(985, 88), new Color(0.96f, 0.68f, 0.24f, 0.5f)); fe.sprite = Outline(); fe.type = Image.Type.Sliced; fe.rectTransform.pivot = mid;
                 formIcon = MakeImage(b.transform, "Icon", new Vector2(0f, 0.5f), new Vector2(14f, 0f), new Vector2(68f, 68f), new Color(0.96f, 0.68f, 0.24f, 0.95f));
                 var cap = MakeText(b.transform, "Top", new Vector2(0f, 1f), new Vector2(98, -12), TextAnchor.UpperLeft, 18, new Color(0.66f, 0.64f, 0.59f)); cap.text = Spaced("FORMATION  ›"); cap.rectTransform.pivot = new Vector2(0f, 1f); cap.rectTransform.sizeDelta = new Vector2(270, 26);
                 formLabel = b.transform.Find("Label").GetComponent<Text>(); formLabel.alignment = TextAnchor.MiddleLeft; formLabel.rectTransform.anchorMin = new Vector2(0f, 0f); formLabel.rectTransform.anchorMax = new Vector2(1f, 1f); formLabel.rectTransform.offsetMin = new Vector2(98f, 0f); formLabel.rectTransform.offsetMax = new Vector2(0f, -22f); formLabel.color = new Color(0.96f, 0.68f, 0.24f); formLabel.fontSize = 32;
@@ -238,6 +239,8 @@ namespace IronNight
             endSheet.SetActive(false);
             // the two things the thumb can press in the night: what is loaded, and the commander's order
             {
+                // the console: a dark plate fading up from the bottom edge behind every control; it takes no taps
+                var console = MakeImage(hudGroup.transform, "Console", new Vector2(0.5f, 0f), Vector2.zero, new Vector2(1600, 400), new Color(0.015f, 0.02f, 0.025f, 0.9f)); console.sprite = Fade(); console.rectTransform.pivot = new Vector2(0.5f, 0f); console.raycastTarget = false; console.transform.SetAsFirstSibling();
                 ammoBtn = MakeButton(hudGroup.transform, "", new Vector2(0f, 0f), new Vector2(330, 268), new Vector2(190, 120), 22, () => OnAmmo?.Invoke());
                 ammoBtn.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.11f, 0.85f);
                 var ae = MakeImage(ammoBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190, 120), new Color(1f, 1f, 1f, 0.2f)); ae.sprite = Outline(); ae.type = Image.Type.Sliced; ae.rectTransform.pivot = new Vector2(0.5f, 0.5f);
@@ -1039,7 +1042,7 @@ namespace IronNight
         }
 
         /// <summary>The formation button showing a formation: its picture and its name.</summary>
-        void Highlight(int idx) { formIdx = idx; formLabel.text = FormNames[idx]; formIcon.sprite = UiSprite("formation_icons", new Rect(idx * 256, 0, 256, 256)); }
+        void Highlight(int idx) { formIdx = idx; formLabel.text = FormNames[idx]; formIcon.sprite = UiSprite("formation_icons", new Rect(idx * 256, 0, 256, 256)); for (int i = 0; i < 4; i++) formPips[i].color = i == idx ? new Color(0.96f, 0.68f, 0.24f, 1f) : new Color(0.93f, 0.91f, 0.86f, 0.22f); }
         static void Stretch(GameObject go) { var rt = go.GetComponent<RectTransform>(); rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; rt.offsetMin = rt.offsetMax = Vector2.zero; }
 
         public void Set(float seconds, int platoon)
@@ -1816,6 +1819,16 @@ namespace IronNight
         static Sprite Outline() => outlineSprite ??= Lightswarm.ProceduralSprites.RoundedOutline(24, 96, 2f);
         static Sprite Shadow() => shadowSprite ??= Lightswarm.ProceduralSprites.SoftShadow(24, 28, 160);
         /// <summary>A tall fade for the end sheet: solid below, clearing over the top quarter where the camera circles the leader.</summary>
+        /// <summary>Opaque at the bottom, fading out to nothing at the top: the console behind the controls.</summary>
+        static Sprite Fade()
+        {
+            if (fadeSprite != null) return fadeSprite;
+            var tex = new Texture2D(2, 128, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+            for (int y = 0; y < 128; y++) { float k = 1f - Mathf.SmoothStep(0f, 1f, y / 127f); tex.SetPixel(0, y, new Color(1f, 1f, 1f, k * k)); tex.SetPixel(1, y, new Color(1f, 1f, 1f, k * k)); }
+            tex.Apply(); return fadeSprite = Sprite.Create(tex, new Rect(0f, 0f, 2f, 128f), new Vector2(0.5f, 0.5f));
+        }
+        static Sprite fadeSprite;
+
         static Sprite Scrim()
         {
             if (scrimSprite != null) return scrimSprite;

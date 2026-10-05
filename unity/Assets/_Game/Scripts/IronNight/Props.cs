@@ -325,10 +325,11 @@ namespace IronNight
 
         void Tree(List<Prop> list, Vector3 pos, int seed)
         {
+            if (InStream(pos, 3f)) return;   // no tree stands in the water
             if (winter && Place(list, seed % 4 == 0 ? "pine_snow" : seed % 4 == 1 ? "fir_snow_b" : "fir_snow", pos, (seed % 360) * Mathf.Deg2Rad) != null) return;
             if (winter) { if (Place(list, seed % 3 == 0 ? "deadtree" : "spruce_snow", pos, (seed % 360) * Mathf.Deg2Rad) == null) Place(list, "deadtree", pos, (seed % 360) * Mathf.Deg2Rad); return; }   // firs and bare trees in the snow
             if (Kursk && seed % 2 == 0 && Place(list, "tree_birch", pos, (seed % 360) * Mathf.Deg2Rad) != null) return;
-            if (Place(list, "tree_oak", pos, (seed % 360) * Mathf.Deg2Rad) != null) return;
+            if (Place(list, "tree_oak", pos, (seed % 360) * Mathf.Deg2Rad) != null || prefabs.ContainsKey("tree_oak")) return;   // the model refused here (too near another, on a lane): no tree, not the drawn one
             list.Add(new Prop { what = What.Tree, pos = pos, seed = seed, yaw = (seed % 360) * Mathf.Deg2Rad, bound = 5f, circleCenters = new[] { new Vector2(pos.x, pos.z) }, radii = new[] { 0.8f } });
         }
 
