@@ -233,14 +233,26 @@ namespace IronNight
                         continue;
                     }
                     float backOff = m.role == Role.Faust ? 7f : 12f; bool ahead = dist > m.stop, back = dist < backOff;
+                    // eyes on our tanks: a gun swinging onto him puts him down; a tank driving at him, he jumps aside
+                    foreach (var v in platoon)
+                    {
+                        if (v.dead) continue; var fromV = m.pos - v.transform.position; fromV.y = 0f; float dv = fromV.magnitude; if (dv < 0.1f || dv > 35f) continue; fromV /= dv;
+                        if (m.pause <= 0f && Vector3.Dot(v.GunDirection, fromV) > 0.978f) { m.pause = Random.Range(1.8f, 3f); m.bounding = false; }
+                        if (dv < 7f && v.vel.sqrMagnitude > 1f && Vector3.Dot(v.vel.normalized, fromV) > 0.6f) { var aside = new Vector3(v.vel.z, 0f, -v.vel.x).normalized; if (Vector3.Dot(aside, fromV) < 0f) aside = -aside; m.pos += aside * (4.5f * dt); }
+                    }
+                    bool ducked = false; if (m.pause > 0f) { m.pause -= dt; ducked = true; ahead = false; back = false; }   // down in cover: no moving, no firing
                     if (ahead && dist < 45f)
                     {
                         // under our guns they go in bounds: run to the next cover a few metres nearer, crouch there, then on
-                        if (m.pause > 0f) { m.pause -= dt; ahead = false; }
-                        else
                         {
                             if (!m.bounding && props.Cover(m.pos, target.transform.position, 12f, 0.5f, 0.3f, out var cv)) { var cvT = target.transform.position - cv; cvT.y = 0f; if (cvT.magnitude < dist - 4f) { m.cover = cv; m.bounding = true; } }
                             if (m.bounding) { var tc = m.cover - m.pos; tc.y = 0f; if (tc.magnitude < 0.7f) { m.bounding = false; m.pause = Random.Range(1.5f, 3.5f); ahead = false; } else to = tc.normalized; }
+                        }
+                        if (m.role == Role.Faust && ahead && !m.bounding && dist > 14f && dist < 40f)
+                        {
+                            // the tank hunters go round to its side and rear, where the armour is thin and it cannot see
+                            var tf = target.Forward; var goal = target.transform.position - tf * 9f + new Vector3(tf.z, 0f, -tf.x) * (m.phase > 3.14f ? 7f : -7f);
+                            var tg = goal - m.pos; tg.y = 0f; if (tg.magnitude > 1f) to = tg.normalized;
                         }
                     }
                     var gait = ahead && dist > 45f ? walk : ahead ? run : walk;   // walking up out of the dark, running in, stepping back from a tank
@@ -248,8 +260,8 @@ namespace IronNight
                     if (ahead) m.pos += to * (speed * dt); else if (back) m.pos -= to * (speed * dt);
                     m.face = to; m.pos = props.PushOut(m.pos, 0.5f);
                     m.reload -= dt;
-                    if (m.role == Role.Faust) { if (dist < 15f && m.reload <= 0f) { m.reload = 9f + Random.value * 3f; fire(m, target); } }
-                    else if (!ahead && !back && dist < m.stop + 4f) Shoot(m, target, dt, shoot);
+                    if (m.role == Role.Faust) { if (!ducked && dist < 15f && m.reload <= 0f) { m.reload = 9f + Random.value * 3f; fire(m, target); } }
+                    else if (!ducked && !ahead && !back && dist < m.stop + 4f) Shoot(m, target, dt, shoot);
                     bool moving = ahead || back;
                     if (moving && gait != null && m.posable && m.mf != null) { m.cycle += speed / (2f * gait.step) * dt * (back ? -1f : 1f); m.mf.sharedMesh = gait.Frame(m.cycle, out var gm); m.mr.sharedMaterial = gm; m.t.position = m.pos; }
                     else
@@ -414,6 +426,7 @@ namespace IronNight
         public void Kill(Soldier m)
         {
             if (m.dead) return; m.dead = true; m.deadAge = 0f; fallen.Add(m);
+            if (!m.ally && m.gun == null) foreach (var s in squads) if (s.men.Contains(m)) { foreach (var o in s.men) if (!o.dead && !o.dug && (o.pos - m.pos).sqrMagnitude < 100f) { o.pause = Mathf.Max(o.pause, Random.Range(1.5f, 2.5f)); o.bounding = false; } break; }   // a man falls: the ones by him go to ground
             if (m.gun != null) { m.t.SetParent(transform, true); if (--m.gun.crew == 0 && !m.gun.dead) gunSilenced?.Invoke(m.gun); }
             foreach (var idle in m.t.GetComponentsInChildren<CrewIdle>()) { var sk = idle.GetComponentInChildren<SkinnedMeshRenderer>(); if (sk != null) Destroy(sk.gameObject); if (m.mr != null) m.mr.enabled = true; Destroy(idle); }
             if (m.ally && !poses.ContainsKey(m.side + "_dead")) { m.t.position = m.pos + Vector3.up * 0.25f; m.t.rotation = Quaternion.LookRotation(m.face, Vector3.up) * Quaternion.Euler(-90f, 0f, Random.Range(-30f, 30f)); return; }   // no fallen figure of ours: he goes over where he stood
@@ -439,7 +452,7 @@ namespace IronNight
         public int Blast(Vector3 at, float radius)
         {
             int n = 0;
-            foreach (var s in squads) foreach (var m in s.men) { if (m.dead || m.ally) continue; var d = m.pos - at; d.y = 0f; if (d.magnitude < radius) { Kill(m); n++; } }
+            foreach (var s in squads) foreach (var m in s.men) { if (m.dead || m.ally) continue; var d = m.pos - at; d.y = 0f; if (d.magnitude < radius && !(m.pause > 0f && d.magnitude > radius * 0.4f && Random.value < 0.5f)) { Kill(m); n++; } }   // down in cover, away from the middle: one in two lives
             return n;
         }
 
