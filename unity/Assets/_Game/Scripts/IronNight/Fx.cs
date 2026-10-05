@@ -15,7 +15,7 @@ namespace IronNight
         class Puff
         {
             public Transform t; public Renderer r; public float life, age, size, grow, spin, alphaPow, stretch; public Color color; public Vector3 vel, axis;
-            public bool smoke, gravity, aligned, flat, leaf; public float spinRate;
+            public bool smoke, gravity, aligned, flat, leaf, lick; public float spinRate;   // lick: a photographed flame, fading in and out
             public int frames, cols, rows, frame0;   // a sprite sheet: frames stepped over the life, or one fixed frame
         }
 
@@ -47,7 +47,7 @@ namespace IronNight
             addExplosion = Make(additive, Pic("fx_explosion")); smokeSheet = Make(smoke, Pic("fx_smoke")); addSparks = Make(additive, Pic("fx_sparks"));
             leafFx = new Material(Resources.Load<Material>("FoliageCut"));
             paintRing = new Material(Resources.Load<Material>("GroundDecal")); var ringPic = Pic("paint_ring"); paintRing.SetTexture("_BaseMap", ringPic != null ? ringPic : PaintedRing(512)); paintRing.SetTexture("_BumpMap", null); paintRing.SetFloat("_Smoothness", 0.35f); paintRing.renderQueue = 2448;   // the keyword stays on: the variant without it is not in the build
-            var fm = new List<Material>(); for (int i = 1; i <= 4; i++) { var t = Pic("flame_" + i); if (t != null) fm.Add(Make(additive, t)); } flameMats = fm.ToArray(); var fbl = new List<Material>(); for (int i = 1; i <= 2; i++) { var fb = Pic("fireball_" + i); if (fb != null) fbl.Add(Make(additive, fb)); } fireballMats = fbl.ToArray();
+            var fm = new List<Material>(); foreach (int i in new[] { 2, 4 }) { var t = Pic("flame_" + i); if (t != null) fm.Add(Make(additive, t)); } flameMats = fm.ToArray(); var fbl = new List<Material>(); for (int i = 1; i <= 2; i++) { var fb = Pic("fireball_" + i); if (fb != null) fbl.Add(Make(additive, fb)); } fireballMats = fbl.ToArray();
             var pm = new List<Material>(); for (int i = 1; i <= 4; i++) { var t = Pic("smoke_puff_" + i); if (t != null) pm.Add(Make(smoke, t)); } puffMats = pm.ToArray();
             blendFlak = Make(smoke, Pic("fx_flak")); blendDust = Make(smoke, Pic("fx_dust")); addMuzzle = Make(additive, Pic("fx_muzzle")); addTracer = Make(additive, Pic("fx_tracer"));
         }
@@ -142,7 +142,8 @@ namespace IronNight
         Puff Flame(Vector3 pos, float size, Color color, float life, Vector3 vel, float grow = 0.8f)
         {
             if (flameMats.Length == 0) return Spawn(addFlame, pos, size, color, life, vel, grow);
-            var p = Spawn(flameMats[Random.Range(0, flameMats.Length)], pos + Vector3.up * size * 0.3f, size * 1.3f, Color.Lerp(Color.white, color, 0.3f), life, vel, grow); p.spin = Random.Range(-15f, 15f); return p;
+            var c = Color.Lerp(Color.white, color, 0.3f) * 0.6f; c.a = 1f;
+            var p = Spawn(flameMats[Random.Range(0, flameMats.Length)], pos + Vector3.up * size * 0.5f, size * 1.2f, c, life * 1.6f, vel * 0.2f, grow * 0.25f); p.spin = Random.Range(-6f, 6f); p.lick = true; return p;
         }
 
         Puff Billow(Vector3 pos, float size, Color color, float life, Vector3 vel, float grow = 0.8f, bool smoke = true)
@@ -206,7 +207,7 @@ namespace IronNight
         /// black smoke rolling off the top. k is how much is left burning, 1 at the start.</summary>
         public void Jet(Vector3 pos, float k)
         {
-            var f = Flame(pos + Vector3.up * (0.6f + Random.value * 0.8f), 1.8f + 2.4f * k, Warm(0.3f + Random.value * 0.5f), 0.22f + Random.value * 0.14f, Vector3.up * (9f + 9f * k), 0.35f);
+            var f = Spawn(addFlame, pos + Vector3.up * (0.6f + Random.value * 0.8f), 1.8f + 2.4f * k, Warm(0.3f + Random.value * 0.5f), 0.22f + Random.value * 0.14f, Vector3.up * (9f + 9f * k), 0.35f);
             f.aligned = true; f.axis = Vector3.up; f.stretch = 2.2f;
             if (Random.value < 0.6f) { var s = Spawn(addSpark, pos + Vector3.up, 0.22f + Random.value * 0.25f, new Color(1f, 0.8f, 0.4f, 1f), 0.5f + Random.value * 0.4f, (Vector3.up * 2f + Random.insideUnitSphere).normalized * (10f + Random.value * 10f), 0f); s.gravity = true; }
             if (Random.value < 0.25f) Billow(pos + Vector3.up * (3f + 2f * k), 2f + Random.value * 1.5f, new Color(0.1f, 0.09f, 0.08f, 0.7f), 2.5f + Random.value, Vector3.up * 3f, 2f, true);
@@ -412,6 +413,7 @@ namespace IronNight
                 p.t.localScale = p.stretch > 1f ? new Vector3(s / Mathf.Sqrt(p.stretch), s * p.stretch, 1f) : Vector3.one * s;
                 var c = p.color; c.a = p.color.a * Mathf.Pow(1f - q, p.alphaPow);
                 if (p.smoke) c.a *= Mathf.SmoothStep(0f, 1f, q / 0.14f);   // swelling in, not popping up
+                if (p.lick) c.a *= Mathf.SmoothStep(0f, 1f, q / 0.35f);   // a flame comes up out of the fire, never pops in
                 mpb.SetColor(BaseColor, c); mpb.SetVector(BaseMapST, FrameST(p, q)); p.r.SetPropertyBlock(mpb);
                 if (p.flat) p.t.rotation = Quaternion.Euler(90f, p.spin, 0f);
                 else if (p.aligned) p.t.rotation = Quaternion.LookRotation(camFwd, p.axis);
