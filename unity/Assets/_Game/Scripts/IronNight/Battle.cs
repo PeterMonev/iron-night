@@ -72,7 +72,7 @@ namespace IronNight
         Vehicle ace; string aceName; float aceTimer = 105f, weatherTurn;
         Nemesis.Ace nem; int nemWingmen; bool nemLeader, nemReported, nemEscaped; float aceHpMax = 1f;   // the night's ace from the roster, and what he does
         string theatre = "normandy", builtTheatre = "normandy";   // the map: it also decides the nation
-        string TheatreName => theatre == "kursk" ? "Kursk" : winter ? "Ardennes" : "Normandy";
+        string TheatreName => theatre == "kursk" ? "Kursk" : theatre == "italy" ? "Italy" : winter ? "Ardennes" : "Normandy";
         string NightPlace => mapSector != null ? mapSector.name : TheatreName;   // where an ace is said to have been met
         string route = "open", builtRoute = "open"; float routePay = 1.1f;   // the way in the player chose, the one the country was built for, and what it pays
         enum Order { Follow, Hold, Advance } Order order = Order.Follow; Vector3[] holdAt = new Vector3[8];   // what the wingmen were told   // a named enemy of the night, and the hour the weather turns

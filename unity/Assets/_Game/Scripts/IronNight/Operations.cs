@@ -85,9 +85,30 @@ namespace IronNight
                         brief = "Close the distance, get to their flanks and do not stop. There is no line behind this one." },
                 },
             },
+            Anzio,   // Italy
         };
 
         public static Op ById(string id) { foreach (var o in All) if (o.id == id) return o; return null; }
+        /// <summary>The Italian front's operation, added to All on first use (kept apart so the list above stays as it was).</summary>
+        static Op Anzio => new Op
+        {
+            id = "anzio", name = "Anzio", theatre = "italy", cover = "op_anzio",
+            front = "Italy · January-May 1944 · US VI Corps",
+            blurb = "Behind the Gustav Line at Anzio and Nettuno. The beachhead is ashore; now the Germans come down from the Alban Hills.",
+            nights = new[]
+            {
+                new Night { name = "Operation Shingle", picture = "op_anzio_1", route = "open", weather = "clear", second = Objectives, third = Kills(30),
+                    brief = "Ashore without a shot. Push inland across the drained marshes before they wake up." },
+                new Night { name = "The Factory", picture = "op_anzio_2", route = "village", weather = "overcast", second = Hunters, third = Intact,
+                    brief = "Aprilia, the Factory: brick sheds and a tower. Grenadiers in every building. Clear them out." },
+                new Night { name = "Among the Olives", picture = "op_anzio_3", route = "bocage", weather = "fog", second = Lamps, third = Kills(40),
+                    brief = "Groves and stone walls up the slopes. Tank hunters behind every trunk. Slow and careful." },
+                new Night { name = "Fischfang", picture = "op_anzio_4", route = "open", weather = "rain", second = Ace, third = Cats,
+                    brief = "Their counterattack down the Albano road: Tigers, Ferdinands and everything they have left. Hold." },
+                new Night { name = "The Road to Rome", picture = "op_anzio_5", route = "village", weather = "clear", second = Boss, third = Kills(60),
+                    brief = "The breakout. Cisterna, then Valmontone, then the city. Do not stop for anything." },
+            },
+        };
 
         static string Key(string op, int night) => "op." + op + "." + night;
         /// <summary>Which of the night's stars have been won: bit 0 the dawn, bits 1 and 2 its two goals.</summary>
@@ -112,8 +133,8 @@ namespace IronNight
         /// <summary>The way in and the weather, as the briefing puts them.</summary>
         public static string Conditions(Op op, Night n)
         {
-            bool kursk = op.theatre == "kursk", winter = op.theatre == "ardennes";
-            string way = n.route == "village" ? "Through the village" : n.route == "bocage" ? (kursk ? "Along the tree belts" : "Through the bocage") : (kursk ? "Across the steppe" : "Across the open fields");
+            bool kursk = op.theatre == "kursk", winter = op.theatre == "ardennes", italy = op.theatre == "italy";
+            string way = n.route == "village" ? (italy ? "Through the hill town" : "Through the village") : n.route == "bocage" ? (kursk ? "Along the tree belts" : italy ? "Through the olive groves" : "Through the bocage") : (kursk ? "Across the steppe" : italy ? "Down the valley" : "Across the open fields");
             string sky = n.weather == "fog" ? "fog" : n.weather == "rain" ? (winter ? "snow" : "rain") : n.weather == "overcast" ? "overcast" : winter ? "clear and freezing" : "clear, a moon";
             return way + " · " + sky;
         }

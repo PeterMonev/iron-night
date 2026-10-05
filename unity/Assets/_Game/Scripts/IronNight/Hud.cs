@@ -130,7 +130,7 @@ namespace IronNight
         public class Card { public string id, title, desc; public bool rare; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain, OnStart, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder, OnAir, OnPara, OnSupply, OnDailyChallenge, OnStandReady; public System.Action<string> OnRoute, OnTheatre, OnStand, OnStandItem, OnConvoy, OnSneak; public System.Action<string, int> OnOperation; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[3]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], routePays = new Text[3], theatreLabels = new Text[3]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, airBtn, routeSheet, trainBtn; Text xpLine, depotXp; static readonly Color XpBlue = new Color(0.56f, 0.76f, 0.98f), XpDeep = new Color(0.22f, 0.43f, 0.74f, 0.96f); Text airLabel; Image airFill; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
+        public System.Action OnAd, OnAgain, OnStart, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder, OnAir, OnPara, OnSupply, OnDailyChallenge, OnStandReady; public System.Action<string> OnRoute, OnTheatre, OnStand, OnStandItem, OnConvoy, OnSneak; public System.Action<string, int> OnOperation; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[4]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], routePays = new Text[3], theatreLabels = new Text[3]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, airBtn, routeSheet, trainBtn; Text xpLine, depotXp; static readonly Color XpBlue = new Color(0.56f, 0.76f, 0.98f), XpDeep = new Color(0.22f, 0.43f, 0.74f, 0.96f); Text airLabel; Image airFill; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
 
         Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel, setQuality, setVibe, rankLine, pointsLine, ordersCount; GameObject settingsSheet, ordersSheet; RawImage titleBackdrop, depotBackdrop; GarageDrag depotDrag; readonly List<RectTransform> embers = new List<RectTransform>(); readonly List<float> emberPhase = new List<float>(); GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         public System.Action OnSuppliesAd; public bool SuppliesGranted; bool suppliesOffer; Text cardsEyebrow;
@@ -1190,7 +1190,7 @@ namespace IronNight
                 if (!open)
                 {
                     var shut = MakeImage(card.transform, "Shut", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(940, 450), new Color(0.01f, 0.01f, 0.02f, 0.72f)); shut.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-                    var why = MakeText(card.transform, "Why", new Vector2(0.5f, 0.5f), new Vector2(0, 20), TextAnchor.MiddleCenter, 34, OpInk); why.text = op.theatre == "kursk" ? "Opens after your first dawn" : "Opens after your first night"; why.font = BoldFont(); why.rectTransform.sizeDelta = new Vector2(900, 60);
+                    var why = MakeText(card.transform, "Why", new Vector2(0.5f, 0.5f), new Vector2(0, 20), TextAnchor.MiddleCenter, 34, OpInk); why.text = op.theatre == "kursk" ? "Opens after your first dawn" : op.theatre == "italy" ? "Opens after three nights" : "Opens after your first night"; why.font = BoldFont(); why.rectTransform.sizeDelta = new Vector2(900, 60);
                 }
             }
         }
@@ -1244,12 +1244,12 @@ namespace IronNight
                 routeSheet = new GameObject("Routes", typeof(RectTransform), typeof(Image)); routeSheet.transform.SetParent(canvas.transform, false); Stretch(routeSheet); routeSheet.GetComponent<Image>().color = new Color(0.02f, 0.02f, 0.03f, 1f);
                 var ey = MakeText(routeSheet.transform, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -80), TextAnchor.MiddleCenter, 26, new Color(0.96f, 0.68f, 0.24f)); ey.text = Spaced("TONIGHT'S ORDERS"); ey.font = LabelFont();
                 var ti = MakeText(routeSheet.transform, "Title", new Vector2(0.5f, 1f), new Vector2(0, -275), TextAnchor.MiddleCenter, 100, new Color(0.93f, 0.91f, 0.86f)); ti.text = "CHOOSE THE WAY IN"; Engrave(ti); ti.verticalOverflow = VerticalWrapMode.Overflow; ti.horizontalOverflow = HorizontalWrapMode.Overflow;
-                // the three fronts across the top; a closed one says what opens it
-                string[] th = { "normandy", "ardennes", "kursk" };
-                for (int k = 0; k < 3; k++)
+                // the four fronts across the top; a closed one says what opens it
+                string[] th = { "normandy", "ardennes", "kursk", "italy" };
+                for (int k = 0; k < 4; k++)
                 {
                     string tid = th[k];
-                    var tab = MakeButton(routeSheet.transform, "", new Vector2(0.5f, 1f), new Vector2(-310 + k * 310, -165), new Vector2(290, 80), 28, () => { if (!Depot.TheatreOpen(tid)) return; sheetTheatre = tid; PlayerPrefs.SetString("theatre", tid); PlayerPrefs.Save(); OnTheatre?.Invoke(tid); FillRoutes(); });
+                    var tab = MakeButton(routeSheet.transform, "", new Vector2(0.5f, 1f), new Vector2(-390 + k * 260, -165), new Vector2(245, 80), 26, () => { if (!Depot.TheatreOpen(tid)) return; sheetTheatre = tid; PlayerPrefs.SetString("theatre", tid); PlayerPrefs.Save(); OnTheatre?.Invoke(tid); FillRoutes(); });
                     theatreTabs[k] = tab.GetComponent<Image>(); theatreLabels[k] = tab.GetComponentInChildren<Text>();
                 }
                 string[] ids = { "village", "open", "bocage" };
@@ -1297,10 +1297,12 @@ namespace IronNight
         /// <summary>The three ways in of the chosen front, and the front tabs lit, dimmed or closed.</summary>
         void FillRoutes()
         {
-            bool k = sheetTheatre == "kursk";
-            string[] pics = k ? new[] { "route_kursk_village", "route_kursk_steppe", "route_kursk_belts" } : new[] { "route_village", "route_open", "route_bocage" };
-            string[] names = k ? new[] { "Through the village", "Across the steppe", "Along the tree belts" } : new[] { "Through the village", "Across the open fields", "Through the bocage" };
-            string[] lines = k
+            bool k = sheetTheatre == "kursk", it = sheetTheatre == "italy";
+            string[] pics = k ? new[] { "route_kursk_village", "route_kursk_steppe", "route_kursk_belts" } : it ? new[] { "route_italy_town", "route_italy_valley", "route_italy_groves" } : new[] { "route_village", "route_open", "route_bocage" };
+            string[] names = k ? new[] { "Through the village", "Across the steppe", "Along the tree belts" } : it ? new[] { "Through the hill town", "Down the valley", "Through the olive groves" } : new[] { "Through the village", "Across the open fields", "Through the bocage" };
+            string[] lines = it
+                ? new[] { "Stone houses, a campanile and narrow lanes. Anti-tank guns in the courtyards, grenadiers on the roofs.", "The drained marshes and the long valley road. Long sight, and nowhere to hide from what comes down it.", "Olive groves and dry stone walls up the slopes, cypresses along the tracks. Short sight, tank hunters close." }
+                : k
                 ? new[] { "Whitewashed huts and a church on every other field. Panzergrenadiers among the houses, Tigers in the lanes.", "Wheat to the horizon, some of it burning. The Panzerkeils come straight at you, Tigers at the tip.", "Wattle fences and birch belts. Short sight, hedgehogs by the roads, tank hunters close." }
                 : new[] { "Farms and houses on every other field. Anti-tank guns in the gardens, infantry in the lanes. Cover for you and for them.", "Few hedges, long sight lines. The tanks come at you in the open - and you see them coming.", "Hedges on every side and trees along them. Short sight, tank hunters close. Slow, dark and dangerous." };
             string[] pays = k ? new[] { "points +38%", "points +27%", "points +32%" } : new[] { "points +20%", "points +10%", "points +15%" };   // Kursk pays 15% more on top
@@ -1315,8 +1317,8 @@ namespace IronNight
                 Cover(sneakPic, UiSprite("sneak_" + sheetTheatre) ?? UiSprite(sheetTheatre == "kursk" ? "route_kursk_belts" : "route_bocage"));
             }
             for (int i = 0; i < 3; i++) { routePics[i].sprite = UiSprite(pics[i]); routeNames[i].text = names[i]; routeLines[i].text = lines[i]; routePays[i].text = pays[i]; }
-            string[] th = { "normandy", "ardennes", "kursk" }; string[] label = { "NORMANDY", "ARDENNES", "KURSK" }; string[] shut = { "", "after 1 night", "after 1 dawn" };
-            for (int t = 0; t < 3; t++)
+            string[] th = { "normandy", "ardennes", "kursk", "italy" }; string[] label = { "NORMANDY", "ARDENNES", "KURSK", "ITALY" }; string[] shut = { "", "after 1 night", "after 1 dawn", "after 3 nights" };
+            for (int t = 0; t < 4; t++)
             {
                 bool open = Depot.TheatreOpen(th[t]), on = th[t] == sheetTheatre;
                 theatreTabs[t].color = on ? new Color(0.96f, 0.68f, 0.24f) : open ? new Color(0.1f, 0.11f, 0.13f) : new Color(0.05f, 0.05f, 0.06f);
@@ -1897,10 +1899,17 @@ namespace IronNight
 
         static readonly Dictionary<string, Sprite> uiSprites = new Dictionary<string, Sprite>();
         /// <summary>A painted picture from Resources/UI as a sprite; a rect (in pixels) picks one cell of a sheet.</summary>
+        /// <summary>Italy's pictures until they are painted: Normandy's.</summary>
+        static readonly Dictionary<string, string> Stand = new Dictionary<string, string>
+        {
+            { "route_italy_town", "route_village" }, { "route_italy_valley", "route_open" }, { "route_italy_groves", "route_bocage" },
+            { "stand_italy", "stand_normandy" }, { "convoy_italy", "convoy_normandy" }, { "sneak_italy", "sneak_normandy" }, { "campaign_italy", "campaign_normandy" },
+            { "op_anzio", "op_cobra" }, { "op_anzio_1", "op_cobra_1" }, { "op_anzio_2", "op_cobra_2" }, { "op_anzio_3", "op_cobra_3" }, { "op_anzio_4", "op_cobra_4" }, { "op_anzio_5", "op_cobra_5" },
+        };
         public static Sprite UiSprite(string name, Rect? cell = null)
         {
             string key = name + (cell.HasValue ? cell.Value.ToString() : ""); if (uiSprites.TryGetValue(key, out var s)) return s;
-            var tex = Resources.Load<Texture2D>("UI/" + name); if (tex == null) return null;
+            var tex = Resources.Load<Texture2D>("UI/" + name); if (tex == null && Stand.TryGetValue(name, out var alt)) tex = Resources.Load<Texture2D>("UI/" + alt); if (tex == null) return null;
             s = Sprite.Create(tex, cell ?? new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f); uiSprites[key] = s; return s;
         }
         static string CardPicture(string id)

@@ -73,6 +73,15 @@ namespace IronNight
             new Kind { mesh = "foxhole_logs", length = 5f, height = -1f, circles = new[] { 0f, 0f, 1.4f } },
             new Kind { mesh = "truck_snow", length = 6.5f, height = 2.8f, circles = new[] { -1.7f, 0f, 1.4f, 1.7f, 0f, 1.4f } },
             new Kind { mesh = "chapel_wayside", length = 4.5f, height = 6f, circles = new[] { 0f, 0f, 2f } },
+            // Italy
+            new Kind { mesh = "it_house", length = 10f, height = 8f, circles = new[] { -2.4f, 0f, 3.1f, 2.4f, 0f, 3.1f } },
+            new Kind { mesh = "it_farmhouse", length = 14f, height = 9f, circles = new[] { -4f, 0f, 3.6f, 0f, 0f, 3.6f, 4f, 0f, 3.6f } },
+            new Kind { mesh = "it_church", length = 20f, height = 18f, circles = new[] { -6f, 0f, 4.6f, 0f, 0f, 4.8f, 6f, 0f, 4.6f } },
+            new Kind { mesh = "it_ruin", length = 11f, height = 6f, circles = new[] { -2.8f, 0f, 3.2f, 2.8f, 0f, 3.2f } },
+            new Kind { mesh = "it_wall", length = 6f, height = -1f, circles = new[] { -2f, 0f, 1f, 0f, 0f, 1f, 2f, 0f, 1f } },
+            new Kind { mesh = "it_well", length = 2.5f, height = 2.4f, circles = new[] { 0f, 0f, 1.3f } },
+            new Kind { mesh = "it_olive", length = 6f, height = -1f, circles = new[] { 0f, 0f, 0.5f } },
+            new Kind { mesh = "it_cypress", length = 3f, height = -1f, circles = new[] { 0f, 0f, 0.45f } },
             new Kind { mesh = "fir_snow", length = 6f, height = -1f, circles = new[] { 0f, 0f, 0.5f } },
             new Kind { mesh = "fir_snow_b", length = 6f, height = -1f, circles = new[] { 0f, 0f, 0.5f } },
             new Kind { mesh = "pine_snow", length = 6f, height = -1f, circles = new[] { 0f, 0f, 0.45f } },
@@ -107,6 +116,7 @@ namespace IronNight
         public bool winter;   // the Ardennes: snow on the fields, bare trees
         public static string Theatre = "normandy";   // "normandy", "ardennes" or "kursk": set before the night is built
         static bool Kursk => Theatre == "kursk";
+        static bool Italy => Theatre == "italy";
         public bool wet;      // a rainy night: puddles in the fields
         public Vector3 platoon;          // where the leader is
         readonly HashSet<int> deadLamps = new HashSet<int>();   // posts shot out tonight, by seed
@@ -119,6 +129,7 @@ namespace IronNight
             foreach (var k in Kinds)
             {
                 if (k.mesh.StartsWith("k_") && !Kursk && k.mesh != "k_hedgehogs") continue;
+                if (k.mesh.StartsWith("it_") && !Italy) continue;   // the Italian models only in Italy
                 if (!Ardennes && ArdennesOnly(k.mesh)) continue;   // the Belgian houses and the snowy trees stay on disk elsewhere   // the hedgehogs are loaded on every front: a last stand digs them in anywhere
                 var pf = Resources.Load<GameObject>("Props/" + k.mesh); if (pf == null) continue;
                 prefabs[k.mesh] = pf;
@@ -246,13 +257,15 @@ namespace IronNight
         static Vector3 In(int ix, int iz, int salt, float r) => new Vector3((Rnd(ix, iz, salt) - 0.5f) * 2f * r, 0f, (Rnd(ix, iz, salt + 1) - 0.5f) * 2f * r);
 
         // the generated textures come out at different brightnesses; this evens them under the moon
-        static Color Tint(string mesh) { switch (mesh) { case "tree_poplar": case "tree_poplar_b": case "tree_apple": case "tree_birch": case "tree_oak": case "spruce_snow": case "hedge": return new Color(0.42f, 0.5f, 0.4f); case "deadtree": return new Color(0.78f, 0.72f, 0.66f); case "haystack": return new Color(0.82f, 0.76f, 0.6f); case "k_birches": return new Color(0.58f, 0.64f, 0.54f); case "k_sunflowers": return new Color(0.7f, 0.68f, 0.56f); case "k_sheaves": return new Color(0.8f, 0.74f, 0.6f); case "sandbags": return new Color(0.78f, 0.74f, 0.66f); default: return new Color(0.8f, 0.78f, 0.74f); } }
+        static Color Tint(string mesh) { switch (mesh) { case "tree_poplar": case "tree_poplar_b": case "tree_apple": case "tree_birch": case "tree_oak": case "it_olive": case "it_cypress": case "spruce_snow": case "hedge": return new Color(0.42f, 0.5f, 0.4f); case "deadtree": return new Color(0.78f, 0.72f, 0.66f); case "haystack": return new Color(0.82f, 0.76f, 0.6f); case "k_birches": return new Color(0.58f, 0.64f, 0.54f); case "k_sunflowers": return new Color(0.7f, 0.68f, 0.56f); case "k_sheaves": return new Color(0.8f, 0.74f, 0.6f); case "sandbags": return new Color(0.78f, 0.74f, 0.66f); default: return new Color(0.8f, 0.78f, 0.74f); } }
 
         Kind K(string mesh) { foreach (var k in Kinds) if (k.mesh == mesh) return k; return null; }
 
         /// <summary>What stands in for a Normandy model on the steppe; null when it has none (the gates).</summary>
         static string Local(string mesh)
         {
+            if (Italy)
+                switch (mesh) { case "farmhouse": return "it_farmhouse"; case "cottage": case "house_normandy": return "it_house"; case "church": return "it_church"; case "wall_a": case "wall_b": return "it_wall"; case "well": case "well_b": return "it_well"; case "house_ruin": return "it_ruin"; case "tree_poplar": case "tree_poplar_b": return "it_cypress"; case "tree_apple": return "it_olive"; default: return mesh; }
             if (Ardennes)
                 switch (mesh) { case "farmhouse": return "farm_belgian"; case "cottage": case "house_normandy": return "house_belgian"; case "truck": return "truck_snow"; default: return mesh; }
             if (!Kursk) return mesh;
@@ -269,7 +282,7 @@ namespace IronNight
         Prop Place(List<Prop> list, string mesh, Vector3 pos, float yaw, bool water = false)
         {
             string local = Local(mesh); if (local == null) return null;
-            if (Ardennes && !prefabs.ContainsKey(local) && prefabs.ContainsKey(mesh)) local = mesh;   // the Belgian model missing: the Norman one stands in
+            if ((Ardennes || Italy) && !prefabs.ContainsKey(local) && prefabs.ContainsKey(mesh)) local = mesh;   // the Belgian or Italian model missing: the Norman one stands in
             mesh = local; var kind = K(mesh); if (kind == null || !prefabs.ContainsKey(mesh)) return null;
             if (!water && InStream(pos, kind.length * 0.35f)) return null;   // nothing stands in a stream but its bridge
             if (!water && OnLane(pos, Reach(kind))) return null;   // nor on a lane
@@ -330,6 +343,7 @@ namespace IronNight
             if (winter && Place(list, seed % 4 == 0 ? "pine_snow" : seed % 4 == 1 ? "fir_snow_b" : "fir_snow", pos, (seed % 360) * Mathf.Deg2Rad) != null) return;
             if (winter) { if (Place(list, seed % 3 == 0 ? "deadtree" : "spruce_snow", pos, (seed % 360) * Mathf.Deg2Rad) == null) Place(list, "deadtree", pos, (seed % 360) * Mathf.Deg2Rad); return; }   // firs and bare trees in the snow
             if (Kursk && seed % 2 == 0 && Place(list, "tree_birch", pos, (seed % 360) * Mathf.Deg2Rad) != null) return;
+            if (Italy && Place(list, seed % 3 == 0 ? "it_cypress" : "it_olive", pos, (seed % 360) * Mathf.Deg2Rad) != null) return;   // olives, and now and then a cypress
             if (Place(list, "tree_oak", pos, (seed % 360) * Mathf.Deg2Rad) != null || prefabs.ContainsKey("tree_oak")) return;   // the model refused here (too near another, on a lane): no tree, not the drawn one
             list.Add(new Prop { what = What.Tree, pos = pos, seed = seed, yaw = (seed % 360) * Mathf.Deg2Rad, bound = 5f, circleCenters = new[] { new Vector2(pos.x, pos.z) }, radii = new[] { 0.8f } });
         }
@@ -627,9 +641,9 @@ namespace IronNight
         void BuildGround()
         {
             groundMat = new Material(Resources.Load<Material>("Ground"));
-            if (winter || Kursk)
+            if (winter || Kursk || (Italy && Resources.Load<Texture2D>("Textures/ground_italy_plough") != null))
             {
-                string[] set = { "plough", "pasture", "mown", "stubble" }; string pre = winter ? "Textures/ground_snow_" : "Textures/ground_kursk_";   // Kursk: black earth, steppe, standing wheat, stubble
+                string[] set = { "plough", "pasture", "mown", "stubble" }; string pre = winter ? "Textures/ground_snow_" : Kursk ? "Textures/ground_kursk_" : "Textures/ground_italy_";   // Italy: red-brown earth, dry grass, stubble, vineyard rows   // Kursk: black earth, steppe, standing wheat, stubble
                 for (int i = 0; i < 4; i++) { groundMat.SetTexture("_Tex" + i, Resources.Load<Texture2D>(pre + set[i])); groundMat.SetTexture("_Nrm" + i, Resources.Load<Texture2D>(pre + set[i] + "_n")); }
                 groundMat.SetFloat("_VariationStrength", 0.25f);
             }

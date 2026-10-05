@@ -92,9 +92,9 @@ namespace IronNight
             string front = TheatreName.ToUpperInvariant();
             eyebrow = stand ? "LAST STAND" : convoy ? "CONVOY" : sneak ? "NIGHT RAID" : daily ? "DAILY CHALLENGE" : opNight > 0 ? op.name.ToUpperInvariant() + " · NIGHT " + opNight + " OF " + op.nights.Length : "NIGHT ASSAULT";
             title = opNight > 0 ? opN.name.ToUpperInvariant() : daily ? Daily.RuleOf(dailyDay).name.ToUpperInvariant() : front;
-            string place = title != front ? front : theatre == "kursk" ? "SOVIET UNION" : winter ? "BELGIUM" : "FRANCE";
-            string when = theatre == "kursk" ? "JULY 1943" : winter ? "DECEMBER 1944" : "JULY 1944";
-            string way = route == "village" ? "VILLAGE" : route == "bocage" ? (theatre == "kursk" ? "TREE BELTS" : "BOCAGE") : (theatre == "kursk" ? "STEPPE" : "OPEN FIELDS");
+            string place = title != front ? front : theatre == "kursk" ? "SOVIET UNION" : theatre == "italy" ? "ITALY" : winter ? "BELGIUM" : "FRANCE";
+            string when = theatre == "kursk" ? "JULY 1943" : theatre == "italy" ? "JANUARY 1944" : winter ? "DECEMBER 1944" : "JULY 1944";
+            string way = route == "village" ? (theatre == "italy" ? "HILL TOWN" : "VILLAGE") : route == "bocage" ? (theatre == "kursk" ? "TREE BELTS" : theatre == "italy" ? "OLIVE GROVES" : "BOCAGE") : (theatre == "kursk" ? "STEPPE" : theatre == "italy" ? "THE VALLEY" : "OPEN FIELDS");
             if (mapSector != null) { eyebrow = "ROAD TO BERLIN" + (Campaign.Counter == mapSector ? " · COUNTERATTACK" : ""); title = mapSector.name.ToUpperInvariant(); place = mapSector.country; when = mapSector.when; }   // a war map sector: its own name and date
             string sky = weather == Weather.Fog ? " · FOG" : weather == Weather.Rain ? (winter ? " · SNOW" : " · RAIN") : "";
             sub = place + " · " + when + " · " + way + sky;
