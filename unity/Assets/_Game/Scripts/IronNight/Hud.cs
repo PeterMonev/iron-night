@@ -138,7 +138,9 @@ namespace IronNight
         class Rising { public Text t; public float life; public Vector3 world; }
         readonly List<Rising> popups = new List<Rising>(); readonly Stack<Text> popupPool = new Stack<Text>(); RectTransform canvasRect;
         Image radar, objectiveArrow; Text objectiveLabel; readonly List<Image> radarDots = new List<Image>(); readonly List<Image> hpBars = new List<Image>(); readonly List<Image> hpFills = new List<Image>(); Transform cardRoot, depotRows; Image rankBadge; GameObject opsTile, againBtn; public Garage garage; int depotTab; readonly Button[] depotTabs = new Button[3]; Image opsPic, briefingPic; GameObject briefing; Text briefingTitle, briefingText; float briefingLeft; ScrollRect depotScroll; Canvas canvas; Text depotPoints, titleStats, endPoints, reserveNote, bossName; Image bossFill; GameObject bossBar;
-        readonly Button[] formButtons = new Button[4];
+        Image formIcon; Text formLabel; int formIdx;
+        static readonly Formation[] FormOrder = { Formation.Wedge, Formation.Column, Formation.Line, Formation.Echelon };
+        static readonly string[] FormNames = { "WEDGE", "COLUMN", "LINE", "ECHELON" };
         readonly List<Image> arrows = new List<Image>(); Sprite arrowSprite;
         float fpsAccum, fpsTimer, toastLeft; int fpsFrames;
 
@@ -179,21 +181,30 @@ namespace IronNight
             toast = MakeText(t, "Toast", new Vector2(0.5f, 0.5f), new Vector2(0, 420), TextAnchor.MiddleCenter, 64, ink); toast.font = LabelFont(); toast.text = ""; toast.rectTransform.sizeDelta = new Vector2(1000, 240); Fit(toast, 38);   // a long one wraps and shrinks, it is never cut
             { var ts = toast.gameObject.AddComponent<UnityEngine.UI.Shadow>(); ts.effectColor = new Color(0f, 0f, 0f, 0.8f); ts.effectDistance = new Vector2(2f, -3f); }
             var pauseBtn = MakeButton(t, "II", new Vector2(0.5f, 1f), new Vector2(0, -150), new Vector2(120, 76), 40, () => OnPause?.Invoke()); pauseBtn.name = "Pause"; pauseBtnRect = pauseBtn.GetComponent<RectTransform>();
-            radar = MakeImage(t, "Radar", new Vector2(1f, 0f), new Vector2(-150, 330), new Vector2(240, 240), new Color(0.02f, 0.03f, 0.04f, 0.55f)); radar.sprite = Lightswarm.ProceduralSprites.Glow(64, 0.98f); radar.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-            var ring = MakeImage(radar.transform, "Ring", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(240, 240), new Color(0.93f, 0.91f, 0.86f, 0.35f)); ring.sprite = Lightswarm.ProceduralSprites.Ring(128, 0.03f); ring.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-            var me = MakeImage(radar.transform, "Me", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(14, 14), new Color(0.95f, 0.66f, 0.23f, 1f)); me.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            // the map circle, above the action buttons on the right: a dark disc with an amber bezel, two faint range
+            // rings, a cross through the middle, ticks every 30 degrees and N at the top; the dots go over all of it
+            var mid = new Vector2(0.5f, 0.5f); var faint = new Color(0.93f, 0.91f, 0.86f, 0.1f);
+            radar = MakeImage(t, "Radar", new Vector2(1f, 0f), new Vector2(-150, 500), new Vector2(250, 250), new Color(0.02f, 0.03f, 0.03f, 0.78f)); radar.sprite = Lightswarm.ProceduralSprites.Glow(64, 0.98f); radar.rectTransform.pivot = mid;
+            foreach (float k in new[] { 0.36f, 0.7f }) { var rr = MakeImage(radar.transform, "Range", mid, Vector2.zero, new Vector2(232f * k, 232f * k), faint); rr.sprite = Lightswarm.ProceduralSprites.Ring(128, 0.02f); rr.rectTransform.pivot = mid; }
+            for (int i = 0; i < 2; i++) { var ln = MakeImage(radar.transform, "Cross", mid, Vector2.zero, i == 0 ? new Vector2(2, 226) : new Vector2(226, 2), faint); ln.rectTransform.pivot = mid; }
+            for (int i = 1; i < 12; i++) { float a = i * 30f * Mathf.Deg2Rad; var tk = MakeImage(radar.transform, "Tick", mid, new Vector2(Mathf.Sin(a), Mathf.Cos(a)) * 110f, new Vector2(3, i % 3 == 0 ? 14 : 8), new Color(0.93f, 0.91f, 0.86f, i % 3 == 0 ? 0.55f : 0.3f)); tk.rectTransform.pivot = mid; tk.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -i * 30f); }
+            var bezel = MakeImage(radar.transform, "Bezel", mid, Vector2.zero, new Vector2(250, 250), new Color(0.96f, 0.68f, 0.24f, 0.6f)); bezel.sprite = Lightswarm.ProceduralSprites.Ring(128, 0.035f); bezel.rectTransform.pivot = mid;
+            var ring = MakeImage(radar.transform, "Ring", mid, Vector2.zero, new Vector2(232, 232), new Color(0.93f, 0.91f, 0.86f, 0.2f)); ring.sprite = Lightswarm.ProceduralSprites.Ring(128, 0.015f); ring.rectTransform.pivot = mid;
+            var north = MakeText(radar.transform, "North", mid, new Vector2(0, 103), TextAnchor.MiddleCenter, 22, new Color(0.96f, 0.68f, 0.24f)); north.text = "N"; north.font = LabelFont(); north.rectTransform.sizeDelta = new Vector2(40, 28);
+            var meGlow = MakeImage(radar.transform, "MeGlow", mid, Vector2.zero, new Vector2(34, 34), new Color(0.95f, 0.66f, 0.23f, 0.45f)); meGlow.sprite = Lightswarm.ProceduralSprites.Glow(32, 0.2f); meGlow.rectTransform.pivot = mid;
+            var me = MakeImage(radar.transform, "Me", mid, Vector2.zero, new Vector2(12, 12), new Color(1f, 0.8f, 0.4f, 1f)); me.sprite = Lightswarm.ProceduralSprites.Glow(16, 0.9f); me.rectTransform.pivot = mid;
             objectiveArrow = MakeImage(t, "ObjectiveArrow", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(64, 64), new Color(0.35f, 0.95f, 0.45f, 0.95f)); objectiveArrow.rectTransform.pivot = new Vector2(0.5f, 0.5f); objectiveArrow.enabled = false;
             objectiveLabel = MakeText(t, "ObjectiveLabel", new Vector2(0.5f, 0.5f), Vector2.zero, TextAnchor.MiddleCenter, 30, new Color(0.35f, 0.95f, 0.45f)); objectiveLabel.rectTransform.sizeDelta = new Vector2(240, 50); objectiveLabel.text = "";
 
-            var names = new[] { "WEDGE", "COLUMN", "LINE", "ECHELON" };
-            var forms = new[] { Formation.Wedge, Formation.Column, Formation.Line, Formation.Echelon };
-            for (int i = 0; i < 4; i++)
+            // the formation: one button bottom left, a tap goes on to the next (wedge, column, line, echelon)
             {
-                var f = forms[i]; int idx = i;
-                var b = MakeButton(t, names[i], new Vector2(0.5f, 0f), new Vector2(-390 + i * 260, 120), new Vector2(244, 92), 30, () => { OnFormation?.Invoke(f); Highlight(idx); });
-                formButtons[i] = b.GetComponent<Button>();
-                var icon = MakeImage(b.transform, "Icon", new Vector2(0f, 0.5f), new Vector2(10f, 0f), new Vector2(64f, 64f), new Color(0.93f, 0.91f, 0.86f, 0.9f)); icon.sprite = UiSprite("formation_icons", new Rect(i * 256, 0, 256, 256));
-                var lbl = b.transform.Find("Label").GetComponent<Text>(); lbl.alignment = TextAnchor.MiddleLeft; lbl.rectTransform.anchorMin = new Vector2(0f, 0f); lbl.rectTransform.anchorMax = new Vector2(1f, 1f); lbl.rectTransform.offsetMin = new Vector2(82f, 0f); lbl.rectTransform.offsetMax = Vector2.zero;
+                var b = MakeButton(t, "", new Vector2(0f, 0f), new Vector2(240, 118), new Vector2(380, 96), 30, () => { formIdx = (formIdx + 1) % 4; OnFormation?.Invoke(FormOrder[formIdx]); Highlight(formIdx); });
+                b.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.11f, 0.85f);
+                var fe = MakeImage(b.transform, "Edge", mid, Vector2.zero, new Vector2(380, 96), new Color(0.96f, 0.68f, 0.24f, 0.5f)); fe.sprite = Outline(); fe.type = Image.Type.Sliced; fe.rectTransform.pivot = mid;
+                formIcon = MakeImage(b.transform, "Icon", new Vector2(0f, 0.5f), new Vector2(14f, 0f), new Vector2(68f, 68f), new Color(0.96f, 0.68f, 0.24f, 0.95f));
+                var cap = MakeText(b.transform, "Top", new Vector2(0f, 1f), new Vector2(98, -12), TextAnchor.UpperLeft, 18, new Color(0.66f, 0.64f, 0.59f)); cap.text = Spaced("FORMATION  ›"); cap.rectTransform.pivot = new Vector2(0f, 1f); cap.rectTransform.sizeDelta = new Vector2(270, 26);
+                formLabel = b.transform.Find("Label").GetComponent<Text>(); formLabel.alignment = TextAnchor.MiddleLeft; formLabel.rectTransform.anchorMin = new Vector2(0f, 0f); formLabel.rectTransform.anchorMax = new Vector2(1f, 1f); formLabel.rectTransform.offsetMin = new Vector2(98f, 0f); formLabel.rectTransform.offsetMax = new Vector2(0f, -22f); formLabel.color = new Color(0.96f, 0.68f, 0.24f); formLabel.fontSize = 32;
+                formLabel.transform.SetAsLastSibling(); cap.transform.SetAsLastSibling();
             }
             Highlight(0);
 
@@ -393,7 +404,7 @@ namespace IronNight
             var help = MakeText(helpList, "Text", new Vector2(0.5f, 1f), new Vector2(0, -10), TextAnchor.UpperLeft, 32, new Color(0.85f, 0.83f, 0.78f)); help.rectTransform.sizeDelta = new Vector2(900, 1600); help.lineSpacing = 1.06f;
             help.text = "Drag anywhere to drive the leader. The turrets aim and fire on their own.\n\n" +
                 "The leader carries a limited rack of AP and HE. Every enemy you destroy leaves an ammunition crate by its wreck: drive over it to rearm. Now and then, while the platoon is short, a new tank comes up with a crate, up to three (a fourth with the ad).\n\n" +
-                "Pick a formation at the bottom. Wedge for the open field, column for the lanes, line to bring every gun to bear.\n\n" +
+                "Tap the formation button, bottom left, to change formation. Wedge for the open field, column for the lanes, line to bring every gun to bear.\n\n" +
                 "Hedges slow a tank but do not stop it: shoulder through and the bushes go down under the hull. Farm buildings stop shells: use them as cover, or deny them to the enemy.\n\n" +
                 "Anti-tank guns dig in behind sandbags and the 88s stand with the searchlights. Hit them from the side.\n\n" +
                 "Green smoke marks the objective. Supply crates come down by parachute. Level up and choose a card.\n\n" +
@@ -1027,7 +1038,8 @@ namespace IronNight
             tex.Apply(); return Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), S);
         }
 
-        void Highlight(int idx) { for (int i = 0; i < 4; i++) formButtons[i].GetComponent<Image>().color = i == idx ? new Color(0.95f, 0.66f, 0.23f, 0.9f) : new Color(0.03f, 0.04f, 0.06f, 0.6f); for (int i = 0; i < 4; i++) formButtons[i].transform.Find("Label").GetComponent<Text>().color = i == idx ? new Color(0.1f, 0.08f, 0.05f) : new Color(0.93f, 0.91f, 0.86f); }
+        /// <summary>The formation button showing a formation: its picture and its name.</summary>
+        void Highlight(int idx) { formIdx = idx; formLabel.text = FormNames[idx]; formIcon.sprite = UiSprite("formation_icons", new Rect(idx * 256, 0, 256, 256)); }
         static void Stretch(GameObject go) { var rt = go.GetComponent<RectTransform>(); rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; rt.offsetMin = rt.offsetMax = Vector2.zero; }
 
         public void Set(float seconds, int platoon)
