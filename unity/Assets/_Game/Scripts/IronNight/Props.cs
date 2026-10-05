@@ -186,6 +186,26 @@ namespace IronNight
             return r;
         }
 
+        /// <summary>A field with a fire fight in it: about one in eight of the open fields (not where the night starts, a
+        /// farm, a post, a village or a forest).</summary>
+        static bool FightCell(int ix, int iz) => !Start(ix, iz) && !(ix == 0 && iz == 1) && !Farm(ix, iz) && !Battery(ix, iz) && !Village(ix, iz) && !Forest(ix, iz) && Rnd(ix, iz, 1800) < 0.12f;
+
+        /// <summary>The fire fights in the fields within reach of a point: where ours lie, where theirs do, and the field's
+        /// key; ours and theirs some 26 m apart across the field, clear of the lanes.</summary>
+        public List<(Vector3 ours, Vector3 theirs, long key)> FightSpots(Vector3 from, float max)
+        {
+            var list = new List<(Vector3, Vector3, long)>(); int cx = Mathf.RoundToInt(from.x / Cell), cz = Mathf.RoundToInt(from.z / Cell), n = Mathf.CeilToInt(max / Cell);
+            for (int ix = cx - n; ix <= cx + n; ix++) for (int iz = cz - n; iz <= cz + n; iz++)
+            {
+                if (!FightCell(ix, iz)) continue;
+                var c = new Vector3(ix * Cell, 0f, iz * Cell); float a = Rnd(ix, iz, 1801) * 6.283f; var dir = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
+                var ours = c + In(ix, iz, 1802, 4f) - dir * 13f; var theirs = ours + dir * 26f;
+                if ((c - from).magnitude > max || OnLane(ours, 2f) || OnLane(theirs, 2f) || InStream(ours, 2f) || InStream(theirs, 2f)) continue;
+                list.Add((ours, theirs, ((long)ix << 32) ^ (uint)iz));
+            }
+            return list;
+        }
+
         /// <summary>True when something reaching this far from a point would lie on a lane (three metres either side of its line).</summary>
         static bool OnLane(Vector3 pos, float reach)
         {

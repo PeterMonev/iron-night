@@ -360,6 +360,7 @@ namespace IronNight
             if (m.dead) return; m.dead = true; m.deadAge = 0f; fallen.Add(m);
             if (m.gun != null) { m.t.SetParent(transform, true); if (--m.gun.crew == 0 && !m.gun.dead) gunSilenced?.Invoke(m.gun); }
             foreach (var idle in m.t.GetComponentsInChildren<CrewIdle>()) { var sk = idle.GetComponentInChildren<SkinnedMeshRenderer>(); if (sk != null) Destroy(sk.gameObject); if (m.mr != null) m.mr.enabled = true; Destroy(idle); }
+            if (m.ally && !poses.ContainsKey(m.side + "_dead")) { m.t.position = m.pos + Vector3.up * 0.25f; m.t.rotation = Quaternion.LookRotation(m.face, Vector3.up) * Quaternion.Euler(-90f, 0f, Random.Range(-30f, 30f)); return; }   // no fallen figure of ours: he goes over where he stood
             if (m.ally && m.mf != null && poses.TryGetValue(m.side + "_dead", out var ad)) { m.mf.sharedMesh = ad.mesh; m.mr.sharedMaterial = ad.mat; m.t.position = new Vector3(m.pos.x, 0f, m.pos.z); m.t.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f); if (m.fig != null) m.fig.localRotation = Quaternion.identity; return; }
             if (m.mf != null && poses.TryGetValue("dead", out var d))
             {

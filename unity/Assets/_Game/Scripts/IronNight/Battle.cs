@@ -232,7 +232,7 @@ namespace IronNight
             props = new GameObject("Props").AddComponent<Props>(); props.winter = winter; props.wet = weather == Weather.Rain && !winter; Vehicle.Wet = props.wet; props.Build(cam); props.fx = fx;
             tracks = new GameObject("Tracks").AddComponent<Tracks>(); tracks.Build();
             infantry = new GameObject("Infantry").AddComponent<Infantry>(); infantry.Build(); infantry.gunSilenced = g => hud.Toast(g.spec.name + " crew down · the gun is silent", 2.4f);
-            infantry.fightWon = at => { score += 200; hud.Popup(at + Vector3.up * 2f, "+200", new Color(0.85f, 0.9f, 0.7f)); hud.Toast(Depot.Nation == "su" ? "The riflemen wave their caps · thank you, tankists" : "The infantry wave · thanks for the help, tanks", 2.8f); };
+            infantry.fightWon = at => { score += 50; hud.Popup(at + Vector3.up * 2f, "+50", new Color(0.85f, 0.9f, 0.7f)); hud.Toast(Depot.Nation == "su" ? "The riflemen wave their caps · thank you, tankists" : "The infantry wave · thanks for the help, tanks", 2.8f); };
             props.bunkerDown = at => { score += 150; hud.Popup(at + Vector3.up * 2f, "+150", new Color(0.95f, 0.66f, 0.23f)); hud.Toast("Bunker silenced", 2f); }; veteran = Depot.Veteran || rule == "veteran" || (mapSector != null && mapSector.veteran);
 
             // night: moonlight with soft shadows, a cold ambient, fog swallowing the distance
@@ -2068,8 +2068,8 @@ namespace IronNight
 
         void InfantryKilled(int n, Vector3 at)
         {
-            if (n <= 0) return; nightInfantry += n; score += 20 * n; xp += n;
-            hud.Popup(at + Vector3.up, "+" + 20 * n, new Color(0.85f, 0.85f, 0.8f));
+            if (n <= 0) return; nightInfantry += n; score += 5 * n; xp += n;   // a man is worth little: the night's points come from the tanks
+            hud.Popup(at + Vector3.up, "+" + 5 * n, new Color(0.85f, 0.85f, 0.8f));
             if (xp >= xpNeed) LevelUp(); else hud.SetLevel(level, (float)xp / xpNeed);
         }
 
@@ -2093,17 +2093,20 @@ namespace IronNight
             if (mg && m.burst == 5) { if (m.ally) Sfx.Mg(from); else Sfx.Mg42(from); }
         }
 
-        /// <summary>Now and then, ahead of the platoon off to one side, a squad of ours dug in against a squad of theirs.</summary>
+        /// <summary>The fire fights in the fields (Props.FightSpots): each one going on once the platoon comes within 100 m
+        /// of it, never twice, at most three at once.</summary>
         void TickSkirmishes(float dt)
         {
             var L = Leader; if (L == null || stand || sneak) return;
-            if ((skirmishLeft -= dt) > 0f) return; skirmishLeft = 45f + Random.value * 35f;
-            string nation = theatre == "kursk" ? "su" : "us"; if (!infantry.CanFight(nation) || infantry.Fights >= 2) return;
-            float ang = L.yaw + Random.Range(-0.6f, 0.6f); var ahead = new Vector3(Mathf.Sin(ang), 0f, Mathf.Cos(ang)); var side = new Vector3(ahead.z, 0f, -ahead.x) * (Random.value < 0.5f ? 1f : -1f);
-            var ours = props.PushOut(L.transform.position + ahead * Random.Range(50f, 70f) - side * 8f, 2f); var theirs = props.PushOut(ours + side * 26f + ahead * Random.Range(-6f, 6f), 2f);
-            if (infantry.Skirmish(ours, theirs, nation)) hud.Toast((nation == "su" ? "Our riflemen in a fire fight, " : "Our infantry under fire, ") + Clock(ours), 2.6f);
+            if ((skirmishLook -= dt) > 0f) return; skirmishLook = 1f;
+            string nation = theatre == "kursk" ? "su" : "us"; if (!infantry.CanFight(nation)) return;
+            foreach (var (ours, theirs, key) in props.FightSpots(L.transform.position, 100f))
+            {
+                if (foughtFields.Contains(key) || infantry.Fights >= 3) continue; foughtFields.Add(key);
+                if (infantry.Skirmish(props.PushOut(ours, 1.5f), props.PushOut(theirs, 1.5f), nation)) hud.Toast((nation == "su" ? "Our riflemen in a fire fight, " : "Our infantry in a fire fight, ") + Clock(ours), 2.6f);
+            }
         }
-        float skirmishLeft = 40f;
+        float skirmishLook; readonly HashSet<long> foughtFields = new HashSet<long>();
 
         /// <summary>A Panzerfaust: a slow rocket from the man's shoulder, two hits when it lands, never a ricochet.</summary>
         void FireFaust(Infantry.Soldier m, Vehicle target)
