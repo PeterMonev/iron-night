@@ -1805,7 +1805,7 @@ namespace IronNight
         // ---- paratroopers on call ----
         class Jumper { public Transform fig, chute; public LineRenderer lines; public Mesh canopy; public Vector3[] rest, heap; public Vector3 pos, face; public float height, wait, age, spill = -1f; public int seed; }
         readonly List<Jumper> jumpers = new List<Jumper>(); Infantry.Squad paraSquad; string paraNation; float paraCool, paraArmedLeft, paraHold; bool paraUp, paraArmed;
-        const float ParaCoolFull = 90f, ParaFight = 60f, ParaScale = 0.85f, ParaLines = 7f;   // ParaScale: the crate's canopy cut down for a man (about 11 m across: the T-5's 28 feet read too small from the camera)
+        const float ParaCoolFull = 90f, ParaFight = 60f, ParaScale = 0.66f, ParaLines = 7f;   // ParaScale: the crate's canopy cut down for a man (about 11 m across: the T-5's 28 feet read too small from the camera)
         static bool ParaRank => Depot.RankLevel >= 3;   // a sergeant: ten nights fought
 
         /// <summary>The PARA button: there from 1:30 for a sergeant and up (not on a night without air), ready every 90 s
@@ -2039,7 +2039,7 @@ namespace IronNight
         /// (above 1: the fabric texture is dark).</summary>
         static Color ChuteColour(int kind) => Random.value < 0.25f ? new Color(1.25f, 1.24f, 1.16f) : new Color(0.62f, 0.6f, 0.4f);   // white, or olive drab (not lime: the cloth is pale grey, not green)
         // the cargo parachute: 24 gores, its rigging lines about as long as it is wide
-        const int ChuteGores = 24; const float ChuteRadius = 6.5f, ChuteHeight = 4.8f, ChuteLines = 9f, ChuteRiser = 1.6f;   // larger than the A-5's 24 feet, to read from the camera
+        const int ChuteGores = 24; const float ChuteRadius = 8.5f, ChuteHeight = 6.2f, ChuteLines = 11f, ChuteRiser = 1.6f;   // larger than the A-5's 24 feet, to read from the camera
         Material shroudMaterial;
         Material ShroudMaterial() { if (shroudMaterial == null) { shroudMaterial = new Material(Resources.Load<Material>("VehicleLit")); shroudMaterial.SetColor("_BaseColor", new Color(0.62f, 0.58f, 0.46f)); shroudMaterial.SetFloat("_Smoothness", 0.1f); } return shroudMaterial; }
 

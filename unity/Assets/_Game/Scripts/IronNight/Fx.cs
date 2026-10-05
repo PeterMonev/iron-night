@@ -15,7 +15,7 @@ namespace IronNight
         class Puff
         {
             public Transform t; public Renderer r; public float life, age, size, grow, spin, alphaPow, stretch; public Color color; public Vector3 vel, axis;
-            public bool smoke, gravity, aligned, flat, leaf, lick; public float spinRate;   // lick: a photographed flame, fading in and out
+            public bool smoke, gravity, aligned, flat, leaf, lick; public float spinRate, seed;   // seed: a flickering flame's place in the noise   // lick: a photographed flame, fading in and out
             public int frames, cols, rows, frame0;   // a sprite sheet: frames stepped over the life, or one fixed frame
         }
 
@@ -31,7 +31,31 @@ namespace IronNight
         readonly List<Puff> puffs = new List<Puff>(); readonly Stack<GameObject> quadPool = new Stack<GameObject>();
         readonly List<Light> lights = new List<Light>(); readonly List<float> lightLife = new List<float>(); readonly List<float> lightMax = new List<float>();
         readonly MaterialPropertyBlock mpb = new MaterialPropertyBlock();
-        static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
+        static readonly int BaseColor = Shader.PropertyToID("_BaseColor"), SeedId = Shader.PropertyToID("_Seed");
+
+        /// <summary>Smooth noise that tiles, three different fields in r, g and b: what moves the flames.</summary>
+        static Texture2D FlameNoise(int size)
+        {
+            var tx = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Bilinear, name = "FlameNoise" };
+            var rng = new System.Random(7); var px = new Color[size * size]; var ch = new float[3][];
+            for (int k = 0; k < 3; k++)
+            {
+                ch[k] = new float[size * size];
+                for (int oct = 0, cells = 4; oct < 4; oct++, cells *= 2)
+                {
+                    var g = new float[cells * cells]; for (int i = 0; i < g.Length; i++) g[i] = (float)rng.NextDouble();
+                    float amp = 1f / (1 << oct);
+                    for (int y = 0; y < size; y++) for (int x = 0; x < size; x++)
+                    {
+                        float fx = (float)x * cells / size, fy = (float)y * cells / size; int x0 = (int)fx, y0 = (int)fy; float u = fx - x0, v = fy - y0; u = u * u * (3f - 2f * u); v = v * v * (3f - 2f * v);
+                        int x1 = (x0 + 1) % cells, y1 = (y0 + 1) % cells;
+                        ch[k][y * size + x] += amp * Mathf.Lerp(Mathf.Lerp(g[y0 * cells + x0], g[y0 * cells + x1], u), Mathf.Lerp(g[y1 * cells + x0], g[y1 * cells + x1], u), v);
+                    }
+                }
+            }
+            for (int i = 0; i < px.Length; i++) px[i] = new Color(ch[0][i] / 1.875f, ch[1][i] / 1.875f, ch[2][i] / 1.875f, 1f);
+            tx.SetPixels(px); tx.Apply(true); return tx;
+        }
         Camera cam;
 
         public void Build(Camera camera)
@@ -47,7 +71,8 @@ namespace IronNight
             addExplosion = Make(additive, Pic("fx_explosion")); smokeSheet = Make(smoke, Pic("fx_smoke")); addSparks = Make(additive, Pic("fx_sparks"));
             leafFx = new Material(Resources.Load<Material>("FoliageCut"));
             paintRing = new Material(Resources.Load<Material>("GroundDecal")); var ringPic = Pic("paint_ring"); paintRing.SetTexture("_BaseMap", ringPic != null ? ringPic : PaintedRing(512)); paintRing.SetTexture("_BumpMap", null); paintRing.SetFloat("_Smoothness", 0.35f); paintRing.renderQueue = 2448;   // the keyword stays on: the variant without it is not in the build
-            var fm = new List<Material>(); foreach (int i in new[] { 2, 4 }) { var t = Pic("flame_" + i); if (t != null) fm.Add(Make(additive, t)); } flameMats = fm.ToArray(); var fbl = new List<Material>(); for (int i = 1; i <= 2; i++) { var fb = Pic("fireball_" + i); if (fb != null) fbl.Add(Make(additive, fb)); } fireballMats = fbl.ToArray();
+            var flicker = Resources.Load<Shader>("Shaders/FlameFlicker"); Material flameBase = null; if (flicker != null) { flameBase = new Material(flicker); flameBase.SetTexture("_Noise", FlameNoise(128)); }
+            var fm = new List<Material>(); foreach (int i in new[] { 2, 4 }) { var t = Pic("flame_" + i); if (t != null) fm.Add(Make(flameBase != null ? flameBase : additive, t)); } flameMats = fm.ToArray(); var fbl = new List<Material>(); for (int i = 1; i <= 2; i++) { var fb = Pic("fireball_" + i); if (fb != null) fbl.Add(Make(additive, fb)); } fireballMats = fbl.ToArray();
             var pm = new List<Material>(); for (int i = 1; i <= 4; i++) { var t = Pic("smoke_puff_" + i); if (t != null) pm.Add(Make(smoke, t)); } puffMats = pm.ToArray();
             blendFlak = Make(smoke, Pic("fx_flak")); blendDust = Make(smoke, Pic("fx_dust")); addMuzzle = Make(additive, Pic("fx_muzzle")); addTracer = Make(additive, Pic("fx_tracer"));
         }
@@ -143,7 +168,7 @@ namespace IronNight
         {
             if (flameMats.Length == 0) return Spawn(addFlame, pos, size, color, life, vel, grow);
             var c = Color.Lerp(Color.white, color, 0.3f) * 0.6f; c.a = 1f;
-            var p = Spawn(flameMats[Random.Range(0, flameMats.Length)], pos + Vector3.up * size * 0.5f, size * 1.2f, c, life * 1.6f, vel * 0.2f, grow * 0.25f); p.spin = Random.Range(-6f, 6f); p.lick = true; return p;
+            var p = Spawn(flameMats[Random.Range(0, flameMats.Length)], pos + Vector3.up * size * 0.5f, size * 1.2f, c, life * 1.6f, vel * 0.2f, grow * 0.25f); p.spin = Random.Range(-6f, 6f); p.lick = true; p.seed = Random.value * 10f; return p;
         }
 
         Puff Billow(Vector3 pos, float size, Color color, float life, Vector3 vel, float grow = 0.8f, bool smoke = true)
@@ -414,7 +439,7 @@ namespace IronNight
                 var c = p.color; c.a = p.color.a * Mathf.Pow(1f - q, p.alphaPow);
                 if (p.smoke) c.a *= Mathf.SmoothStep(0f, 1f, q / 0.14f);   // swelling in, not popping up
                 if (p.lick) c.a *= Mathf.SmoothStep(0f, 1f, q / 0.35f);   // a flame comes up out of the fire, never pops in
-                mpb.SetColor(BaseColor, c); mpb.SetVector(BaseMapST, FrameST(p, q)); p.r.SetPropertyBlock(mpb);
+                mpb.SetColor(BaseColor, c); mpb.SetVector(BaseMapST, FrameST(p, q)); if (p.lick) mpb.SetFloat(SeedId, p.seed); p.r.SetPropertyBlock(mpb);
                 if (p.flat) p.t.rotation = Quaternion.Euler(90f, p.spin, 0f);
                 else if (p.aligned) p.t.rotation = Quaternion.LookRotation(camFwd, p.axis);
                 else p.t.rotation = camRot * Quaternion.Euler(0f, 0f, p.spin + (p.smoke ? q * 25f : 0f));
