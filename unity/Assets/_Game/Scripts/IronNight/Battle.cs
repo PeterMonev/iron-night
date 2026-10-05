@@ -303,7 +303,7 @@ namespace IronNight
             if (stick.ConsumeTap() && phase == Phase.Play)
             {
                 var ray = cam.ScreenPointToRay(stick.TapAt); if (ray.direction.y < -0.01f) { var g = ray.origin + ray.direction * (-ray.origin.y / ray.direction.y); bool placed = !airArmed && !paraArmed && !supplyArmed && StandPlace(g); bool called = !placed && (airArmed || paraArmed || supplyArmed); if (called) { if (airArmed) { airArmed = false; CallAir(g); } else if (paraArmed) { paraArmed = false; CallPara(g); } else { supplyArmed = false; CallSupply(g); } } var pick = called || placed ? null : Nearest(foes, g, 9f);
-                    if (!called && !placed && pick == null && objective != null && objective.kind == "dump" && new Vector2(g.x - objective.pos.x, g.z - objective.pos.z).magnitude < 10f) { point = objective.pos; pointLeft = 10f; hud.Toast("Shell the fuel dump", 1.6f); Sfx.Click(); }
+                    if (!called && !placed && pick == null && objective != null && objective.kind == "dump" && new Vector2(g.x - objective.pos.x, g.z - objective.pos.z).magnitude < 14f) { point = objective.pos; pointLeft = 10f; hud.Toast("Shell the fuel dump", 1.6f); Sfx.Click(); }
                     else if (!called && !placed && pick == null) { var mine = NearestMine(g, 4f); if (mine != null) { point = mine.pos; pointLeft = 5f; hud.Toast("Shell the mine", 1.6f); Sfx.Click(); } else { var man = infantry.Nearest(g, 7f); if (man != null) { point = man.pos; pointLeft = 6f; hud.Toast(man.gun != null ? "Shell the gun crew" : man.still ? "Shell the observer" : "Shell the infantry", 1.6f); Sfx.Click(); } } }
                     if (pick != null) { focus = pick; focusLeft = 8f; if (focusRing == null) focusRing = fx.Marker(pick.transform.position, new Color(1f, 0.55f, 0.3f), 7f); focusRing.gameObject.SetActive(true); hud.Toast("Focus fire · " + pick.spec.name, 1.6f); Sfx.Click(); } }
             }
@@ -317,6 +317,11 @@ namespace IronNight
                 v.reloadLeft -= dt;
                 var target = Nearest(foes, v.transform.position, v.Range * 1.15f);
                 if (focus != null && Dist(v, focus) <= v.Range * 1.15f) target = focus;
+                if (target == null && focus == null && pointLeft <= 0f && objective != null && objective.kind == "dump")
+                {
+                    // nothing else to fire at and the fuel dump in range: shell it without being told
+                    var toD = objective.pos - v.transform.position; toD.y = 0f; if (toD.magnitude <= v.Range) { point = objective.pos; pointLeft = 0.5f; }
+                }
                 if (pointLeft > 0f && (target == null || focus == null))
                 {
                     // told to shell a spot: every gun in range onto it
@@ -413,13 +418,23 @@ namespace IronNight
             if (objective.hits < 3) return;
             var pos = objective.pos; score += 500; objectivesReached++; shake = Mathf.Max(shake, 0.9f); Sfx.Explosion(pos); Sfx.Pickup();
             foreach (var p in objective.props) { if (p == null) continue; fx.Explosion(p.transform.position + Vector3.up * 0.5f); props.Crater(p.transform.position, 3f); Destroy(p); }
-            fx.Explosion(pos + Vector3.up); props.Crater(pos, 5f); props.Blast(pos, 9f, 4f);
+            fx.Explosion(pos + Vector3.up); props.Crater(pos, 7f); props.Blast(pos, 14f, 4f);
             var fire = new GameObject("DumpFire").AddComponent<Light>(); fire.type = LightType.Point; fire.color = new Color(1f, 0.55f, 0.2f); fire.range = 26f; fire.intensity = 14f; fire.shadows = LightShadows.None; fire.transform.position = pos + Vector3.up * 3f; dumpFires.Add(fire);
-            InfantryKilled(infantry.Blast(pos, 9f), pos); foreach (var e in foes.ToArray()) { var d = e.transform.position - pos; d.y = 0f; if (d.magnitude < 9f && !e.dead) Damage(e, 2f, pos); }
+            InfantryKilled(infantry.Blast(pos, 14f), pos); foreach (var e in foes.ToArray()) { var d = e.transform.position - pos; d.y = 0f; if (d.magnitude < 14f && !e.dead) Damage(e, 2f, pos); }
             hud.Popup(pos, "+500", new Color(1f, 0.6f, 0.3f)); hud.Toast("Fuel dump destroyed · +500", 2.6f);
             Destroy(objective.marker.gameObject); objective = null; pointLeft = 0f; if (sneak) SneakDone(); else NextObjective();
         }
         readonly List<Light> dumpFires = new List<Light>();
+
+        /// <summary>Something of ours exploding (a rocket, a shell, cannon fire): when it lands on the fuel dump, hits
+        /// that many times (three blow it up).</summary>
+        void DumpStruck(Vector3 at, float radius, int hits)
+        {
+            for (int k = 0; k < hits && objective != null && objective.kind == "dump"; k++)
+            {
+                var d = objective.pos - at; d.y = 0f; if (d.magnitude > radius + 9f) return; DumpHit(at);
+            }
+        }
 
         /// <summary>One gore of the canopy, repeated round it: pale cloth a shade lighter in the middle of the panel,
         /// darker at the seams, a little darker toward the skirt; smooth so it does not shimmer from far off.</summary>
@@ -595,7 +610,7 @@ namespace IronNight
                     else fx.Hit(new Vector3(s.pos.x, 1.6f, s.pos.z), 1f);
                 }
                 if (s.bounced) s.vel += Vector3.down * (30f * dt);
-                if (hit == null && !s.bounced && s.friendly && objective != null && objective.kind == "dump" && new Vector2(s.pos.x - objective.pos.x, s.pos.z - objective.pos.z).magnitude < 4.5f && s.pos.y < 4f) { DumpHit(s.pos); s.life = 0f; }
+                if (hit == null && !s.bounced && s.friendly && objective != null && objective.kind == "dump" && new Vector2(s.pos.x - objective.pos.x, s.pos.z - objective.pos.z).magnitude < 10f && s.pos.y < 4f) { DumpHit(s.pos); s.life = 0f; }
                 if (hit == null && !s.bounced && s.friendly && s.life > 0f && MineShot(s.pos)) s.life = 0f;
                 if (hit == null && !s.bounced && s.friendly) { int men = infantry.Blast(s.pos, 1.6f); if (men > 0) { InfantryKilled(men, s.pos); fx.Hit(s.pos, 0.7f); s.life = 0f; } }
                 if (hit == null && !s.bounced && s.friendly && props.HitLamp(s.pos)) { fx.Explosion(s.pos); Sfx.Explosion(s.pos); LampOut(s.pos); s.life = 0f; }
@@ -1229,7 +1244,7 @@ namespace IronNight
             if (debugDump) kind = "dump";   // test switch: every objective a fuel dump
             if (debugCrew) kind = "crew";   // test switch: every objective a stranded crew
             if (kind != "reach") hold = false;
-            objective = new Objective { pos = pos, n = objectivesReached + 1, hold = hold, kind = kind, marker = fx.Marker(pos, kind == "reach" ? new Color(0.35f, 0.95f, 0.45f) : new Color(1f, 0.45f, 0.3f), hold ? 15f : 9f, true) };
+            objective = new Objective { pos = pos, n = objectivesReached + 1, hold = hold, kind = kind, marker = fx.Marker(pos, kind == "reach" ? new Color(0.35f, 0.95f, 0.45f) : new Color(1f, 0.45f, 0.3f), hold ? 15f : kind == "dump" ? 26f : 9f, true) };   // round the whole fuel yard
             if (kind == "reach") objective.grenade = props.Spawn("marker_smoke", pos, Random.value * 360f);   // the coloured smoke grenade marking the spot
             if (kind == "battery")
             {
@@ -1247,10 +1262,16 @@ namespace IronNight
             }
             if (kind == "dump")
             {
-                // a fuel dump: stacks of barrels under a guard of four; three shells into it and it goes up
-                objective.pos = props.PushOut(pos, 6f); pos = objective.pos; objective.marker.position = pos;
-                for (int i = 0; i < 4; i++) { float a = i * 1.6f + Random.value; var p = props.Spawn("barrels", pos + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * 2.6f, Random.value * 360f); if (p != null) objective.props.Add(p); }
-                var toL = L.transform.position - pos; toL.y = 0f; infantry.Spawn(pos + toL.normalized * 7f, toL.normalized);
+                // a fuel dump: a yard of drums in rows, two fuel trucks, sandbags at the corners, two squads guarding it;
+                // three shells into it and it goes up
+                objective.pos = props.PushOut(pos, 12f); pos = objective.pos; objective.marker.position = pos;
+                float yaw = Random.value * 360f; var q = Quaternion.Euler(0f, yaw, 0f);
+                void Put(string what, float x, float z, float turn) { var p = props.Spawn(what, pos + q * new Vector3(x, 0f, z), yaw + turn); if (p != null) objective.props.Add(p); }
+                for (int r = 0; r < 3; r++) for (int c = 0; c < 4; c++) Put("barrels", -6.75f + c * 4.5f + Random.Range(-0.4f, 0.4f), -4f + r * 4f + Random.Range(-0.3f, 0.3f), Random.Range(-20f, 20f));
+                Put("truck", -3f, 9f, 90f); Put("truck", 5f, 9.5f, 84f);
+                foreach (var (x, z) in new[] { (-11f, -7f), (11f, -7f), (-11f, 6f), (11f, 6f) }) Put("sandbags", x, z, x * z > 0f ? 45f : -45f);
+                var toL = L.transform.position - pos; toL.y = 0f; var side = new Vector3(toL.z, 0f, -toL.x).normalized;
+                infantry.Spawn(pos + toL.normalized * 12f + side * 6f, toL.normalized); infantry.Spawn(pos + toL.normalized * 12f - side * 6f, toL.normalized);
             }
             if (kind == "car")
             {
@@ -1258,7 +1279,7 @@ namespace IronNight
                 var car = Foe(VehicleSpec.Kubelwagen, props.PushOut(L.transform.position + L.Forward * 45f, 2f), L.yaw); car.unloaded = true; car.leaving = true; objective.targets.Add(car); objective.clock = 40f;
             }
             if (phase == Phase.Play) Brief(kind);
-            if (phase == Phase.Play) hud.Toast("Objective " + objective.n + " · " + (kind == "battery" ? "destroy the rocket battery, " : kind == "dump" ? "fuel dump · tap it to shell it, " : kind == "crew" ? "crew of a knocked-out tank · pick them up, " : kind == "car" ? "staff car making a run for it · stop it" : (hold ? "hold the crossing, " : "")) + (kind == "car" ? "" : Mathf.RoundToInt(dist) + " m ahead"), 3f);
+            if (phase == Phase.Play) hud.Toast("Objective " + objective.n + " · " + (kind == "battery" ? "destroy the rocket battery, " : kind == "dump" ? "fuel dump · shell it, " : kind == "crew" ? "crew of a knocked-out tank · pick them up, " : kind == "car" ? "staff car making a run for it · stop it" : (hold ? "hold the crossing, " : "")) + (kind == "car" ? "" : Mathf.RoundToInt(dist) + " m ahead"), 3f);
         }
 
         /// <summary>The gun is empty: the crew says so, once every few seconds, and the drops become the thing to drive for.</summary>
@@ -1739,7 +1760,7 @@ namespace IronNight
             fx.MgTracer(plane.position, (at - plane.position).normalized); if (Random.value < 0.5f) fx.Dust(at); if (Random.value < 0.3f) Sfx.Mg(at);
             foreach (var v in foes.ToArray()) if (!v.dead && Flat(v.transform.position - at) < 2.6f) Damage(v, 0.35f, at);
             foreach (var v in platoon.ToArray()) if (!v.dead && Flat(v.transform.position - at) < 2.6f) Damage(v, 0.35f, at);
-            InfantryKilled(infantry.Blast(at, 2.5f), at);
+            InfantryKilled(infantry.Blast(at, 2.5f), at); DumpStruck(at, 2.5f, 1);
             foreach (var lamp in props.BreakLamps(at, 2.6f)) { fx.Hit(lamp, 0.8f); LampOut(lamp); }
         }
 
@@ -1772,7 +1793,7 @@ namespace IronNight
                 if (Leader != null && Flat(Leader.transform.position - r.to) < 20f) Haptics.Boom();
                 foreach (var v in foes.ToArray()) if (!v.dead && Flat(v.transform.position - r.to) < 4.5f) Damage(v, 2.2f, r.to);
                 foreach (var v in platoon.ToArray()) if (!v.dead && Flat(v.transform.position - r.to) < 4.5f) Damage(v, 2.2f, r.to);
-                InfantryKilled(infantry.Blast(r.to, 6f), r.to);
+                InfantryKilled(infantry.Blast(r.to, 6f), r.to); DumpStruck(r.to, 6f, 3);
                 if (phase != Phase.Play) return;
             }
         }
@@ -2288,6 +2309,13 @@ namespace IronNight
                 int k = 0; foreach (var o in foes) if (!o.dead && Dist(e, o) < 10f) k++;
                 if (k > bestN) { bestN = k; best = e; }
             }
+            if (best == null && objective != null && objective.kind == "dump" && (objective.pos - Leader.transform.position).magnitude < 80f)
+            {
+                // no tanks to shell: the guns onto the fuel dump
+                hud.Toast("Artillery · on the fuel dump"); Sfx.Whistle(objective.pos);
+                for (int i = 0; i < 4; i++) { var at = objective.pos + new Vector3(Random.Range(-4f, 4f), 0f, Random.Range(-4f, 4f)); float when = 1.1f + i * 0.35f; arty.Add(new ArtyShell { at = at, timer = when }); fx.Incoming(at, when); }
+                return true;
+            }
             if (best == null) return false;
             hud.Toast("Artillery · fire mission"); Sfx.Whistle(best.transform.position);
             for (int i = 0; i < 4; i++) { var at = best.transform.position + new Vector3(Random.Range(-6f, 6f), 0f, Random.Range(-6f, 6f)); float when = 1.1f + i * 0.35f; arty.Add(new ArtyShell { at = at, timer = when }); fx.Incoming(at, when); }
@@ -2300,7 +2328,7 @@ namespace IronNight
             for (int i = arty.Count - 1; i >= 0; i--)
             {
                 var a = arty[i]; a.timer -= dt; if (a.timer > 0f) continue;
-                fx.Explosion(a.at); Sfx.Artillery(a.at); props.Crater(a.at, 5f); props.Blast(a.at, 7f, 3f); arty.RemoveAt(i); InfantryKilled(infantry.Blast(a.at, 7f), a.at);
+                fx.Explosion(a.at); Sfx.Artillery(a.at); props.Crater(a.at, 5f); props.Blast(a.at, 7f, 3f); arty.RemoveAt(i); InfantryKilled(infantry.Blast(a.at, 7f), a.at); DumpStruck(a.at, 4f, 3);
                 foreach (var e in foes.ToArray()) { if (e.dead) continue; var d = e.transform.position - a.at; d.y = 0f; if (d.magnitude < 7f) Damage(e, d.magnitude < 3.5f ? 2f : 1f, a.at); }
             }
         }
