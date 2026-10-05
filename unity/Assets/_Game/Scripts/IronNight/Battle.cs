@@ -29,7 +29,7 @@ namespace IronNight
         class Mine { public Vector3 pos; public Transform vis; public bool friendly; }   // friendly: laid in a last stand, set off by the enemy only
         class Drop { public Vector3 pos; public float height, age, lift, top, wait; public int kind; public Transform crate, chute, marker; public LineRenderer lines; public Mesh canopy; public Vector3[] rest, heap; public float spill = -1f; public Vector3 spillTo; }   // heap: the canopy on the ground; spill: how far it has fallen in (-1 not yet)   // lift: the crate origin above its base; top: where the shrouds tie
         class Mortar { public Vector3 at; public float timer; public Transform ring; public bool bomb; }   // bomb: a dive bomber's, heavier
-        class Star { public Vector3 pos; public float height, life, puff; public Transform flare, chute; public Light light; }
+        class Star { public Vector3 pos; public float height, life, puff; public Transform flare, chute; public Light light; public LineRenderer lines; }
         enum Phase { Title, Intro, Play, LevelUp, Pause, End, Photo }
 
         static readonly float NightLength = NightArg();   // five minutes of darkness, dawn at 5:00 (--night=30 for tests)
@@ -1507,6 +1507,7 @@ namespace IronNight
             {
                 dropTimer = 50f + Random.value * 25f;
                 float a = Random.value * Mathf.PI * 2f; var pos = props.PushOut(L.transform.position + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * (16f + Random.value * 14f), 3f);
+                if (stand) { var off = Random.insideUnitCircle * (StandHold * 0.7f); pos = props.PushOut(standAt + new Vector3(off.x, 0f, off.y), 3f); }   // a last stand: inside the ring
                 SpawnDrop(pos); hud.Toast("Supply drop coming down, " + Clock(pos), 2.8f);
             }
             TickPlanes(dt);
@@ -1604,7 +1605,8 @@ namespace IronNight
         {
             {
                 star = new Star { pos = over, height = 42f, life = 16f, flare = fx.StarFlare() };
-                star.chute = new GameObject("StarCanopy").transform; star.chute.gameObject.AddComponent<MeshFilter>().sharedMesh = Canopy(10, 4, 1.5f, 1f, out _); star.chute.gameObject.AddComponent<MeshRenderer>(); star.chute.GetComponent<Renderer>().sharedMaterial = ChuteMaterial();
+                star.chute = new GameObject("StarCanopy").transform; star.chute.gameObject.AddComponent<MeshFilter>().sharedMesh = Canopy(12, 4, 2.6f, 1.7f, out _);
+                star.lines = new GameObject("StarShrouds").AddComponent<LineRenderer>(); star.lines.positionCount = 13; star.lines.startWidth = star.lines.endWidth = 0.05f; star.lines.material = ShroudMaterial(); star.lines.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; star.chute.gameObject.AddComponent<MeshRenderer>(); star.chute.GetComponent<Renderer>().sharedMaterial = ChuteMaterial();
                 star.light = new GameObject("StarLight").AddComponent<Light>(); star.light.type = LightType.Point; star.light.color = new Color(1f, 0.96f, 0.86f); star.light.range = 80f; star.light.intensity = 70f; star.light.shadows = LightShadows.None;
                 Sfx.Flak(star.pos + Vector3.up * 30f); hud.Toast(toast, 3f);
             }
@@ -1615,11 +1617,13 @@ namespace IronNight
             var L = Leader;
             if (star == null) { lit = false; return; }
             star.life -= dt; star.height = Mathf.Max(6f, star.height - 1.7f * dt); star.pos += new Vector3(0.5f, 0f, 0.3f) * dt;
-            var at = star.pos + Vector3.up * star.height; star.flare.position = at; star.flare.GetChild(0).rotation = cam.transform.rotation; star.chute.position = at + Vector3.up * 3f; star.light.transform.position = at;
+            var at = star.pos + Vector3.up * star.height; star.flare.position = at; star.flare.GetChild(0).rotation = cam.transform.rotation; star.chute.position = at + Vector3.up * 3.6f; star.light.transform.position = at;
+            for (int k = 0; k < 6; k++) { float a = k * Mathf.PI / 3f; star.lines.SetPosition(k * 2, at + Vector3.up * 0.3f); star.lines.SetPosition(k * 2 + 1, at + new Vector3(Mathf.Cos(a) * 2.3f, 3.7f, Mathf.Sin(a) * 2.3f)); }   // six lines from the skirt down to the flare
+            star.lines.SetPosition(12, at + Vector3.up * 0.3f);
             float burn = Mathf.Clamp01(star.life / 3f) * (0.85f + 0.15f * Mathf.PerlinNoise(Time.time * 9f, 0.5f)); star.light.intensity = 70f * burn; star.flare.GetChild(0).localScale = Vector3.one * (7f * (0.5f + 0.5f * burn));
             star.puff -= dt; if (star.puff <= 0f) { star.puff = 0.25f; fx.Signal(at, new Color(0.8f, 0.8f, 0.8f, 0.5f)); }
             var d = L.transform.position - star.pos; d.y = 0f; lit = star.life > 0f && d.magnitude < 40f;
-            if (star.life <= 0f) { fx.Release(star.flare); Destroy(star.chute.gameObject); Destroy(star.light.gameObject); star = null; lit = false; }
+            if (star.life <= 0f) { fx.Release(star.flare); Destroy(star.chute.gameObject); Destroy(star.lines.gameObject); Destroy(star.light.gameObject); star = null; lit = false; }
         }
 
         class Raid { public float t; public Vector3 a, b, dir, last; public bool lit, siren, marked, shown, whistled; public Transform plane, glow; }
@@ -1858,7 +1862,8 @@ namespace IronNight
         /// <summary>A crate called down where the player tapped, clear of buildings and water.</summary>
         void CallSupply(Vector3 at)
         {
-            at.y = 0f; at = props.PushOut(at, 3f); if (Props.InStream(at, 3f)) at = props.PushOut(at + Vector3.forward * 10f, 3f);
+            at.y = 0f; if (stand) { var o = at - standAt; o.y = 0f; if (o.magnitude > StandHold * 0.8f) at = standAt + o.normalized * StandHold * 0.8f; }   // a last stand: inside the ring
+            at = props.PushOut(at, 3f); if (Props.InStream(at, 3f)) at = props.PushOut(at + Vector3.forward * 10f, 3f);
             SpawnDrop(at); supplyCool = SupplyCoolFull; hud.Toast("Supplies inbound, " + Clock(at), 2.6f); Sfx.Click();
         }
 

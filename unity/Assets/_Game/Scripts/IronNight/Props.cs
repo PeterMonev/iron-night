@@ -408,12 +408,11 @@ namespace IronNight
         public static readonly Vector3 Crossroads = new Vector3(Half, 0f, Half);
 
         /// <summary>One corner of the crossroads, in the cell that has it: a house a few metres off both lanes turned to
-        /// the one in front of it, a wall along the other, a cart or a lorry by it.</summary>
+        /// the one in front of it, a cart or a lorry by it (no wall: with the house it made a pocket a tank stuck in).</summary>
         void StandCorner(List<Prop> list, int ix, int iz)
         {
             float sx = ix == 0 ? -1f : 1f, sz = iz == 0 ? -1f : 1f; var x = Crossroads;
             Place(list, Rnd(ix, iz, 1700) < 0.3f ? "house_ruin" : Rnd(ix, iz, 1701) < 0.5f ? "farmhouse" : "cottage", x + new Vector3(sx * 12f, 0f, sz * 11f), sz > 0f ? Mathf.PI : 0f);   // its front to the lane it stands by
-            Place(list, Rnd(ix, iz, 1702) < 0.5f ? "wall_a" : "wall_b", x + new Vector3(sx * 6f, 0f, sz * 21f), 0f);
             Place(list, Rnd(ix, iz, 1703) < 0.5f ? "cart" : "truck", x + new Vector3(sx * 21f, 0f, sz * 6.5f), Mathf.PI / 2f + (Rnd(ix, iz, 1704) - 0.5f) * 0.4f);
             if (Rnd(ix, iz, 1705) < 0.5f) Tree(list, x + new Vector3(sx * 22f, 0f, sz * 19f), (int)(Hash(ix, iz, 1706) & 0xffff));
         }

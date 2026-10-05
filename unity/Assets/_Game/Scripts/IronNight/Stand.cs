@@ -44,7 +44,7 @@ namespace IronNight
         /// <summary>The stand's own clock: the break to dig in, the wave coming in by ones and twos, dawn after the tenth.</summary>
         /// <summary>A sandbag ring of ours: its men (a squad in a fight with no end) and the bazooka's reload.</summary>
         class Nest { public Infantry.Squad squad; public Vector3 at; public float reload; }
-        readonly List<Nest> nests = new List<Nest>();
+        readonly List<Nest> nests = new List<Nest>(); readonly Dictionary<Vehicle, float> standSeen = new Dictionary<Vehicle, float>();
 
         /// <summary>Four of ours into a new sandbag ring, facing out from the crossroads; one has a bazooka.</summary>
         void ManNest(Vector3 at)
@@ -95,6 +95,14 @@ namespace IronNight
             int left = standQuota - standSpawned + foes.Count;
             hud.SetGoals("Wave " + standWave + " of " + StandWaves + " · " + left + " left"); hud.SetStandKit(standSupply, standArmed, false);
             if (standSpawned >= standQuota && foes.Count == 0) StandCleared();
+            // a tank still out past 40 m after 30 s is caught somewhere: onto the nearest lane 45 m out, facing in
+            foreach (var e in foes)
+            {
+                if (e.dead) continue; if (!standSeen.TryGetValue(e, out var born)) { standSeen[e] = t; continue; }
+                var d = e.transform.position - standAt; d.y = 0f; if (t - born < 30f || d.magnitude < 40f) continue;
+                var axis = Mathf.Abs(d.x) > Mathf.Abs(d.z) ? new Vector3(Mathf.Sign(d.x), 0f, 0f) : new Vector3(0f, 0f, Mathf.Sign(d.z)); var p = props.PushOut(standAt + axis * 45f, 3f);
+                e.transform.position = new Vector3(p.x, e.transform.position.y, p.z); e.yaw = Mathf.Atan2(-axis.x, -axis.z); e.transform.rotation = Quaternion.Euler(0f, e.yaw * Mathf.Rad2Deg, 0f); standSeen[e] = t;
+            }
         }
 
         /// <summary>The next wave: its tanks from one quarter, the extras of the fifth, eighth and tenth, the infantry.</summary>
