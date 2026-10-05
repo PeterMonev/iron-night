@@ -23,7 +23,7 @@ namespace IronNight
         Material addExplosion, smokeSheet, addSparks, blendFlak, blendDust, addMuzzle, addTracer;   // the photographic sprites
         Material leafFx;   // torn sprigs: the hedges' own lit, cut-out leaves sheet
         Material paintRing;   // the tactical markers: a ring painted on the ground (Fx/paint_ring when there is one, else PaintedRing), lit like the ground
-        Material fireballMat;   // the photographed fireball (Fx/fireball_1); null: the old sheet of frames
+        Material[] fireballMats;   // the photographed fireballs (Fx/fireball_1..2); empty: the old sheet of frames
         Material[] puffMats, flameMats;   // flameMats: photographed flames (Fx/flame_1..4); empty: the procedural flame stands in   // photographed smoke puffs (Fx/smoke_puff_1..4), white to be tinted; empty: the smoke sheet's grown frames stand in
         static readonly Vector3 Wind = new Vector3(0.7f, 0f, 0.35f);   // the night's breeze: smoke leans off with it
         static readonly int BaseMapST = Shader.PropertyToID("_BaseMap_ST"); static readonly Vector4 WholeSheet = new Vector4(1f, 1f, 0f, 0f);
@@ -47,7 +47,7 @@ namespace IronNight
             addExplosion = Make(additive, Pic("fx_explosion")); smokeSheet = Make(smoke, Pic("fx_smoke")); addSparks = Make(additive, Pic("fx_sparks"));
             leafFx = new Material(Resources.Load<Material>("FoliageCut"));
             paintRing = new Material(Resources.Load<Material>("GroundDecal")); var ringPic = Pic("paint_ring"); paintRing.SetTexture("_BaseMap", ringPic != null ? ringPic : PaintedRing(512)); paintRing.SetTexture("_BumpMap", null); paintRing.SetFloat("_Smoothness", 0.35f); paintRing.renderQueue = 2448;   // the keyword stays on: the variant without it is not in the build
-            var fm = new List<Material>(); for (int i = 1; i <= 4; i++) { var t = Pic("flame_" + i); if (t != null) fm.Add(Make(additive, t)); } flameMats = fm.ToArray(); var fb = Pic("fireball_1"); if (fb != null) fireballMat = Make(additive, fb);
+            var fm = new List<Material>(); for (int i = 1; i <= 4; i++) { var t = Pic("flame_" + i); if (t != null) fm.Add(Make(additive, t)); } flameMats = fm.ToArray(); var fbl = new List<Material>(); for (int i = 1; i <= 2; i++) { var fb = Pic("fireball_" + i); if (fb != null) fbl.Add(Make(additive, fb)); } fireballMats = fbl.ToArray();
             var pm = new List<Material>(); for (int i = 1; i <= 4; i++) { var t = Pic("smoke_puff_" + i); if (t != null) pm.Add(Make(smoke, t)); } puffMats = pm.ToArray();
             blendFlak = Make(smoke, Pic("fx_flak")); blendDust = Make(smoke, Pic("fx_dust")); addMuzzle = Make(additive, Pic("fx_muzzle")); addTracer = Make(additive, Pic("fx_tracer"));
         }
@@ -129,12 +129,12 @@ namespace IronNight
 
         /// <summary>A puff of smoke: a photographed one, turned any way, tinted by the colour; it swells in, rises
         /// slowing, leans off with the wind and thins away.</summary>
-        /// <summary>A fireball: the photographed one swelling from a little over half its size and burning out, turned any
+        /// <summary>A fireball: one of the photographed ones swelling from a little over half its size and burning out, turned any
         /// way; the old sheet of frames while there is no picture.</summary>
         Puff Fireball(Vector3 pos, float size, Color color, float life, Vector3 vel, float grow)
         {
-            if (fireballMat == null) return Sheet(Spawn(addExplosion, pos, size, color, life, vel, grow), 4, 4, 16);
-            return Spawn(fireballMat, pos, size * 0.6f, color, life, vel, grow * 2.4f + 0.5f);
+            if (fireballMats.Length == 0) return Sheet(Spawn(addExplosion, pos, size, color, life, vel, grow), 4, 4, 16);
+            return Spawn(fireballMats[Random.Range(0, fireballMats.Length)], pos, size * 0.6f, color, life, vel, grow * 2.4f + 0.5f);
         }
 
         /// <summary>A flame: a photographed one, upright within fifteen degrees, its colour only warmed a little (the picture
