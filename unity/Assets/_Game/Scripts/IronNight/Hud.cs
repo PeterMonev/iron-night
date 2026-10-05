@@ -1006,7 +1006,7 @@ namespace IronNight
                 d.enabled = true; d.color = c; d.rectTransform.sizeDelta = new Vector2(size, size); d.rectTransform.anchoredPosition = o; return d;
             }
             foreach (var c in crates) Dot(c, new Color(1f, 0.86f, 0.5f), 7f);
-            foreach (var e in foes) if (!e.dead) Dot(e.transform.position, e.spec.isGun ? new Color(1f, 0.55f, 0.3f) : new Color(0.95f, 0.3f, 0.25f), e.spec == VehicleSpec.TigerAce ? 16f : 11f);
+            foreach (var e in foes) if (!e.dead && !e.Unseen) Dot(e.transform.position, e.spec.isGun ? new Color(1f, 0.55f, 0.3f) : new Color(0.95f, 0.3f, 0.25f), e.spec == VehicleSpec.TigerAce ? 16f : 11f);
             for (int i = 1; i < platoon.Count; i++) if (!platoon[i].dead) Dot(platoon[i].transform.position, new Color(0.45f, 0.9f, 0.5f), 10f);
             if (hasObjective) Dot(objective, new Color(0.35f, 0.95f, 0.45f), 14f);
             for (int i = used; i < radarDots.Count; i++) radarDots[i].enabled = false;

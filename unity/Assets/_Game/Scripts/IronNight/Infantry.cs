@@ -20,10 +20,12 @@ namespace IronNight
         public class Soldier
         {
             public Transform t; public Vector3 pos; public float reload, phase, deadAge, cycle, stop; public bool dead, still; public Vector3 face = Vector3.forward;   // still: an observer or a gun crewman, he stays where he is and does not shoot
-            public Vector3 cover; public bool bounding; public float pause;   // going in bounds: the next cover, running to it, crouched in it
+            public Vector3 cover; public bool bounding, surrender; public float pause;   // going in bounds: the next cover, running to it, crouched in it
             public Role role; public Vehicle gun; public int burst; public bool posable, dug, ally; public string side; public MeshFilter mf; public MeshRenderer mr; public Transform fig;   // ally: one of ours in a fire fight; side: his nation's pose prefix (us, su)
         }
-        public class Squad { public readonly List<Soldier> men = new List<Soldier>(); }
+        public class Squad { public readonly List<Soldier> men = new List<Soldier>(); public bool mobile, surrendered; }   // mobile: a squad on foot coming at us
+        /// <summary>A squad giving up: where.</summary>
+        public System.Action<Vector3> surrendered;
 
         public readonly List<Squad> squads = new List<Squad>();
         class Runner { public Transform t; public Vector3 dir; public float age, cycle; public MeshFilter mf; public MeshRenderer mr; }
@@ -141,7 +143,7 @@ namespace IronNight
                 m.stop = role == Role.Faust ? 13f : role == Role.Rifle ? Random.Range(18f, 24f) : Random.Range(24f, 29f);
                 sq.men.Add(m);
             }
-            squads.Add(sq); return sq;
+            sq.mobile = true; squads.Add(sq); return sq;
         }
 
         /// <summary>Men put into a trench or a nest: they hold it, turn to the nearest tank and fight from where they are -
@@ -204,12 +206,19 @@ namespace IronNight
             for (int q = squads.Count - 1; q >= 0; q--)
             {
                 var sq = squads[q]; bool any = false;
+                if (sq.mobile && !sq.surrendered)
+                {
+                    // down to two with one of our tanks close: they give up
+                    int up = 0; Soldier one = null; foreach (var m in sq.men) if (!m.dead) { up++; one = m; }
+                    if (up > 0 && up <= 2) foreach (var v in platoon) { if (v.dead) continue; var d = v.transform.position - one.pos; d.y = 0f; if (d.magnitude < 18f) { sq.surrendered = true; break; } }
+                    if (sq.surrendered) { foreach (var m in sq.men) if (!m.dead) { m.surrender = true; m.bounding = false; if (walk != null) Show(m, "rifle"); m.t.position = m.pos; } surrendered?.Invoke(one.pos); }
+                }
                 foreach (var m in sq.men)
                 {
                     if (m.dead) continue; any = true;
                     if (m.gun != null) { m.pos = m.t.position; continue; }   // a crewman goes round with his gun
                     if (m.ally) continue;   // ours fight in TickFights
-                    if (m.still) continue;
+                    if (m.still || m.surrender) continue;
                     Vehicle target = null; float best = float.MaxValue;
                     foreach (var v in platoon) { if (v.dead) continue; var d = v.transform.position - m.pos; d.y = 0f; if (d.sqrMagnitude < best) { best = d.sqrMagnitude; target = v; } }
                     if (target == null) continue;
@@ -396,7 +405,7 @@ namespace IronNight
         public Soldier Nearest(Vector3 from, float reach)
         {
             Soldier best = null; float bd = reach * reach;
-            foreach (var s in squads) foreach (var m in s.men) { if (m.dead || m.ally) continue; var d = m.pos - from; d.y = 0f; float q = d.sqrMagnitude; if (q < bd) { bd = q; best = m; } }
+            foreach (var s in squads) foreach (var m in s.men) { if (m.dead || m.ally || m.surrender) continue; var d = m.pos - from; d.y = 0f; float q = d.sqrMagnitude; if (q < bd) { bd = q; best = m; } }
             return best;
         }
 
@@ -418,6 +427,14 @@ namespace IronNight
             m.t.position = m.pos + Vector3.up * 0.25f; m.t.rotation = Quaternion.LookRotation(m.face, Vector3.up) * Quaternion.Euler(-90f, 0f, Random.Range(-30f, 30f));
         }
 
+        /// <summary>The men who gave up within reach of a point, taken prisoner (gone from the field); how many.</summary>
+        public int TakePrisoners(Vector3 at, float reach)
+        {
+            int n = 0;
+            foreach (var s in squads) foreach (var m in s.men) { if (m.dead || !m.surrender) continue; var d = m.pos - at; d.y = 0f; if (d.magnitude < reach) { m.dead = true; Destroy(m.t.gameObject); n++; } }
+            return n;
+        }
+
         /// <summary>Kills every man within the radius of a blast; returns how many.</summary>
         public int Blast(Vector3 at, float radius)
         {
@@ -432,7 +449,7 @@ namespace IronNight
             int n = 0;
             foreach (var s in squads) foreach (var m in s.men)
             {
-                if (m.dead || m.ally) continue;   // ours step aside
+                if (m.dead || m.ally || m.surrender) continue;   // ours step aside, and nobody runs down a man with his hands up
                 foreach (var v in vehicles) { if (v.dead || v.spec.isGun) continue; var d = m.pos - v.transform.position; d.y = 0f; if (d.magnitude < v.spec.radius * 0.7f) { Kill(m); n++; break; } }
             }
             return n;

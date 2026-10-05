@@ -233,7 +233,7 @@ namespace IronNight
             // the ground, the fields, lanes, hedges, farms and searchlight posts are Props, built cell by cell around the camera
             props = new GameObject("Props").AddComponent<Props>(); props.winter = winter; props.wet = weather == Weather.Rain && !winter; Vehicle.Wet = props.wet; props.Build(cam); props.fx = fx;
             tracks = new GameObject("Tracks").AddComponent<Tracks>(); tracks.Build();
-            infantry = new GameObject("Infantry").AddComponent<Infantry>(); infantry.Build(); infantry.gunSilenced = g => hud.Toast(g.spec.name + " crew down · the gun is silent", 2.4f);
+            infantry = new GameObject("Infantry").AddComponent<Infantry>(); infantry.Build(); infantry.gunSilenced = g => hud.Toast(g.spec.name + " crew down · the gun is silent", 2.4f); infantry.surrendered = p => { hud.Toast("They are giving up, " + Clock(p) + " · drive up to take them prisoner", 2.6f); Intercept("Nicht schießen!", "don't shoot"); };
             infantry.fightWon = at => { score += 50; hud.Popup(at + Vector3.up * 2f, "+50", new Color(0.85f, 0.9f, 0.7f)); hud.Toast(Depot.Nation == "su" ? "The riflemen wave their caps · thank you, tankists" : "The infantry wave · thanks for the help, tanks", 2.8f); };
             props.bunkerDown = at => { score += 150; hud.Popup(at + Vector3.up * 2f, "+150", new Color(0.95f, 0.66f, 0.23f)); hud.Toast("Bunker silenced", 2f); }; veteran = Depot.Veteran || rule == "veteran" || (mapSector != null && mapSector.veteran);
 
@@ -290,6 +290,8 @@ namespace IronNight
                 var v = platoon[i]; var slot = Slot(i);
                 if (order == Order.Hold && i < holdAt.Length) slot = holdAt[i];
                 else if (order == Order.Advance) slot += L.Forward * 22f;   // pushed out ahead of the leader, still in formation
+                else if (L.hp < Depot.LeaderHp * 0.4f) { var th = Nearest(foes, L.transform.position, 60f); if (th != null) { var dTh = th.transform.position - L.transform.position; dTh.y = 0f; dTh.Normalize(); slot = L.transform.position + dTh * 7f + new Vector3(dTh.z, 0f, -dTh.x) * ((i % 2 == 1 ? -4f : 4f) * ((i + 1) / 2)); if (!coverSaid) { coverSaid = true; hud.Toast("Wingmen closing in to cover you", 2.2f); } } }   // the leader badly hurt: between him and the enemy
+                if (order != Order.Hold && v.hp < v.spec.hp * 0.35f) slot -= L.Forward * 6f;   // a hurt wingman hangs back
                 var d = slot - v.transform.position; d.y = 0f;
                 if (d.magnitude > 1.2f) v.Drive(Steer(v, new Vector2(d.x, d.z) * (Mathf.Clamp01(d.magnitude / 5f))), dt);
             }
@@ -347,6 +349,7 @@ namespace IronNight
             Sfx.Turret(Mathf.Abs(Mathf.DeltaAngle(leaderTurret * Mathf.Rad2Deg, L.turretYaw * Mathf.Rad2Deg)) * Mathf.Deg2Rad / Mathf.Max(dt, 1e-4f));
             if (!sneak || sneakAlarm) foreach (var v in platoon) TickMg(v, dt);
             infantry.Tick(dt, platoon, props, FireFaust, SmallArms, SmallArmsAt);
+            int taken = infantry.TakePrisoners(L.transform.position, 6f); if (taken > 0) { score += 15 * taken; hud.Popup(L.transform.position + Vector3.up * 2f, "+" + 15 * taken + " · prisoners", new Color(0.9f, 0.85f, 0.6f)); Sfx.Pickup(); }
             int crushed = infantry.Crush(platoon); if (crushed > 0) { InfantryKilled(crushed, L.transform.position); hud.Toast("Run down", 1.5f); }
 
             // ours: how fast each one moves, for the enemy to lead its shot
@@ -358,10 +361,31 @@ namespace IronNight
                 var target = PickTarget(e); if (convoy) target = ConvoyTarget(e, target); if (target == null) continue; e.rangeMul = enemyRangeMul * (lit ? 1.2f : 1f);
                 float dist = Dist(e, target); if (SneakAsleep(e, dist, dt)) continue;
                 if (e.spec.transport) { TickTransport(e, target, dist, dt); continue; }
-                if (!e.spec.isGun && !e.spec.casemate && e.hp <= 1f && e.spec.hp >= 3f && e.fallBack <= 0f && e.fallenBack < 1 && dist < e.Range * 0.8f) { e.fallBack = 6f; e.fallenBack++; hud.Toast(e.spec.name + " falling back", 2f); }
+                if (e.hidden)
+                {
+                    // an ambush: still and silent till we are close or it is hit
+                    if (dist < e.Range * 0.6f || Time.time - e.lastHit < 2f) { e.hidden = false; hud.Toast("Ambush! " + e.spec.name + ", " + Clock(e.transform.position), 2.6f); Intercept("Feuer frei!", "open fire"); shake = Mathf.Max(shake, 0.3f); }
+                    else { e.Aim(target.transform.position, dt); e.Apply(); continue; }
+                }
+                if (!e.aiRetreat && !stand && e != ace && e != boss && !e.spec.isGun && e.hp < e.spec.hp * 0.5f && (objective == null || !objective.targets.Contains(e)) && LastOfThem(e)) { e.aiRetreat = true; hud.Toast(e.spec.name + " is pulling out · stop him", 2.4f); Intercept("Rückzug!", "fall back"); }
+                if (e.aiRetreat)
+                {
+                    // the last of them, badly hurt: away from us, firing back; gone at 110 m
+                    var away = e.transform.position - target.transform.position; away.y = 0f; e.Drive(Steer(e, new Vector2(away.x, away.z)), dt);
+                    bool onR = e.Aim(target.transform.position, dt); if (onR && e.reloadLeft <= 0f && dist <= e.Range && e.crew != 0) Fire(e, target); e.Apply();
+                    if (dist > 110f) { hud.Toast(e.spec.name + " got away", 2f); if (focus == e) focus = null; foes.RemoveAt(i); i--; tracks.Forget(e); Destroy(e.gameObject); }
+                    continue;
+                }
+                if (!e.aiCalled && platoon.Count > 1 && !e.spec.isGun && dist < 45f)
+                {
+                    // a wingman sees him working round our side
+                    var rel = e.transform.position - Leader.transform.position; rel.y = 0f;
+                    if (rel.sqrMagnitude > 1f && Vector3.Dot(rel.normalized, Leader.Forward) < -0.2f) { e.aiCalled = true; hud.Toast("Wingman: " + e.spec.name + " on our flank, " + Clock(e.transform.position) + "!", 2.4f); }
+                }
+                if (!e.spec.isGun && !e.spec.casemate && e.hp <= 1f && e.spec.hp >= 3f && e.fallBack <= 0f && e.fallenBack < 1 && dist < e.Range * 0.8f) { e.fallBack = 6f; e.fallenBack++; hud.Toast(e.spec.name + " falling back behind smoke", 2f); fx.SmokeCloud(e.transform.position + e.Forward * 3f, 3.5f); e.smokedUntil = Time.time + 9f; Intercept("Nebel werfen!", "smoke"); }
                 if (e.aiWait <= 0f && !e.aiWaited && !stand && e != ace && e != boss && !e.spec.isGun && !e.spec.transport && dist < e.Range * 1.2f && Alone(e))
                 {
-                    e.aiWaited = true; e.aiWait = 20f; if (Time.time > waitSaid) { waitSaid = Time.time + 20f; hud.Toast(e.spec.name + " pulls back · waiting for support", 2.2f); }
+                    e.aiWaited = true; e.aiWait = 20f; if (Time.time > waitSaid) { waitSaid = Time.time + 20f; hud.Toast(e.spec.name + " pulls back · waiting for support", 2.2f); Intercept("Warten auf Verstärkung", "waiting for support"); }
                 }
                 if (e.aiWait > 0f)
                 {
@@ -374,11 +398,18 @@ namespace IronNight
                     // reversing out of range, gun still on us
                     e.fallBack -= dt; var away = e.transform.position - target.transform.position; away.y = 0f; e.Drive(Steer(e, new Vector2(away.x, away.z)), dt);
                 }
-                else if (!e.spec.isGun && dist > e.Range * 0.8f)
+                else if (!e.spec.isGun && dist > e.Range * 0.8f && !HoldForFlankers(e, dist, dt))
                 {
                     var goal = target.transform.position;
                     if (e.flank != 0 && dist > 20f) { var tf = target.Forward; goal += new Vector3(tf.z, 0f, -tf.x) * (e.flank * 18f) - tf * 4f; }   // round to his side, where the armour is thin
                     var d = goal - e.transform.position; e.Drive(Steer(e, new Vector2(d.x, d.z)), dt);
+                }
+                else if (e == ace && nem != null && nem.flanked > 0)
+                {
+                    // flanked once before: hull to us, backing off when we close
+                    var toA = target.transform.position - e.transform.position; toA.y = 0f; float wantA = Mathf.Atan2(toA.x, toA.z);
+                    e.yaw += Mathf.Clamp(Mathf.DeltaAngle(e.yaw * Mathf.Rad2Deg, wantA * Mathf.Rad2Deg) * Mathf.Deg2Rad, -e.spec.turnRate * dt, e.spec.turnRate * dt);
+                    if (dist < e.Range * 0.5f) e.transform.position -= e.Forward * (e.spec.speed * 0.5f * dt);
                 }
                 else if (!e.spec.isGun && !e.spec.casemate)
                 {
@@ -572,7 +603,35 @@ namespace IronNight
             return L.transform.position + r * lat - f * back;
         }
 
-        int flankTurn; float waitSaid;
+        int flankTurn; float waitSaid, interceptNext; int aceHits, aceSideHits; bool coverSaid, attackSaid;
+        static float Difficulty => PlayerPrefs.GetFloat("difficulty", 1f);   // 0.8 (eased after lost nights) to 1.2 (hardened after won ones)
+
+        /// <summary>A German radio message overheard: their words and what they mean, one every ten seconds at most.</summary>
+        void Intercept(string german, string meaning)
+        {
+            if (Time.time < interceptNext) return; interceptNext = Time.time + 10f;
+            hud.Toast("Intercepted · \"" + german + "\" (" + meaning + ")", 2.8f); Sfx.Click();
+        }
+
+        /// <summary>The tank of a group going straight in waits short of our reach till one going round a side is in
+        /// place, or 15 s; true while it waits.</summary>
+        bool HoldForFlankers(Vehicle e, float dist, float dt)
+        {
+            if (e.flank != 0 || stand || e == ace || e == boss || e.aiHold >= 15f || dist > e.Range * 1.15f) return false;
+            bool flankers = false, ready = false;
+            foreach (var o in foes) { if (o == e || o.dead || o.flank == 0 || o.spec.isGun) continue; var d = o.transform.position - e.transform.position; d.y = 0f; if (d.magnitude > 90f) continue; flankers = true; if (Dist(o, Leader) <= o.Range) ready = true; }
+            if (!flankers) return false;
+            if (ready) { e.aiHold = 15f; if (!attackSaid) { attackSaid = true; Intercept("Angriff! Alle zugleich!", "attack, all together"); } return false; }
+            if (e.aiHold == 0f) Intercept("Links und rechts umgehen!", "go round left and right");
+            e.aiHold += dt; return true;
+        }
+
+        /// <summary>No other tank of theirs within 150 m: the last of them here.</summary>
+        bool LastOfThem(Vehicle e)
+        {
+            foreach (var o in foes) { if (o == e || o.dead || o.spec.isGun || o.spec.transport) continue; var d = o.transform.position - e.transform.position; d.y = 0f; if (d.magnitude < 150f) return false; }
+            return true;
+        }
 
         /// <summary>An enemy tank on its own: no other tank of theirs within 35 m, while there are others about (within
         /// 150 m) to wait for.</summary>
@@ -606,7 +665,7 @@ namespace IronNight
         static Vehicle Nearest(List<Vehicle> list, Vector3 from, float maxDist)
         {
             Vehicle best = null; float bd = maxDist * maxDist;
-            foreach (var v in list) { if (v.dead) continue; var d = v.transform.position - from; d.y = 0f; float q = d.sqrMagnitude; if (q < bd) { bd = q; best = v; } }
+            foreach (var v in list) { if (v.dead || v.Unseen) continue; var d = v.transform.position - from; d.y = 0f; float q = d.sqrMagnitude; if (q < bd) { bd = q; best = v; } }
             return best;
         }
 
@@ -727,6 +786,7 @@ namespace IronNight
 
         void Damage(Vehicle v, float dmg, Vector3 at)
         {
+            if (v == ace) { aceHits++; var from = at - v.transform.position; from.y = 0f; if (from.sqrMagnitude > 0.01f && Vector3.Dot(from.normalized, v.Forward) < 0.4f) aceSideHits++; }   // side or rear: he will remember
             if (v.friendly && v == Leader && leaderShield > 0f) return;
             if (v == Leader && wetStowage && !savedTonight && v.hp - dmg <= 0f) { savedTonight = true; v.hp = 1f; leaderShield = 2.5f; hud.Flash(); shake = Mathf.Max(shake, 0.9f); hud.Toast("The wet racks held · the leader is alive on one", 3.2f); Sfx.Ricochet(v.transform.position); if (Random.value < 0.7f) Radio("hit"); return; }
             if (!v.friendly && bonus == "heavy" && v.spec.hp >= 6f) dmg *= 1.5f;
@@ -767,7 +827,7 @@ namespace IronNight
                 combo = Time.time - lastKill < 4f ? combo + 1 : 1; lastKill = Time.time;
                 if (combo >= 2) { int bonus = combo * 25; score += bonus; hud.Popup(v.transform.position + Vector3.up * 3f, "×" + combo + " +" + bonus, new Color(1f, 0.92f, 0.6f)); if (combo == 3) hud.Toast("Triple kill", 1.8f); else if (combo == 5) hud.Toast("Rampage", 1.8f); }
                 if (v == boss) { score += 1500; bossKilled = true; shake = 2f; SlowMo(0.8f); hud.HideBoss(); Sfx.Theme("battle"); hud.Toast("Tiger Ace destroyed · +1500"); }
-                if (v == ace) { score += 600; shake = Mathf.Max(shake, 1f); SlowMo(0.7f); Depot.Tally("acesNamed", 1); nightAces++; hud.Popup(v.transform.position, "+600", new Color(1f, 0.8f, 0.4f)); if (nem != null && !nemReported) { nemReported = true; nemEscaped = Nemesis.Knocked(nem, NightPlace); } hud.Toast(nemEscaped ? nem.Title + " bailed out of the burning tank · he will be back" : aceName + " is finished · +600", 3f); Radio("kill"); }
+                if (v == ace) { score += 600; shake = Mathf.Max(shake, 1f); SlowMo(0.7f); Depot.Tally("acesNamed", 1); nightAces++; hud.Popup(v.transform.position, "+600", new Color(1f, 0.8f, 0.4f)); if (nem != null && !nemReported) { nemReported = true; nemEscaped = Nemesis.Knocked(nem, NightPlace); Nemesis.Learned(nem, aceSideHits * 2 >= Mathf.Max(1, aceHits)); } hud.Toast(nemEscaped ? nem.Title + " bailed out of the burning tank · he will be back" : aceName + " is finished · +600", 3f); Radio("kill"); }
                 Killcam(v, worth * 50 + (v == boss ? 1500 : 0) + (v == ace ? 600 : 0));
                 if (xp >= xpNeed) LevelUp(); else hud.SetLevel(level, (float)xp / xpNeed);
             }
@@ -1380,6 +1440,7 @@ namespace IronNight
             var L = Leader; nem = Nemesis.Pick(); var spec = Nemesis.Tank(nem); nemWingmen = 0; nemLeader = false; nemReported = false; nemEscaped = false;
             float a = (Random.value - 0.5f) * 1.2f; var at = L.transform.position + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * 62f;
             ace = Foe(spec, props.PushOut(at, 3f), Mathf.Atan2(L.transform.position.x - at.x, L.transform.position.z - at.z));
+            aceHits = aceSideHits = 0; if (nem.flanked > 0) { ace.flank = 0; hud.Toast(nem.Title + " remembers being flanked · he keeps his front to you", 3f); }
             ace.hp *= Nemesis.HpMul(nem); aceHpMax = ace.hp; ace.damageMul *= 1.5f; ace.reloadMul *= 0.7f; ace.rangeMul *= 1.2f;   // and he hits harder, quicker, from further
             aceName = nem.Title + " · " + spec.name; bool back = nem.met > 0; Nemesis.Met(nem, NightPlace);
             hud.Toast(back ? nem.Title + (string.IsNullOrEmpty(nem.nick) ? "" : ", " + nem.nick + ",") + " is back · " + Clock(at) : aceName + " · an ace is on the field, " + Clock(at), 3.4f); Voices.Callout("ace", ClockHour(at)); Sfx.Whistle(at); if (Random.value < 0.7f) Radio("hit");
@@ -2258,7 +2319,9 @@ namespace IronNight
         /// <summary>An enemy vehicle into the fight; veteran nights give it half again the hits.</summary>
         Vehicle Foe(VehicleSpec spec, Vector3 pos, float yaw)
         {
-            var e = Vehicle.Create(spec, false, pos, yaw); e.turretYaw = e.yaw; if (spec.isGun) infantry.ManGun(e); if (veteran) e.hp *= 1.5f; if (debugWeak) e.hp = 0.3f; if (!spec.isGun && !spec.casemate && !spec.transport) { e.flank = (flankTurn % 3) - 1; flankTurn++; } foes.Add(e); return e;   // every second tank works round a side, left and right in turn
+            var e = Vehicle.Create(spec, false, pos, yaw); e.turretYaw = e.yaw; if (spec.isGun) infantry.ManGun(e); if (veteran) e.hp *= 1.5f; if (debugWeak) e.hp = 0.3f; if (!spec.isGun && !spec.casemate && !spec.transport) { e.flank = (flankTurn % 3) - 1; flankTurn++; }
+            if (!stand && !sneak && (spec.isGun || spec == VehicleSpec.Hetzer) && Random.value < 0.6f) e.hidden = true;   // an ambush
+            e.damageMul *= Difficulty; e.reloadMul /= Difficulty; foes.Add(e); return e;   // every second tank works round a side, left and right in turn
         }
 
         /// <summary>The coaxial and bow machine guns: a burst at any tank hunter within 24 m in front of the gun or the
@@ -2406,7 +2469,7 @@ namespace IronNight
             phase = Phase.End; stick.Blocked = true; EndOrbit(); Sfx.Theme(dawn ? "dawn" : null);
             int earned = Mathf.RoundToInt(score * (veteran ? 1.5f : 1f) * (endless ? 1.5f : 1f) * routePay * (premiumNight ? Depot.PremiumMul : 1f)) * (doubled ? 2 : 1) + (dawn || endless ? 500 : 0);
             Depot.AddPoints(earned - banked); banked = earned;                       // a revived night banks only what is new
-            if (!nightRecorded) { Depot.RecordNight(kills, t); nightRecorded = true; }
+            if (!nightRecorded) { Depot.RecordNight(kills, t); nightRecorded = true; PlayerPrefs.SetFloat("difficulty", Mathf.Clamp(Difficulty + (dawn ? 0.03f : -0.05f), 0.8f, 1.2f)); PlayerPrefs.Save(); }   // the difficulty follows the player
             Letters.Served(Depot.Nation);   // the crew who fought it write home
             var done = Missions.Report(new Missions.Night { kills = kills, tigers = nightTigers, paks = nightPaks, crates = nightCrates, level = level, time = t, boss = bossKilled, objectives = objectivesReached, infantry = nightInfantry, tracked = nightTracked, focus = nightFocus, lamps = nightLamps, campaign = opNight == 5 && dawn ? 1 : 0 });
             Depot.Tally("kills", kills - talliedKills); talliedKills = kills; Depot.Tally("tigers", nightTigers - talliedTigers); talliedTigers = nightTigers;

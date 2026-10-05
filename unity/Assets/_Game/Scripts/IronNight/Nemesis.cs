@@ -16,7 +16,7 @@ namespace IronNight
         [System.Serializable]
         public class Ace
         {
-            public string name, nick, place, trophy, killedAt, killedOn; public int level = 1, met, leaders, wingmen, escapes, scars, portrait; public bool dead, studied;
+            public string name, nick, place, trophy, killedAt, killedOn; public int level = 1, met, leaders, wingmen, escapes, scars, portrait, flanked; public bool dead, studied;
             public string Rank => Ranks[Mathf.Clamp(level, 1, 5) - 1];
             public string Title => Rank + " " + name;                      // "Hptm. Keller"
             public string FullRank => RankNames[Mathf.Clamp(level, 1, 5) - 1];
@@ -110,6 +110,8 @@ namespace IronNight
 
         /// <summary>A rewarded ad: his tactics studied, a third more damage against him the next time he is met.</summary>
         public static void Study(Ace a) { a.studied = true; Save(); }
+        /// <summary>What he learnt from being knocked out: flanked, he keeps his front to us after.</summary>
+        public static void Learned(Ace a, bool flanked) { if (flanked) { a.flanked++; Save(); } }
         /// <summary>His record, short, for the poster.</summary>
         public static string Record(Ace a)
         {
