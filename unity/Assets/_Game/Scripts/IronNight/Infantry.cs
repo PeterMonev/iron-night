@@ -280,7 +280,7 @@ namespace IronNight
         }
 
         // ---- fire fights: ours against theirs ----
-        class Fight { public Squad ours, theirs; public bool over; }
+        class Fight { public Squad ours, theirs; public bool over; public float left; }   // theirs null: paratroopers, fighting whoever is near for left seconds
         readonly List<Fight> fights = new List<Fight>();
         /// <summary>A fire fight won (the Germans in it all dead, some of ours alive): where ours are.</summary>
         public System.Action<Vector3> fightWon;
@@ -307,12 +307,43 @@ namespace IronNight
             fights.Add(new Fight { ours = ours, theirs = theirs }); return true;
         }
 
+        /// <summary>A stick of paratroopers called in: an empty squad of ours that the men join as they land (Land), in
+        /// the fight for a time.</summary>
+        public Squad Paratroops(float time)
+        {
+            var sq = new Squad(); squads.Add(sq); fights.Add(new Fight { ours = sq, left = time }); return sq;
+        }
+
+        /// <summary>A paratrooper down: one of ours dug in where he landed, facing on.</summary>
+        public void Land(Squad sq, Vector3 at, Vector3 face, string nation)
+        {
+            string[] poseOf = { "kneel", "stand", "prone" }; string pose = poseOf[sq.men.Count % 3], key = nation + "_" + pose; if (!poses.ContainsKey(key)) key = nation + "_kneel";
+            var m = Man(transform, at, face, pose == "prone" ? Role.Mg : Role.Rifle, key); m.ally = true; m.dug = true; m.side = nation; m.reload = 1f + Random.value * 2f; sq.men.Add(m);
+        }
+
+        /// <summary>Paratroopers fight German infantry and gun crews within 55 m; the Germans on foot shoot back now and
+        /// then. At the end of their time the ones still up move off (gone).</summary>
+        void TickPara(Fight f, float dt, System.Action<Soldier, Vector3> shootAt)
+        {
+            f.left -= dt; bool up = false;
+            foreach (var m in f.ours.men)
+            {
+                if (m.dead) continue; up = true;
+                var foe = NearestOf(m.pos, 55f, false, true); if (foe == null) continue;
+                FightOn(m, foe, shootAt, 0.08f);
+                if (foe.gun == null && !foe.dug && !foe.still && Random.value < dt * 0.05f) { shootAt(foe, m.pos + Vector3.up * 0.9f); Kill(m); }   // a German on foot fires back (the dug ones do it in Tick)
+            }
+            if (f.left > 0f && (up || f.ours.men.Count < 6)) return;   // still landing, or still in it
+            f.over = true; foreach (var m in f.ours.men) if (!m.dead) { m.dead = true; Destroy(m.t.gameObject); }
+        }
+
         /// <summary>Ours fire on the nearest German within 45 m; a fight is over once one side is all down.</summary>
         void TickFights(float dt, System.Action<Soldier, Vector3> shootAt)
         {
             foreach (var f in fights)
             {
                 if (f.over) continue;
+                if (f.theirs == null) { TickPara(f, dt, shootAt); continue; }
                 bool oursUp = false, theirsUp = false;
                 foreach (var m in f.theirs.men) if (!m.dead) theirsUp = true;
                 foreach (var m in f.ours.men)
@@ -337,11 +368,12 @@ namespace IronNight
             if (Random.value < hit) Kill(foe);
         }
 
-        /// <summary>The nearest living soldier of one side to a point within reach: ours (true) or theirs.</summary>
-        Soldier NearestOf(Vector3 from, float reach, bool ours)
+        /// <summary>The nearest living soldier of one side to a point within reach: ours (true) or theirs; gun crews only
+        /// when asked for (crews).</summary>
+        Soldier NearestOf(Vector3 from, float reach, bool ours, bool crews = false)
         {
             Soldier best = null; float bd = reach * reach;
-            foreach (var s in squads) foreach (var m in s.men) { if (m.dead || m.ally != ours || m.gun != null) continue; var d = m.pos - from; d.y = 0f; float q = d.sqrMagnitude; if (q < bd) { bd = q; best = m; } }
+            foreach (var s in squads) foreach (var m in s.men) { if (m.dead || m.ally != ours || (m.gun != null && !crews)) continue; var d = m.pos - from; d.y = 0f; float q = d.sqrMagnitude; if (q < bd) { bd = q; best = m; } }
             return best;
         }
 

@@ -130,7 +130,7 @@ namespace IronNight
         public class Card { public string id, title, desc; public bool rare; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain, OnStart, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder, OnAir, OnDailyChallenge, OnStandReady; public System.Action<string> OnRoute, OnTheatre, OnStand, OnStandItem, OnConvoy, OnSneak; public System.Action<string, int> OnOperation; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[3]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], routePays = new Text[3], theatreLabels = new Text[3]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, airBtn, routeSheet, trainBtn; Text xpLine, depotXp; static readonly Color XpBlue = new Color(0.56f, 0.76f, 0.98f), XpDeep = new Color(0.22f, 0.43f, 0.74f, 0.96f); Text airLabel; Image airFill; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
+        public System.Action OnAd, OnAgain, OnStart, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder, OnAir, OnPara, OnDailyChallenge, OnStandReady; public System.Action<string> OnRoute, OnTheatre, OnStand, OnStandItem, OnConvoy, OnSneak; public System.Action<string, int> OnOperation; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[3]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], routePays = new Text[3], theatreLabels = new Text[3]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, airBtn, routeSheet, trainBtn; Text xpLine, depotXp; static readonly Color XpBlue = new Color(0.56f, 0.76f, 0.98f), XpDeep = new Color(0.22f, 0.43f, 0.74f, 0.96f); Text airLabel; Image airFill; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
 
         Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel, setQuality, setVibe, rankLine, pointsLine, ordersCount; GameObject settingsSheet, ordersSheet; RawImage titleBackdrop, depotBackdrop; GarageDrag depotDrag; readonly List<RectTransform> embers = new List<RectTransform>(); readonly List<float> emberPhase = new List<float>(); GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         public System.Action OnSuppliesAd; public bool SuppliesGranted; bool suppliesOffer; Text cardsEyebrow;
@@ -254,6 +254,14 @@ namespace IronNight
                 var atop = MakeText(airBtn.transform, "Top", new Vector2(0.5f, 1f), new Vector2(0, -12), TextAnchor.UpperCenter, 20, new Color(0.66f, 0.64f, 0.59f)); atop.text = Spaced("AIR"); atop.rectTransform.sizeDelta = new Vector2(190, 30);
                 airLabel = airBtn.transform.Find("Label").GetComponent<Text>(); airLabel.alignment = TextAnchor.MiddleCenter; airLabel.rectTransform.anchoredPosition = new Vector2(0, -12); airLabel.fontSize = 28; airLabel.color = new Color(0.96f, 0.68f, 0.24f);
                 airLabel.transform.SetAsLastSibling(); atop.transform.SetAsLastSibling(); airBtn.SetActive(false);
+                // paratroopers: the same, beside it
+                paraBtn = MakeButton(hudGroup.transform, "", new Vector2(0f, 0f), new Vector2(930, 268), new Vector2(190, 120), 26, () => OnPara?.Invoke());
+                paraBtn.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.11f, 0.85f);
+                paraFill = MakeImage(paraBtn.transform, "Cool", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190, 120), new Color(0.02f, 0.02f, 0.03f, 0.78f)); paraFill.rectTransform.pivot = new Vector2(0.5f, 0.5f); paraFill.sprite = Rounded(); paraFill.type = Image.Type.Filled; paraFill.fillMethod = Image.FillMethod.Vertical; paraFill.fillOrigin = (int)Image.OriginVertical.Top;
+                var paraEdge = MakeImage(paraBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190, 120), new Color(0.96f, 0.68f, 0.24f, 0.5f)); paraEdge.sprite = Outline(); paraEdge.type = Image.Type.Sliced; paraEdge.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                var ptop = MakeText(paraBtn.transform, "Top", new Vector2(0.5f, 1f), new Vector2(0, -12), TextAnchor.UpperCenter, 20, new Color(0.66f, 0.64f, 0.59f)); ptop.text = Spaced("PARA"); ptop.rectTransform.sizeDelta = new Vector2(190, 30);
+                paraLabel = paraBtn.transform.Find("Label").GetComponent<Text>(); paraLabel.alignment = TextAnchor.MiddleCenter; paraLabel.rectTransform.anchoredPosition = new Vector2(0, -12); paraLabel.fontSize = 28; paraLabel.color = new Color(0.96f, 0.68f, 0.24f);
+                paraLabel.transform.SetAsLastSibling(); ptop.transform.SetAsLastSibling(); paraBtn.SetActive(false);
             }
             arrowSprite = ArrowSprite(); objectiveArrow.sprite = arrowSprite;
             var root = canvasGo.transform;
@@ -1030,7 +1038,7 @@ namespace IronNight
         /// <summary>What is in the racks, and which round is loaded.</summary>
         /// <summary>The stick must let these buttons have their own presses.</summary>
         TouchStick handStick;   // the stick, for the buttons made later to be kept out of its taps
-        public void HandTo(TouchStick stick) { if (stick == null) return; handStick = stick; stick.Blockers.Add(ammoBtn.GetComponent<RectTransform>()); stick.Blockers.Add(abilityBtn.GetComponent<RectTransform>()); stick.Blockers.Add(orderBtn.GetComponent<RectTransform>()); stick.Blockers.Add(pauseBtnRect); stick.Blockers.Add(airBtn.GetComponent<RectTransform>()); }
+        public void HandTo(TouchStick stick) { if (stick == null) return; handStick = stick; stick.Blockers.Add(ammoBtn.GetComponent<RectTransform>()); stick.Blockers.Add(abilityBtn.GetComponent<RectTransform>()); stick.Blockers.Add(orderBtn.GetComponent<RectTransform>()); stick.Blockers.Add(pauseBtnRect); stick.Blockers.Add(airBtn.GetComponent<RectTransform>()); stick.Blockers.Add(paraBtn.GetComponent<RectTransform>()); }
 
         public void SetOrder(string text) { if (orderLabel != null) orderLabel.text = text; }
 
@@ -1305,6 +1313,16 @@ namespace IronNight
         /// <summary>The commander's button: his portrait, the cooldown draining down it, a glow while his order lasts.</summary>
         /// <summary>The AIR button: hidden until the planes are on station, filling while the next strike is readied,
         /// lit while it waits for a tap on the target.</summary>
+        GameObject paraBtn; Image paraFill; Text paraLabel;
+        public void SetPara(bool has, float charged, string label, bool armed)
+        {
+            if (paraBtn == null) return;
+            if (paraBtn.activeSelf != has) paraBtn.SetActive(has);
+            if (!has) return;
+            paraFill.fillAmount = 1f - Mathf.Clamp01(charged); if (paraLabel.text != label) paraLabel.text = label;
+            paraBtn.transform.Find("Edge").GetComponent<Image>().color = armed ? new Color(1f, 0.85f, 0.4f, 0.95f) : charged >= 1f ? new Color(0.96f, 0.68f, 0.24f, 0.85f) : new Color(0.96f, 0.68f, 0.24f, 0.3f);
+        }
+
         public void SetAir(bool has, float charged, string label, bool armed)
         {
             if (airBtn == null) return;

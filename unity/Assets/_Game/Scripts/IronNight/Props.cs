@@ -217,7 +217,7 @@ namespace IronNight
         }
 
         /// <summary>True within the water (and the margin round it) of a stream.</summary>
-        static bool InStream(Vector3 pos, float margin)
+        public static bool InStream(Vector3 pos, float margin)
         {
             int iz = Mathf.RoundToInt((pos.z - Half) / Cell);
             for (int k = iz - 1; k <= iz + 1; k++) if (StreamZ(k) && Mathf.Abs(pos.z - StreamAt(k, pos.x)) < StreamHalf + margin) return true;

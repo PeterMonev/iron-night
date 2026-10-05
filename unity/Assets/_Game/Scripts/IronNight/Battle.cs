@@ -182,7 +182,8 @@ namespace IronNight
             hud.OnTheatre = t => theatre = t;
             hud.OnDailyChallenge = () => { PlayerPrefs.SetString("daily.launch", Daily.Today); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); };
             hud.OnWeekly = () => { PlayerPrefs.SetString("weekly.launch", "1"); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); };
-            hud.OnAir = () => { if (!airUp || airCool > 0f || phase != Phase.Play || strike != null) return; airArmed = !airArmed; airArmedLeft = 8f; hud.Toast(airArmed ? "Tap the target" : "Air strike called off", 2f); Sfx.Click(); };
+            hud.OnPara = () => { if (!paraUp || paraCool > 0f || phase != Phase.Play || paraSquad != null) return; paraArmed = !paraArmed; paraArmedLeft = 8f; airArmed = false; hud.Toast(paraArmed ? "Tap the drop zone" : "Drop called off", 2f); Sfx.Click(); };
+            hud.OnAir = () => { if (!airUp || airCool > 0f || phase != Phase.Play || strike != null) return; airArmed = !airArmed; airArmedLeft = 8f; paraArmed = false; hud.Toast(airArmed ? "Tap the target" : "Air strike called off", 2f); Sfx.Click(); };
             hud.OnAd = () => { if (phase == Phase.End) Ads.Rewarded("end", EndReward); };
             hud.OnGoldAd = () => { if (phase != Phase.End) return; if (Depot.SpendGold(Depot.GoldRepair)) EndReward(); else hud.ShowShop(); };   // not enough gold: the shop
             hud.OnAgain = () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
@@ -300,7 +301,7 @@ namespace IronNight
             // a tap on an enemy: every gun onto it for eight seconds
             if (stick.ConsumeTap() && phase == Phase.Play)
             {
-                var ray = cam.ScreenPointToRay(stick.TapAt); if (ray.direction.y < -0.01f) { var g = ray.origin + ray.direction * (-ray.origin.y / ray.direction.y); bool placed = !airArmed && StandPlace(g); bool called = !placed && airArmed; if (called) { airArmed = false; CallAir(g); } var pick = called || placed ? null : Nearest(foes, g, 9f);
+                var ray = cam.ScreenPointToRay(stick.TapAt); if (ray.direction.y < -0.01f) { var g = ray.origin + ray.direction * (-ray.origin.y / ray.direction.y); bool placed = !airArmed && !paraArmed && StandPlace(g); bool called = !placed && (airArmed || paraArmed); if (called) { if (airArmed) { airArmed = false; CallAir(g); } else { paraArmed = false; CallPara(g); } } var pick = called || placed ? null : Nearest(foes, g, 9f);
                     if (!called && !placed && pick == null && objective != null && objective.kind == "dump" && new Vector2(g.x - objective.pos.x, g.z - objective.pos.z).magnitude < 10f) { point = objective.pos; pointLeft = 10f; hud.Toast("Shell the fuel dump", 1.6f); Sfx.Click(); }
                     else if (!called && !placed && pick == null) { var mine = NearestMine(g, 4f); if (mine != null) { point = mine.pos; pointLeft = 5f; hud.Toast("Shell the mine", 1.6f); Sfx.Click(); } else { var man = infantry.Nearest(g, 7f); if (man != null) { point = man.pos; pointLeft = 6f; hud.Toast(man.gun != null ? "Shell the gun crew" : man.still ? "Shell the observer" : "Shell the infantry", 1.6f); Sfx.Click(); } } }
                     if (pick != null) { focus = pick; focusLeft = 8f; if (focusRing == null) focusRing = fx.Marker(pick.transform.position, new Color(1f, 0.55f, 0.3f), 7f); focusRing.gameObject.SetActive(true); hud.Toast("Focus fire · " + pick.spec.name, 1.6f); Sfx.Click(); } }
@@ -384,7 +385,7 @@ namespace IronNight
             hud.Set(t, platoon.Count); hud.SetLeader(Mathf.CeilToInt(L.hp), Mathf.CeilToInt(Depot.LeaderHp)); hud.SetTally(kills, score);
             hud.ReloadArc(L.transform.position + Vector3.up * 0.2f, L.reloadLeft <= 0f ? 1f : 1f - L.reloadLeft / Mathf.Max(0.1f, L.spec.reload * L.reloadMul), cam);
             hud.Indicators(foes, cam);
-            TickObjective(dt); TickDrops(dt); TickSalvage(dt); TickHoles(dt); TickTosses(dt); if (!sneak || sneakAlarm) { TickMortars(dt); TickStar(dt); TickRaid(dt); }
+            TickObjective(dt); TickDrops(dt); TickPara(dt); TickSalvage(dt); TickHoles(dt); TickTosses(dt); if (!sneak || sneakAlarm) { TickMortars(dt); TickStar(dt); TickRaid(dt); }
             if (ammoLeft > 0f) { ammoLeft -= dt; if (ammoLeft <= 0f) { ammoMul = 1f; hud.Toast("APCR spent"); } }
             hud.Radar(foes, platoon, L.transform.position, objective != null ? objective.pos : Vector3.zero, objective != null, cratePos);   // the commander's spotting shows them all: the markers are placed when it is called
             hud.HpBars(foes, cam, boss);
@@ -1786,16 +1787,89 @@ namespace IronNight
 
         // the transport that drops the crate: crosses the sky over the drop point and is gone
         class Plane { public Transform t; public Vector3 from, dir; public float age; }
-        readonly List<Plane> planes = new List<Plane>(); Material planeMaterial;
-        void Flyover(Vector3 over)
+
+        // ---- paratroopers on call ----
+        class Jumper { public Transform fig, chute; public LineRenderer lines; public Mesh canopy; public Vector3[] rest, heap; public Vector3 pos, face; public float height, wait, age, spill = -1f; public int seed; }
+        readonly List<Jumper> jumpers = new List<Jumper>(); Infantry.Squad paraSquad; string paraNation; float paraCool, paraArmedLeft, paraHold; bool paraUp, paraArmed;
+        const float ParaCoolFull = 90f, ParaFight = 60f, ParaScale = 0.62f, ParaLines = 5.5f;   // ParaScale: the crate's canopy cut to a man's (about 8 m across, the T-5's 28 feet)
+        static bool ParaRank => Depot.RankLevel >= 3;   // a sergeant: ten nights fought
+
+        /// <summary>The PARA button: there from 1:30 for a sergeant and up (not on a night without air), ready every 90 s
+        /// once the last stick is out of the fight; armed, it waits eight seconds for a tap.</summary>
+        void TickPara(float dt)
         {
-            var pf = Resources.Load<GameObject>("Models/c47_hull"); if (pf == null) return;
+            paraNation = Depot.Nation == "su" ? "su" : "us";
+            if (!paraUp && ParaRank && rule != "noair" && t >= 90f && infantry.CanFight(paraNation) && Resources.Load<GameObject>("Props/para_" + paraNation) != null) { paraUp = true; hud.Toast("Paratroopers standing by · press PARA", 3.2f); }
+            if (paraCool > 0f && paraSquad == null) paraCool = Mathf.Max(0f, paraCool - dt);
+            if (paraArmed) { paraArmedLeft -= dt; if (paraArmedLeft <= 0f) { paraArmed = false; hud.Toast("Drop called off", 1.6f); } }
+            hud.SetPara(paraUp, paraSquad != null ? 0f : 1f - paraCool / ParaCoolFull, paraArmed ? "MARK" : paraSquad != null ? (jumpers.Count > 0 && jumpers[jumpers.Count - 1].height > 0f ? "JUMPING" : Mathf.CeilToInt(Mathf.Max(0f, paraHold)) + " s") : paraCool > 0f ? Mathf.CeilToInt(paraCool) + " s" : "READY", paraArmed);
+            if (paraSquad == null) return;
+            paraHold -= dt;
+            for (int i = jumpers.Count - 1; i >= 0; i--)
+            {
+                var j = jumpers[i];
+                if (j.wait > 0f) { j.wait -= dt; if (j.wait <= 0f) { j.fig.gameObject.SetActive(true); j.chute.gameObject.SetActive(true); j.lines.enabled = true; } else continue; }
+                j.age += dt;
+                if (j.height > 0f)
+                {
+                    j.height = Mathf.Max(0f, j.height - 6.5f * dt);
+                    // the man swings under the canopy like the crates do, less; the canopy drifts
+                    var swing = new Vector3(Mathf.Sin(j.age * 1.4f + j.seed) * 7f, 0f, Mathf.Sin(j.age * 0.9f + j.seed * 0.7f) * 5f); var drift = new Vector3(Mathf.Sin(j.age * 0.3f + j.seed), 0f, Mathf.Cos(j.age * 0.23f)) * 0.6f;
+                    var hang = Quaternion.Euler(swing.z, 0f, -swing.x); var turn = Quaternion.LookRotation(j.face, Vector3.up);
+                    var feet = j.pos + Vector3.up * j.height + drift; var hands = feet + hang * (Vector3.up * 2.1f); var conf = hands + hang * (Vector3.up * 1.2f);
+                    j.fig.position = feet; j.fig.rotation = hang * turn;
+                    j.chute.position = conf + hang * (Vector3.up * ParaLines); j.chute.rotation = hang * Quaternion.Euler(0f, j.age * 7f + j.seed * 40f, 0f); Ripple(j.canopy, j.rest, j.age + j.seed, 0.12f);
+                    j.lines.SetPosition(0, hands); j.lines.SetPosition(1, conf);
+                    for (int k = 0; k < ChuteGores; k++) { j.lines.SetPosition(2 + k * 2, j.chute.TransformPoint(j.rest[j.rest.Length - ChuteGores * 2 + k * 2])); j.lines.SetPosition(3 + k * 2, conf); }
+                    if (j.height <= 0f) { Destroy(j.fig.gameObject); infantry.Land(paraSquad, j.pos, j.face, paraNation); j.heap = Heap(j.rest, j.seed); j.spill = 0f; }   // down: one of ours on the ground, the canopy spilling
+                    continue;
+                }
+                if (j.spill >= 0f && j.spill < 1f)
+                {
+                    // the canopy spills its air and lies down beside him, downwind; the lines go slack and are gone
+                    j.spill = Mathf.Min(1f, j.spill + dt / 1.1f); float k = j.spill * j.spill * (3f - 2f * j.spill);
+                    var from = j.pos + Vector3.up * (2.1f + 1.2f + ParaLines); j.chute.position = Vector3.Lerp(from, j.pos + j.face * 3.5f + Vector3.up * 0.05f, k); Spill(j.canopy, j.rest, j.heap, k);
+                    var tie = j.pos + Vector3.up * 1.2f; j.lines.SetPosition(0, tie); j.lines.SetPosition(1, tie);
+                    for (int g = 0; g < ChuteGores; g++) { int vi = j.rest.Length - ChuteGores * 2 + g * 2; j.lines.SetPosition(2 + g * 2, j.chute.TransformPoint(Vector3.Lerp(j.rest[vi], j.heap[vi], k))); j.lines.SetPosition(3 + g * 2, tie); }
+                    if (j.spill >= 1f) j.lines.enabled = false;
+                }
+            }
+            if (paraHold > 0f) return;
+            // their time is up: the canopies are gathered, the ones still up move off (Infantry ends the fight)
+            foreach (var j in jumpers) { if (j.fig != null) Destroy(j.fig.gameObject); Destroy(j.chute.gameObject); Destroy(j.lines.gameObject); Destroy(j.canopy); }
+            jumpers.Clear(); paraSquad = null; paraCool = ParaCoolFull;
+        }
+
+        /// <summary>A stick of six over a point: a C-47 across it, the men out of the door one after another along its
+        /// track, each landing a few metres apart, clear of buildings and water, facing on.</summary>
+        void CallPara(Vector3 target)
+        {
+            target.y = 0f; var dir = Flyover(target); var side = new Vector3(dir.z, 0f, -dir.x);
+            var pf = Resources.Load<GameObject>("Props/para_" + paraNation); var skin = Gait.Skin("para_" + paraNation, Resources.Load<Material>("VehicleLit")); ChuteMaterial();
+            paraSquad = infantry.Paratroops(ParaFight + 12f); paraHold = ParaFight + 12f;   // 12: the jump and the time down
+            for (int i = 0; i < 6; i++)
+            {
+                var at = props.PushOut(target + dir * ((i - 2.5f) * 4f) + side * Random.Range(-2f, 2f), 1.5f); if (Props.InStream(at, 1.5f)) at = props.PushOut(at + side * 8f, 1.5f);
+                var j = new Jumper { pos = at, face = dir, height = 52f, wait = 3.4f + i * 0.35f, seed = Random.Range(0, 1000) };
+                j.fig = Instantiate(pf).transform; foreach (var r in j.fig.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = skin; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+                j.canopy = Canopy(ChuteGores, 8, ChuteRadius, ChuteHeight, out j.rest); j.chute = new GameObject("ParaCanopy").transform; j.chute.localScale = Vector3.one * ParaScale; j.chute.gameObject.AddComponent<MeshFilter>().sharedMesh = j.canopy;
+                var cr = j.chute.gameObject.AddComponent<MeshRenderer>(); cr.sharedMaterial = new Material(chuteMaterial); cr.sharedMaterial.SetColor("_BaseColor", ChuteColour(0)); cr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+                j.lines = new GameObject("ParaShrouds").AddComponent<LineRenderer>(); j.lines.positionCount = 2 + ChuteGores * 2; j.lines.startWidth = j.lines.endWidth = 0.07f; j.lines.material = ShroudMaterial(); j.lines.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                j.fig.gameObject.SetActive(false); j.chute.gameObject.SetActive(false); j.lines.enabled = false; jumpers.Add(j);
+            }
+            hud.Toast((paraNation == "su" ? "Desantniki" : "Paratroopers") + " inbound, " + Clock(target), 2.6f); Sfx.Click();
+        }
+        readonly List<Plane> planes = new List<Plane>(); Material planeMaterial;
+        /// <summary>A C-47 over a point, from any side; its heading (any when there is no model).</summary>
+        Vector3 Flyover(Vector3 over)
+        {
+            var pf = Resources.Load<GameObject>("Models/c47_hull"); if (pf == null) return Vector3.forward;
             if (planeMaterial == null) { planeMaterial = new Material(Resources.Load<Material>("VehicleLit")); planeMaterial.SetTexture("_BaseMap", Resources.Load<Texture2D>("Models/c47")); planeMaterial.SetColor("_BaseColor", new Color(0.8f, 0.8f, 0.82f)); planeMaterial.SetFloat("_Cull", 0f); }
             var root = new GameObject("C-47").transform; var body = Instantiate(pf, root); body.transform.localScale = Vector3.one * 1.5f; body.transform.localRotation = Quaternion.Euler(0f, -62f, 0f);   // the model's nose, measured
             foreach (var r in body.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = planeMaterial; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; }
             float a = Random.value * Mathf.PI * 2f; var dir = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
             var p = new Plane { t = root, from = over - dir * 260f + Vector3.up * 95f, dir = dir }; root.position = p.from; root.rotation = Quaternion.LookRotation(dir); planes.Add(p);
-            Sfx.Rumble();
+            Sfx.Rumble(); return dir;
         }
         void TickPlanes(float dt)
         {
