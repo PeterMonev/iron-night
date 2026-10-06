@@ -1242,14 +1242,15 @@ namespace IronNight
             if (routeSheet == null)
             {
                 routeSheet = new GameObject("Routes", typeof(RectTransform), typeof(Image)); routeSheet.transform.SetParent(canvas.transform, false); Stretch(routeSheet); routeSheet.GetComponent<Image>().color = new Color(0.02f, 0.02f, 0.03f, 1f);
-                var ey = MakeText(routeSheet.transform, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -80), TextAnchor.MiddleCenter, 26, new Color(0.96f, 0.68f, 0.24f)); ey.text = Spaced("TONIGHT'S ORDERS"); ey.font = LabelFont();
+                var ey = MakeText(routeSheet.transform, "Eyebrow", new Vector2(0.5f, 1f), new Vector2(0, -95), TextAnchor.MiddleCenter, 26, new Color(0.96f, 0.68f, 0.24f)); ey.text = Spaced("TONIGHT'S ORDERS"); ey.font = LabelFont(); ey.rectTransform.sizeDelta = new Vector2(600, 40);
+                MakeGhost(routeSheet.transform, "BACK", new Vector2(0f, 1f), new Vector2(130, -95), new Vector2(200, 80), 26, () => routeSheet.SetActive(false));   // back to the title, as from every sheet
                 var ti = MakeText(routeSheet.transform, "Title", new Vector2(0.5f, 1f), new Vector2(0, -275), TextAnchor.MiddleCenter, 100, new Color(0.93f, 0.91f, 0.86f)); ti.text = "CHOOSE THE WAY IN"; Engrave(ti); ti.verticalOverflow = VerticalWrapMode.Overflow; ti.horizontalOverflow = HorizontalWrapMode.Overflow;
                 // the four fronts across the top; a closed one says what opens it
                 string[] th = { "normandy", "ardennes", "kursk", "italy" };
                 for (int k = 0; k < 4; k++)
                 {
                     string tid = th[k];
-                    var tab = MakeButton(routeSheet.transform, "", new Vector2(0.5f, 1f), new Vector2(-390 + k * 260, -165), new Vector2(245, 80), 26, () => { if (!Depot.TheatreOpen(tid)) return; sheetTheatre = tid; PlayerPrefs.SetString("theatre", tid); PlayerPrefs.Save(); OnTheatre?.Invoke(tid); FillRoutes(); });
+                    var tab = MakeButton(routeSheet.transform, "", new Vector2(0.5f, 1f), new Vector2(-390 + k * 260, -185), new Vector2(245, 72), 26, () => { if (!Depot.TheatreOpen(tid)) return; sheetTheatre = tid; PlayerPrefs.SetString("theatre", tid); PlayerPrefs.Save(); OnTheatre?.Invoke(tid); FillRoutes(); });
                     theatreTabs[k] = tab.GetComponent<Image>(); theatreLabels[k] = tab.GetComponentInChildren<Text>();
                 }
                 string[] ids = { "village", "open", "bocage" };

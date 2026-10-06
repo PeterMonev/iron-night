@@ -50,17 +50,20 @@ namespace IronNight
             S("poznan", "Poznań", "east", 7, "FEBRUARY 1945", "kursk", "village", "overcast", 810f, 336f, "warsaw", null, true),
             S("seelow", "Seelow Heights", "east", 8, "APRIL 1945", "kursk", "bocage", "fog", 750f, 337f, "poznan", null, true),
             // the southern road: up Italy, American tanks
-            S("anzio", "Anzio", "south", 0, "JANUARY 1944", "italy", "open", "clear", 689f, 760f, null),
-            S("cassino", "Monte Cassino", "south", 1, "MAY 1944", "italy", "village", "rain", 723f, 756f, "anzio"),
-            S("rome", "Rome", "south", 2, "JUNE 1944", "italy", "village", "clear", 687f, 742f, "cassino", "supply"),
-            S("florence", "Florence", "south", 3, "AUGUST 1944", "italy", "village", "clear", 650f, 672f, "rome"),
-            S("gothic", "The Gothic Line", "south", 4, "SEPTEMBER 1944", "italy", "bocage", "fog", 648f, 657f, "florence"),
-            S("bologna", "Bologna", "south", 5, "APRIL 1945", "italy", "village", "overcast", 655f, 642f, "gothic", null, true),
-            S("po", "The Po Valley", "south", 6, "APRIL 1945", "italy", "open", "clear", 640f, 622f, "bologna", "officer", true),
+            S("gela", "Sicily · Gela", "south", 0, "JULY 1943", "italy", "open", "clear", 730f, 938f, null),
+            S("messina", "Messina", "south", 1, "AUGUST 1943", "italy", "village", "clear", 768f, 898f, "gela"),
+            S("salerno", "Salerno", "south", 2, "SEPTEMBER 1943", "italy", "bocage", "overcast", 748f, 790f, "messina", "supply"),
+            S("anzio", "Anzio", "south", 3, "JANUARY 1944", "italy", "open", "clear", 689f, 760f, "salerno"),
+            S("cassino", "Monte Cassino", "south", 4, "MAY 1944", "italy", "village", "rain", 723f, 756f, "anzio"),
+            S("rome", "Rome", "south", 5, "JUNE 1944", "italy", "village", "clear", 687f, 742f, "cassino", "supply"),
+            S("florence", "Florence", "south", 6, "AUGUST 1944", "italy", "village", "clear", 650f, 672f, "rome"),
+            S("gothic", "The Gothic Line", "south", 7, "SEPTEMBER 1944", "italy", "bocage", "fog", 648f, 657f, "florence"),
+            S("bologna", "Bologna", "south", 8, "APRIL 1945", "italy", "village", "overcast", 655f, 642f, "gothic", null, true),
+            S("po", "The Po Valley", "south", 9, "APRIL 1945", "italy", "open", "clear", 640f, 622f, "bologna", "officer", true),
             // where the roads meet
             S("berlin", "Berlin", "both", 11, "APRIL 1945", "kursk", "village", "overcast", 705f, 330f, "magdeburg,seelow", "officer", true),
         };
-        public static readonly int WestCount = 11, EastCount = 9, SouthCount = 7;
+        public static readonly int WestCount = 11, EastCount = 9, SouthCount = 10;
         /// <summary>A road's length in sectors.</summary>
         public static int Count(string road) => road == "west" ? WestCount : road == "south" ? SouthCount : EastCount;
         public static Sector ById(string id) { foreach (var s in All) if (s.id == id) return s; return null; }
