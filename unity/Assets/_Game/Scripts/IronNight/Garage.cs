@@ -188,6 +188,7 @@ namespace IronNight
                 var mat = new Material(Resources.Load<Material>("VehicleLit")); mat.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + id + "_tex")); mat.SetFloat("_Cull", 0f);
                 foreach (var r in go.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
                 idle[i] = CrewIdle.Bring(go, i + (nation == "su" ? 4 : 0), Crew.Roles[i] == "radio" ? 0.5f : 1f);   // at ease, not statues; the radio operators hold a handset to the ear
+                if (Crew.Roles[i] == "driver") { var rb = go.GetComponentInChildren<Renderer>().bounds; Cigarette.Smoke(go, rb.max.y - go.transform.position.y); }   // the driver having a smoke
                 crewFigures.Add(go);
             }
             for (int p = 0; p < 4; p += 2)   // the pairs: the left man looks to his left for the right one, who looks to his right
