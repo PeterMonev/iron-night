@@ -1,0 +1,3 @@
+newmtl it_wall
+Kd 1 1 1
+map_Kd it_wall_tex.png

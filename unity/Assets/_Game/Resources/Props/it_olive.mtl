@@ -1,0 +1,3 @@
+newmtl it_olive
+Kd 1 1 1
+map_Kd it_olive_tex.png

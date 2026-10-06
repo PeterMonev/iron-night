@@ -74,9 +74,9 @@ namespace IronNight
             new Kind { mesh = "truck_snow", length = 6.5f, height = 2.8f, circles = new[] { -1.7f, 0f, 1.4f, 1.7f, 0f, 1.4f } },
             new Kind { mesh = "chapel_wayside", length = 4.5f, height = 6f, circles = new[] { 0f, 0f, 2f } },
             // Italy
-            new Kind { mesh = "it_house", length = 10f, height = 8f, circles = new[] { -2.4f, 0f, 3.1f, 2.4f, 0f, 3.1f } },
+            new Kind { mesh = "it_house", length = 10f, height = 9f, circles = new[] { -2.4f, 0f, 3.1f, 2.4f, 0f, 3.1f } },
             new Kind { mesh = "it_farmhouse", length = 14f, height = 9f, circles = new[] { -4f, 0f, 3.6f, 0f, 0f, 3.6f, 4f, 0f, 3.6f } },
-            new Kind { mesh = "it_church", length = 20f, height = 18f, circles = new[] { -6f, 0f, 4.6f, 0f, 0f, 4.8f, 6f, 0f, 4.6f } },
+            new Kind { mesh = "it_church", length = 20f, height = 15f, circles = new[] { -6f, 0f, 4.6f, 0f, 0f, 4.8f, 6f, 0f, 4.6f } },
             new Kind { mesh = "it_ruin", length = 11f, height = 6f, circles = new[] { -2.8f, 0f, 3.2f, 2.8f, 0f, 3.2f } },
             new Kind { mesh = "it_wall", length = 6f, height = -1f, circles = new[] { -2f, 0f, 1f, 0f, 0f, 1f, 2f, 0f, 1f } },
             new Kind { mesh = "it_well", length = 2.5f, height = 2.4f, circles = new[] { 0f, 0f, 1.3f } },

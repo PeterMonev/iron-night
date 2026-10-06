@@ -1,0 +1,3 @@
+newmtl it_cypress
+Kd 1 1 1
+map_Kd it_cypress_tex.png
