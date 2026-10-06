@@ -248,6 +248,18 @@ namespace IronNight
         }
 
         /// <summary>True within the water (and the margin round it) of a stream.</summary>
+        /// <summary>A point in a stream moved to its nearer bank (a little past the water); any other point as it is.</summary>
+        public static Vector3 OutOfStream(Vector3 pos)
+        {
+            int iz = Mathf.RoundToInt((pos.z - Half) / Cell);
+            for (int k = iz - 1; k <= iz + 1; k++)
+            {
+                if (!StreamZ(k)) continue; float mid = StreamAt(k, pos.x), off = pos.z - mid;
+                if (Mathf.Abs(off) < StreamHalf + 1f) { pos.z = mid + (off >= 0f ? 1f : -1f) * (StreamHalf + 1.4f); return pos; }
+            }
+            return pos;
+        }
+
         public static bool InStream(Vector3 pos, float margin)
         {
             int iz = Mathf.RoundToInt((pos.z - Half) / Cell);
@@ -462,6 +474,12 @@ namespace IronNight
         /// <summary>Hay bales in the mown and stubble fields, a wreck or a crater anywhere, a lone tree, a dead one.</summary>
         void Loose(List<Prop> list, int ix, int iz, Vector3 c, int type)
         {
+            if (Italy && Rnd(ix, iz, 1900) < (Route == "bocage" ? 0.6f : 0.32f))
+            {
+                // an olive grove: three rows of three, seven metres apart, a little out of line
+                float gy = Rnd(ix, iz, 1901) * Mathf.PI; var gf = new Vector3(Mathf.Sin(gy), 0f, Mathf.Cos(gy)); var gr = new Vector3(gf.z, 0f, -gf.x); var go = c + In(ix, iz, 1902, 5f);
+                for (int a = -1; a <= 1; a++) for (int b = -1; b <= 1; b++) Place(list, "it_olive", go + gf * (a * 7f) + gr * (b * 7f) + In(ix, iz, 1910 + (a + 1) * 6 + (b + 1) * 2, 0.8f), Rnd(ix, iz, 1930 + (a + 1) * 3 + b + 1) * 6.28f);
+            }
             if (Kursk)
             {
                 if (type == 1 && Rnd(ix, iz, 1200) < 0.5f) { int m = 2 + (int)(Rnd(ix, iz, 1201) * 4f); for (int h = 0; h < m; h++) Place(list, "k_sunflowers", c + In(ix, iz, 1202 + h * 2, 14f), Rnd(ix, iz, 1215 + h) * 6.28f); }
@@ -1360,7 +1378,7 @@ namespace IronNight
             if (p.what == What.Hedge) return 4;
             if (p.what == What.Abatis || p.what == What.Logs) return 2;
             if (p.what != What.Model) return 0;
-            switch (p.kind.mesh)
+            switch (Twin(p.kind.mesh))
             {
                 case "tree_oak": case "tree_poplar": case "tree_poplar_b": case "tree_apple": case "tree_birch": case "deadtree": case "spruce_snow": case "k_birches": case "pole": case "signpost": return 1;
                 case "barbed_wire": case "foxhole_logs": case "trench": return 2;
@@ -1374,8 +1392,14 @@ namespace IronNight
                 default: return 0;
             }
         }
-        static float MaxHp(string mesh) { switch (mesh) { case "farm_belgian": return 7f; case "house_belgian": return 5f; case "chapel_wayside": return 4f; case "sawmill": return 3f; case "truck_snow": return 1.5f; case "windmill": return 7f; case "house_normandy": return 5f; case "izba": return 4f; case "house_ruin": return 3f; case "church": return 12f; case "k_church": return 9f; case "bunker": return 8f; case "farmhouse": return 6f; case "cottage": case "barn": case "k_izba": return 4f; case "k_khata": return 3f; case "truck": case "sandbags": return 1.5f; default: return 2f; } }
-        static bool Burns(string mesh) => mesh == "sawmill" || mesh == "truck_snow" || mesh == "house_normandy" || mesh == "izba" || mesh == "barn" || mesh == "cottage" || mesh == "k_khata" || mesh == "k_izba" || mesh == "truck" || mesh == "haystack" || mesh == "k_sheaves" || mesh == "cart";
+        /// <summary>The Normandy model an Italian one behaves like (how it gives way, its strength, whether it burns).</summary>
+        static string Twin(string mesh)
+        {
+            switch (mesh) { case "it_house": return "cottage"; case "it_farmhouse": return "farmhouse"; case "it_church": return "church"; case "it_ruin": return "house_ruin"; case "it_wall": return "wall_a"; case "it_well": return "well"; case "it_olive": return "tree_apple"; case "it_cypress": return "tree_poplar"; default: return mesh; }
+        }
+        static float MaxHp(string mesh) { mesh = Twin(mesh); switch (mesh) { case "farm_belgian": return 7f; case "house_belgian": return 5f; case "chapel_wayside": return 4f; case "sawmill": return 3f; case "truck_snow": return 1.5f; case "windmill": return 7f; case "house_normandy": return 5f; case "izba": return 4f; case "house_ruin": return 3f; case "church": return 12f; case "k_church": return 9f; case "bunker": return 8f; case "farmhouse": return 6f; case "cottage": case "barn": case "k_izba": return 4f; case "k_khata": return 3f; case "truck": case "sandbags": return 1.5f; default: return 2f; } }
+        static bool Burns(string mesh) => Burns0(Twin(mesh));
+        static bool Burns0(string mesh) => mesh == "sawmill" || mesh == "truck_snow" || mesh == "house_normandy" || mesh == "izba" || mesh == "barn" || mesh == "cottage" || mesh == "k_khata" || mesh == "k_izba" || mesh == "truck" || mesh == "haystack" || mesh == "k_sheaves" || mesh == "cart";
         static Vector3 FallDir(Prop p) => new Vector3(Mathf.Sin(p.fallYaw), 0f, Mathf.Cos(p.fallYaw));
         static Quaternion Fallen(Prop p) => Quaternion.AngleAxis(88f, Vector3.Cross(Vector3.up, FallDir(p))) * Quaternion.Euler(0f, p.yaw * Mathf.Rad2Deg, 0f);
 
@@ -1421,7 +1445,7 @@ namespace IronNight
             if (p.what == What.Tree) return 0.45f;
             if (p.what == What.Abatis) return 0.42f;
             if (p.what == What.Logs) return 0.5f;
-            switch (p.kind.mesh)
+            switch (Twin(p.kind.mesh))
             {
                 case "tree_oak": case "tree_poplar": case "tree_poplar_b": case "tree_apple": case "tree_birch": case "spruce_snow": case "k_birches": return 0.45f;
                 case "well_b": return 0.5f;

@@ -102,6 +102,7 @@ namespace IronNight
         /// figure; the capsule man when there is nothing at all.</summary>
         Soldier Man(Transform parent, Vector3 at, Vector3 facing, Role role, string still)
         {
+            at = Props.OutOfStream(at);   // never in the water
             var go = new GameObject("Soldier"); go.transform.SetParent(parent, false); go.transform.position = at; go.transform.rotation = Quaternion.LookRotation(facing, Vector3.up);
             var m = new Soldier { t = go.transform, pos = at, face = facing, role = role, reload = 2f + Random.value * 3f, phase = Random.value * 6.28f, cycle = Random.value * 2f };
             Pose sp = null; if (still != null) poses.TryGetValue(still, out sp);
@@ -273,7 +274,7 @@ namespace IronNight
                     var gait = ahead && dist > 45f ? walk : ahead ? run : walk;   // walking up out of the dark, running in, stepping back from a tank
                     float speed = ahead ? (dist > 45f ? 1.5f : 2.8f) : back ? 1.6f : 0f;
                     if (ahead) m.pos += to * (speed * dt); else if (back) m.pos -= to * (speed * dt);
-                    m.face = to; m.pos = props.PushOut(m.pos, 0.5f);
+                    m.face = to; m.pos = Props.OutOfStream(props.PushOut(m.pos, 0.5f));   // along the bank, not through the water
                     m.reload -= dt;
                     if (m.role == Role.Faust) { if (!ducked && dist < 15f && m.reload <= 0f) { m.reload = 9f + Random.value * 3f; fire(m, target); } }
                     else if (!ducked && !ahead && !back && dist < m.stop + 4f) Shoot(m, target, dt, shoot);
