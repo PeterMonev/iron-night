@@ -1176,10 +1176,11 @@ namespace IronNight
         {
             OpsPage("HISTORICAL OPERATIONS", "OPERATIONS", () => opsSheet.SetActive(false));
             var total = MakeText(opsBody, "Total", new Vector2(0.5f, 1f), new Vector2(0, -365), TextAnchor.MiddleCenter, 28, OpDim); total.text = Operations.TotalStars + " of " + Operations.All.Length * 15 + " stars won"; total.rectTransform.sizeDelta = new Vector2(900, 40);
+            var list = OpsScroll(400f, 20f + Operations.All.Length * 488f);   // the cards scroll under the title: four do not fit every screen
             for (int i = 0; i < Operations.All.Length; i++)
             {
-                var op = Operations.All[i]; bool open = Depot.TheatreOpen(op.theatre); float y = -410 - i * 488;
-                var card = MakeButton(opsBody, "", new Vector2(0.5f, 1f), new Vector2(0, y - 225), new Vector2(940, 450), 20, () => { if (open) OpNights(op); });
+                var op = Operations.All[i]; bool open = Depot.TheatreOpen(op.theatre); float y = -10 - i * 488;
+                var card = MakeButton(list, "", new Vector2(0.5f, 1f), new Vector2(0, y - 225), new Vector2(940, 450), 20, () => { if (open) OpNights(op); });
                 card.GetComponent<Image>().color = new Color(0.07f, 0.08f, 0.1f, 1f);
                 Framed(card.transform, op.cover, op.nights[0].picture, new Vector2(0.5f, 1f), new Vector2(0, -8), new Vector2(924, 270), new Color(0.07f, 0.08f, 0.1f, 1f));
                 var edge = MakeImage(card.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(940, 450), new Color(1f, 1f, 1f, 0.16f)); edge.sprite = Outline(); edge.type = Image.Type.Sliced; edge.rectTransform.pivot = new Vector2(0.5f, 0.5f); edge.raycastTarget = false;
@@ -1193,6 +1194,19 @@ namespace IronNight
                     var why = MakeText(card.transform, "Why", new Vector2(0.5f, 0.5f), new Vector2(0, 20), TextAnchor.MiddleCenter, 34, OpInk); why.text = op.theatre == "kursk" ? "Opens after your first dawn" : op.theatre == "italy" ? "Opens after three nights" : "Opens after your first night"; why.font = BoldFont(); why.rectTransform.sizeDelta = new Vector2(900, 60);
                 }
             }
+        }
+
+        /// <summary>A list that scrolls up and down from so far below the top of the sheet to its bottom; its content, this
+        /// tall, to put the cards in (anchored at its top).</summary>
+        Transform OpsScroll(float top, float height)
+        {
+            var view = new GameObject("List", typeof(RectTransform), typeof(RectMask2D), typeof(Image)); view.transform.SetParent(opsBody, false);
+            var vr = view.GetComponent<RectTransform>(); vr.anchorMin = new Vector2(0f, 0f); vr.anchorMax = new Vector2(1f, 1f); vr.offsetMin = Vector2.zero; vr.offsetMax = new Vector2(0f, -top);
+            view.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0f);   // catches the drag between the cards
+            var content = new GameObject("Content", typeof(RectTransform)); content.transform.SetParent(view.transform, false);
+            var cr = content.GetComponent<RectTransform>(); cr.anchorMin = new Vector2(0f, 1f); cr.anchorMax = new Vector2(1f, 1f); cr.pivot = new Vector2(0.5f, 1f); cr.sizeDelta = new Vector2(0f, height); cr.anchoredPosition = Vector2.zero;
+            var sr = view.AddComponent<ScrollRect>(); sr.content = cr; sr.viewport = vr; sr.horizontal = false; sr.vertical = true; sr.movementType = ScrollRect.MovementType.Elastic; sr.scrollSensitivity = 40f;
+            return content.transform;
         }
 
         void OpNights(Operations.Op op)
