@@ -23,7 +23,23 @@ namespace IronNight
         }
         [System.Serializable] class Roster { public List<Ace> aces = new List<Ace>(); }
 
-        public static readonly string[] Surnames = { "Keller", "Brandt", "Hoffmann", "Ziegler", "Vogel", "Reinhardt", "Stahl", "Neumann" };
+        public static readonly string[] Surnames =
+        {
+            "Keller", "Brandt", "Hoffmann", "Ziegler", "Vogel", "Reinhardt", "Stahl", "Neumann",   // the west
+            "Lehmann", "Baumann", "Fischer", "Wolff", "Schreiber", "Kessler", "Haas", "Krause",   // the east
+            "Becker", "Lorenz", "Seidel", "Winter", "Pohl", "Arnold", "Brenner", "Sommer",       // the south
+        };
+        /// <summary>The roster a front's aces come from: west (Normandy, the Ardennes), east (Kursk), south (Italy).</summary>
+        public static string FrontOf(string theatre) => theatre == "kursk" ? "east" : theatre == "italy" ? "south" : "west";
+        public static int First(string front) => front == "east" ? 8 : front == "south" ? 16 : 0;
+        static string FrontOfName(string name) { int i = System.Array.IndexOf(Surnames, name); return i >= 16 ? "south" : i >= 8 ? "east" : "west"; }
+
+        /// <summary>How he fights, by his place on the roster.</summary>
+        public static readonly string[] Traits = { "the Sniper", "the Hunter", "the Ambusher", "the Brawler", "the Ghost", "the Marksman", "Iron", "the Hound" };
+        public static readonly string[] TraitLines = { "fires from further than anyone", "always comes round your side", "waits hidden until you are close", "comes straight in, thick armour", "hit, he throws smoke and is gone", "every round counts double", "takes a beating like no other", "the fastest tank on the field" };
+        public static int TraitOf(Ace a) => Mathf.Max(0, System.Array.IndexOf(Surnames, a.name)) % 8;
+        /// <summary>Every ace of a front's roster dead.</summary>
+        public static bool Cleared(string front) { int n = 0; foreach (var a in Dead) if (FrontOfName(a.name) == front) n++; return n >= 8; }
         static readonly string[] Ranks = { "Ltn.", "Oblt.", "Hptm.", "Maj.", "Obst." }, RankNames = { "Leutnant", "Oberleutnant", "Hauptmann", "Major", "Oberst" };
         static readonly string[] Trophies = { "binoculars", "map case", "turret number", "headset", "field cap", "logbook", "gunsight", "pistol holster" };
 
@@ -48,27 +64,28 @@ namespace IronNight
         public static int BountyGold(Ace a) => 10 * (a.level - 1);
 
         /// <summary>The ace for tonight: an old enemy (the more to settle, the likelier), or a new name while there are some.</summary>
-        public static Ace Pick()
+        public static Ace Pick(string theatre)
         {
-            var living = Living;
+            string front = FrontOf(theatre); int first = First(front);
+            var living = Living.FindAll(a => FrontOfName(a.name) == front);
             if (living.Count > 0 && (PreferOld || living.Count >= 4 || Random.value < 0.6f))
             {
                 float total = 0f; foreach (var a in living) total += 1f + a.met + a.level + a.leaders * 2f;
                 float r = Random.value * total; foreach (var a in living) { r -= 1f + a.met + a.level + a.leaders * 2f; if (r <= 0f) return a; }
                 return living[living.Count - 1];
             }
-            var free = new List<int>(); for (int i = 0; i < Surnames.Length; i++) if (!Data.aces.Exists(a => a.name == Surnames[i])) free.Add(i);
-            if (free.Count == 0) { var old = Dead; if (old.Count == 0) return living[0]; var gone = old[0]; Data.aces.Remove(gone); free.Add(gone.portrait); }   // all eight names used: the longest dead makes room for a new man of that name
+            var free = new List<int>(); for (int i = first; i < first + 8; i++) if (!Data.aces.Exists(a => a.name == Surnames[i])) free.Add(i);
+            if (free.Count == 0) { var old = Dead.FindAll(a => FrontOfName(a.name) == front); if (old.Count == 0) return living[0]; var gone = old[0]; Data.aces.Remove(gone); free.Add(gone.portrait); }   // all eight names used: the longest dead makes room for a new man of that name
             int k = free[Random.Range(0, free.Count)];
             var ace = new Ace { name = Surnames[k], portrait = k };
             Data.aces.Add(ace); Save(); return ace;
         }
         public static void Met(Ace a, string place) { a.met++; a.place = place; Save(); }
         /// <summary>The hunt board's eight places, one for each name on the roster: 0 not met yet, 1 at large, 2 dead.</summary>
-        public static int[] Board()
+        public static int[] Board(string front)
         {
-            var s = new int[Surnames.Length];
-            foreach (var a in Data.aces) { int i = System.Array.IndexOf(Surnames, a.name); if (i >= 0 && (a.dead || a.met > 0)) s[i] = a.dead ? 2 : 1; }
+            var s = new int[8]; int first = First(front);
+            foreach (var a in Data.aces) { int i = System.Array.IndexOf(Surnames, a.name) - first; if (i >= 0 && i < 8 && (a.dead || a.met > 0)) s[i] = a.dead ? 2 : 1; }
             return s;
         }
 

@@ -360,9 +360,14 @@ namespace IronNight
             {
                 var e = foes[i]; e.reloadLeft -= dt; if (e.trackOut > 0f) e.trackOut -= dt;
                 if (e.post || e.aaBusy) continue;   // a searchlight post's flak: its own (TickPostGuns); any flak firing at our planes: at them
-                var target = PickTarget(e); if (convoy) target = ConvoyTarget(e, target); if (target == null) continue; e.rangeMul = enemyRangeMul * (lit ? 1.2f : 1f);
+                var target = PickTarget(e); if (convoy) target = ConvoyTarget(e, target); if (target == null) continue; e.rangeMul = enemyRangeMul * (lit ? 1.2f : 1f) * e.aiRange;
                 float dist = Dist(e, target); if (SneakAsleep(e, dist, dt)) continue;
                 if (e.spec.transport) { TickTransport(e, target, dist, dt); continue; }
+                if (e == ace && nem != null && Nemesis.TraitOf(nem) == 4 && e.lastHit > aceGhostSeen && Time.time > aceGhostNext)
+                {
+                    // the Ghost: hit, smoke, and gone a moment
+                    aceGhostSeen = e.lastHit; aceGhostNext = Time.time + 15f; e.fallBack = 4f; fx.SmokeCloud(e.transform.position + e.Forward * 3f, 3.5f); e.smokedUntil = Time.time + 8f; hud.Toast(nem.Title + " vanishes into his smoke", 2f);
+                }
                 if (e.hidden)
                 {
                     // an ambush: still and silent till we are close or it is hit
@@ -626,6 +631,7 @@ namespace IronNight
         }
         Color grimeTint; float grimeMud, grimeSnow, grimeMudNow, leaderSoot0, leaderSootNow;
 
+        float aceGhostSeen, aceGhostNext;
         int flankTurn; float waitSaid, interceptNext; int aceHits, aceSideHits; bool coverSaid, attackSaid;
         static float Difficulty => PlayerPrefs.GetFloat("difficulty", 1f);   // 0.8 (eased after lost nights) to 1.2 (hardened after won ones)
 
@@ -1487,19 +1493,29 @@ namespace IronNight
         /// him pays 600 and goes into the tally. His name rides over his turret while he lives.</summary>
         void TickAce(float dt)
         {
-            if (ace != null && !ace.dead) { hud.NamePlate(aceName, ace.transform.position + Vector3.up * 3.4f, cam, ace.hp / aceHpMax); return; }
+            if (ace != null && !ace.dead) { if (ace.Unseen) hud.NamePlate(null, Vector3.zero, cam, 0f); else hud.NamePlate(aceName, ace.transform.position + Vector3.up * 3.4f, cam, ace.hp / aceHpMax); return; }
             if (ace != null && ace.dead) { hud.NamePlate(null, Vector3.zero, cam, 0f); ace = null; aceTimer = rule == "aces" ? 55f : 95f + Random.value * 40f; }
             if (t < (rule == "aces" ? 60f : debugAce ? 4f : 100f) || boss != null) return;
             aceTimer -= dt; if (aceTimer > 0f) return;
-            var L = Leader; nem = Nemesis.Pick(); var spec = Nemesis.Tank(nem); nemWingmen = 0; nemLeader = false; nemReported = false; nemEscaped = false;
+            var L = Leader; nem = Nemesis.Pick(theatre); var spec = Nemesis.Tank(nem); nemWingmen = 0; nemLeader = false; nemReported = false; nemEscaped = false;
             float a = (Random.value - 0.5f) * 1.2f; var at = L.transform.position + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * 62f;
             ace = Foe(spec, props.PushOut(at, 3f), Mathf.Atan2(L.transform.position.x - at.x, L.transform.position.z - at.z));
-            aceHits = aceSideHits = 0; if (nem.flanked > 0) { ace.flank = 0; hud.Toast(nem.Title + " remembers being flanked · he keeps his front to you", 3f); }
+            aceHits = aceSideHits = 0; aceGhostNext = 0f;
+            switch (Nemesis.TraitOf(nem))   // how this one fights
+            {
+                case 0: ace.aiRange = 1.2f; break;                                    // the Sniper
+                case 1: ace.flank = Random.value < 0.5f ? -1 : 1; break;               // the Hunter
+                case 2: ace.hidden = true; break;                                      // the Ambusher
+                case 3: ace.hp *= 1.2f; ace.flank = 0; break;                          // the Brawler
+                case 5: ace.damageMul *= 1.25f; break;                                 // the Marksman
+                case 6: ace.hp *= 1.35f; break;                                        // Iron
+                case 7: ace.speedMul *= 1.3f; break;                                   // the Hound
+            } if (nem.flanked > 0) { ace.flank = 0; hud.Toast(nem.Title + " remembers being flanked · he keeps his front to you", 3f); }
             ace.hp *= Nemesis.HpMul(nem); aceHpMax = ace.hp; ace.damageMul *= 1.5f; ace.reloadMul *= 0.7f; ace.rangeMul *= 1.2f;   // and he hits harder, quicker, from further
             aceName = nem.Title + " · " + spec.name; bool back = nem.met > 0; Nemesis.Met(nem, NightPlace);
-            hud.Toast(back ? nem.Title + (string.IsNullOrEmpty(nem.nick) ? "" : ", " + nem.nick + ",") + " is back · " + Clock(at) : aceName + " · an ace is on the field, " + Clock(at), 3.4f); Voices.Callout("ace", ClockHour(at)); Sfx.Whistle(at); if (Random.value < 0.7f) Radio("hit");
+            hud.Toast(back ? nem.Title + (string.IsNullOrEmpty(nem.nick) ? "" : ", " + nem.nick + ",") + " is back · " + Clock(at) : aceName + " · " + Nemesis.Traits[Nemesis.TraitOf(nem)] + ", " + Clock(at), 3.4f); Voices.Callout("ace", ClockHour(at)); Sfx.Whistle(at); if (Random.value < 0.7f) Radio("hit");
             if (back) NemesisCam(ace, nem);   // an old enemy: the camera goes to him
-            fx.Marker(at, new Color(1f, 0.3f, 0.25f), 7f, true);
+            if (!ace.hidden) fx.Marker(at, new Color(1f, 0.3f, 0.25f), 7f, true);   // the Ambusher is not marked
         }
 
         /// <summary>Phosphorus: what was hit goes on burning. The spotter plane marks the thickest group. The recovery

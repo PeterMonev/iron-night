@@ -43,17 +43,19 @@ namespace IronNight
             if (board == null) return;
             if (prints != null) Destroy(prints.gameObject);
             prints = new GameObject("Prints").transform; prints.SetParent(board, false);
-            var board8 = Nemesis.Board();
+            string front = Nemesis.FrontOf(PlayerPrefs.GetString("theatre", "normandy")); int first = Nemesis.First(front);   // the front on the orders sheet
+            var board8 = Nemesis.Board(front);
+            var atlas = Resources.Load<Texture2D>("Textures/hunt_photos" + (front == "west" ? "" : "_" + front)); photos.SetTexture("_BaseMap", atlas != null ? atlas : Resources.Load<Texture2D>("Textures/hunt_photos")); bool own = atlas != null;   // till a front has its prints, the unknown man for everyone
             for (int i = 0; i < board8.Length && i < 8; i++)
             {
                 float x = -1.41f + (i % 4) * 0.94f + ((i * 7) % 5 - 2) * 0.012f, y = (i < 4 ? 0.23f : -0.72f) + ((i * 3) % 5 - 2) * 0.01f, tilt = ((i * 37) % 11 - 5) * 0.9f;
-                var print = new GameObject("Print " + Nemesis.Surnames[i], typeof(MeshFilter), typeof(MeshRenderer)); print.transform.SetParent(prints, false);
+                var print = new GameObject("Print " + Nemesis.Surnames[first + i], typeof(MeshFilter), typeof(MeshRenderer)); print.transform.SetParent(prints, false);
                 print.transform.localPosition = new Vector3(x, y, -0.012f); print.transform.localRotation = Quaternion.Euler(0f, 0f, tilt); print.transform.localScale = new Vector3(0.62f, 0.778f, 1f);
-                print.GetComponent<MeshFilter>().sharedMesh = PrintQuad(board8[i] == 0 ? 8 : i); print.GetComponent<MeshRenderer>().sharedMaterial = photos;
+                print.GetComponent<MeshFilter>().sharedMesh = PrintQuad(board8[i] == 0 || !own ? 8 : i); print.GetComponent<MeshRenderer>().sharedMaterial = photos;
                 if (board8[i] != 2) continue;
                 var x2 = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(x2.GetComponent<Collider>()); x2.name = "Cross"; x2.transform.SetParent(print.transform, false);
                 x2.transform.localPosition = new Vector3(0f, 0.05f, -0.01f); x2.transform.localRotation = Quaternion.Euler(0f, 0f, tilt * -1.3f + 4f); x2.transform.localScale = new Vector3(1.05f, 0.84f, 1f); x2.GetComponent<Renderer>().sharedMaterial = cross;
-                HangTrophy(i, x, y, tilt);
+                HangTrophy(first + i, x, y, tilt);
             }
         }
 

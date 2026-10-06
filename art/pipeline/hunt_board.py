@@ -12,6 +12,9 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..', 'unity', 'Assets', '_Game', 'Resources')
 UI = os.path.join(ROOT, 'UI'); TEX = os.path.join(ROOT, 'Textures'); FONTS = os.path.join(ROOT, 'Fonts')
 SURNAMES = ['keller', 'brandt', 'hoffmann', 'ziegler', 'vogel', 'reinhardt', 'stahl', 'neumann']
+# the other fronts' rosters (Nemesis.Surnames 8-15, 16-23): their prints go to hunt_photos_east, hunt_photos_south
+FRONTS = {'_east': ['lehmann', 'baumann', 'fischer', 'wolff', 'schreiber', 'kessler', 'haas', 'krause'],
+          '_south': ['becker', 'lorenz', 'seidel', 'winter', 'pohl', 'arnold', 'brenner', 'sommer']}
 rng = np.random.default_rng(1944)
 
 
@@ -53,13 +56,13 @@ def paper(w, h):
     return np.clip(p, 0, 1)
 
 
-def photos():
+def photos(names=SURNAMES, suffix=''):
     cw, ch = 204, 256; sheet = np.zeros((512, 1024, 3), np.float32); sheet[:] = [0.9, 0.86, 0.76]
     side, top, bottom = 12, 12, 38
     for i in range(10):
         c = paper(cw, ch)
         if i < 8:
-            c[top:ch - bottom, side:cw - side] = sepia_print(os.path.join(UI, 'ace_%s.png' % SURNAMES[i]), cw - 2 * side, ch - top - bottom)
+            c[top:ch - bottom, side:cw - side] = sepia_print(os.path.join(UI, 'ace_%s.png' % names[i]), cw - 2 * side, ch - top - bottom)
         elif i == 8:
             # an unknown man: a dark print, a head and shoulders in shadow, a question mark over it
             w, h = cw - 2 * side, ch - top - bottom
@@ -76,7 +79,7 @@ def photos():
             c[top:ch - bottom, side:cw - side] = img
         col, row = i % 5, i // 5
         sheet[row * ch:(row + 1) * ch, col * cw:(col + 1) * cw] = c
-    Image.fromarray((sheet * 255).astype(np.uint8)).save(os.path.join(TEX, 'hunt_photos.png'))
+    Image.fromarray((sheet * 255).astype(np.uint8)).save(os.path.join(TEX, 'hunt_photos%s.png' % suffix))
 
 
 def cross():
@@ -145,5 +148,11 @@ def tiger():
 
 
 if __name__ == '__main__':
+    import sys
+    if 'fronts' in sys.argv:   # python hunt_board.py fronts: only the other fronts' prints, for those whose eight portraits are all there
+        for suffix, names in FRONTS.items():
+            if all(os.path.exists(os.path.join(UI, 'ace_%s.png' % n)) for n in names): photos(names, suffix); print('hunt_photos' + suffix)
+            else: print('hunt_photos' + suffix + ': portraits missing')
+        sys.exit(0)
     photos(); cross(); board(); tiger()
     print('hunt board, photos, cross and the Tiger mark written to', os.path.abspath(TEX))
