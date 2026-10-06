@@ -151,7 +151,7 @@ namespace IronNight
         {
             if (spec == null || (shown != null && shownId == spec.id)) return;
             if (shown != null) Destroy(shown.gameObject);
-            shown = Vehicle.Create(spec, true, Home, 0f); shown.transform.SetParent(stage, true); shownId = spec.id;
+            shown = Vehicle.Create(spec, true, Home, 0f); shown.transform.SetParent(stage, true); shownId = spec.id; Wear.Dress(shown, spec.id);   // as she came back from her last night
             shown.turretYaw = 0.35f; shown.Apply(); shown.enabled = false; shown.KillRings(Career.Rings(spec.id)); shown.PaintTurret(Career.Name(spec.id), Career.Cats(spec.id)); foreach (var t in shown.GetComponentsInChildren<Transform>()) if (t.name == "Commander") CrewIdle.Bring(t.gameObject, 9, 0.8f); ShowCrew(System.Array.Exists(Depot.Leaders, x => x.id == spec.id && x.nation == "su") ? "su" : "us");
             if (parkedTank == null && parked != null)
             {

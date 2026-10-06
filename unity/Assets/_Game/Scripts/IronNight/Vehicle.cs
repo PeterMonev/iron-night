@@ -42,7 +42,7 @@ namespace IronNight
             v.spec = spec; v.friendly = friendly; v.hp = spec.hp; v.yaw = yaw; v.turretYaw = yaw;
             go.transform.position = position;
             v.Build();
-            v.Apply();
+            v.Apply(); Grime.Dress(go);   // clean to start with: the night, or the hangar, says how dirty
             return v;
         }
 

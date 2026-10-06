@@ -34,7 +34,7 @@ namespace IronNight
         static readonly int BaseColor = Shader.PropertyToID("_BaseColor"), SeedId = Shader.PropertyToID("_Seed");
 
         /// <summary>Smooth noise that tiles, three different fields in r, g and b: what moves the flames.</summary>
-        static Texture2D FlameNoise(int size)
+        public static Texture2D FlameNoise(int size)
         {
             var tx = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Bilinear, name = "FlameNoise" };
             var rng = new System.Random(7); var px = new Color[size * size]; var ch = new float[3][];

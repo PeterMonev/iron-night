@@ -352,6 +352,7 @@ namespace IronNight
             int taken = infantry.TakePrisoners(L.transform.position, 6f); if (taken > 0) { score += 15 * taken; hud.Popup(L.transform.position + Vector3.up * 2f, "+" + 15 * taken + " · prisoners", new Color(0.9f, 0.85f, 0.6f)); Sfx.Pickup(); }
             int crushed = infantry.Crush(platoon); if (crushed > 0) { InfantryKilled(crushed, L.transform.position); hud.Toast("Run down", 1.5f); }
 
+            TickGrime();
             // ours: how fast each one moves, for the enemy to lead its shot
             foreach (var v in platoon) { var p = v.transform.position; v.vel = v.aiPrev == Vector3.zero || dt <= 0f ? Vector3.zero : (p - v.aiPrev) / dt; v.vel.y = 0f; v.aiPrev = p; }
             // enemies: pick one of ours, come round his side, keep moving in range, lead the shot
@@ -603,6 +604,27 @@ namespace IronNight
             }
             return L.transform.position + r * lat - f * back;
         }
+
+        /// <summary>The night on every tank: the front's mud, dust or snow building up over the first two and a half
+        /// minutes, soot as they are hit (the leader keeps what he brought back from the last night).</summary>
+        void TickGrime()
+        {
+            if (grimeTint.a == 0f) { Grime.Front(theatre, weather == Weather.Rain, out grimeTint, out grimeMud, out grimeSnow); grimeTint.a = 1f; leaderSoot0 = Wear.Soot(leaderId); }
+            float grow = 0.4f + 0.6f * Mathf.Clamp01(t / 150f);
+            foreach (var v in platoon)
+            {
+                var g = v.GetComponent<Grime>(); if (g == null) continue; float max = v == Leader ? Depot.LeaderHp : Mathf.Max(1f, v.spec.hp);
+                float soot = Mathf.Clamp01(1f - v.hp / max) * 0.9f; if (v == Leader) { soot = Mathf.Max(soot, leaderSoot0); leaderSootNow = soot; }
+                g.Set(grimeMud * grow, grimeTint, grimeSnow * grow, v.dead ? 1f : soot);
+            }
+            foreach (var e in foes)
+            {
+                var g = e.GetComponent<Grime>(); if (g == null) continue; float max = e == ace ? aceHpMax : Mathf.Max(1f, e.spec.hp);
+                g.Set(grimeMud * (0.7f + 0.3f * grow), grimeTint, grimeSnow, e.dead ? 1f : 0.12f + Mathf.Clamp01(1f - e.hp / max) * 0.85f);
+            }
+            grimeMudNow = grimeMud * grow;
+        }
+        Color grimeTint; float grimeMud, grimeSnow, grimeMudNow, leaderSoot0, leaderSootNow;
 
         int flankTurn; float waitSaid, interceptNext; int aceHits, aceSideHits; bool coverSaid, attackSaid;
         static float Difficulty => PlayerPrefs.GetFloat("difficulty", 1f);   // 0.8 (eased after lost nights) to 1.2 (hardened after won ones)
@@ -2521,7 +2543,8 @@ namespace IronNight
                 Career.Add(leaderId, gain, Mathf.Max(0, kills - careerKills), !careerNight, dawn && !careerDawn, score);
                 careerXp = Mathf.Max(careerXp, xpNow); careerKills = kills; careerNight = true; if (dawn) careerDawn = true;
                 Career.AddCats(leaderId, nightTigers - careerCats); careerCats = Mathf.Max(careerCats, nightTigers);   // a white Tiger on the turret for each
-                if (leaderLost || (dawn && Leader != null && Leader.hp <= Depot.LeaderHp * 0.5f)) Garage.Damaged(leaderId);   // a hard night: the mechanics will be at her
+                bool hardNight = leaderLost || (dawn && Leader != null && Leader.hp <= Depot.LeaderHp * 0.5f); if (hardNight) Garage.Damaged(leaderId);   // a hard night: the mechanics will be at her
+                Wear.Record(leaderId, leaderLost ? 1f : leaderSootNow, grimeMudNow, theatre, weather == Weather.Rain, GameClock.UtcNow.AddMinutes(hardNight ? 4 : 30).Ticks);   // her marks back to the hangar
                 careerLine = "\n" + leaderName + " · +" + gain + " XP" + (Career.AnyUpgrade(leaderId) ? " · an upgrade is ready" : "");
                 int cxNow = Mathf.RoundToInt((score * (stand ? 0.05f : 0.1f) + (dawn ? 100 : 0)) * (premiumNight ? Depot.PremiumMul : 1f)), cGain = Mathf.Max(0, cxNow - crewXpBanked); Depot.AddCrewXp(cGain); crewXpBanked = Mathf.Max(crewXpBanked, cxNow);   // the crew's share, in the second currency
                 if (crewXpBanked > 0) careerLine += "\nCrew · +" + crewXpBanked + " XP to train with";
