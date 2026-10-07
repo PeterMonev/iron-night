@@ -618,9 +618,11 @@ namespace IronNight
                 string kind = k == 0 ? "track" : "fire"; int have = Kits.Count(kind), cost = Kits.Cost(kind); bool can = have < Kits.Max && Depot.Points >= cost;
                 float y = -(Depot.Upgrades.Count + 2 + k) * 250f;
                 var row = MakeImage(depotRows, "Row kit " + kind, new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 230), new Color(0.08f, 0.09f, 0.1f, 0.96f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);
-                var title = MakeText(row.transform, "Title", new Vector2(0f, 1f), new Vector2(30, -20), TextAnchor.UpperLeft, 44, new Color(0.93f, 0.91f, 0.86f)); title.text = k == 0 ? "Repair kit" : "Fire extinguisher"; title.rectTransform.sizeDelta = new Vector2(600, 60);
+                var kitPic = UiSprite("card_kit_" + kind); float kl = kitPic != null ? 200f : 30f;
+                if (kitPic != null) { var art = MakeImage(row.transform, "Art", new Vector2(0f, 1f), new Vector2(18f, -18f), new Vector2(150f, 150f), Color.white); art.sprite = kitPic; }
+                var title = MakeText(row.transform, "Title", new Vector2(0f, 1f), new Vector2(kl, -20), TextAnchor.UpperLeft, 44, new Color(0.93f, 0.91f, 0.86f)); title.text = k == 0 ? "Repair kit" : "Fire extinguisher"; title.rectTransform.sizeDelta = new Vector2(600, 60);
                 var count = MakeText(row.transform, "Have", new Vector2(1f, 1f), new Vector2(-30, -26), TextAnchor.UpperRight, 36, new Color(0.95f, 0.66f, 0.23f)); count.text = have + " / " + Kits.Max; count.rectTransform.sizeDelta = new Vector2(300, 60);
-                var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(30, -80), TextAnchor.UpperLeft, 28, new Color(0.66f, 0.64f, 0.59f)); desc.text = k == 0 ? "A thrown track back on in two seconds instead of ten." : "A fire out in a second and a half instead of burning on for twelve."; desc.rectTransform.sizeDelta = new Vector2(880, 80);
+                var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(kl, -80), TextAnchor.UpperLeft, 28, new Color(0.66f, 0.64f, 0.59f)); desc.text = k == 0 ? "A thrown track back on in two seconds instead of ten." : "A fire out in a second and a half instead of burning on for twelve."; desc.rectTransform.sizeDelta = new Vector2(910 - kl, 80);
                 var b = MakeButton(row.transform, have >= Kits.Max ? "Full" : $"Buy · {cost}", new Vector2(1f, 0f), new Vector2(-190, 50), new Vector2(340, 80), 32, () => { if (Kits.Buy(kind)) { Sfx.Pickup(); RefreshDepot(); } });
                 b.GetComponent<Image>().color = can ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : new Color(0.2f, 0.2f, 0.22f, 0.9f);
                 b.transform.Find("Label").GetComponent<Text>().color = can ? new Color(0.1f, 0.08f, 0.05f) : new Color(0.55f, 0.53f, 0.5f);
@@ -1367,7 +1369,7 @@ namespace IronNight
         /// <summary>The commander's button: his portrait, the cooldown draining down it, a glow while his order lasts.</summary>
         /// <summary>The AIR button: hidden until the planes are on station, filling while the next strike is readied,
         /// lit while it waits for a tap on the target.</summary>
-        GameObject fixBtn, kitBtn; Text fixLabel, kitLabel;
+        GameObject fixBtn, kitBtn; Text fixLabel, kitLabel; Image kitIcon;
         /// <summary>The repairs over the controls while there is something to fix: the kit (its label, null when there is
         /// none to use) and NOW for gold (null: nothing to fix).</summary>
         public void SetFix(string kit, string now)
@@ -1379,6 +1381,13 @@ namespace IronNight
                 kitBtn = FixButton(new Vector2(-160, 420), new Color(0.12f, 0.2f, 0.12f, 0.92f), () => OnFixKit?.Invoke(), out kitLabel);
             }
             Show(fixBtn, fixLabel, now); Show(kitBtn, kitLabel, now != null ? kit : null);
+            if (kit != null)
+            {
+                // the kit's picture on its button, the one for the job in hand
+                string pic = kit.StartsWith("EXTINGUISHER") ? "card_kit_fire" : "card_kit_track"; var sp = UiSprite(pic);
+                if (kitIcon == null && sp != null) { kitIcon = MakeImage(kitBtn.transform, "Icon", new Vector2(0f, 0.5f), new Vector2(8f, 0f), new Vector2(76f, 76f), Color.white); kitLabel.rectTransform.anchoredPosition = new Vector2(36f, 0f); }
+                if (kitIcon != null && sp != null) kitIcon.sprite = sp;
+            }
             void Show(GameObject b, Text l, string text)
             {
                 if (b.activeSelf != (text != null)) b.SetActive(text != null); if (text == null) return;
