@@ -15,7 +15,7 @@ namespace IronNight
         const int Breath = 0, ShiftR = 1, ShiftL = 2, LeanF = 3, LeanB = 4, TwistL = 5, TwistR = 6, HeadL = 7, HeadR = 8, HeadDown = 9;
         const int Look = 0, Ahead = 1, Talk = 2, Down = 3;   // what the head is doing
         SkinnedMeshRenderer skin; float seed, period, headAmp = 1f; Quaternion baseRot;
-        const float Amp = 2.4f;   // how far each idle shape goes: well past the modelled 100 for a livelier man
+        const float Amp = 1.15f;   // how far each idle shape goes: well past the modelled 100 for a livelier man
         public CrewIdle partner; public float partnerSide;   // the man to talk to, and which way to turn the head to him (+1 or -1)
         float shift, shiftTo, shiftV, shiftNext, head, headTo, headV, down, downTo, downV, twist, twistV, modeEnd; int mode = Ahead;
 
@@ -54,7 +54,7 @@ namespace IronNight
             float l = (Mathf.PerlinNoise(seed + 5.3f, t * 0.24f) - 0.5f) * 2.4f;
             skin.SetBlendShapeWeight(LeanF, Mathf.Max(0f, l) * 100f * Amp); skin.SetBlendShapeWeight(LeanB, Mathf.Max(0f, -l) * 100f * Amp);
             // the whole man turning a little on his feet now and then
-            transform.localRotation = baseRot * Quaternion.Euler(0f, Mathf.Sin((t + seed) * 0.23f) * 11f + (Mathf.PerlinNoise(seed + 2.2f, t * 0.12f) - 0.5f) * 22f, 0f);
+            transform.localRotation = baseRot * Quaternion.Euler(0f, Mathf.Sin((t + seed) * 0.23f) * 5f + (Mathf.PerlinNoise(seed + 2.2f, t * 0.12f) - 0.5f) * 10f, 0f);
             // the head: looks about, looks ahead, glances down, or turns to the partner and talks
             if (t > modeEnd)
             {

@@ -35,8 +35,9 @@ namespace IronNight
                 next += dir; if (Random.value < 0.45f) wait = Random.Range(2f, 6f);
                 return;
             }
-            var step = to.normalized * Mathf.Min(to.magnitude, Speed * dt); transform.localPosition += step;
-            var want = Quaternion.LookRotation(to.normalized, Vector3.up); transform.localRotation = Quaternion.RotateTowards(transform.localRotation, want, 220f * dt);
+            var step = to.normalized * Mathf.Min(to.magnitude, Speed * dt); var p = transform.localPosition + step;
+            p.y = Mathf.Abs(Mathf.Sin(cycle * Mathf.PI)) * 0.035f; transform.localPosition = p;   // up a little as the leg straightens under him
+            var want = Quaternion.LookRotation(to.normalized, Vector3.up) * Quaternion.Euler(0f, 0f, Mathf.Sin(cycle * Mathf.PI) * 2.2f); transform.localRotation = Quaternion.RotateTowards(transform.localRotation, want, 220f * dt);   // the shoulders rock from foot to foot
             cycle += Speed / (2f * gait.step) * dt; mf.sharedMesh = gait.Frame(cycle, out var m); mr.sharedMaterial = m;
         }
     }

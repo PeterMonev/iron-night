@@ -11,7 +11,7 @@ namespace IronNight
     /// </summary>
     public sealed class Gait
     {
-        const int Levels = 4;   // apart, a third closed, two thirds, passing
+        const int Levels = 8;   // from legs apart to passing, in eight steps: smooth enough to watch close up
         readonly Mesh[] a = new Mesh[Levels], b = new Mesh[Levels];
         public readonly Material matA, matB; public readonly float step;   // the metres one step covers
 
