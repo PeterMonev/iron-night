@@ -182,6 +182,12 @@ namespace IronNight
             hud.OnTheatre = t => theatre = t;
             hud.OnDailyChallenge = () => { PlayerPrefs.SetString("daily.launch", Daily.Today); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); };
             hud.OnWeekly = () => { PlayerPrefs.SetString("weekly.launch", "1"); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); };
+            hud.OnFixKit = () =>
+            {
+                var Lf = Leader; if (Lf == null || Lf.dead || phase != Phase.Play) return;
+                if (Lf.burning > Kits.FireSecs) { if (Kits.Use("fire")) { Lf.burning = Kits.FireSecs; hud.Toast("Extinguisher on it", 1.6f); Sfx.Click(); } }
+                else if (Lf.trackOut > Kits.TrackSecs) { if (Kits.Use("track")) { Lf.trackOut = Kits.TrackSecs; hud.Toast("Repair kit · the track goes back on", 1.6f); Sfx.Click(); } }
+            };
             hud.OnFix = () =>
             {
                 var Lf = Leader; if (Lf == null || Lf.dead || phase != Phase.Play) return;
@@ -361,7 +367,12 @@ namespace IronNight
             int crushed = infantry.Crush(platoon); if (crushed > 0) { InfantryKilled(crushed, L.transform.position); hud.Toast("Run down", 1.5f); }
 
             TickGrime(); TickFire(dt);
-            { var Lf = Leader; hud.SetFix(Lf == null || Lf.dead || phase != Phase.Play ? null : Lf.burning > 0.5f ? "PUT OUT THE FIRE · " + FixGold + " GOLD" : Lf.trackOut > 1f ? "FIX THE TRACK · " + FixGold + " GOLD" : null); }
+            {
+                // the leader burning or with a track off: a kit (when there is one and it is not on already) or gold, now
+                var Lf = Leader; bool fire = Lf != null && !Lf.dead && phase == Phase.Play && Lf.burning > 0.5f, track = !fire && Lf != null && !Lf.dead && phase == Phase.Play && Lf.trackOut > 1f;
+                string kind = fire ? "fire" : "track"; bool kitOn = fire ? Lf.burning <= Kits.FireSecs : Lf != null && Lf.trackOut <= Kits.TrackSecs;
+                hud.SetFix(Kits.Count(kind) > 0 && !kitOn ? (fire ? "EXTINGUISHER · " : "REPAIR KIT · ") + Kits.Count(kind) : null, fire || track ? "NOW · " + FixGold + " GOLD" : null);
+            }
             // ours: how fast each one moves, for the enemy to lead its shot
             foreach (var v in platoon) { var p = v.transform.position; v.vel = v.aiPrev == Vector3.zero || dt <= 0f ? Vector3.zero : (p - v.aiPrev) / dt; v.vel.y = 0f; v.aiPrev = p; }
             // enemies: pick one of ours, come round his side, keep moving in range, lead the shot

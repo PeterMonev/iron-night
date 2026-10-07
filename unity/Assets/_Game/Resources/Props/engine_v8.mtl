@@ -1,0 +1,3 @@
+newmtl engine_v8
+Kd 1 1 1
+map_Kd engine_v8_tex.png

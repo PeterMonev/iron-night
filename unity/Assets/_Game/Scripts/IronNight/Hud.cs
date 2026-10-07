@@ -130,7 +130,7 @@ namespace IronNight
         public class Card { public string id, title, desc; public bool rare; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain, OnStart, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder, OnAir, OnPara, OnSupply, OnFix, OnDailyChallenge, OnStandReady; public System.Action<string> OnRoute, OnTheatre, OnStand, OnStandItem, OnConvoy, OnSneak; public System.Action<string, int> OnOperation; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[4]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], routePays = new Text[3], theatreLabels = new Text[4]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, airBtn, routeSheet, trainBtn; Text xpLine, depotXp; static readonly Color XpBlue = new Color(0.56f, 0.76f, 0.98f), XpDeep = new Color(0.22f, 0.43f, 0.74f, 0.96f); Text airLabel; Image airFill; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
+        public System.Action OnAd, OnAgain, OnStart, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder, OnAir, OnPara, OnSupply, OnFix, OnFixKit, OnDailyChallenge, OnStandReady; public System.Action<string> OnRoute, OnTheatre, OnStand, OnStandItem, OnConvoy, OnSneak; public System.Action<string, int> OnOperation; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[4]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], routePays = new Text[3], theatreLabels = new Text[4]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, airBtn, routeSheet, trainBtn; Text xpLine, depotXp; static readonly Color XpBlue = new Color(0.56f, 0.76f, 0.98f), XpDeep = new Color(0.22f, 0.43f, 0.74f, 0.96f); Text airLabel; Image airFill; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
 
         Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel, setQuality, setVibe, rankLine, pointsLine, ordersCount; GameObject settingsSheet, ordersSheet; RawImage titleBackdrop, depotBackdrop; GarageDrag depotDrag; readonly List<RectTransform> embers = new List<RectTransform>(); readonly List<float> emberPhase = new List<float>(); GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         public System.Action OnSuppliesAd; public bool SuppliesGranted; bool suppliesOffer; Text cardsEyebrow;
@@ -611,6 +611,20 @@ namespace IronNight
                 var b = MakeButton(row.transform, on ? "Veteran: on" : "Veteran: off", new Vector2(1f, 0f), new Vector2(-190, 50), new Vector2(340, 80), 32, () => { Depot.Veteran = !Depot.Veteran; RefreshDepot(); });
                 b.GetComponent<Image>().color = on ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : new Color(0.2f, 0.22f, 0.24f, 0.95f);
                 b.transform.Find("Label").GetComponent<Text>().color = on ? new Color(0.1f, 0.08f, 0.05f) : new Color(0.93f, 0.91f, 0.86f);
+            }
+            // the kits: repair kits and fire extinguishers, carried into the night
+            for (int k = 0; k < 2; k++)
+            {
+                string kind = k == 0 ? "track" : "fire"; int have = Kits.Count(kind), cost = Kits.Cost(kind); bool can = have < Kits.Max && Depot.Points >= cost;
+                float y = -(Depot.Upgrades.Count + 2 + k) * 250f;
+                var row = MakeImage(depotRows, "Row kit " + kind, new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 230), new Color(0.08f, 0.09f, 0.1f, 0.96f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);
+                var title = MakeText(row.transform, "Title", new Vector2(0f, 1f), new Vector2(30, -20), TextAnchor.UpperLeft, 44, new Color(0.93f, 0.91f, 0.86f)); title.text = k == 0 ? "Repair kit" : "Fire extinguisher"; title.rectTransform.sizeDelta = new Vector2(600, 60);
+                var count = MakeText(row.transform, "Have", new Vector2(1f, 1f), new Vector2(-30, -26), TextAnchor.UpperRight, 36, new Color(0.95f, 0.66f, 0.23f)); count.text = have + " / " + Kits.Max; count.rectTransform.sizeDelta = new Vector2(300, 60);
+                var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(30, -80), TextAnchor.UpperLeft, 28, new Color(0.66f, 0.64f, 0.59f)); desc.text = k == 0 ? "A thrown track back on in two seconds instead of ten." : "A fire out in a second and a half instead of burning on for twelve."; desc.rectTransform.sizeDelta = new Vector2(880, 80);
+                var b = MakeButton(row.transform, have >= Kits.Max ? "Full" : $"Buy · {cost}", new Vector2(1f, 0f), new Vector2(-190, 50), new Vector2(340, 80), 32, () => { if (Kits.Buy(kind)) { Sfx.Pickup(); RefreshDepot(); } });
+                b.GetComponent<Image>().color = can ? new Color(0.95f, 0.66f, 0.23f, 0.95f) : new Color(0.2f, 0.2f, 0.22f, 0.9f);
+                b.transform.Find("Label").GetComponent<Text>().color = can ? new Color(0.1f, 0.08f, 0.05f) : new Color(0.55f, 0.53f, 0.5f);
+                b.GetComponent<Button>().interactable = can;
             }
             FitDepotRows();
             // the leader's tank is chosen in the garage now
@@ -1353,21 +1367,29 @@ namespace IronNight
         /// <summary>The commander's button: his portrait, the cooldown draining down it, a glow while his order lasts.</summary>
         /// <summary>The AIR button: hidden until the planes are on station, filling while the next strike is readied,
         /// lit while it waits for a tap on the target.</summary>
-        GameObject fixBtn; Text fixLabel;
-        /// <summary>The bought repair over the controls: shown with its label while there is something to fix, gone with null.</summary>
-        public void SetFix(string label)
+        GameObject fixBtn, kitBtn; Text fixLabel, kitLabel;
+        /// <summary>The repairs over the controls while there is something to fix: the kit (its label, null when there is
+        /// none to use) and NOW for gold (null: nothing to fix).</summary>
+        public void SetFix(string kit, string now)
         {
             if (fixBtn == null)
             {
-                if (label == null || hudGroup == null) return;
-                fixBtn = MakeButton(hudGroup.transform, "", new Vector2(0.5f, 0f), new Vector2(0, 420), new Vector2(520, 92), 30, () => OnFix?.Invoke());
-                fixBtn.GetComponent<Image>().color = new Color(0.55f, 0.12f, 0.06f, 0.92f);
-                var fe = MakeImage(fixBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(520, 92), new Color(1f, 0.75f, 0.4f, 0.8f)); fe.sprite = Outline(); fe.type = Image.Type.Sliced; fe.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-                fixLabel = fixBtn.transform.Find("Label").GetComponent<Text>(); fixLabel.color = new Color(1f, 0.92f, 0.78f); fixLabel.font = LabelFont(); fixLabel.transform.SetAsLastSibling();
+                if (now == null || hudGroup == null) return;
+                fixBtn = FixButton(new Vector2(160, 420), new Color(0.55f, 0.12f, 0.06f, 0.92f), () => OnFix?.Invoke(), out fixLabel);
+                kitBtn = FixButton(new Vector2(-160, 420), new Color(0.12f, 0.2f, 0.12f, 0.92f), () => OnFixKit?.Invoke(), out kitLabel);
             }
-            if (fixBtn.activeSelf != (label != null)) fixBtn.SetActive(label != null);
-            if (label != null && fixLabel.text != label) fixLabel.text = label;
-            if (label != null) fixBtn.transform.localScale = Vector3.one * (1f + 0.04f * Mathf.Sin(Time.time * 6f));   // it pulses: something is wrong
+            Show(fixBtn, fixLabel, now); Show(kitBtn, kitLabel, now != null ? kit : null);
+            void Show(GameObject b, Text l, string text)
+            {
+                if (b.activeSelf != (text != null)) b.SetActive(text != null); if (text == null) return;
+                if (l.text != text) l.text = text; b.transform.localScale = Vector3.one * (1f + 0.04f * Mathf.Sin(Time.time * 6f));   // it pulses: something is wrong
+            }
+        }
+        GameObject FixButton(Vector2 at, Color colour, System.Action click, out Text label)
+        {
+            var b = MakeButton(hudGroup.transform, "", new Vector2(0.5f, 0f), at, new Vector2(300, 92), 26, click); b.GetComponent<Image>().color = colour;
+            var fe = MakeImage(b.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300, 92), new Color(1f, 0.75f, 0.4f, 0.8f)); fe.sprite = Outline(); fe.type = Image.Type.Sliced; fe.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            label = b.transform.Find("Label").GetComponent<Text>(); label.color = new Color(1f, 0.92f, 0.78f); label.font = LabelFont(); label.transform.SetAsLastSibling(); return b;
         }
 
         GameObject supplyBtn; Image supplyFill; Text supplyLabel;

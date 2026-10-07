@@ -141,7 +141,7 @@ namespace IronNight
         {
             var t = transform;
             // at the right, the Sherman's radial engine out on its stand under a work lamp, spare road wheels and track by it
-            Prop(t, "engine_radial", new Vector3(7.2f, 0f, 4.2f), -115f);
+            Prop(t, "engine_v8", new Vector3(7.2f, 0f, 4.2f), -115f);   // the Ford V8 of the later Shermans (the radial read as an aircraft engine)
             Prop(t, "wheels", new Vector3(9.9f, 0f, 5.9f), -49f);   // the stack, the leaning wheel and the track side by side to the camera
             WorkLamp(new Vector3(7.2f, 3.1f, 4.2f));
             // at the left under the hunt board, the workbench with a lamp of its own, and a diesel on its stand
