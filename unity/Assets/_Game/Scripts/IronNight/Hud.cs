@@ -645,6 +645,20 @@ namespace IronNight
                 b.transform.Find("Label").GetComponent<Text>().color = can ? new Color(0.1f, 0.08f, 0.05f) : new Color(0.55f, 0.53f, 0.5f);
                 b.GetComponent<Button>().interactable = can;
             }
+            // the quartermaster: a chocolate for the next night for an advert, three a day
+            {
+                string nat = Depot.Nation == "su" ? "su" : "us"; int left = Rations.AdsLeft;
+                float y = -(Depot.Upgrades.Count + 4 + Rations.Kinds.Length) * 250f;
+                var row = MakeImage(depotRows, "Row ration ad", new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 230), new Color(0.1f, 0.09f, 0.06f, 0.96f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);
+                var rp = UiSprite("card_ration_chocolate_" + nat); float rl = rp != null ? 200f : 30f;
+                if (rp != null) { var art = MakeImage(row.transform, "Art", new Vector2(0f, 1f), new Vector2(18f, -18f), new Vector2(150f, 150f), Color.white); art.sprite = rp; }
+                var title = MakeText(row.transform, "Title", new Vector2(0f, 1f), new Vector2(rl, -20), TextAnchor.UpperLeft, 40, new Color(1f, 0.85f, 0.5f)); title.text = "From the quartermaster"; title.rectTransform.sizeDelta = new Vector2(600, 60);
+                var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(rl, -80), TextAnchor.UpperLeft, 28, new Color(0.66f, 0.64f, 0.59f)); desc.text = "Watch an ad: " + Rations.Name("chocolate", nat).ToLowerInvariant() + " for the next night, +10% to the whole crew. " + left + " left today."; desc.rectTransform.sizeDelta = new Vector2(910 - rl, 80);
+                var b = MakeButton(row.transform, left > 0 ? "Watch an ad" : "Tomorrow", new Vector2(1f, 0f), new Vector2(-190, 50), new Vector2(340, 80), 32, () => { if (Rations.AdsLeft <= 0) return; Ads.Rewarded("ration", () => { Rations.FromAd(); Sfx.Pickup(); RefreshDepot(); }); });
+                b.GetComponent<Image>().color = left > 0 ? new Color(0.35f, 0.62f, 0.3f, 0.95f) : new Color(0.2f, 0.2f, 0.22f, 0.9f);
+                b.transform.Find("Label").GetComponent<Text>().color = left > 0 ? new Color(0.06f, 0.08f, 0.05f) : new Color(0.55f, 0.53f, 0.5f);
+                b.GetComponent<Button>().interactable = left > 0;
+            }
             FitDepotRows();
             // the leader's tank is chosen in the garage now
             if (false)

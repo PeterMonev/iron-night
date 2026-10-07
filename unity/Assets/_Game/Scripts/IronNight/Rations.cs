@@ -29,6 +29,16 @@ namespace IronNight
             if (ForGold(kind) ? !Depot.SpendGold(Cost(kind)) : !Depot.Spend(Cost(kind))) return false;
             PlayerPrefs.SetInt(Key(kind), Count(kind) + 1); PlayerPrefs.Save(); return true;
         }
+        public const int AdsPerDay = 3;
+        static string AdKey => "ration.ads." + GameClock.Now.ToString("yyyyMMdd");
+        /// <summary>Chocolates still to be had for an advert today.</summary>
+        public static int AdsLeft => Mathf.Max(0, AdsPerDay - PlayerPrefs.GetInt(AdKey, 0));
+        /// <summary>The advert watched: one chocolate more (past the five if need be), one fewer left today.</summary>
+        public static void FromAd()
+        {
+            PlayerPrefs.SetInt(AdKey, PlayerPrefs.GetInt(AdKey, 0) + 1); PlayerPrefs.SetInt(Key("chocolate"), Count("chocolate") + 1); PlayerPrefs.Save();
+        }
+
         /// <summary>The best ration carried, eaten now (one fewer); null when there is none.</summary>
         public static string Eat()
         {
