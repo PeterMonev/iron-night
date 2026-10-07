@@ -163,6 +163,7 @@ namespace IronNight
         readonly System.Collections.Generic.List<GameObject> crewFigures = new System.Collections.Generic.List<GameObject>(); string crewNation;
         /// <summary>The leader's crew standing on the hangar floor in front of the turntable, turned to the camera, when there
         /// are figures of them (Props/crew_us_gunner and the like, exported facing +Z).</summary>
+        static readonly string[] AtEase = { "map", "smoke", "rag", "mess" };   // what each seat is at in the hangar: gunner, loader, driver, radio
         /// <summary>The figures again after a change of crew: a woman taking a seat stands there herself.</summary>
         public void RefreshCrew() { var n = crewNation; crewNation = null; if (n != null) ShowCrew(n); }
 
@@ -182,13 +183,15 @@ namespace IronNight
             for (int i = 0; i < 4; i++)
             {
                 var man = Crew.Chosen(nation, Crew.Roles[i]); string id = "crew_" + man.id; var pf = Resources.Load<GameObject>("Props/" + id);   // the one in the seat, when there is a figure of her or him
-                if (pf == null) { id = "crew_" + nation + "_" + Crew.Roles[i]; pf = Resources.Load<GameObject>("Props/" + id); } if (pf == null) continue;
+                if (pf == null) { id = "crew_" + nation + "_" + Crew.Roles[i]; pf = Resources.Load<GameObject>("Props/" + id); }
+                { string ease = id.EndsWith("_4") ? id + "_idle" : "crew_" + nation + "_" + AtEase[i]; var ep = Resources.Load<GameObject>("Props/" + ease); if (ep != null) { id = ease; pf = ep; } }   // at ease, at something
+                if (pf == null) continue;
                 var go = Instantiate(pf, transform); go.name = id; go.transform.localPosition = at[i];
                 var look = eye - at[i]; look.y = 0f; go.transform.localRotation = Quaternion.LookRotation(look.normalized) * Quaternion.Euler(0f, turn[i], 0f);   // to the camera, a little toward the tank
                 var mat = new Material(Resources.Load<Material>("VehicleLit")); mat.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/" + id + "_tex")); mat.SetFloat("_Cull", 0f);
                 foreach (var r in go.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
                 idle[i] = CrewIdle.Bring(go, i + (nation == "su" ? 4 : 0), Crew.Roles[i] == "radio" ? 0.5f : 1f);   // at ease, not statues; the radio operators hold a handset to the ear
-                if (Crew.Roles[i] == "driver") { var rb = go.GetComponentInChildren<Renderer>().bounds; Cigarette.Smoke(go, rb.max.y - go.transform.position.y); }   // the driver having a smoke
+                if (id.EndsWith("_smoke") || id.EndsWith("loader_4_idle")) Cigarette.Smoke(go, 1.8f);   // whoever is having a smoke
                 crewFigures.Add(go);
             }
             for (int p = 0; p < 4; p += 2)   // the pairs: the left man looks to his left for the right one, who looks to his right
