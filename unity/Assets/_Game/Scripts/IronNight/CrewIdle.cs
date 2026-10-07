@@ -14,7 +14,8 @@ namespace IronNight
     {
         const int Breath = 0, ShiftR = 1, ShiftL = 2, LeanF = 3, LeanB = 4, TwistL = 5, TwistR = 6, HeadL = 7, HeadR = 8, HeadDown = 9;
         const int Look = 0, Ahead = 1, Talk = 2, Down = 3;   // what the head is doing
-        SkinnedMeshRenderer skin; float seed, period, headAmp = 1f;
+        SkinnedMeshRenderer skin; float seed, period, headAmp = 1f; Quaternion baseRot;
+        const float Amp = 1.7f;   // how far each idle shape goes: well past the modelled 100 for a livelier man
         public CrewIdle partner; public float partnerSide;   // the man to talk to, and which way to turn the head to him (+1 or -1)
         float shift, shiftTo, shiftV, shiftNext, head, headTo, headV, down, downTo, downV, twist, twistV, modeEnd; int mode = Ahead;
 
@@ -27,7 +28,7 @@ namespace IronNight
             var go = new GameObject("Idle"); go.transform.SetParent(mf.transform, false);
             var s = go.AddComponent<SkinnedMeshRenderer>(); s.sharedMesh = Shapes(mf.sharedMesh); s.sharedMaterial = mr.sharedMaterial; s.shadowCastingMode = mr.shadowCastingMode;
             var b = s.sharedMesh.bounds; b.Expand(0.4f); s.localBounds = b; mr.enabled = false;
-            var idle = figure.AddComponent<CrewIdle>(); idle.skin = s; idle.seed = seed * 13.7f + 3.1f; idle.headAmp = headAmp;
+            var idle = figure.AddComponent<CrewIdle>(); idle.skin = s; idle.seed = seed * 13.7f + 3.1f; idle.headAmp = headAmp; idle.baseRot = figure.transform.localRotation;
             idle.period = 3.4f + (seed % 4) * 0.4f; idle.shiftTo = seed % 2 == 0 ? 0.8f : -0.8f; idle.shiftNext = 2f + seed * 1.3f; idle.modeEnd = 0.8f + seed * 0.9f;
             return idle;
         }
@@ -46,29 +47,31 @@ namespace IronNight
             // breathing: about fifteen breaths a minute, each man his own
             skin.SetBlendShapeWeight(Breath, 50f + 50f * Mathf.Sin((t + seed) * 2f * Mathf.PI / period));
             // the weight on one leg, then the other: a new stance every five to ten seconds, and a restless drift on top
-            if (t > shiftNext) { shiftTo = (Random.value < 0.5f ? -1f : 1f) * Random.Range(0.55f, 1f); if (Random.value < 0.2f) shiftTo = 0f; shiftNext = t + Random.Range(5f, 10f); }
+            if (t > shiftNext) { shiftTo = (Random.value < 0.5f ? -1f : 1f) * Random.Range(0.55f, 1f); if (Random.value < 0.2f) shiftTo = 0f; shiftNext = t + Random.Range(3f, 6f); }
             shift = Mathf.SmoothDamp(shift, shiftTo, ref shiftV, 1.1f, Mathf.Infinity, dt);
             float s = Mathf.Clamp(shift + (Mathf.PerlinNoise(seed, t * 0.25f) - 0.5f) * 0.3f, -1f, 1f);
-            skin.SetBlendShapeWeight(ShiftR, Mathf.Max(0f, s) * 100f); skin.SetBlendShapeWeight(ShiftL, Mathf.Max(0f, -s) * 100f);
-            float l = (Mathf.PerlinNoise(seed + 5.3f, t * 0.13f) - 0.5f) * 2f;
-            skin.SetBlendShapeWeight(LeanF, Mathf.Max(0f, l) * 100f); skin.SetBlendShapeWeight(LeanB, Mathf.Max(0f, -l) * 100f);
+            skin.SetBlendShapeWeight(ShiftR, Mathf.Max(0f, s) * 100f * Amp); skin.SetBlendShapeWeight(ShiftL, Mathf.Max(0f, -s) * 100f * Amp);
+            float l = (Mathf.PerlinNoise(seed + 5.3f, t * 0.24f) - 0.5f) * 2.4f;
+            skin.SetBlendShapeWeight(LeanF, Mathf.Max(0f, l) * 100f * Amp); skin.SetBlendShapeWeight(LeanB, Mathf.Max(0f, -l) * 100f * Amp);
+            // the whole man turning a little on his feet now and then
+            transform.localRotation = baseRot * Quaternion.Euler(0f, Mathf.Sin((t + seed) * 0.19f) * 7f + (Mathf.PerlinNoise(seed + 2.2f, t * 0.09f) - 0.5f) * 14f, 0f);
             // the head: looks about, looks ahead, glances down, or turns to the partner and talks
             if (t > modeEnd)
             {
                 float r = Random.value;
-                if (partner != null && r < 0.3f) StartTalk(t + Random.Range(3.5f, 6.5f), true);
-                else if (r < 0.62f) { mode = Look; headTo = Random.Range(-0.75f, 0.75f); downTo = Random.value < 0.3f ? Random.Range(0.1f, 0.35f) : 0f; modeEnd = t + Random.Range(2f, 4.5f); }
-                else if (r < 0.9f) { mode = Ahead; headTo = Random.Range(-0.12f, 0.12f); downTo = 0f; modeEnd = t + Random.Range(2.5f, 5f); }
-                else { mode = Down; headTo = Random.Range(-0.3f, 0.3f); downTo = Random.Range(0.6f, 1f); modeEnd = t + Random.Range(1.5f, 3f); }
+                if (partner != null && r < 0.42f) StartTalk(t + Random.Range(3f, 5.5f), true);
+                else if (r < 0.75f) { mode = Look; headTo = Random.Range(-1f, 1f); downTo = Random.value < 0.3f ? Random.Range(0.1f, 0.4f) : 0f; modeEnd = t + Random.Range(1.2f, 2.8f); }
+                else if (r < 0.9f) { mode = Ahead; headTo = Random.Range(-0.15f, 0.15f); downTo = 0f; modeEnd = t + Random.Range(1.5f, 3f); }
+                else { mode = Down; headTo = Random.Range(-0.35f, 0.35f); downTo = Random.Range(0.6f, 1f); modeEnd = t + Random.Range(1.2f, 2.4f); }
             }
-            if (mode == Talk) downTo = 0.18f + 0.18f * Mathf.Sin((t + seed) * 2f * Mathf.PI * 0.6f);   // nodding along
+            if (mode == Talk) { downTo = 0.18f + 0.25f * Mathf.Sin((t + seed) * 2f * Mathf.PI * 0.8f); headTo = partnerSide * (0.8f + 0.25f * Mathf.Sin((t + seed) * 1.7f)); }   // nodding along, turning with what he says
             head = Mathf.SmoothDamp(head, headTo, ref headV, 0.32f, Mathf.Infinity, dt); down = Mathf.SmoothDamp(down, downTo, ref downV, 0.35f, Mathf.Infinity, dt);
             skin.SetBlendShapeWeight(HeadL, Mathf.Max(0f, head) * 100f * headAmp); skin.SetBlendShapeWeight(HeadR, Mathf.Max(0f, -head) * 100f * headAmp);
             skin.SetBlendShapeWeight(HeadDown, down * 100f * headAmp);
             // the waist goes a little way with the head, and drifts on its own
             float tw = Mathf.Clamp(head * 0.45f + (Mathf.PerlinNoise(seed + 9.1f, t * 0.1f) - 0.5f) * 0.5f, -1f, 1f);
             twist = Mathf.SmoothDamp(twist, tw, ref twistV, 0.6f, Mathf.Infinity, dt);
-            skin.SetBlendShapeWeight(TwistL, Mathf.Max(0f, twist) * 100f); skin.SetBlendShapeWeight(TwistR, Mathf.Max(0f, -twist) * 100f);
+            skin.SetBlendShapeWeight(TwistL, Mathf.Max(0f, twist) * 100f * Amp); skin.SetBlendShapeWeight(TwistR, Mathf.Max(0f, -twist) * 100f * Amp);
         }
 
         static float Ramp(float x, float a, float b) { float t = Mathf.Clamp01((x - a) / (b - a)); return t * t * (3f - 2f * t); }

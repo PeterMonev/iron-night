@@ -130,7 +130,7 @@ namespace IronNight
         public class Card { public string id, title, desc; public bool rare; }
 
         public System.Action<Formation> OnFormation;
-        public System.Action OnAd, OnAgain, OnStart, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder, OnAir, OnPara, OnSupply, OnDailyChallenge, OnStandReady; public System.Action<string> OnRoute, OnTheatre, OnStand, OnStandItem, OnConvoy, OnSneak; public System.Action<string, int> OnOperation; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[4]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], routePays = new Text[3], theatreLabels = new Text[4]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, airBtn, routeSheet, trainBtn; Text xpLine, depotXp; static readonly Color XpBlue = new Color(0.56f, 0.76f, 0.98f), XpDeep = new Color(0.22f, 0.43f, 0.74f, 0.96f); Text airLabel; Image airFill; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
+        public System.Action OnAd, OnAgain, OnStart, OnRestart, OnDepot, OnBack, OnReserveAd, OnPause, OnResume, OnSound, OnQuit, OnDaily, OnQuality, OnHold, OnAmmo, OnAbility, OnOrder, OnAir, OnPara, OnSupply, OnFix, OnDailyChallenge, OnStandReady; public System.Action<string> OnRoute, OnTheatre, OnStand, OnStandItem, OnConvoy, OnSneak; public System.Action<string, int> OnOperation; string sheetTheatre = "normandy"; readonly Image[] routePics = new Image[3], theatreTabs = new Image[4]; readonly Text[] routeNames = new Text[3], routeLines = new Text[3], routePays = new Text[3], theatreLabels = new Text[4]; GameObject holdBtn, ammoBtn, abilityBtn, orderBtn, airBtn, routeSheet, trainBtn; Text xpLine, depotXp; static readonly Color XpBlue = new Color(0.56f, 0.76f, 0.98f), XpDeep = new Color(0.22f, 0.43f, 0.74f, 0.96f); Text airLabel; Image airFill; Text orderLabel; System.Action routeGo; RectTransform pauseBtnRect; Text ammoLabel, ammoKind; Image abilityFill, abilityPic;
 
         Text clock, count, fps, tally, levelText, toast, endTitle, endEyebrow, adLabel, adNote, leaderHp, assaultLabel, conditions, qualityLabel, setQuality, setVibe, rankLine, pointsLine, ordersCount; GameObject settingsSheet, ordersSheet; RawImage titleBackdrop, depotBackdrop; GarageDrag depotDrag; readonly List<RectTransform> embers = new List<RectTransform>(); readonly List<float> emberPhase = new List<float>(); GameObject dailyBtn, helpSheet, medalsSheet, recordsSheet; Transform medalRows, recordRows;
         public System.Action OnSuppliesAd; public bool SuppliesGranted; bool suppliesOffer; Text cardsEyebrow;
@@ -1353,6 +1353,23 @@ namespace IronNight
         /// <summary>The commander's button: his portrait, the cooldown draining down it, a glow while his order lasts.</summary>
         /// <summary>The AIR button: hidden until the planes are on station, filling while the next strike is readied,
         /// lit while it waits for a tap on the target.</summary>
+        GameObject fixBtn; Text fixLabel;
+        /// <summary>The bought repair over the controls: shown with its label while there is something to fix, gone with null.</summary>
+        public void SetFix(string label)
+        {
+            if (fixBtn == null)
+            {
+                if (label == null || hudGroup == null) return;
+                fixBtn = MakeButton(hudGroup.transform, "", new Vector2(0.5f, 0f), new Vector2(0, 420), new Vector2(520, 92), 30, () => OnFix?.Invoke());
+                fixBtn.GetComponent<Image>().color = new Color(0.55f, 0.12f, 0.06f, 0.92f);
+                var fe = MakeImage(fixBtn.transform, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(520, 92), new Color(1f, 0.75f, 0.4f, 0.8f)); fe.sprite = Outline(); fe.type = Image.Type.Sliced; fe.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                fixLabel = fixBtn.transform.Find("Label").GetComponent<Text>(); fixLabel.color = new Color(1f, 0.92f, 0.78f); fixLabel.font = LabelFont(); fixLabel.transform.SetAsLastSibling();
+            }
+            if (fixBtn.activeSelf != (label != null)) fixBtn.SetActive(label != null);
+            if (label != null && fixLabel.text != label) fixLabel.text = label;
+            if (label != null) fixBtn.transform.localScale = Vector3.one * (1f + 0.04f * Mathf.Sin(Time.time * 6f));   // it pulses: something is wrong
+        }
+
         GameObject supplyBtn; Image supplyFill; Text supplyLabel;
         public void SetSupply(bool has, float charged, string label, bool armed)
         {

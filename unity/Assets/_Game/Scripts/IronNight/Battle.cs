@@ -182,6 +182,14 @@ namespace IronNight
             hud.OnTheatre = t => theatre = t;
             hud.OnDailyChallenge = () => { PlayerPrefs.SetString("daily.launch", Daily.Today); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); };
             hud.OnWeekly = () => { PlayerPrefs.SetString("weekly.launch", "1"); PlayerPrefs.Save(); StartCoroutine(Curtained(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex))); };
+            hud.OnFix = () =>
+            {
+                var Lf = Leader; if (Lf == null || Lf.dead || phase != Phase.Play) return;
+                if (!Depot.SpendGold(FixGold)) { hud.Toast("Not enough gold · " + FixGold + " needed", 2f); return; }
+                if (Lf.burning > 0f) { Lf.burning = 0f; hud.Toast("Fire out · -" + FixGold + " gold", 1.8f); }
+                else if (Lf.trackOut > 0f) { Lf.trackOut = 0f; hud.Toast("Track fixed · -" + FixGold + " gold", 1.8f); }
+                Sfx.Pickup();
+            };
             hud.OnSupply = () => { if (!supplyUp || supplyCool > 0f || phase != Phase.Play) return; supplyArmed = !supplyArmed; supplyArmedLeft = 8f; airArmed = false; paraArmed = false; hud.Toast(supplyArmed ? "Tap where the crate should land" : "Supply drop called off", 2f); Sfx.Click(); };
             hud.OnPara = () => { if (!paraUp || paraCool > 0f || phase != Phase.Play || paraSquad != null) return; paraArmed = !paraArmed; paraArmedLeft = 8f; airArmed = false; supplyArmed = false; hud.Toast(paraArmed ? "Tap the drop zone" : "Drop called off", 2f); Sfx.Click(); };
             hud.OnAir = () => { if (!airUp || airCool > 0f || phase != Phase.Play || strike != null) return; airArmed = !airArmed; airArmedLeft = 8f; paraArmed = false; supplyArmed = false; hud.Toast(airArmed ? "Tap the target" : "Air strike called off", 2f); Sfx.Click(); };
@@ -352,7 +360,8 @@ namespace IronNight
             int taken = infantry.TakePrisoners(L.transform.position, 6f); if (taken > 0) { score += 15 * taken; hud.Popup(L.transform.position + Vector3.up * 2f, "+" + 15 * taken + " · prisoners", new Color(0.9f, 0.85f, 0.6f)); Sfx.Pickup(); }
             int crushed = infantry.Crush(platoon); if (crushed > 0) { InfantryKilled(crushed, L.transform.position); hud.Toast("Run down", 1.5f); }
 
-            TickGrime();
+            TickGrime(); TickFire(dt);
+            { var Lf = Leader; hud.SetFix(Lf == null || Lf.dead || phase != Phase.Play ? null : Lf.burning > 0.5f ? "PUT OUT THE FIRE · " + FixGold + " GOLD" : Lf.trackOut > 1f ? "FIX THE TRACK · " + FixGold + " GOLD" : null); }
             // ours: how fast each one moves, for the enemy to lead its shot
             foreach (var v in platoon) { var p = v.transform.position; v.vel = v.aiPrev == Vector3.zero || dt <= 0f ? Vector3.zero : (p - v.aiPrev) / dt; v.vel.y = 0f; v.aiPrev = p; }
             // enemies: pick one of ours, come round his side, keep moving in range, lead the shot
@@ -629,6 +638,22 @@ namespace IronNight
             }
             grimeMudNow = grimeMud * grow;
         }
+        const int FixGold = 5;
+
+        /// <summary>Ours on fire: flames and smoke off the engine deck, the hull losing strength as it burns; out by itself
+        /// after its twelve seconds, or the end of her if it burns through.</summary>
+        void TickFire(float dt)
+        {
+            foreach (var v in platoon.ToArray())
+            {
+                if (v.dead || v.burning <= 0f) continue;
+                v.burning -= dt; v.hp -= 0.11f * dt;
+                if (Time.frameCount % 5 == 0) fx.Burn(v.transform.position - v.Forward * 1.6f + Vector3.up * 0.4f);
+                if (v.hp <= 0.05f) { v.hp = 0.05f; v.burning = 0f; Damage(v, 1f, v.transform.position); continue; }   // burnt through
+                if (v.burning <= 0f && v == Leader) hud.Toast("The fire is out", 1.6f);
+            }
+        }
+
         Color grimeTint; float grimeMud, grimeSnow, grimeMudNow, leaderSoot0, leaderSootNow;
 
         float aceGhostSeen, aceGhostNext;
@@ -815,6 +840,11 @@ namespace IronNight
 
         void Damage(Vehicle v, float dmg, Vector3 at)
         {
+            if (v.friendly && !v.dead && v.burning <= 0f && dmg >= 0.5f && !(v == Leader && leaderShield > 0f) && Random.value < (dmg >= 1.5f ? 0.2f : 0.1f))
+            {
+                // a hit that sets her burning
+                v.burning = 12f; hud.Toast(v == Leader ? "We're on fire! The extinguisher is on it" : "A wingman is on fire", 2.4f); if (v == Leader) shake = Mathf.Max(shake, 0.5f);
+            }
             if (v == ace) { aceHits++; var from = at - v.transform.position; from.y = 0f; if (from.sqrMagnitude > 0.01f && Vector3.Dot(from.normalized, v.Forward) < 0.4f) aceSideHits++; }   // side or rear: he will remember
             if (v.friendly && v == Leader && leaderShield > 0f) return;
             if (v == Leader && wetStowage && !savedTonight && v.hp - dmg <= 0f) { savedTonight = true; v.hp = 1f; leaderShield = 2.5f; hud.Flash(); shake = Mathf.Max(shake, 0.9f); hud.Toast("The wet racks held · the leader is alive on one", 3.2f); Sfx.Ricochet(v.transform.position); if (Random.value < 0.7f) Radio("hit"); return; }
