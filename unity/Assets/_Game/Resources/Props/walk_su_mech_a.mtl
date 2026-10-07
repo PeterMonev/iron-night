@@ -1,0 +1,3 @@
+newmtl walk_su_mech_a
+Kd 1 1 1
+map_Kd walk_su_mech_a_tex.png

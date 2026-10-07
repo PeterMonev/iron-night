@@ -1,0 +1,3 @@
+newmtl walk_us_crate_a
+Kd 1 1 1
+map_Kd walk_us_crate_a_tex.png
