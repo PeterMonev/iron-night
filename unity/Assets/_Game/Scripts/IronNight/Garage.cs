@@ -196,6 +196,9 @@ namespace IronNight
             }
             for (int p = 0; p < 4; p += 2)   // the pairs: the left man looks to his left for the right one, who looks to his right
                 if (idle[p] != null && idle[p + 1] != null) { idle[p].partner = idle[p + 1]; idle[p].partnerSide = -1f; idle[p + 1].partner = idle[p]; idle[p + 1].partnerSide = 1f; }
+            // two men going about the hangar behind and beside the tank: a mechanic with his toolbox, one with a crate of shells
+            var walkPath = new[] { new Vector3(-9f, 0f, 8f), new Vector3(0f, 0f, 9.5f), new Vector3(5f, 0f, 9f), new Vector3(10.5f, 0f, 9f), new Vector3(10f, 0f, 1f), new Vector3(5.2f, 0f, -0.5f) };
+            foreach (var (who, from) in new[] { ("mech", 0), ("crate", 4) }) { var w = HangarWalker.Make(transform, "walk_" + nation + "_" + who, walkPath, from); if (w != null) crewFigures.Add(w.gameObject); }
         }
 
         public void SetActive(bool on) { cam.enabled = on; gameObject.SetActive(on || titleOn); }
