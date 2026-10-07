@@ -271,7 +271,16 @@ namespace IronNight
             var L = Leader; if (L != null && camShot != CamShot.Orbit) leaderAt = L.transform.position;
             if (TickShot(L)) return;   // a shot of the camera's own (Cine): the opening, a killcam, the orbit behind the end sheet
             if (L == null) return;
-            var want = L.transform.position + new Vector3(0f, 52f, -42.5f);   // a little higher than before: more field in view, same 48-degree tilt
+            // the fight on the screen: back as far as it takes to see every enemy in reach, up to half as far again
+            float halfW = 67f * Mathf.Tan(Mathf.Atan(Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * cam.aspect)), need = 0f;
+            foreach (var e in foes)
+            {
+                if (e.dead || e.Unseen || e.post) continue; var d = e.transform.position - L.transform.position; d.y = 0f;
+                if (d.magnitude > Mathf.Max(e.Range, L.Range) * 1.15f) continue;
+                need = Mathf.Max(need, Mathf.Max(Mathf.Abs(d.x), Mathf.Abs(d.z) * 0.62f) + 5f);
+            }
+            float zoomTo = Mathf.Clamp(need / Mathf.Max(1f, halfW), 1f, 1.5f); camZoom = Mathf.Lerp(camZoom, zoomTo, 1f - Mathf.Exp(-Time.deltaTime * (zoomTo > camZoom ? 1.6f : 0.6f)));   // out quickly, back in slowly
+            var want = L.transform.position + new Vector3(0f, 52f, -42.5f) * camZoom;   // a little higher than before: more field in view, same 48-degree tilt
             cam.transform.position = snap ? want : Vector3.Lerp(cam.transform.position, want, 1f - Mathf.Exp(-Time.deltaTime * 4f));
             cam.transform.LookAt(cam.transform.position + new Vector3(0f, -44f, 40f));
             if (shake > 0f) { cam.transform.position += Random.insideUnitSphere * (shake * 0.5f); shake = Mathf.Max(0f, shake - Time.deltaTime * 3f); }
@@ -667,7 +676,7 @@ namespace IronNight
 
         Color grimeTint; float grimeMud, grimeSnow, grimeMudNow, leaderSoot0, leaderSootNow;
 
-        float aceGhostSeen, aceGhostNext;
+        float aceGhostSeen, aceGhostNext, camZoom = 1f;
         int flankTurn; float waitSaid, interceptNext; int aceHits, aceSideHits; bool coverSaid, attackSaid;
         static float Difficulty => PlayerPrefs.GetFloat("difficulty", 1f);   // 0.8 (eased after lost nights) to 1.2 (hardened after won ones)
 
