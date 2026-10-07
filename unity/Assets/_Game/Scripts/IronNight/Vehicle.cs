@@ -35,7 +35,7 @@ namespace IronNight
         public Vector3 GunDirection => new Vector3(Mathf.Sin(turretYaw), 0f, Mathf.Cos(turretYaw));
         public Vector3 MuzzlePosition => muzzle != null ? muzzle.position : transform.position + Vector3.up * 2f;
         public float Range => spec.range * rangeMul * RangeScale;
-        public const float RangeScale = 0.8f;   // every gun's reach, to keep the fight on the screen
+        public const float RangeScale = 0.65f;   // every gun's reach, to keep the fight on the screen
 
         public static Vehicle Create(VehicleSpec spec, bool friendly, Vector3 position, float yaw)
         {
