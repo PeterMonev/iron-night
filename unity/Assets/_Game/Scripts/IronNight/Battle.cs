@@ -660,6 +660,17 @@ namespace IronNight
         }
         const int FixGold = 5;
 
+        /// <summary>The best ration carried, eaten as the night begins: the crew's hands, turret, aim and speed better by
+        /// its share for the night; the hot meal also gives the leader one hit more.</summary>
+        void EatRation()
+        {
+            string kind = Rations.Eat(); if (kind == null) return; float b = Rations.Boost(kind);
+            reloadMul *= 1f - b; turretMul *= 1f + b;
+            if (kind != "coffee") { scatterMul *= 1f - b; speedMul *= 1f + b * 0.5f; }
+            if (kind == "meal" && Leader != null) Leader.hp += 1f;
+            hud.Toast("The crew had " + Rations.Name(kind, Depot.Nation == "su" ? "su" : "us").ToLowerInvariant() + " · +" + Mathf.RoundToInt(b * 100f) + "%", 3f);
+        }
+
         /// <summary>Ours on fire: flames and smoke off the engine deck, the hull losing strength as it burns; out by itself
         /// after its twelve seconds, or the end of her if it burns through.</summary>
         void TickFire(float dt)
@@ -2515,7 +2526,7 @@ namespace IronNight
             fx.MuzzleFlash(from, dir); Sfx.Faust(from);
         }
 
-        void StartNight() { hud.HideTitle(); if (testDrive) Depot.SpendTestDrive(); if (camoTrial) Depot.SpendCamoTrial(); if (!IntroShot()) Begin(); }   // the opening shot first (Cine), then the play
+        void StartNight() { EatRation(); hud.HideTitle(); if (testDrive) Depot.SpendTestDrive(); if (camoTrial) Depot.SpendCamoTrial(); if (!IntroShot()) Begin(); }   // the opening shot first (Cine), then the play
 
         /// <summary>A change of screen behind the black: down, swap, up.</summary>
         System.Collections.IEnumerator Curtained(System.Action swap)

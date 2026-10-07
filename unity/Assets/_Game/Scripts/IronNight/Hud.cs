@@ -628,6 +628,23 @@ namespace IronNight
                 b.transform.Find("Label").GetComponent<Text>().color = can ? new Color(0.1f, 0.08f, 0.05f) : new Color(0.55f, 0.53f, 0.5f);
                 b.GetComponent<Button>().interactable = can;
             }
+            // the rations: the best one carried is eaten as the night begins
+            for (int k = 0; k < Rations.Kinds.Length; k++)
+            {
+                string kind = Rations.Kinds[k], nat = Depot.Nation == "su" ? "su" : "us"; int have = Rations.Count(kind), cost = Rations.Cost(kind); bool gold = Rations.ForGold(kind);
+                bool can = have < Rations.Max && (gold ? Depot.Gold >= cost : Depot.Points >= cost);
+                float y = -(Depot.Upgrades.Count + 4 + k) * 250f;
+                var row = MakeImage(depotRows, "Row ration " + kind, new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(940, 230), new Color(0.08f, 0.09f, 0.1f, 0.96f)); row.rectTransform.pivot = new Vector2(0.5f, 1f);
+                var rp = UiSprite("card_ration_" + kind + "_" + nat); float rl = rp != null ? 200f : 30f;
+                if (rp != null) { var art = MakeImage(row.transform, "Art", new Vector2(0f, 1f), new Vector2(18f, -18f), new Vector2(150f, 150f), Color.white); art.sprite = rp; }
+                var title = MakeText(row.transform, "Title", new Vector2(0f, 1f), new Vector2(rl, -20), TextAnchor.UpperLeft, 40, new Color(0.93f, 0.91f, 0.86f)); title.text = Rations.Name(kind, nat); title.rectTransform.sizeDelta = new Vector2(560, 60);
+                var count = MakeText(row.transform, "Have", new Vector2(1f, 1f), new Vector2(-30, -26), TextAnchor.UpperRight, 36, new Color(0.95f, 0.66f, 0.23f)); count.text = have + " / " + Rations.Max; count.rectTransform.sizeDelta = new Vector2(200, 60);
+                var desc = MakeText(row.transform, "Desc", new Vector2(0f, 1f), new Vector2(rl, -80), TextAnchor.UpperLeft, 28, new Color(0.66f, 0.64f, 0.59f)); desc.text = Rations.Line(kind); desc.rectTransform.sizeDelta = new Vector2(910 - rl, 80);
+                var b = MakeButton(row.transform, have >= Rations.Max ? "Full" : gold ? $"Buy · {cost} gold" : $"Buy · {cost}", new Vector2(1f, 0f), new Vector2(-190, 50), new Vector2(340, 80), 32, () => { if (Rations.Buy(kind)) { Sfx.Pickup(); RefreshDepot(); } });
+                b.GetComponent<Image>().color = can ? (gold ? new Color(1f, 0.8f, 0.35f, 0.95f) : new Color(0.95f, 0.66f, 0.23f, 0.95f)) : new Color(0.2f, 0.2f, 0.22f, 0.9f);
+                b.transform.Find("Label").GetComponent<Text>().color = can ? new Color(0.1f, 0.08f, 0.05f) : new Color(0.55f, 0.53f, 0.5f);
+                b.GetComponent<Button>().interactable = can;
+            }
             FitDepotRows();
             // the leader's tank is chosen in the garage now
             if (false)
