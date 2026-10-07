@@ -163,7 +163,21 @@ namespace IronNight
         readonly System.Collections.Generic.List<GameObject> crewFigures = new System.Collections.Generic.List<GameObject>(); string crewNation;
         /// <summary>The leader's crew standing on the hangar floor in front of the turntable, turned to the camera, when there
         /// are figures of them (Props/crew_us_gunner and the like, exported facing +Z).</summary>
-        static readonly string[] AtEase = { "map", "smoke", "rag", "mess" };   // what each seat is at in the hangar: gunner, loader, driver, radio
+        static readonly string[] AtEase = { "map", "smoke", "rag", "mess" };
+        /// <summary>What each seat does when rigged: the gunner sits (on a crate), the loader smokes, the driver looks about, the radio operator drinks; all talk now and then.</summary>
+        static readonly string[][] Motions = { new[] { "sittingidle", "sittingtalking" }, new[] { "smoking", "breathingidle", "talking" }, new[] { "lookingaround", "breathingidle", "talking" }, new[] { "drinking", "talking", "breathingidle" } };
+
+        /// <summary>A crate under a sitting figure, its top at the seat's height, a little behind where his feet are.</summary>
+        void SeatCrate(Transform man)
+        {
+            var pf = Resources.Load<GameObject>("Props/crate"); if (pf == null) return;
+            var c = Instantiate(pf, transform); c.name = "SeatCrate";
+            var cm = new Material(Resources.Load<Material>("VehicleLit")); cm.SetTexture("_BaseMap", Resources.Load<Texture2D>("Props/crate_tex")); cm.SetFloat("_Cull", 0f);
+            foreach (var r in c.GetComponentsInChildren<Renderer>()) { r.sharedMaterial = cm; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; }
+            c.transform.position = man.position - man.forward * 0.12f; c.transform.rotation = man.rotation;
+            var b = c.GetComponentInChildren<Renderer>().bounds; float h = Mathf.Max(0.05f, b.max.y - c.transform.position.y);
+            c.transform.localScale *= 0.46f / h; crewFigures.Add(c);
+        }   // what each seat is at in the hangar: gunner, loader, driver, radio
         /// <summary>The figures again after a change of crew: a woman taking a seat stands there herself.</summary>
         public void RefreshCrew() { var n = crewNation; crewNation = null; if (n != null) ShowCrew(n); }
 
@@ -183,6 +197,18 @@ namespace IronNight
             for (int i = 0; i < 4; i++)
             {
                 var man = Crew.Chosen(nation, Crew.Roles[i]); string id = "crew_" + man.id; var pf = Resources.Load<GameObject>("Props/" + id);   // the one in the seat, when there is a figure of her or him
+                {
+                    // rigged in Mixamo: real motions instead of the statue
+                    string rig = man.id.EndsWith("_4") ? "rig_" + man.id : "rig_" + nation + "_" + Crew.Roles[i];
+                    var rc = RiggedCrew.Make(transform, rig, Motions[i]);
+                    if (rc != null)
+                    {
+                        var rgo = rc.gameObject; rgo.transform.localPosition = at[i];
+                        var rlook = eye - at[i]; rlook.y = 0f; rgo.transform.localRotation = Quaternion.LookRotation(rlook.normalized) * Quaternion.Euler(0f, turn[i], 0f);
+                        if (i == 0) SeatCrate(rgo.transform);   // the gunner sits on a crate
+                        crewFigures.Add(rgo); continue;
+                    }
+                }
                 if (pf == null) { id = "crew_" + nation + "_" + Crew.Roles[i]; pf = Resources.Load<GameObject>("Props/" + id); }
                 { string ease = id.EndsWith("_4") ? id + "_idle" : "crew_" + nation + "_" + AtEase[i]; var ep = Resources.Load<GameObject>("Props/" + ease); if (ep != null) { id = ease; pf = ep; } }   // at ease, at something
                 if (pf == null) continue;
@@ -198,7 +224,13 @@ namespace IronNight
                 if (idle[p] != null && idle[p + 1] != null) { idle[p].partner = idle[p + 1]; idle[p].partnerSide = -1f; idle[p + 1].partner = idle[p]; idle[p + 1].partnerSide = 1f; }
             // two men going about the hangar behind and beside the tank: a mechanic with his toolbox, one with a crate of shells
             var walkPath = new[] { new Vector3(-9f, 0f, 8f), new Vector3(0f, 0f, 9.5f), new Vector3(5f, 0f, 9f), new Vector3(10.5f, 0f, 9f), new Vector3(10f, 0f, 1f), new Vector3(5.2f, 0f, -0.5f) };
-            foreach (var (who, from) in new[] { ("mech", 0), ("crate", 4) }) { var w = HangarWalker.Make(transform, "walk_" + nation + "_" + who, walkPath, from); if (w != null) crewFigures.Add(w.gameObject); }
+            foreach (var (who, from) in new[] { ("mech", 0), ("crate", 4) })
+            {
+                // rigged men with real walks first (the driver as the mechanic, the loader carrying), the stride figures else
+                string rig = who == "mech" ? "rig_" + nation + "_driver" : "rig_" + nation + "_loader"; if (Resources.Load<GameObject>("Rigs/" + rig) == null) rig = "rig_" + nation + "_gunner";
+                var w = HangarWalker.MakeRigged(transform, rig, walkPath, from, who == "crate") ?? HangarWalker.Make(transform, "walk_" + nation + "_" + who, walkPath, from);
+                if (w != null) crewFigures.Add(w.gameObject);
+            }
         }
 
         public void SetActive(bool on) { cam.enabled = on; gameObject.SetActive(on || titleOn); }
